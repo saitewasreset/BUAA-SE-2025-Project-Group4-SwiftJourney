@@ -16,14 +16,27 @@ interface UserLoginRequest {
   password: string;
 }
 
+interface UserLoginInfo {
+  // 是否是第一次登录
+  isFirstLogin: boolean;
+}
+
 interface UserInfo {
+  username: string;
+  gender?: "male" | "female";
+  age?: number;
+  phone?: string;
+  email?: string;
+  // 当前用户是否设置了支付密码
+  havePaymentPasswordSet: boolean;
+}
+
+interface UserUpdateInfo {
   username: string;
   gender?: "male" | "female";
   age?: number;
   phone: string;
   email: string;
-  // 当前用户是否设置了支付密码
-  havePaymentPasswordSet: boolean;
 }
 
 interface PersonalInfo {

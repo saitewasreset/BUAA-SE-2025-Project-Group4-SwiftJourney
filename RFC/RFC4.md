@@ -1,6 +1,13 @@
 # Request For Comments 4: API 文档
 
-Version: 1 (2025-04-03 14:42:00)
+Version: 2 (2025-04-03 19:50:00)
+
+最近变更：
+
+- Version 2
+  - 用户登录：响应数据变为`UserLoginInfo`
+  - 获取个人资料：获取时`phone`、`email`可能为空
+  - 设置个人资料：请求数据变为`UserUpdateInfo`
 
 关于火车站点及货币的约定，见 RFC3。
 
@@ -114,7 +121,12 @@ interface UserLoginRequest {
 响应**数据**：
 
 ```typescript
-type ResponseData = null;
+type ResponseData = UserLoginInfo;
+
+interface UserLoginInfo {
+  // 是否是第一次登录
+  isFirstLogin: boolean;
+}
 ```
 
 设置 Cookie：
@@ -175,8 +187,8 @@ interface UserInfo {
   username: string;
   gender?: "male" | "female";
   age?: number;
-  phone: string;
-  email: string;
+  phone?: string;
+  email?: string;
   // 当前用户是否设置了支付密码
   havePaymentPasswordSet: boolean;
 }
@@ -190,6 +202,8 @@ interface UserInfo {
 
 `POST /api/user/user_info`
 
+注：设置资料时必须设置`phone`、`email`。
+
 需要 Cookie：
 
 - session_id
@@ -197,8 +211,14 @@ interface UserInfo {
 请求：
 
 ```typescript
-type Request = UserInfo;
-// UserInfo定义见“获取个人资料”
+type Request = UserUpdateInfo;
+interface UserUpdateInfo {
+  username: string;
+  gender?: "male" | "female";
+  age?: number;
+  phone: string;
+  email: string;
+}
 ```
 
 响应代码表：
