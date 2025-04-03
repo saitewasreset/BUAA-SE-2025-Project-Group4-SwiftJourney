@@ -8,7 +8,9 @@ Version: 2 (2025-04-03 20:44:00)
   - 用户登录：响应数据变为`UserLoginInfo`
   - 获取个人资料：获取时`phone`、`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
+  - 支付订单：更改API端点为`/api/transaction/pay/{transaction_id}`
   - 新增：运行模式
+  - 新增：生成测试订单
 
 关于火车站点及货币的约定，见 RFC3。
 
@@ -465,7 +467,7 @@ type ResponseData = null;
 
 ### 支付订单（US1.1.6 US1.3.2）
 
-`POST /api/transaction/{transaction_id}`
+`POST /api/transaction/pay/{transaction_id}`
 
 需要 Cookie：
 
@@ -505,6 +507,43 @@ interface PaymentConfirmation {
 
 ```typescript
 type ResponseData = null;
+```
+
+设置 Cookie：
+
+- 无
+
+### （Debug）生成测试订单（US1.1.3）
+
+`POST /api/transaction/generate`
+
+注意：本API仅在Debug模式下可用
+
+需要 Cookie：
+
+- session_id
+
+请求：
+
+```typescript
+type Request = TransactionGenerateRequest;
+
+interface TransactionGenerateRequest {
+  amount: number;
+}
+```
+
+响应代码表：
+
+| 代码  | 可能的响应消息                                                             | 含义                                          |
+| ----- | -------------------------------------------------------------------------- | --------------------------------------------- |
+| 200   | `For Super Earth!`                                                         | 请求已被成功执行，可访问响应数据              |
+
+响应**数据**：
+
+```typescript
+type ResponseData = TransactionInfo;
+// TransactionInfo定义见“交易信息查询”
 ```
 
 设置 Cookie：
