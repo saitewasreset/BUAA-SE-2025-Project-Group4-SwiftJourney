@@ -101,6 +101,10 @@ interface SeatTypeInfo {
   price: number;
 }
 
+interface TransactionGenerateRequest {
+  amount: number;
+}
+
 interface TrainScheduleInfo {
   depatureStation: string;
   // 离开“起始站”的日期时间
