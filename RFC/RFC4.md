@@ -6,6 +6,8 @@ Version: 1 (2025-04-03 14:42:00)
 
 API 请求/返回类型采用 TypeScript 表达，[参见](https://www.typescriptlang.org/docs/handbook/intro.html)。
 
+`./RFC/attachment/RFC4/typing.ts`中包含了下文中的所有类型定义，可直接在前端使用。
+
 对于所有 API，若无特别说明：
 
 - 对于`GET`请求，请求体为空
