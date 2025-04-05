@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-05 16:41:00)
+Version: 2 (2025-04-05 18:52:00)
 
 最近变更：
 
@@ -9,6 +9,7 @@ Version: 2 (2025-04-05 16:41:00)
   - 获取个人资料：获取时`phone`、`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
+  - 订单列表、订单详情：`OrderInfo`新增`orderTime`
   - 设置个人信息：修改请求内容
   - 新增：运行模式
   - 新增：生成测试订单
@@ -789,6 +790,8 @@ interface OrderInfo {
   transactionId: string;
   // 订单状态：详见RFC3 “关于订单状态的约定”
   status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
+  // 订单创建日期时间
+  orderTime: string;
   // 支付日期时间
   payTime?: string;
   // 订单金额
