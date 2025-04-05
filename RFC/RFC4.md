@@ -442,6 +442,7 @@ interface BalanceInfo {
 type ResponseData = TransactionInfo;
 
 interface TransactionInfo {
+  transactionId: string;
   amount: number;
   status: "unpaid" | "paid";
 }
