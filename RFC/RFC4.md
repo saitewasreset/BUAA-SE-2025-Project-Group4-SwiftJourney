@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-03 20:44:00)
+Version: 2 (2025-04-05 16:41:00)
 
 最近变更：
 
@@ -8,7 +8,8 @@ Version: 2 (2025-04-03 20:44:00)
   - 用户登录：响应数据变为`UserLoginInfo`
   - 获取个人资料：获取时`phone`、`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
-  - 支付订单：更改API端点为`/api/transaction/pay/{transaction_id}`
+  - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
+  - 设置个人信息：修改请求内容
   - 新增：运行模式
   - 新增：生成测试订单
 
@@ -73,9 +74,9 @@ API 请求/返回类型采用 TypeScript 表达，[参见](https://www.typescrip
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                     | 含义                                                                                                                                                         |
-| ---- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 200  | `For Super Earth!`                                                 | 请求已被成功执行，可访问响应数据                                                                                                                             |
+| 代码 | 可能的响应消息     | 含义                             |
+| ---- | ------------------ | -------------------------------- |
+| 200  | `For Super Earth!` | 请求已被成功执行，可访问响应数据 |
 
 响应**数据**：
 
@@ -307,9 +308,21 @@ interface PersonalInfo {
 请求：
 
 ```typescript
-type Request = PersonalInfo;
-// PersonalInfo定义见“获取个人信息”
+type Request = type Request = UpdatePersonalInfo;
+
+interface UpdatePersonalInfo {
+  // 姓名
+  name?: string;
+  // 身份证号
+  identityCardId: string;
+  // 偏好座位位置
+  preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+}
+
 ```
+
+若要新增/更新信息，至少设置`name`、`identityCardId`字段。
+若要删除信息，只设置`identityCardId`字段。
 
 响应代码表：
 
@@ -317,7 +330,8 @@ type Request = PersonalInfo;
 | ----- | -------------------------------------------------------------------- | -------------------------------- |
 | 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
 | 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
-| 13001 | `Invalid identity card id`                                           | 身份证号格式错误                 |
+| 13001 | `Identity card id format`                                            | 身份证号格式错误                 |
+| 13002 | `Invalid identity card id`                                           | 该身份证号对应的个人信息不存在，或没有权限设置                 |
 
 响应**数据**：
 
@@ -517,7 +531,7 @@ type ResponseData = null;
 
 `POST /api/transaction/generate`
 
-注意：本API仅在Debug模式下可用
+注意：本 API 仅在 Debug 模式下可用
 
 需要 Cookie：
 
@@ -535,9 +549,9 @@ interface TransactionGenerateRequest {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                             | 含义                                          |
-| ----- | -------------------------------------------------------------------------- | --------------------------------------------- |
-| 200   | `For Super Earth!`                                                         | 请求已被成功执行，可访问响应数据              |
+| 代码 | 可能的响应消息     | 含义                             |
+| ---- | ------------------ | -------------------------------- |
+| 200  | `For Super Earth!` | 请求已被成功执行，可访问响应数据 |
 
 响应**数据**：
 
@@ -774,14 +788,7 @@ interface OrderInfo {
   // 订单对应的交易的UUID
   transactionId: string;
   // 订单状态：详见RFC3 “关于订单状态的约定”
-  status:
-    | "Unpaid"
-    | "Paid"
-    | "Ongoing"
-    | "Active"
-    | "Completed"
-    | "Failed"
-    | "Canceled";
+  status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
   // 支付日期时间
   payTime?: string;
   // 订单金额
