@@ -5,17 +5,18 @@ interface APIResponse<T> {
 }
 
 interface UserRegisterRequest {
+  // 手机号
+  phone: string;
   username: string;
   // 明文密码
   password: string;
 }
 
 interface UserLoginRequest {
-  username: string;
+  phone: string;
   // 明文密码
   password: string;
 }
-
 interface UserLoginInfo {
   // 是否是第一次登录
   isFirstLogin: boolean;
@@ -48,6 +49,20 @@ interface PersonalInfo {
   identityCardId: string;
   // 偏好座位位置
   preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+
+  // 是否为默认个人资料，即，当前用户的身份
+  default: boolean;
+}
+
+interface UpdatePersonalInfo {
+  // 姓名
+  name?: string;
+  // 身份证号
+  identityCardId: string;
+  // 偏好座位位置
+  preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+  // 是否为默认个人资料，即，当前用户的身份
+  default?: boolean;
 }
 
 interface RechargeInfo {
@@ -86,10 +101,10 @@ interface TrainScheduleQuery {
 // 站点停靠信息
 interface StoppingStationInfo {
   stationName: string;
-  // 到达该站点的日期时间
-  arrivalTime: string;
-  // 离开该站点的日期时间
-  depatureTime: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  depatureTime?: string;
 }
 
 interface SeatTypeInfo {
@@ -181,6 +196,10 @@ interface OrderInfo {
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish";
+  // 订单是否能够取消
+  canCancel: boolean;
+  // 人类可读的不能取消订单的原因（若适用）
+  reason?: string;
 }
 
 interface TrainOrderInfo extends OrderInfo {
