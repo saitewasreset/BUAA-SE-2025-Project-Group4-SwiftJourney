@@ -7,12 +7,13 @@ Version: 2 (2025-04-05 19:09:00)
 - Version 2
   - 用户注册：使用手机号进行注册
   - 用户登录：使用手机号进行登录，响应数据变为`UserLoginInfo`
-  - 获取个人资料：获取时`phone`、`email`可能为空
+  - 获取个人资料：获取时`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
   - 订单列表、订单详情：`OrderInfo`新增`orderTime`、`canCancel`、`reason`
   - 获取个人信息：新增`default`属性
   - 设置个人信息：修改请求内容，新增`default`属性
+  - 车次查询：`StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
   - 新增：运行模式
   - 新增：生成测试订单
 
@@ -611,10 +612,10 @@ type ResponseData = TrainScheduleInfo[];
 // 站点停靠信息
 interface StoppingStationInfo {
   stationName: string;
-  // 到达该站点的日期时间
-  arrivalTime: string;
-  // 离开该站点的日期时间
-  depatureTime: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  depatureTime?: string;
 }
 
 interface SeatTypeInfo {
