@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-05 18:52:00)
+Version: 2 (2025-04-05 19:05:00)
 
 最近变更：
 
@@ -10,7 +10,8 @@ Version: 2 (2025-04-05 18:52:00)
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
   - 订单列表、订单详情：`OrderInfo`新增`orderTime`
-  - 设置个人信息：修改请求内容
+  - 获取个人信息：新增`default`属性
+  - 设置个人信息：修改请求内容，新增`default`属性
   - 新增：运行模式
   - 新增：生成测试订单
 
@@ -295,6 +296,8 @@ interface PersonalInfo {
   identityCardId: string;
   // 偏好座位位置
   preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+  // 是否为默认个人资料，即，当前用户的身份
+  default: boolean;
 }
 ```
 
@@ -318,11 +321,13 @@ interface UpdatePersonalInfo {
   identityCardId: string;
   // 偏好座位位置
   preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+  // 是否为默认个人资料，即，当前用户的身份
+  default?: boolean;
 }
 
 ```
 
-若要新增/更新信息，至少设置`name`、`identityCardId`字段。
+若要新增/更新信息，至少设置`name`、`identityCardId`、`default`字段。
 若要删除信息，只设置`identityCardId`字段。
 
 响应代码表：
