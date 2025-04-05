@@ -5,7 +5,8 @@ Version: 2 (2025-04-05 19:09:00)
 最近变更：
 
 - Version 2
-  - 用户登录：响应数据变为`UserLoginInfo`
+  - 用户注册：使用手机号进行注册
+  - 用户登录：使用手机号进行登录，响应数据变为`UserLoginInfo`
   - 获取个人资料：获取时`phone`、`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
@@ -102,6 +103,8 @@ type ResponseData = "debug" | "release";
 type Request = UserRegisterRequest;
 
 interface UserRegisterRequest {
+  // 手机号
+  phone: string;
   username: string;
   // 明文密码
   password: string;
@@ -110,10 +113,10 @@ interface UserRegisterRequest {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                   | 含义           |
-| ----- | -------------------------------- | -------------- |
-| 200   | `For Super Earth!`               | 注册成功       |
-| 15001 | `User {username} already exists` | 用户名已经存在 |
+| 代码  | 可能的响应消息                 | 含义                       |
+| ----- | ------------------------------ | -------------------------- |
+| 200   | `For Super Earth!`             | 注册成功                   |
+| 15001 | `Phone {phone} already exists` | 该手机号对应的用户已经存在 |
 
 响应**数据**：
 
@@ -135,7 +138,7 @@ type ResponseData = null;
 type Request = UserLoginRequest;
 
 interface UserLoginRequest {
-  username: string;
+  phone: string;
   // 明文密码
   password: string;
 }
@@ -143,10 +146,10 @@ interface UserLoginRequest {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                 | 含义             |
-| ----- | ------------------------------ | ---------------- |
-| 200   | `For Super Earth!`             | 登录成功         |
-| 15002 | `Invalid username or password` | 用户名或密码错误 |
+| 代码  | 可能的响应消息                     | 含义             |
+| ----- | ---------------------------------- | ---------------- |
+| 200   | `For Super Earth!`                 | 登录成功         |
+| 15002 | `Invalid phone number or password` | 用户名或密码错误 |
 
 响应**数据**：
 
@@ -217,7 +220,7 @@ interface UserInfo {
   username: string;
   gender?: "male" | "female";
   age?: number;
-  phone?: string;
+  phone: string;
   email?: string;
   // 当前用户是否设置了支付密码
   havePaymentPasswordSet: boolean;
@@ -232,7 +235,7 @@ interface UserInfo {
 
 `POST /api/user/user_info`
 
-注：设置资料时必须设置`phone`、`email`。
+注：设置资料时必须设置`email`。
 
 需要 Cookie：
 
@@ -246,7 +249,6 @@ interface UserUpdateInfo {
   username: string;
   gender?: "male" | "female";
   age?: number;
-  phone: string;
   email: string;
 }
 ```
@@ -332,12 +334,12 @@ interface UpdatePersonalInfo {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                       | 含义                             |
-| ----- | -------------------------------------------------------------------- | -------------------------------- |
-| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
-| 13001 | `Identity card id format`                                            | 身份证号格式错误                 |
-| 13002 | `Invalid identity card id`                                           | 该身份证号对应的个人信息不存在，或没有权限设置                 |
+| 代码  | 可能的响应消息                                                       | 含义                                           |
+| ----- | -------------------------------------------------------------------- | ---------------------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据               |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                                       |
+| 13001 | `Identity card id format`                                            | 身份证号格式错误                               |
+| 13002 | `Invalid identity card id`                                           | 该身份证号对应的个人信息不存在，或没有权限设置 |
 
 响应**数据**：
 
