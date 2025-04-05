@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-05 19:05:00)
+Version: 2 (2025-04-05 19:09:00)
 
 最近变更：
 
@@ -9,7 +9,7 @@ Version: 2 (2025-04-05 19:05:00)
   - 获取个人资料：获取时`phone`、`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
-  - 订单列表、订单详情：`OrderInfo`新增`orderTime`
+  - 订单列表、订单详情：`OrderInfo`新增`orderTime`、`canCancel`、`reason`
   - 获取个人信息：新增`default`属性
   - 设置个人信息：修改请求内容，新增`default`属性
   - 新增：运行模式
@@ -803,6 +803,10 @@ interface OrderInfo {
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish";
+  // 订单是否能够取消
+  canCancel: boolean;
+  // 人类可读的不能取消订单的原因（若适用）
+  reason?: string;
 }
 
 interface TrainOrderInfo extends OrderInfo {
