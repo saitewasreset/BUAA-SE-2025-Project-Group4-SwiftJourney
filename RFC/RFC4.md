@@ -154,7 +154,7 @@ interface UserLoginRequest {
 type ResponseData = UserLoginInfo;
 
 interface UserLoginInfo {
-  // 是否是第一次登录
+  // 是否是第一次登录，具体地，指的是用户是否已经设置个人资料
   isFirstLogin: boolean;
 }
 ```
