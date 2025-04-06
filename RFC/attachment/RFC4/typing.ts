@@ -203,6 +203,17 @@ interface OrderInfo {
   reason?: string;
 }
 
+interface SeatLocationInfo {
+  // 车厢号，例如：“03车 12A 二等座”中的“3”
+  carriage: number;
+  // 座位行数，例如：“03车 12A 二等座”中的“12”
+  row: number;
+  // 座位位置代码，例如：“03车 12A 二等座”中的“A”
+  location: string;
+  // 座位类型，例如：“03车 12A 二等座”中的“二等座”
+  type: string;
+}
+
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
@@ -210,8 +221,8 @@ interface TrainOrderInfo extends OrderInfo {
   depatureTime: string;
   // 乘车人姓名
   name: string;
-  // 人类可读的座位号，例如：“03车 12A 二等座”
-  seat: string;
+  // 人类可读的座位号
+  seat: SeatLocationInfo;
 }
 
 interface HotelOrderInfo extends OrderInfo {
