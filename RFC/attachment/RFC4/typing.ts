@@ -41,7 +41,7 @@ interface UserUpdateInfo {
 }
 
 interface PersonalInfo {
-  // 该用户身份的UUID
+  // 该用户身份的 UUID
   personalId: string;
   // 姓名
   name: string;
@@ -157,7 +157,7 @@ interface IndirectTrainScheduleInfo {
 }
 
 interface OrderPack {
-  // 原子操作，若为true，则`orderList`中任意订单失败将回滚已成功的订单
+  // 原子操作，若为 true，则`orderList`中任意订单失败将回滚已成功的订单
   atomic: boolean;
   orderList: TrainOrderRequest[];
 }
@@ -173,18 +173,18 @@ interface TrainOrderRequest {
   // 到达站
   arrivalStation: string;
 
-  // 乘车人Id（见`PersonalInfo`）
+  // 乘车人 Id（见`PersonalInfo`）
   personalId: string;
   // 座位类别，如：二等座
   seatType: string;
 }
 
 interface OrderInfo {
-  // 订单的UUID
+  // 订单的 UUID
   orderId: string;
-  // 订单对应的交易的UUID
+  // 订单对应的交易的 UUID
   transactionId: string;
-  // 订单状态：详见RFC3 “关于订单状态的约定”
+  // 订单状态：详见 RFC3“关于订单状态的约定”
   status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
   // 支付日期时间
   payTime?: string;
@@ -199,13 +199,13 @@ interface OrderInfo {
 }
 
 interface SeatLocationInfo {
-  // 车厢号，例如：“03车 12A 二等座”中的“3”
+  // 车厢号，例如：“03 车 12A 二等座”中的“3”
   carriage: number;
-  // 座位行数，例如：“03车 12A 二等座”中的“12”
+  // 座位行数，例如：“03 车 12A 二等座”中的“12”
   row: number;
-  // 座位位置代码，例如：“03车 12A 二等座”中的“A”
+  // 座位位置代码，例如：“03 车 12A 二等座”中的“A”
   location: string;
-  // 座位类型，例如：“03车 12A 二等座”中的“二等座”
+  // 座位类型，例如：“03 车 12A 二等座”中的“二等座”
   type: string;
 }
 
@@ -223,7 +223,7 @@ interface TrainOrderInfo extends OrderInfo {
 interface HotelOrderInfo extends OrderInfo {
   // 酒店名称
   hotelName: string;
-  // 酒店UUID
+  // 酒店 UUID
   hotelId: string;
   // 旅客姓名
   name: string;
@@ -264,7 +264,7 @@ interface TakeawayOrderInfo extends OrderInfo {
 }
 
 interface CancelOrderInfo {
-  // 订单的UUID
+  // 订单的 UUID
   orderId: string;
 }
 
@@ -282,7 +282,7 @@ interface HotelQuery {
 
 // 酒店的总体信息
 interface HotelGeneralInfo {
-  // 酒店UUID
+  // 酒店 UUID
   hotelId: string;
   // 酒店名称
   name: string;
@@ -311,7 +311,7 @@ interface HotelComment {
 
 // 酒店的总体信息
 interface HotelDetailInfo {
-  // 酒店UUID
+  // 酒店 UUID
   hotelId: string;
   // 酒店名称
   name: string;
@@ -333,7 +333,7 @@ interface HotelDetailInfo {
 }
 
 interface HotelOrderQuery {
-  // 欲查询酒店的UUID
+  // 欲查询酒店的 UUID
   hotelId: string;
   // 入住日期
   beginDate?: string;
@@ -352,7 +352,7 @@ interface HotelRoomDetailInfo {
 }
 
 interface HotelOrderRequest {
-  // 欲预订酒店的UUID
+  // 欲预订酒店的 UUID
   hotelId: string;
 
   // 人类可读的房间类型
@@ -363,7 +363,7 @@ interface HotelOrderRequest {
   // 离开日期
   endDate?: string;
 
-  // 旅客UUID（见`PersonalInfo`）
+  // 旅客 UUID（见`PersonalInfo`）
   personalId: string;
 }
 
@@ -375,7 +375,7 @@ interface HotelCommentQuota {
 }
 
 interface NewHotelComment {
-  // 欲评价酒店的UUID
+  // 欲评价酒店的 UUID
   hotelId: string;
   // 评分
   rating: number;
@@ -458,7 +458,6 @@ interface Takeaway {
   dishes: TakeawayDishInfo[];
 }
 
-
 interface FullTrainDishInfo {
   // 车次
   trainNumber: string;
@@ -489,7 +488,7 @@ interface FullTrainDishInfo {
 interface DishOrder {
   // 火车餐名称
   name: string;
-  // 用餐人UUID
+  // 用餐人 UUID
   personalId: string;
   // 份数
   amount: number;
@@ -504,7 +503,7 @@ interface TakeawayOrder {
   shopName: string;
   // 餐品名称
   name: string;
-  // 用餐人UUID
+  // 用餐人 UUID
   personalId: string;
   // 份数
   amount: number;
@@ -523,7 +522,7 @@ interface TrainDishOrderRequest {
 }
 
 interface Message<T> {
-  // 标识该消息的类型，即`T`，由于WebSocket在同一个端点中传递多种类型的消息，需要通过`type`确定收到的消息类型。
+  // 标识该消息的类型，即`T`，由于 WebSocket 在同一个端点中传递多种类型的消息，需要通过`type`确定收到的消息类型。
   type: string;
   data: T;
 }
@@ -537,7 +536,7 @@ interface Notify {
   type: "order" | "trip";
 }
 
-// OrderInfo定义详见“订单列表、订单详情”
+// OrderInfo 定义详见“订单列表、订单详情”
 interface OrderNotify extends Notify {
   order: OrderInfo;
 }
@@ -551,4 +550,10 @@ interface TripNotify extends Notify {
   depatureStation: string;
   // 到达站
   arrivalStation: string;
+}
+
+interface DishTakeawayInfo {
+  dishes: DishInfo[];
+  // 车站 -> Takeaway[]
+  takeaway: Map<string, Takeaway[]>;
 }
