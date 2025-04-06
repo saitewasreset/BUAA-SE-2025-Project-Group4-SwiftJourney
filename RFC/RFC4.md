@@ -15,7 +15,9 @@ Version: 2 (2025-04-06 11:40:00)
     - 拆分人类可读的座位信息为`SeatLocationInfo`
   - 获取个人信息：新增`default`属性
   - 设置个人信息：修改请求内容，新增`default`属性
-  - 车次查询：`StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
+  - 车次查询：
+    - `StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
+    - 支持按城市查询
   - 新增：运行模式
   - 新增：生成测试订单
 
@@ -592,12 +594,21 @@ type ResponseData = TransactionInfo;
 type Request = TrainScheduleQuery;
 
 interface TrainScheduleQuery {
-  depatureStation: string;
-  arrivalStation: string;
+  depatureStation?: string;
+  arrivalStation?: string;
+  depatureCity?: string;
+  arrivalCity?: string;
   // deparuteDate：YYYY-MM-DD
   deparuteDate: string;
 }
 ```
+
+支持按城市查询或者按车站查询。
+
+查询一致性要求：
+
+- `depatureStation`和`depatureCity`有且仅有一个存在
+- `arrivalStation`和`arrivalCity`有且仅有一个存在
 
 响应代码表：
 
@@ -606,6 +617,8 @@ interface TrainScheduleQuery {
 | 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
 | 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
 | 404  | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`depatureStation`或`depatureStation`不存在 |
+| 404  | `Sorry, but this was meant to be a private game: invalid city: {station}` | 查询的`depatureCity`或`arrivalCity`不存在 |
+| 12001  | `Inconsistent query` | 不满足上述查询一致性要求 |
 
 响应**数据**：
 
@@ -673,12 +686,21 @@ interface TrainScheduleInfo {
 type Request = TrainScheduleQuery;
 
 interface TrainScheduleQuery {
-  depatureStation: string;
-  arrivalStation: string;
+  depatureStation?: string;
+  arrivalStation?: string;
+  depatureCity?: string;
+  arrivalCity?: string;
   // deparuteDate：YYYY-MM-DD
   deparuteDate: string;
 }
 ```
+
+支持按城市查询或者按车站查询。
+
+查询一致性要求：
+
+- `depatureStation`和`depatureCity`有且仅有一个存在
+- `arrivalStation`和`arrivalCity`有且仅有一个存在
 
 响应代码表：
 
@@ -687,6 +709,8 @@ interface TrainScheduleQuery {
 | 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
 | 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
 | 404  | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`depatureStation`或`depatureStation`不存在 |
+| 404  | `Sorry, but this was meant to be a private game: invalid city: {station}` | 查询的`depatureCity`或`arrivalCity`不存在 |
+| 12001  | `Inconsistent query` | 不满足上述查询一致性要求 |
 
 响应**数据**：
 

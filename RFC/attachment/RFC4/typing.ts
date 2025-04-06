@@ -93,8 +93,10 @@ interface PaymentConfirmation {
 }
 
 interface TrainScheduleQuery {
-  depatureStation: string;
-  arrivalStation: string;
+  depatureStation?: string;
+  arrivalStation?: string;
+  depatureCity?: string;
+  arrivalCity?: string;
   // deparuteDate：YYYY-MM-DD
   deparuteDate: string;
 }
@@ -143,13 +145,6 @@ interface TrainScheduleInfo {
   route: StoppingStationInfo[];
   // 座位类型，如：二等座 -> SeatTypeInfo
   seatInfo: Map<string, SeatTypeInfo>;
-}
-
-interface TrainScheduleQuery {
-  depatureStation: string;
-  arrivalStation: string;
-  // deparuteDate：YYYY-MM-DD
-  deparuteDate: string;
 }
 
 interface IndirectTrainScheduleInfo {
