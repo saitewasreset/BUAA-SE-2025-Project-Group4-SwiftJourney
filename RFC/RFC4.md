@@ -13,8 +13,10 @@ Version: 2 (2025-04-06 11:40:00)
   - 订单列表、订单详情：
     - `OrderInfo`新增`orderTime`、`canCancel`、`reason`
     - 拆分人类可读的座位信息为`SeatLocationInfo`
+    - 新增`TakeawayOrderInfo`
   - 获取个人信息：新增`default`属性
   - 设置个人信息：修改请求内容，新增`default`属性
+  - 火车餐预订：新增外卖预订
   - 车次查询：
     - `StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
     - 支持按城市查询
@@ -832,7 +834,7 @@ interface OrderInfo {
   // 订单金额
   amount: number;
   // 订单类型
-  orderType: "train" | "hotel" | "dish";
+  orderType: "train" | "hotel" | "dish" | "takeaway";
   // 订单是否能够取消
   canCancel: boolean;
   // 人类可读的不能取消订单的原因（若适用）
@@ -887,6 +889,21 @@ interface DishOrderInfo extends OrderInfo {
   name: string;
   // 人类可读的餐品名称
   dishName: string;
+}
+
+interface TakeawayOrderInfo extends OrderInfo {
+  // 车次，例如：“G53”
+  trainNumber: string;
+  // 离开起始站日期时间
+  depatureTime: string;
+  // 车站
+  station: string;
+  // 店铺名称
+  shopName: string;
+  // 用餐人姓名
+  name: string;
+  // 人类可读的外卖餐品名称
+  takeawayName: string;
 }
 ```
 
@@ -1282,10 +1299,28 @@ interface DishInfo {
   availableTime: Array<"launch" | "dinner">;
   // 火车餐名称
   name: string;
+  // 火车餐类别，例如：主食、饮料、零食
+  type: string;
   // 火车餐图片，URL
   picture: string;
   // 价格
   price: number;
+}
+
+interface TakeawayDishInfo {
+  // 餐品名称
+  name: string;
+  // 餐品图片，URL
+  picture: string;
+  // 价格
+  price: number;
+}
+
+interface Takeaway {
+  // 店铺名称
+  shopName: string;
+
+  dishes: TakeawayDishInfo[];
 }
 
 interface TrainDishInfo {
@@ -1297,6 +1332,9 @@ interface TrainDishInfo {
   terminalArrivalTime: string;
 
   dishes: DishInfo[];
+
+  // 车站名称 -> 可点的外卖列表
+  takeaway: Map<string, Takeaway[]>;
 
   // 能否预订
   canBooking: boolean;
@@ -1345,17 +1383,6 @@ interface DishStationQuery {
 ```typescript
 type ResponseData = FullTrainDishInfo[];
 
-interface DishInfo {
-  // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
-  // 火车餐名称
-  name: string;
-  // 火车餐图片，URL
-  picture: string;
-  // 价格
-  price: number;
-}
-
 interface FullTrainDishInfo {
   // 车次
   trainNumber: string;
@@ -1374,6 +1401,8 @@ interface FullTrainDishInfo {
   terminalArrivalTime: string;
 
   dishes: DishInfo[];
+  // 车站名称 -> 可点的外卖列表
+  takeaway: Map<string, Takeaway[]>;
 
   // 能否预订
   canBooking: boolean;
@@ -1412,13 +1441,29 @@ interface DishOrder {
   dishTime: "launch" | "dinner";
 }
 
+interface TakeawayOrder {
+  // 车站名称
+  station: string;
+  // 店铺名称
+  shopName: string;
+  // 餐品名称
+  name: string;
+  // 用餐人UUID
+  personalId: string;
+  // 份数
+  amount: number;
+}
+
 interface TrainDishOrderRequest {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
   originDepatureTime: string;
 
+  // 要预订的火车餐列表
   dishes: DishOrder[];
+  // 要预订的外卖列表
+  takeaway: TakeawayOrder[];
 }
 ```
 
@@ -1432,6 +1477,9 @@ interface TrainDishOrderRequest {
 | 404   | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}` | 乘车人 Id 不存在，或未与当前用户绑定 |
 | 22001 | `Invalid dish name: {name}`                                                         | 火车餐不存在                         |
 | 22002 | `Invalid dish amount: {amount}`                                                     | 非法份数                             |
+| 22003 | `Invalid takeaway station: {station}`                                                     | 非法车站名称                             |
+| 22004 | `Invalid takeaway shop name: {shop_name}`                                                     | 非法店铺名称                             |
+| 22005 | `Invalid takeaway name: {name}`                                                     | 非法外卖名称                             |
 
 响应**数据**：
 
