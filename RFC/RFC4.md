@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-05 19:09:00)
+Version: 2 (2025-04-06 11:40:00)
 
 最近变更：
 
@@ -10,7 +10,9 @@ Version: 2 (2025-04-05 19:09:00)
   - 获取个人资料：获取时`email`可能为空
   - 设置个人资料：请求数据变为`UserUpdateInfo`
   - 支付订单：更改 API 端点为`/api/transaction/pay/{transaction_id}`
-  - 订单列表、订单详情：`OrderInfo`新增`orderTime`、`canCancel`、`reason`
+  - 订单列表、订单详情：
+    - `OrderInfo`新增`orderTime`、`canCancel`、`reason`
+    - 拆分人类可读的座位信息为`SeatLocationInfo`
   - 获取个人信息：新增`default`属性
   - 设置个人信息：修改请求内容，新增`default`属性
   - 车次查询：`StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
@@ -813,6 +815,17 @@ interface OrderInfo {
   reason?: string;
 }
 
+interface SeatLocationInfo {
+  // 车厢号，例如：“03车 12A 二等座”中的“3”
+  carriage: number;
+  // 座位行数，例如：“03车 12A 二等座”中的“12”
+  row: number;
+  // 座位位置代码，例如：“03车 12A 二等座”中的“A”
+  location: string;
+  // 座位类型，例如：“03车 12A 二等座”中的“二等座”
+  type: string;
+}
+
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
@@ -820,8 +833,8 @@ interface TrainOrderInfo extends OrderInfo {
   depatureTime: string;
   // 乘车人姓名
   name: string;
-  // 人类可读的座位号，例如：“03车 12A 二等座”
-  seat: string;
+  // 人类可读的座位号
+  seat: SeatLocationInfo;
 }
 
 interface HotelOrderInfo extends OrderInfo {
