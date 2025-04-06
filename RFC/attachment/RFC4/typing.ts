@@ -191,7 +191,7 @@ interface OrderInfo {
   // 订单金额
   amount: number;
   // 订单类型
-  orderType: "train" | "hotel" | "dish";
+  orderType: "train" | "hotel" | "dish" | "takeaway";
   // 订单是否能够取消
   canCancel: boolean;
   // 人类可读的不能取消订单的原因（若适用）
@@ -246,6 +246,21 @@ interface DishOrderInfo extends OrderInfo {
   name: string;
   // 人类可读的餐品名称
   dishName: string;
+}
+
+interface TakeawayOrderInfo extends OrderInfo {
+  // 车次，例如：“G53”
+  trainNumber: string;
+  // 离开起始站日期时间
+  depatureTime: string;
+  // 车站
+  station: string;
+  // 店铺名称
+  shopName: string;
+  // 用餐人姓名
+  name: string;
+  // 人类可读的外卖餐品名称
+  takeawayName: string;
 }
 
 interface CancelOrderInfo {
@@ -396,6 +411,9 @@ interface TrainDishInfo {
 
   dishes: DishInfo[];
 
+  // 车站名称 -> 可点的外卖列表
+  takeaway: Map<string, Takeaway[]>;
+
   // 能否预订
   canBooking: boolean;
   // 不能预订原因
@@ -416,11 +434,30 @@ interface DishInfo {
   availableTime: Array<"launch" | "dinner">;
   // 火车餐名称
   name: string;
+  // 火车餐类别，例如：主食、饮料、零食
+  type: string;
   // 火车餐图片，URL
   picture: string;
   // 价格
   price: number;
 }
+
+interface TakeawayDishInfo {
+  // 餐品名称
+  name: string;
+  // 餐品图片，URL
+  picture: string;
+  // 价格
+  price: number;
+}
+
+interface Takeaway {
+  // 店铺名称
+  shopName: string;
+
+  dishes: TakeawayDishInfo[];
+}
+
 
 interface FullTrainDishInfo {
   // 车次
@@ -440,6 +477,8 @@ interface FullTrainDishInfo {
   terminalArrivalTime: string;
 
   dishes: DishInfo[];
+  // 车站名称 -> 可点的外卖列表
+  takeaway: Map<string, Takeaway[]>;
 
   // 能否预订
   canBooking: boolean;
@@ -458,13 +497,29 @@ interface DishOrder {
   dishTime: "launch" | "dinner";
 }
 
+interface TakeawayOrder {
+  // 车站名称
+  station: string;
+  // 店铺名称
+  shopName: string;
+  // 餐品名称
+  name: string;
+  // 用餐人UUID
+  personalId: string;
+  // 份数
+  amount: number;
+}
+
 interface TrainDishOrderRequest {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
   originDepatureTime: string;
 
+  // 要预订的火车餐列表
   dishes: DishOrder[];
+  // 要预订的外卖列表
+  takeaway: TakeawayOrder[];
 }
 
 interface Message<T> {
