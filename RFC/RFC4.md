@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-06 11:40:00)
+Version: 2 (2025-04-06 18:16:00)
 
 最近变更：
 
@@ -21,6 +21,7 @@ Version: 2 (2025-04-06 11:40:00)
     - `StoppingStationInfo`明确了始发站、终到站的离开时间、到达时间处理
     - 支持按城市查询
   - 新增：运行模式
+  - 新增：城市车站信息
   - 新增：生成测试订单
 
 关于火车站点及货币的约定，见 RFC3。
@@ -92,6 +93,29 @@ API 请求/返回类型采用 TypeScript 表达，[参见](https://www.typescrip
 
 ```typescript
 type ResponseData = "debug" | "release";
+```
+
+### 城市车站信息
+
+`GET /api/general/city_stations`
+
+返回从城市到该城市车站列表的映射。
+
+需要 Cookie：
+
+- 无
+
+响应代码表：
+
+| 代码 | 可能的响应消息     | 含义                             |
+| ---- | ------------------ | -------------------------------- |
+| 200  | `For Super Earth!` | 请求已被成功执行，可访问响应数据 |
+
+响应**数据**：
+
+```typescript
+// 城市 -> 车站[]
+type ResponseData = Map<string, string[]>;
 ```
 
 ## 用户管理（FE1.3 FE1.5）
