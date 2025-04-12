@@ -10,6 +10,10 @@ interface UserRegisterRequest {
   username: string;
   // 明文密码
   password: string;
+  // 姓名
+  name: string;
+  // 身份证号
+  identityCardId: string;
 }
 
 interface UserLoginRequest {
@@ -17,19 +21,19 @@ interface UserLoginRequest {
   // 明文密码
   password: string;
 }
-interface UserLoginInfo {
-  // 是否是第一次登录
-  isFirstLogin: boolean;
-}
 
 interface UserInfo {
   username: string;
   gender?: "male" | "female";
   age?: number;
-  phone?: string;
+  phone: string;
   email?: string;
   // 当前用户是否设置了支付密码
   havePaymentPasswordSet: boolean;
+  // 姓名
+  name: string;
+  // 身份证号
+  identityCardId: string;
 }
 
 interface UserUpdateInfo {
