@@ -16,6 +16,8 @@ pub enum User {
     Age,
     Phone,
     Email,
+    Name,
+    IdentityCardId,
 }
 
 #[async_trait::async_trait]
@@ -40,6 +42,8 @@ impl MigrationTrait for Migration {
                     .col(integer(User::Age).check(Expr::col(User::Age).gte(0)))
                     .col(string(User::Phone).unique_key())
                     .col(string(User::Email))
+                    .col(string(User::Name).not_null())
+                    .col(string(User::IdentityCardId).not_null())
                     .to_owned(),
             )
             .await
