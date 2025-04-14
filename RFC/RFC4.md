@@ -1,9 +1,13 @@
 # Request For Comments 4: API 文档
 
-Version: 2 (2025-04-06 19:18:00)
+Version: 3 (2025-04-12 15:05:00)
 
 最近变更：
 
+- Version 3
+  - 用户注册：要求填写姓名以及身份证号
+  - 用户登录：移除判断是否是第一次登录功能，响应数据变为`null`
+  - 获取个人资料：返回值新增姓名和身份证号
 - Version 2
   - 用户注册：使用手机号进行注册
   - 用户登录：使用手机号进行登录，响应数据变为`UserLoginInfo`
@@ -139,6 +143,10 @@ interface UserRegisterRequest {
   username: string;
   // 明文密码
   password: string;
+  // 姓名
+  name: string;
+  // 身份证号
+  identityCardId: string;
 }
 ```
 
@@ -147,6 +155,7 @@ interface UserRegisterRequest {
 | 代码  | 可能的响应消息                 | 含义                       |
 | ----- | ------------------------------ | -------------------------- |
 | 200   | `For Super Earth!`             | 注册成功                   |
+| 13001 | `Identity card id format`      | 身份证号格式错误           |
 | 15001 | `Phone {phone} already exists` | 该手机号对应的用户已经存在 |
 
 响应**数据**：
@@ -185,12 +194,7 @@ interface UserLoginRequest {
 响应**数据**：
 
 ```typescript
-type ResponseData = UserLoginInfo;
-
-interface UserLoginInfo {
-  // 是否是第一次登录，具体地，指的是用户是否已经设置个人资料
-  isFirstLogin: boolean;
-}
+type ResponseData = null;
 ```
 
 设置 Cookie：
@@ -255,6 +259,10 @@ interface UserInfo {
   email?: string;
   // 当前用户是否设置了支付密码
   havePaymentPasswordSet: boolean;
+  // 姓名
+  name: string;
+  // 身份证号
+  identityCardId: string;
 }
 ```
 
