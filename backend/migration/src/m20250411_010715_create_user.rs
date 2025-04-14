@@ -38,10 +38,15 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(string(User::Gender))
-                    .col(integer(User::Age).check(Expr::col(User::Age).gte(0)))
+                    .col(ColumnDef::new(User::Gender).string().null())
+                    .col(
+                        ColumnDef::new(User::Age)
+                            .integer()
+                            .null()
+                            .check(Expr::col(User::Age).gte(0)),
+                    )
                     .col(string(User::Phone).unique_key())
-                    .col(string(User::Email))
+                    .col(ColumnDef::new(User::Email).string().null())
                     .col(string(User::Name).not_null())
                     .col(string(User::IdentityCardId).not_null())
                     .to_owned(),
