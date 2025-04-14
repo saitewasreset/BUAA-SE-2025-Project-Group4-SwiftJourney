@@ -15,11 +15,13 @@ pub struct Model {
     #[sea_orm(column_type = "VarBinary(StringLen::None)")]
     pub salt: Vec<u8>,
     pub wrong_payment_password_tried: i32,
-    pub gender: String,
-    pub age: i32,
+    pub gender: Option<String>,
+    pub age: Option<i32>,
     #[sea_orm(unique)]
     pub phone: String,
-    pub email: String,
+    pub email: Option<String>,
+    pub name: String,
+    pub identity_card_id: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
