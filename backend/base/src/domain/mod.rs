@@ -498,7 +498,12 @@ where
 
     async fn save(&self, aggregate: AG) -> Result<(), RepositoryError> {
         if aggregate.get_id().is_none() {
-            self.on_insert(aggregate.clone()).await
+            self.on_insert(aggregate.clone()).await?;
+
+            self.get_aggregate_manager()
+                .lock()
+                .unwrap()
+                .attach(aggregate);
         } else {
             let diff = self
                 .get_aggregate_manager()
@@ -506,10 +511,13 @@ where
                 .unwrap()
                 .detect_changes(aggregate.clone());
             if !diff.is_empty() {
-                self.on_update(diff).await
-            } else {
-                Ok(())
+                self.on_update(diff).await?;
+                self.get_aggregate_manager()
+                    .lock()
+                    .unwrap()
+                    .merge(aggregate);
             }
         }
+        Ok(())
     }
 }
