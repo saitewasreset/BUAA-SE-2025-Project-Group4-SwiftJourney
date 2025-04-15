@@ -2,7 +2,7 @@ use crate::domain::{Aggregate, AggregateManager, Identifier, MultiEntityDiff};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-struct DiffInfo<AG, ID>
+pub struct DiffInfo<AG, ID>
 where
     AG: Aggregate<ID>,
     ID: Identifier,
@@ -33,9 +33,23 @@ where
     ID: Identifier,
 {
     aggregate_map: HashMap<ID, AG>,
-    detect_changes_fn: fn(DiffInfo<AG, ID>) -> MultiEntityDiff,
+    detect_changes_fn: Box<dyn Fn(DiffInfo<AG, ID>) -> MultiEntityDiff + Sync + Send>,
 }
 
+impl<AG, ID> AggregateManagerImpl<AG, ID>
+where
+    AG: Aggregate<ID>,
+    ID: Identifier,
+{
+    pub fn new(
+        detect_changes_fn: Box<dyn Fn(DiffInfo<AG, ID>) -> MultiEntityDiff + Sync + Send>,
+    ) -> Self {
+        AggregateManagerImpl {
+            aggregate_map: HashMap::new(),
+            detect_changes_fn,
+        }
+    }
+}
 impl<AG, ID> AggregateManager<AG, ID> for AggregateManagerImpl<AG, ID>
 where
     AG: Aggregate<ID>,
