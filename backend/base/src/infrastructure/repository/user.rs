@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct UserRepositoryImpl {
     db: DatabaseConnection,
-    aggregate_manager: Arc<Mutex<AggregateManagerImpl<User, UserId>>>,
+    aggregate_manager: Arc<Mutex<AggregateManagerImpl<User>>>,
 }
 
 pub struct UserDataConverter;
@@ -123,7 +123,7 @@ impl UserDataConverter {
 
 impl UserRepositoryImpl {
     pub fn new(db: DatabaseConnection) -> Self {
-        let detect_changes_fn = |diff: DiffInfo<User, UserId>| {
+        let detect_changes_fn = |diff: DiffInfo<User>| {
             let mut result = MultiEntityDiff::new();
 
             let old = diff.old;
@@ -156,8 +156,8 @@ impl UserRepositoryImpl {
     }
 }
 
-impl DbRepositorySupport<User, UserId> for UserRepositoryImpl {
-    type Manager = AggregateManagerImpl<User, UserId>;
+impl DbRepositorySupport<User> for UserRepositoryImpl {
+    type Manager = AggregateManagerImpl<User>;
 
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>> {
         Arc::clone(&self.aggregate_manager)
@@ -193,7 +193,7 @@ impl DbRepositorySupport<User, UserId> for UserRepositoryImpl {
     }
 
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
-        for changes in diff.get_changes::<User, UserId>() {
+        for changes in diff.get_changes::<User>() {
             match changes.diff_type {
                 DiffType::Unchanged => {}
                 DiffType::Added => {

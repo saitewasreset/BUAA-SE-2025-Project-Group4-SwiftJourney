@@ -2,7 +2,6 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -17,28 +16,18 @@ pub mod service;
 // 详见：https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md
 // 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
 // 而Any特征只为'static的类型实现
-pub trait Identifier: Debug + 'static + Send + Clone + PartialEq + Eq + Hash {}
+pub trait Identifier: Debug + 'static + Send + Copy + Clone + PartialEq + Eq + Hash {}
 
-pub trait Identifiable<ID>
-where
-    ID: Identifier,
-{
-    fn get_id(&self) -> Option<ID>;
+pub trait Identifiable {
+    type ID: Identifier;
+    fn get_id(&self) -> Option<Self::ID>;
 }
 
 // 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
 // 而Any特征只为'static的类型实现
-pub trait Entity<ID>: Identifiable<ID> + 'static + Send + Clone
-where
-    ID: Identifier,
-{
-}
+pub trait Entity: Identifiable + 'static + Send + Clone {}
 
-pub trait Aggregate<ID>: Entity<ID>
-where
-    ID: Identifier,
-{
-}
+pub trait Aggregate: Entity {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiffType {
@@ -55,37 +44,31 @@ pub trait Diff {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TypedDiff<T, ID>
+pub struct TypedDiff<T>
 where
-    T: Entity<ID>,
-    ID: Identifier,
+    T: Entity,
 {
     pub diff_type: DiffType,
     pub old_value: Option<T>,
     pub new_value: Option<T>,
-
-    _for_super_earth: PhantomData<ID>,
 }
 
-impl<T, ID> TypedDiff<T, ID>
+impl<T> TypedDiff<T>
 where
-    T: Entity<ID>,
-    ID: Identifier,
+    T: Entity,
 {
     pub fn new(diff_type: DiffType, old: Option<T>, new: Option<T>) -> Self {
         TypedDiff {
             diff_type,
             old_value: old,
             new_value: new,
-            _for_super_earth: PhantomData,
         }
     }
 }
 
-impl<T, ID> Diff for TypedDiff<T, ID>
+impl<T> Diff for TypedDiff<T>
 where
-    T: Entity<ID>,
-    ID: Identifier,
+    T: Entity,
 {
     fn diff_type(&self) -> DiffType {
         self.diff_type
@@ -100,10 +83,9 @@ trait AnyDiff: Send {
     fn as_any(&self) -> &dyn Any;
 }
 
-impl<T, ID> AnyDiff for TypedDiff<T, ID>
+impl<T> AnyDiff for TypedDiff<T>
 where
-    T: Entity<ID>,
-    ID: Identifier,
+    T: Entity,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -122,27 +104,25 @@ impl MultiEntityDiff {
         }
     }
 
-    pub fn add_change<T, ID>(&mut self, diff: TypedDiff<T, ID>)
+    pub fn add_change<T>(&mut self, diff: TypedDiff<T>)
     where
-        T: Entity<ID>,
-        ID: Identifier,
+        T: Entity,
     {
         self.changes
-            .entry(TypeId::of::<TypedDiff<T, ID>>())
+            .entry(TypeId::of::<TypedDiff<T>>())
             .or_default()
             .push(Box::new(diff))
     }
 
-    pub fn get_changes<T, ID>(&self) -> Vec<TypedDiff<T, ID>>
+    pub fn get_changes<T>(&self) -> Vec<TypedDiff<T>>
     where
-        T: Entity<ID>,
-        ID: Identifier,
+        T: Entity,
     {
         self.changes
-            .get(&TypeId::of::<TypedDiff<T, ID>>())
+            .get(&TypeId::of::<TypedDiff<T>>())
             .map(|v| {
                 v.iter()
-                    .filter_map(|d| d.as_any().downcast_ref::<TypedDiff<T, ID>>())
+                    .filter_map(|d| d.as_any().downcast_ref::<TypedDiff<T>>())
                     .cloned()
                     .collect()
             })
@@ -154,10 +134,9 @@ impl MultiEntityDiff {
     }
 }
 
-pub trait AggregateManager<AG, ID>
+pub trait AggregateManager<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     fn attach(&mut self, aggregate: AG);
     fn detach(&mut self, aggregate: &AG);
@@ -174,30 +153,30 @@ pub enum RepositoryError {
     ValidationError(#[from] anyhow::Error),
 }
 
-pub trait Repository<AG, ID>
+pub trait Repository<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     fn attach(&self, aggregate: AG);
     fn detach(&self, aggregate: &AG);
 
-    fn find(&self, id: ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
+    fn find(&self, id: AG::ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
     fn remove(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
     fn save(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }
 
-pub trait DbRepositorySupport<AG, ID>
+pub trait DbRepositorySupport<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
-    type Manager: AggregateManager<AG, ID>;
+    type Manager: AggregateManager<AG>;
 
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>>;
     fn on_insert(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
-    fn on_select(&self, id: ID)
-    -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
+    fn on_select(
+        &self,
+        id: AG::ID,
+    ) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
     fn on_update(
         &self,
         diff: MultiEntityDiff,
@@ -205,11 +184,10 @@ where
     fn on_delete(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }
 
-impl<AG, ID, T> Repository<AG, ID> for T
+impl<AG, T> Repository<AG> for T
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
-    T: DbRepositorySupport<AG, ID> + Send + Sync,
+    AG: Aggregate,
+    T: DbRepositorySupport<AG> + Send + Sync,
 {
     fn attach(&self, aggregate: AG) {
         self.get_aggregate_manager()
@@ -225,7 +203,7 @@ where
             .detach(aggregate);
     }
 
-    async fn find(&self, id: ID) -> Result<Option<AG>, RepositoryError> {
+    async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError> {
         let entity = self.on_select(id).await?;
 
         if let Some(ref entity) = entity {
