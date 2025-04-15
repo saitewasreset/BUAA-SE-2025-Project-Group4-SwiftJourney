@@ -25,7 +25,7 @@ pub trait Identifiable {
 
 // 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
 // 而Any特征只为'static的类型实现
-pub trait Entity: Identifiable + 'static + Send + Clone {}
+pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 
 pub trait Aggregate: Entity {}
 
