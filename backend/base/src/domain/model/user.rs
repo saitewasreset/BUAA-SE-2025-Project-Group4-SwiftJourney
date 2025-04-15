@@ -171,7 +171,7 @@ pub enum PhoneError {
 /// use base::domain::model::user::{Phone, PhoneError};
 /// use std::convert::TryFrom;
 ///
-/// let result = Phone::try_from("12345678901".to_string());
+/// let result = Phone::try_from("15412345678".to_string());
 /// assert!(matches!(result, Err(PhoneError::InvalidPrefix(_))));
 /// ```
 impl TryFrom<String> for Phone {
@@ -547,6 +547,210 @@ impl UserInfo {
             phone,
             email,
             identity_card_id,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::{assert_err, assert_ok};
+    use std::convert::TryFrom;
+
+    #[test]
+    fn user_id_conversions() {
+        let id = 42u64;
+        let user_id = UserId::from(id);
+        assert_eq!(u64::from(user_id), id);
+    }
+
+    mod gender {
+        use super::*;
+        use claims::{assert_err_eq, assert_ok_eq};
+
+        #[test]
+        fn display() {
+            assert_eq!(Gender::Male.to_string(), "male");
+            assert_eq!(Gender::Female.to_string(), "female");
+        }
+
+        #[test]
+        fn try_from_valid_str() {
+            assert_ok_eq!(Gender::try_from("male"), Gender::Male);
+            assert_ok_eq!(Gender::try_from("female"), Gender::Female);
+        }
+
+        #[test]
+        fn try_from_invalid_str() {
+            let result = Gender::try_from("For Super Earth!");
+            assert!(matches!(result, Err(GenderError::InvalidGender(_))));
+        }
+    }
+
+    mod age {
+        use super::*;
+
+        #[test]
+        fn try_from_valid() {
+            assert_ok!(Age::try_from(0));
+            assert_ok!(Age::try_from(200));
+            assert_ok!(Age::try_from(25));
+        }
+
+        #[test]
+        fn try_from_negative() {
+            let result = Age::try_from(-1);
+            assert!(matches!(result, Err(AgeError::NegativeValue)));
+        }
+
+        #[test]
+        fn try_from_exceed() {
+            let result = Age::try_from(300);
+            assert!(matches!(result, Err(AgeError::ExceedsMaximum(300))));
+        }
+
+        #[test]
+        fn try_from_overflow() {
+            let result = Age::try_from(u8::MAX as i32 + 233);
+            assert!(matches!(result, Err(AgeError::ExceedsMaximum(_))));
+        }
+
+        #[test]
+        fn display() {
+            let age = Age::try_from(30).unwrap();
+            assert_eq!(age.to_string(), "30");
+        }
+    }
+
+    mod phone {
+        use super::*;
+
+        #[test]
+        fn valid_phone() {
+            let phone = Phone::try_from("13012345678".to_string());
+            assert_ok!(phone);
+        }
+
+        #[test]
+        fn invalid_length() {
+            let cases = vec!["1", "123456789", "123456789012"];
+            for case in cases {
+                let result = Phone::try_from(case.to_string());
+                assert!(matches!(result, Err(PhoneError::InvalidLength(_))));
+            }
+        }
+
+        #[test]
+        fn invalid_format() {
+            let cases = vec![
+                "12012345678", // 第二位不是3-9
+                "10012345678", // 第二位是0
+                "1a012345678", // 包含非数字
+            ];
+            for case in cases {
+                let result = Phone::try_from(case.to_string());
+                assert!(matches!(result, Err(PhoneError::InvalidFormat)));
+            }
+        }
+
+        #[test]
+        fn invalid_prefix() {
+            let result = Phone::try_from("15412345678".to_string());
+            assert!(matches!(result, Err(PhoneError::InvalidPrefix(_))));
+        }
+    }
+
+    mod identity_card {
+        use super::*;
+
+        #[test]
+        fn valid_id() {
+            let valid_ids = vec![
+                "110108197502157336", // 正确校验码
+                "110108200811088252", // 正确校验码
+            ];
+            for id in valid_ids {
+                assert_ok!(IdentityCardId::try_from(id.to_string()));
+            }
+        }
+
+        #[test]
+        fn invalid_length() {
+            let cases = vec!["12345", "1234567890123456789"];
+            for case in cases {
+                let result = IdentityCardId::try_from(case.to_string());
+                assert!(matches!(result, Err(IdentityCardError::InvalidLength(_))));
+            }
+        }
+
+        #[test]
+        fn invalid_format() {
+            let cases = vec![
+                "1101051949a231002X", // 前17位包含字母
+                "11010519491231002#", // 非法结尾字符
+            ];
+            for case in cases {
+                let result = IdentityCardId::try_from(case.to_string());
+
+                assert!(matches!(result, Err(IdentityCardError::InvalidFormat)))
+            }
+        }
+
+        #[test]
+        fn invalid_check_code() {
+            let case = "110105194912310020"; // 错误校验码
+            let result = IdentityCardId::try_from(case.to_string());
+            assert!(matches!(
+                result,
+                Err(IdentityCardError::InvalidCheckCode(_, _))
+            ))
+        }
+    }
+
+    mod password_attempts {
+        use super::*;
+
+        #[test]
+        fn new() {
+            let attempts = PasswordAttempts::new();
+            assert_eq!(u8::from(attempts), 0);
+        }
+
+        #[test]
+        fn increment() {
+            let mut attempts = PasswordAttempts::new();
+            for _ in 0..5 {
+                assert_ok!(attempts.increment());
+            }
+            assert_err!(attempts.increment());
+            assert!(matches!(
+                attempts.increment(),
+                Err(PasswordError::MaxAttemptsExceeded(5))
+            ))
+        }
+
+        #[test]
+        fn try_from_valid_u8() {
+            assert_ok!(PasswordAttempts::try_from(0));
+            assert_ok!(PasswordAttempts::try_from(5));
+        }
+
+        #[test]
+        fn try_from_invalid_u8() {
+            let result = PasswordAttempts::try_from(6);
+            assert!(matches!(
+                result,
+                Err(PasswordAttemptsError::ExceedMaxAttempts(6, 5))
+            ))
+        }
+
+        #[test]
+        fn try_from_negative_i32() {
+            let result = PasswordAttempts::try_from(-1);
+            assert!(matches!(
+                result,
+                Err(PasswordAttemptsError::NegativeValue(-1))
+            ))
         }
     }
 }
