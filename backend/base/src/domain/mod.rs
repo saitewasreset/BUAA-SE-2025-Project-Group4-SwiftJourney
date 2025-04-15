@@ -9,26 +9,159 @@ pub mod model;
 pub mod repository;
 pub mod service;
 
-// Identifier特征标识可用于作为实体ID的类型
-// Identifier必须是'static的
-// 注意，这并不是表述Identifier需要从程序开始执行到结束一直存在
-// 而表示我们可以持有一个Identifier任意长的时间
-// 详见：https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md
-// 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
-// 而Any特征只为'static的类型实现
+/// 标识符特征，用于表示可作为实体ID的类型
+///
+/// # 要求
+/// - 必须是`'static`的（但并不意味着需要在整个程序生命周期都存在）
+/// - 可发送到不同线程（`Send`）
+/// - 可复制（`Copy` + `Clone`）
+/// - 可比较相等性（`PartialEq` + `Eq`）
+/// - 可哈希（`Hash`）
+/// - 可调试打印（`Debug`）
+///
+/// # 关于'static的说明
+/// 这里的`'static`约束表示我们可以持有该标识符任意长的时间，
+/// 而并非要求它必须在整个程序运行期间都存在。
+/// 详见：[Common Rust Lifetime Misconceptions](https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md)
+///
+/// # Examples
+/// ```
+/// use base::domain::Identifier;
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// struct UserId(u64);
+///
+/// impl Identifier for UserId {}
+/// ```
 pub trait Identifier: Debug + 'static + Send + Copy + Clone + PartialEq + Eq + Hash {}
 
+/// 可标识特征，表示具有唯一标识符的类型
+///
+/// # 关联类型
+/// - `ID`: 实现`Identifier`特征的标识符类型
+///
+/// # 方法
+/// - `get_id`: 获取当前对象的标识符（可能为None）
+///
+/// # Examples
+/// ```
+/// use base::domain::model::user::UserId;
+/// use base::domain::Identifiable;
+///
+/// #[derive(Debug, Clone)]
+/// struct User {
+///     id: UserId,
+///     name: String,
+/// }
+///
+/// impl Identifiable for User {
+///     type ID = UserId;
+///     fn get_id(&self) -> Option<Self::ID> {
+///         Some(self.id)
+///     }
+/// }
+/// ```
 pub trait Identifiable {
     type ID: Identifier;
     fn get_id(&self) -> Option<Self::ID>;
 }
 
-// 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
-// 而Any特征只为'static的类型实现
+/// 实体特征，表示领域模型中的基本实体
+///
+/// # 要求
+/// - 必须是`'static`的（用于支持`Any`特征）
+/// - 可发送到不同线程（`Send`）
+/// - 可克隆（`Clone`）
+/// - 可调试打印（`Debug`）
+/// - 具有唯一标识符（`Identifiable`）
+///
+/// # 注意
+/// 在Repository实现中，我们通过Snapshot追踪实体状态变更，
+/// 这需要实体实现`Any`特征，而`Any`特征只为`'static`的类型实现。
+///
+/// # Examples
+/// ```
+/// # use base::domain::model::user::UserId;
+/// # use base::domain::{Identifiable, Entity};
+/// #[derive(Debug, Clone)]
+/// struct User {
+///     id: UserId,
+///     name: String,
+/// }
+///
+/// # impl Identifiable for User {
+/// #    type ID = UserId;
+/// #
+/// #    fn get_id(&self) -> Option<Self::ID> {
+/// #       todo!()
+/// #       }
+/// # }
+/// impl Entity for User {}
+/// ```
 pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 
+/// 聚合根特征，表示领域模型中的聚合根
+///
+/// 聚合根是实体的一种特殊形式，作为聚合的入口点，
+/// 负责维护聚合内的不变条件和一致性边界。
+///
+/// # 要求
+/// 继承所有`Entity`特征的约束
+///
+/// # Examples
+/// ```
+///
+/// use base::domain::{Aggregate, Entity, Identifiable, Identifier};
+///
+/// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// # pub struct OrderId(u64);
+/// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// # pub struct OrderItemId(u64);
+///
+/// # impl Identifier for OrderId {}
+/// # impl Identifier for OrderItemId {}
+///
+/// # #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// # pub struct OrderItem {
+/// #    item_id: OrderItemId,
+/// # }
+///
+/// # impl Identifiable for OrderItem {
+/// #    type ID = OrderItemId;
+/// #
+/// #    fn get_id(&self) -> Option<Self::ID> {
+/// #        todo!()
+/// #   }
+/// # }
+///
+///
+/// #[derive(Debug, Clone)]
+/// struct Order {
+///     id: OrderId,
+///     items: Vec<OrderItem>,
+/// }
+///
+/// # impl Identifiable for Order {
+/// #     type ID = OrderId;
+/// #
+/// #    fn get_id(&self) -> Option<Self::ID> {
+/// #       todo!()
+/// #   }
+/// # }
+///
+/// # impl Entity for OrderItem {}
+/// # impl Entity for Order {}
+///
+/// impl Aggregate for Order {}
+/// ```
 pub trait Aggregate: Entity {}
 
+/// 表示变更类型的枚举
+///
+/// # 变体
+/// - `Added`: 表示实体被添加
+/// - `Removed`: 表示实体被移除
+/// - `Modified`: 表示实体被修改
+/// - `Unchanged`: 表示实体未发生变化
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiffType {
     Added,
@@ -37,12 +170,28 @@ pub enum DiffType {
     Unchanged,
 }
 
+/// 定义变更检测的基本特征
+///
+/// # 方法
+/// - `diff_type`: 获取变更类型
+/// - `is_empty`: 检查变更是否为空（即是否为`Unchanged`状态）
 pub trait Diff {
     fn diff_type(&self) -> DiffType;
 
     fn is_empty(&self) -> bool;
 }
 
+/// 类型化的实体变更记录
+///
+/// 用于存储实体变更前后的状态，并记录变更类型
+///
+/// # 类型参数
+/// - `T`: 实现`Entity`特征的实体类型
+///
+/// # 字段
+/// - `diff_type`: 变更类型
+/// - `old_value`: 变更前的值（None表示新增）
+/// - `new_value`: 变更后的值（None表示删除）
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypedDiff<T>
 where
@@ -57,6 +206,12 @@ impl<T> TypedDiff<T>
 where
     T: Entity,
 {
+    /// 创建新的类型化变更记录
+    ///
+    /// # 参数
+    /// - `diff_type`: 变更类型
+    /// - `old`: 变更前的实体状态
+    /// - `new`: 变更后的实体状态
     pub fn new(diff_type: DiffType, old: Option<T>, new: Option<T>) -> Self {
         TypedDiff {
             diff_type,
@@ -79,7 +234,11 @@ where
     }
 }
 
+/// 任意类型变更的trait对象特征
+///
+/// 主要用于实现类型擦除，允许将不同类型变更存储在同一个集合中
 trait AnyDiff: Send {
+    /// 将自身转换为`Any` trait对象，以支持向下转型
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -92,18 +251,67 @@ where
     }
 }
 
+/// 多实体变更集合
+///
+/// 使用`TypeId`作为键存储不同类型的实体变更
+///
+/// # Examples
+/// ```
+/// # use base::domain::{MultiEntityDiff, TypedDiff, DiffType, Identifier, Identifiable, Entity};
+/// #
+/// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// # pub struct UserId(u64);
+/// #
+/// # impl Identifier for UserId {}
+/// #
+/// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// # pub struct User {
+/// #     user_id: UserId
+/// # }
+/// #
+/// # impl Identifiable for User {
+/// #     type ID = UserId;
+/// #
+/// #     fn get_id(&self) -> Option<Self::ID> {
+/// #        todo!()
+/// #    }
+/// # }
+/// #
+/// # impl User {
+/// #     pub fn new() -> Self {
+/// #         User {
+/// #             user_id: UserId(0),
+/// #         }
+/// #     }
+/// # }
+/// #
+/// # impl Entity for User {}
+/// #
+/// let user = User::new();
+/// let mut multi_diff = MultiEntityDiff::new();
+/// multi_diff.add_change(TypedDiff::new(DiffType::Added, None, Some(user)));
+/// let changes = multi_diff.get_changes::<User>();
+/// ```
 #[derive(Default)]
 pub struct MultiEntityDiff {
     changes: HashMap<TypeId, Vec<Box<dyn AnyDiff>>>,
 }
 
 impl MultiEntityDiff {
+    /// 创建新的多实体变更集合
     pub fn new() -> Self {
         MultiEntityDiff {
             changes: HashMap::new(),
         }
     }
 
+    /// 添加实体变更记录
+    ///
+    /// # 类型参数
+    /// - `T`: 实现`Entity`特征的实体类型
+    ///
+    /// # 参数
+    /// - `diff`: 类型化变更记录
     pub fn add_change<T>(&mut self, diff: TypedDiff<T>)
     where
         T: Entity,
@@ -114,6 +322,13 @@ impl MultiEntityDiff {
             .push(Box::new(diff))
     }
 
+    // 获取指定类型的实体变更记录
+    ///
+    /// # 类型参数
+    /// - `T`: 实现`Entity`特征的实体类型
+    ///
+    /// # 返回值
+    /// 返回该类型的所有变更记录的`Vec`
     pub fn get_changes<T>(&self) -> Vec<TypedDiff<T>>
     where
         T: Entity,
@@ -129,18 +344,35 @@ impl MultiEntityDiff {
             .unwrap_or_default()
     }
 
+    /// 检查变更集合是否为空
     pub fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 }
 
+/// 聚合根管理特征
+///
+/// 定义了对聚合根进行变更检测和状态管理的基本操作
+///
+/// # 类型参数
+/// - `AG`: 实现`Aggregate`特征的聚合根类型
 pub trait AggregateManager<AG>
 where
     AG: Aggregate,
 {
+    /// 附加聚合根到管理器
     fn attach(&mut self, aggregate: AG);
+    /// 从管理器分离聚合根
     fn detach(&mut self, aggregate: &AG);
+    /// 合并聚合根状态
     fn merge(&mut self, aggregate: AG);
+    /// 检测聚合根状态变更
+    ///
+    /// # 参数
+    /// - `aggregate`: 要检测的聚合根
+    ///
+    /// # 返回值
+    /// 返回包含所有变更的`MultiEntityDiff`
     fn detect_changes(&self, aggregate: AG) -> MultiEntityDiff;
 }
 
@@ -153,6 +385,17 @@ pub enum RepositoryError {
     ValidationError(#[from] anyhow::Error),
 }
 
+/// 仓储接口，定义了对聚合根(AG)的持久化操作
+///
+/// # 泛型参数
+/// - `AG`: 实现`Aggregate`特征的聚合根类型
+///
+/// # 方法
+/// - `attach`: 将聚合根附加到仓储聚合根管理器中
+/// - `detach`: 从仓储仓储聚合根管理器中分离聚合根
+/// - `find`: 根据ID查找聚合根
+/// - `remove`: 移除指定的聚合根
+/// - `save`: 保存聚合根（根据ID是否存在自动判断插入或更新）
 pub trait Repository<AG>
 where
     AG: Aggregate,
@@ -165,6 +408,21 @@ where
     fn save(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }
 
+/// 数据库仓储支持特性，提供与数据库交互的底层操作
+///
+/// # 泛型参数
+/// - `AG`: 实现`Aggregate`特征的聚合根类型
+///
+/// # 关联类型
+/// - `Manager`: 实现`AggregateManager<AG>`的聚合管理器类型
+///
+/// # 方法
+/// - `get_aggregate_manager`: 获取聚合管理器
+/// - `on_insert`: 执行插入操作时的回调
+/// - `on_select`: 执行查询操作时的回调
+/// - `on_update`: 执行更新操作时的回调
+/// - `on_delete`: 执行删除操作时的回调
+///
 pub trait DbRepositorySupport<AG>
 where
     AG: Aggregate,
@@ -184,6 +442,19 @@ where
     fn on_delete(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }
 
+/// 为实现了`DbRepositorySupport`的类型自动提供`Repository`的默认实现
+///
+/// 这个实现桥接了仓储接口与数据库具体操作，并提供了：
+/// - 变更追踪
+/// - 自动附加/分离聚合根
+/// - 根据状态自动选择插入或更新
+///
+/// # 泛型参数
+/// - `AG`: 实现`Aggregate`特征的聚合根类型
+/// - `T`: 实现`DbRepositorySupport<AG>`的类型
+///
+/// # Errors
+/// - 当数据库操作失败时返回`RepositoryError`
 impl<AG, T> Repository<AG> for T
 where
     AG: Aggregate,
