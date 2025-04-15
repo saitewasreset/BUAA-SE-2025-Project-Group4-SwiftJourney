@@ -1,48 +1,40 @@
-use crate::domain::{Aggregate, AggregateManager, Identifier, MultiEntityDiff};
+use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
-pub struct DiffInfo<AG, ID>
+pub struct DiffInfo<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     pub old: Option<AG>,
     pub new: Option<AG>,
-
-    _for_super_earth: PhantomData<ID>,
 }
 
-impl<AG, ID> DiffInfo<AG, ID>
+impl<AG> DiffInfo<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     pub fn new(old: Option<AG>, new: AG) -> Self {
         DiffInfo {
             old,
             new: Some(new),
-            _for_super_earth: PhantomData,
         }
     }
 }
 
-pub struct AggregateManagerImpl<AG, ID>
+pub struct AggregateManagerImpl<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
-    aggregate_map: HashMap<ID, AG>,
-    detect_changes_fn: Box<dyn Fn(DiffInfo<AG, ID>) -> MultiEntityDiff + Sync + Send>,
+    aggregate_map: HashMap<AG::ID, AG>,
+    detect_changes_fn: Box<dyn Fn(DiffInfo<AG>) -> MultiEntityDiff + Sync + Send>,
 }
 
-impl<AG, ID> AggregateManagerImpl<AG, ID>
+impl<AG> AggregateManagerImpl<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     pub fn new(
-        detect_changes_fn: Box<dyn Fn(DiffInfo<AG, ID>) -> MultiEntityDiff + Sync + Send>,
+        detect_changes_fn: Box<dyn Fn(DiffInfo<AG>) -> MultiEntityDiff + Sync + Send>,
     ) -> Self {
         AggregateManagerImpl {
             aggregate_map: HashMap::new(),
@@ -50,10 +42,9 @@ where
         }
     }
 }
-impl<AG, ID> AggregateManager<AG, ID> for AggregateManagerImpl<AG, ID>
+impl<AG> AggregateManager<AG> for AggregateManagerImpl<AG>
 where
-    AG: Aggregate<ID>,
-    ID: Identifier,
+    AG: Aggregate,
 {
     fn attach(&mut self, aggregate: AG) {
         if let Some(id) = aggregate.get_id() {

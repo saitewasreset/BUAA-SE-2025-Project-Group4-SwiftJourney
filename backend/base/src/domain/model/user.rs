@@ -512,15 +512,16 @@ impl User {
     }
 }
 
-impl Identifiable<UserId> for User {
+impl Identifiable for User {
+    type ID = UserId;
     fn get_id(&self) -> Option<UserId> {
         self.id
     }
 }
 
-impl Entity<UserId> for User {}
+impl Entity for User {}
 
-impl Aggregate<UserId> for User {}
+impl Aggregate for User {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserInfo {
     pub name: String,
@@ -566,7 +567,7 @@ mod tests {
 
     mod gender {
         use super::*;
-        use claims::{assert_err_eq, assert_ok_eq};
+        use claims::assert_ok_eq;
 
         #[test]
         fn display() {
