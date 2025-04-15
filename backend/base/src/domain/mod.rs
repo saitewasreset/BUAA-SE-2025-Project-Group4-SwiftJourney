@@ -1,5 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -9,13 +10,14 @@ pub mod model;
 pub mod repository;
 pub mod service;
 
+// Identifier特征标识可用于作为实体ID的类型
 // Identifier必须是'static的
 // 注意，这并不是表述Identifier需要从程序开始执行到结束一直存在
 // 而表示我们可以持有一个Identifier任意长的时间
 // 详见：https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md
 // 在Repository中，我们通过Snapshot来追踪实体状态变更，这需要实体实现Any特征
 // 而Any特征只为'static的类型实现
-pub trait Identifier: 'static + Send + Clone + PartialEq + Eq + Hash {}
+pub trait Identifier: Debug + 'static + Send + Clone + PartialEq + Eq + Hash {}
 
 pub trait Identifiable<ID>
 where
@@ -63,6 +65,21 @@ where
     pub new_value: Option<T>,
 
     _for_super_earth: PhantomData<ID>,
+}
+
+impl<T, ID> TypedDiff<T, ID>
+where
+    T: Entity<ID>,
+    ID: Identifier,
+{
+    pub fn new(diff_type: DiffType, old: Option<T>, new: Option<T>) -> Self {
+        TypedDiff {
+            diff_type,
+            old_value: old,
+            new_value: new,
+            _for_super_earth: PhantomData,
+        }
+    }
 }
 
 impl<T, ID> Diff for TypedDiff<T, ID>
