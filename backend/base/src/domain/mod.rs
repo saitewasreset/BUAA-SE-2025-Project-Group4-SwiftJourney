@@ -373,6 +373,9 @@ where
     ///
     /// # 返回值
     /// 返回包含所有变更的`MultiEntityDiff`
+    ///
+    /// # Notes
+    /// 该函数不更新聚合根中的快照，需要手动调用merge
     fn detect_changes(&self, aggregate: AG) -> MultiEntityDiff;
 }
 
