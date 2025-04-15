@@ -50,11 +50,24 @@ where
     ///
     /// # Examples
     /// ```rust
+    /// # use base::domain::MultiEntityDiff;
     /// # use std::collections::HashMap;
+    /// # use base::domain::{Aggregate, Entity, Identifiable, Identifier};
     /// # use base::domain::service::AggregateManagerImpl;
-    /// # type User = String;
-    /// # struct MultiEntityDiff;
-    /// # let changes_fn = Box::new(|_| MultiEntityDiff);
+    /// # #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    /// # struct User(UserId);
+    /// # #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    /// # struct UserId(i32);
+    /// # impl Identifier for UserId {}
+    /// # impl Identifiable for User {
+    ///     type ID = UserId;
+    ///     fn get_id(&self) -> Option<Self::ID> {
+    ///         Some(self.0)
+    ///     }
+    /// }
+    /// # impl Entity for User {}
+    /// # impl Aggregate for User {}
+    /// # let changes_fn = Box::new(|_| MultiEntityDiff::new());
     /// let manager = AggregateManagerImpl::<User>::new(changes_fn);
     /// ```
     pub fn new(
@@ -113,5 +126,259 @@ where
             .and_then(|id| self.aggregate_map.get(&id).cloned());
 
         (self.detect_changes_fn)(DiffInfo::new(old, aggregate))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{DiffType, Entity, Identifiable, Identifier, TypedDiff};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct User {
+        id: Option<u32>,
+        name: String,
+    }
+
+    impl Identifier for u32 {}
+
+    impl Identifiable for User {
+        type ID = u32;
+
+        fn get_id(&self) -> Option<Self::ID> {
+            self.id
+        }
+    }
+
+    impl Entity for User {}
+    impl Aggregate for User {}
+
+    impl Identifier for i32 {}
+
+    // 模拟差异检测函数
+    fn mock_diff(diff: DiffInfo<User>) -> MultiEntityDiff {
+        let mut result = MultiEntityDiff::new();
+
+        let old = diff.old;
+        let new = diff.new;
+
+        match (old.clone(), new.clone()) {
+            // 新增操作
+            (None, Some(new)) => {
+                result.add_change(TypedDiff::new(DiffType::Added, None, Some(new)));
+            }
+            // 更新操作
+            (Some(old), Some(new)) if old != new => {
+                result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+            }
+            // 删除操作
+            (Some(old), None) => {
+                result.add_change(TypedDiff::new(DiffType::Removed, Some(old), None));
+            }
+            // 未变化的情况
+            _ => {
+                result.add_change(TypedDiff::new(DiffType::Unchanged, old, new));
+            }
+        }
+
+        result
+    }
+
+    #[test]
+    fn test_basic_lifecycle() {
+        let mut manager = AggregateManagerImpl::new(Box::new(mock_diff));
+
+        // 测试新增
+        let user = User {
+            id: Some(1),
+            name: "Alice".into(),
+        };
+        let diff = manager.detect_changes(user.clone());
+        let changes = diff.get_changes::<User>();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].diff_type, DiffType::Added);
+        assert!(changes[0].old_value.is_none());
+        assert_eq!(changes[0].new_value, Some(user.clone()));
+
+        // 测试更新
+        manager.merge(user.clone());
+        let updated_user = User {
+            id: Some(1),
+            name: "Bob".into(),
+        };
+        let diff = manager.detect_changes(updated_user.clone());
+        let changes = diff.get_changes::<User>();
+        assert_eq!(changes[0].diff_type, DiffType::Modified);
+        assert_eq!(changes[0].old_value, Some(user));
+        assert_eq!(changes[0].new_value, Some(updated_user.clone()));
+
+        // 测试删除
+        let diff = (manager.detect_changes_fn)(DiffInfo {
+            old: Some(updated_user.clone()),
+            new: None,
+        });
+        let changes = diff.get_changes::<User>();
+        assert_eq!(changes[0].diff_type, DiffType::Removed);
+        assert_eq!(changes[0].old_value, Some(updated_user));
+        assert!(changes[0].new_value.is_none());
+    }
+
+    #[test]
+    fn test_unchanged_detection() {
+        let mut manager = AggregateManagerImpl::new(Box::new(mock_diff));
+
+        let user = User {
+            id: Some(1),
+            name: "Alice".into(),
+        };
+        manager.attach(user.clone());
+
+        // 检测未变化的实体
+        let diff = manager.detect_changes(user.clone());
+        let changes = diff.get_changes::<User>();
+        assert_eq!(changes[0].diff_type, DiffType::Unchanged);
+        assert_eq!(changes[0].old_value, Some(user.clone()));
+        assert_eq!(changes[0].new_value, Some(user));
+    }
+
+    #[test]
+    fn test_multi_entity_support() {
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        struct Order {
+            id: Option<i32>,
+            order_type: i32,
+            product: Vec<Product>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        struct Product {
+            id: Option<i32>,
+            sku: String,
+        }
+
+        impl Identifiable for Product {
+            type ID = i32;
+
+            fn get_id(&self) -> Option<Self::ID> {
+                self.id
+            }
+        }
+
+        impl Identifiable for Order {
+            type ID = i32;
+
+            fn get_id(&self) -> Option<Self::ID> {
+                self.id
+            }
+        }
+
+        impl Entity for Product {}
+        impl Aggregate for Product {}
+
+        impl Entity for Order {}
+        impl Aggregate for Order {}
+
+        // 创建支持多实体的检测函数
+        let multi_diff = Box::new(|diff: DiffInfo<Order>| {
+            let mut result = MultiEntityDiff::new();
+
+            let old = diff.old;
+            let new = diff.new;
+
+            match (old.clone(), new.clone()) {
+                // 新增操作
+                (None, Some(new)) => {
+                    result.add_change(TypedDiff::new(DiffType::Added, None, Some(new)));
+                }
+                // 更新操作
+                (Some(old), Some(new)) if old != new => {
+                    for product in &new.product {
+                        if let Some(old_product) = old.product.iter().find(|p| p.id == product.id) {
+                            if old_product != product {
+                                result.add_change(TypedDiff::new(
+                                    DiffType::Modified,
+                                    Some(old_product.clone()),
+                                    Some(product.clone()),
+                                ));
+                            }
+                        } else {
+                            result.add_change(TypedDiff::new(
+                                DiffType::Added,
+                                None,
+                                Some(product.clone()),
+                            ));
+                        }
+                    }
+
+                    result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+                }
+                // 删除操作
+                (Some(old), None) => {
+                    result.add_change(TypedDiff::new(DiffType::Removed, Some(old), None));
+                }
+                // 未变化的情况
+                _ => {
+                    result.add_change(TypedDiff::new(DiffType::Unchanged, old, new));
+                }
+            }
+
+            result
+        });
+
+        let mut manager = AggregateManagerImpl::new(multi_diff);
+
+        let product1 = Product {
+            id: Some(1),
+            sku: "SKU1".into(),
+        };
+
+        let product2 = Product {
+            id: Some(2),
+            sku: "SKU2".into(),
+        };
+
+        let mut order = Order {
+            id: Some(1),
+            order_type: 1,
+            product: vec![product1, product2],
+        };
+
+        manager.attach(order.clone());
+
+        order.order_type = 2;
+        order.product.first_mut().unwrap().sku = "SKU3".into();
+
+        let diff = manager.detect_changes(order);
+        assert_eq!(diff.get_changes::<Order>().len(), 1);
+        assert_eq!(diff.get_changes::<Product>().len(), 1);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        let mut manager = AggregateManagerImpl::new(Box::new(mock_diff));
+
+        // 测试无ID实体
+        let ghost_user = User {
+            id: None,
+            name: "Democracy Has Landed!".into(),
+        };
+        manager.attach(ghost_user.clone());
+        assert!(manager.aggregate_map.is_empty());
+
+        // 测试重复附加
+        let user = User {
+            id: Some(1),
+            name: "For Super Earth!".into(),
+        };
+        manager.attach(user.clone());
+        manager.attach(user.clone());
+        assert_eq!(manager.aggregate_map.len(), 1);
+
+        // 测试分离不存在的实体
+        manager.detach(&User {
+            id: Some(999),
+            name: "Not Today!".into(),
+        });
+        assert_eq!(manager.aggregate_map.len(), 1);
     }
 }
