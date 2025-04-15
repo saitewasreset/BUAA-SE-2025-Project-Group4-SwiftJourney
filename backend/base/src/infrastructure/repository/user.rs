@@ -1,9 +1,9 @@
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, User, UserId, UserInfo,
 };
-use crate::domain::service::AggregateManagerImpl;
+use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
-    DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
+    DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use argon2::password_hash::PasswordHashString;
@@ -118,6 +118,41 @@ impl UserDataConverter {
         );
 
         Ok(user)
+    }
+}
+
+impl UserRepositoryImpl {
+    pub fn new(db: DatabaseConnection) -> Self {
+        let detect_changes_fn = |diff: DiffInfo<User, UserId>| {
+            let mut result = MultiEntityDiff::new();
+
+            let old = diff.old;
+            let new = diff.new;
+
+            let diff_type = match (&old, &new) {
+                (None, None) => DiffType::Unchanged,
+                (None, Some(_)) => DiffType::Added,
+                (Some(_), None) => DiffType::Removed,
+                (Some(old_value), Some(new_value)) => {
+                    if old_value == new_value {
+                        DiffType::Unchanged
+                    } else {
+                        DiffType::Modified
+                    }
+                }
+            };
+
+            result.add_change(TypedDiff::new(diff_type, old, new));
+
+            result
+        };
+
+        UserRepositoryImpl {
+            db,
+            aggregate_manager: Arc::new(Mutex::new(AggregateManagerImpl::new(Box::new(
+                detect_changes_fn,
+            )))),
+        }
     }
 }
 
