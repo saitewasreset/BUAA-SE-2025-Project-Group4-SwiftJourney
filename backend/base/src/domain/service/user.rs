@@ -74,20 +74,6 @@ pub trait UserService {
     /// # Errors
     /// * `UserExists` - 手机号或身份证号已存在
     /// * `InfrastructureError` - 基础设施错误（如数据库访问失败）
-    ///
-    /// # Examples
-    /// ```rust,no_run
-    /// # use domain::service::user::UserService;
-    /// # async fn example(user_service: impl UserService) {
-    /// let result = user_service.register(
-    ///     "new_user".to_string(),
-    ///     "password123".to_string(),
-    ///     "张三".to_string(),
-    ///     Phone::try_from("13800138000").unwrap(),
-    ///     IdentityCardId::try_from("110101199003077635").unwrap()
-    /// ).await;
-    /// # }
-    /// ```
     fn register(
         &self,
         username: String,
