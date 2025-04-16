@@ -1,5 +1,5 @@
 <template>
-    <p> there is homepage. </p>
+    <p> there is TrainTacket. </p>
 </template>
 
 <script setup lang="ts">
