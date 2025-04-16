@@ -14,10 +14,10 @@
             </div>
             </el-menu-item>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
-            <el-menu-item index="1">首页</el-menu-item>
-            <el-menu-item index="2">车票</el-menu-item>
-            <el-menu-item index="3">酒店</el-menu-item>
-            <el-menu-item index="4">火车餐</el-menu-item>
+            <el-menu-item index="homepage">首页</el-menu-item>
+            <el-menu-item index="traintacket">车票</el-menu-item>
+            <el-menu-item index="hotel">酒店</el-menu-item>
+            <el-menu-item index="trainmeal">火车餐</el-menu-item>
             <div class="TitleBarButton">
                 <el-menu-item index="5" style="padding: 0;">
                     <el-button type="primary" plain>登录</el-button>
@@ -32,11 +32,14 @@
   
 <script lang="ts" setup>
     import { ref } from 'vue'
+    import { RouterLink, RouterView } from 'vue-router'
+    import { useRouter } from 'vue-router'
+    const router = useRouter()
 
-    const activeIndex = ref('1')
+    const activeIndex = ref('homepage')
     const handleSelect = (key: string, keyPath: string[]) => {
-    console.log(key, keyPath)
-}
+        router.push({ name: key })
+    }
 </script>
 
 <style lang="css" scoped>
