@@ -678,6 +678,92 @@ impl Identifiable for User {
     }
 }
 
+/// 支付密码
+///
+/// 表示一个符合业务规则的支付密码，必须是6位ASCII数字组成。
+/// 该类型保证一旦创建就一定是有效格式，所有使用该类型的地方都可以信任其内容。
+///
+/// # Examples
+///
+/// ```
+/// # use std::convert::TryFrom;
+/// # use base::domain::model::user::PaymentPassword;
+/// let password = PaymentPassword::try_from("123456").unwrap();
+/// assert_eq!(String::from(password), "123456");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PaymentPassword([char; 6]);
+
+/// 支付密码相关错误类型
+#[derive(Error, Debug)]
+pub enum PaymentPasswordError {
+    /// 密码长度不符合6位要求
+    #[error("payment password must be 6 digits, got {0} characters")]
+    InvalidLength(usize),
+    /// 密码包含非数字字符
+    #[error("payment password must contain only digits, found non-digit character")]
+    NonDigitCharacter,
+}
+
+impl TryFrom<&str> for PaymentPassword {
+    type Error = PaymentPasswordError;
+
+    /// 从字符串创建支付密码
+    ///
+    /// 执行严格验证：
+    /// 1. 必须正好6个字符长度
+    /// 2. 必须全部为ASCII数字(0-9)
+    ///
+    /// # 参数
+    /// - `value`: 待验证的密码字符串
+    ///
+    /// # 返回
+    /// - `Ok(PaymentPassword)`: 验证通过的有效密码
+    /// - `Err(PaymentPasswordError)`: 包含具体验证失败原因
+    ///
+    /// # Errors
+    ///
+    /// 返回以下错误之一：
+    /// - `PaymentPasswordError::InvalidLength`: 当输入长度不为6时
+    /// - `PaymentPasswordError::NonDigitCharacter`: 当包含非数字字符时
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // 有效密码
+    /// # use base::domain::model::user::PaymentPassword;
+    /// let password = PaymentPassword::try_from("123456").unwrap();
+    ///
+    /// // 无效密码
+    /// assert!(PaymentPassword::try_from("12345").is_err());  // 长度不足
+    /// assert!(PaymentPassword::try_from("12345a").is_err()); // 包含字母
+    /// ```
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value.len() != 6 {
+            return Err(PaymentPasswordError::InvalidLength(value.len()));
+        }
+
+        let mut result_array: [char; 6] = ['0'; 6];
+
+        for (idx, ch) in value.chars().enumerate() {
+            if !ch.is_ascii_digit() {
+                return Err(PaymentPasswordError::NonDigitCharacter);
+            }
+
+            result_array[idx] = ch;
+        }
+
+        Ok(PaymentPassword(result_array))
+    }
+}
+
+impl From<PaymentPassword> for String {
+    /// 将支付密码转换回字符串
+    fn from(value: PaymentPassword) -> Self {
+        String::from_iter(value.0)
+    }
+}
+
 impl Entity for User {}
 
 impl Aggregate for User {}
@@ -932,6 +1018,74 @@ mod tests {
                 result,
                 Err(PasswordAttemptsError::NegativeValue(-1))
             ))
+        }
+    }
+
+    mod payment_password {
+        use super::*;
+        use claims::{assert_err, assert_ok}; // 可以使用 claims crate 更清晰的断言
+
+        /// 测试有效支付密码的创建
+        #[test]
+        fn valid_payment_password() {
+            let cases = ["123456", "000000", "999999", "010203"];
+
+            for &input in &cases {
+                let password = PaymentPassword::try_from(input);
+                assert_ok!(&password);
+
+                // 验证内容是否正确存储
+                let password = password.unwrap();
+                assert_eq!(String::from(password), input);
+            }
+        }
+
+        /// 测试长度不符合要求的输入
+        #[test]
+        fn invalid_length() {
+            let cases = [
+                ("", 0),        // 空字符串
+                ("1", 1),       // 过短
+                ("12345", 5),   // 少一位
+                ("1234567", 7), // 多一位
+            ];
+
+            for &(input, expected_len) in &cases {
+                let err = PaymentPassword::try_from(input).unwrap_err();
+                match err {
+                    PaymentPasswordError::InvalidLength(len) => assert_eq!(len, expected_len),
+                    _ => panic!("Expected InvalidLength error"),
+                }
+            }
+        }
+
+        /// 测试非数字字符输入
+        #[test]
+        fn non_digit_characters() {
+            let cases = [
+                "a23456",       // 字母开头
+                "1b3456",       // 字母中间
+                "12345c",       // 字母结尾
+                "123-56",       // 特殊字符
+                "１２３４５６", // 全角数字(应该失败)
+            ];
+
+            for &input in &cases {
+                let err = PaymentPassword::try_from(input).unwrap_err();
+                assert!(
+                    matches!(err, PaymentPasswordError::NonDigitCharacter),
+                    "Input: {} should trigger NonDigitCharacter error",
+                    input
+                );
+            }
+        }
+
+        /// 测试类型转换
+        #[test]
+        fn string_conversion() {
+            let input = "654321";
+            let password = PaymentPassword::try_from(input).unwrap();
+            assert_eq!(String::from(password), input);
         }
     }
 }
