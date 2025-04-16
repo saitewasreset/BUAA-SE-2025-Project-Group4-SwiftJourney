@@ -60,6 +60,9 @@ impl UserDataConverter {
     ///
     /// # Returns
     /// 返回可用于数据库操作的SeaORM`Active Model`
+    ///
+    /// # Notes
+    /// 用于password和payment_password的盐**必须相同**，具体地，数据库中只存储payment_password的盐
     pub fn transform_to_do(user: User) -> crate::models::user::ActiveModel {
         let mut model = crate::models::user::ActiveModel {
             id: ActiveValue::NotSet,
