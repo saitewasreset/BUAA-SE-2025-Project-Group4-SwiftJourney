@@ -40,13 +40,6 @@ where
     ///
     /// # Arguments
     /// * `repository` - 用户仓储实现
-    ///
-    /// # Examples
-    /// ```rust,no_run
-    /// # use infrastructure::service::user::UserServiceImpl;
-    /// # let user_repo = unimplemented!();
-    /// let user_service = UserServiceImpl::new(user_repo);
-    /// ```
     pub fn new(repository: R) -> Self {
         Self {
             repository,
