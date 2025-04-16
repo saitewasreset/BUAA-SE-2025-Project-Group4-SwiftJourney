@@ -90,7 +90,7 @@ pub mod password;
 pub mod session;
 pub mod user;
 
-use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff};
+use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -224,8 +224,16 @@ where
 
 #[derive(Error, Debug)]
 pub enum ServiceError {
-    #[error("database error: {0}")]
-    DbError(anyhow::Error),
+    #[error("repository error: {0}")]
+    RepositoryError(RepositoryError),
+    #[error("a related service returned an error: {0}")]
+    RelatedServiceError(anyhow::Error),
+}
+
+impl From<RepositoryError> for ServiceError {
+    fn from(value: RepositoryError) -> Self {
+        ServiceError::RepositoryError(value)
+    }
 }
 
 #[cfg(test)]
