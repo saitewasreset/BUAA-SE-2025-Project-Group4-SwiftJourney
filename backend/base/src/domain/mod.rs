@@ -474,12 +474,17 @@ pub trait Repository<AG>
 where
     AG: Aggregate,
 {
-    fn attach(&self, aggregate: AG);
-    fn detach(&self, aggregate: &AG);
-
     fn find(&self, id: AG::ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
     fn remove(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
     fn save(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+}
+
+pub trait SnapshottingRepository<AG>: Repository<AG>
+where
+    AG: Aggregate,
+{
+    fn attach(&self, aggregate: AG);
+    fn detach(&self, aggregate: &AG);
 }
 
 /// 数据库仓储支持特性，提供与数据库交互的底层操作
@@ -534,20 +539,6 @@ where
     AG: Aggregate,
     T: DbRepositorySupport<AG> + Send + Sync,
 {
-    fn attach(&self, aggregate: AG) {
-        self.get_aggregate_manager()
-            .lock()
-            .unwrap()
-            .attach(aggregate);
-    }
-
-    fn detach(&self, aggregate: &AG) {
-        self.get_aggregate_manager()
-            .lock()
-            .unwrap()
-            .detach(aggregate);
-    }
-
     async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError> {
         let entity = self.on_select(id).await?;
 
@@ -593,5 +584,25 @@ where
             }
         }
         Ok(())
+    }
+}
+
+impl<AG, T> SnapshottingRepository<AG> for T
+where
+    T: DbRepositorySupport<AG> + Send + Sync,
+    AG: Aggregate,
+{
+    fn attach(&self, aggregate: AG) {
+        self.get_aggregate_manager()
+            .lock()
+            .unwrap()
+            .attach(aggregate);
+    }
+
+    fn detach(&self, aggregate: &AG) {
+        self.get_aggregate_manager()
+            .lock()
+            .unwrap()
+            .detach(aggregate);
     }
 }
