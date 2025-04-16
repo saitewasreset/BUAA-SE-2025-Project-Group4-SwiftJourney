@@ -324,14 +324,12 @@ impl UserRepository for UserRepositoryImpl {
             .map_err(RepositoryError::Db)?;
 
         user_do
-            .map(|user_do| UserDataConverter::make_from_do(user_do))
+            .map(UserDataConverter::make_from_do)
             .transpose()
-            .map(|user| {
+            .inspect(|user| {
                 if let Some(user) = user.clone() {
                     self.aggregate_manager.lock().unwrap().attach(user);
                 }
-
-                user
             })
             .context(format!("failed to validation user with phone: {}", phone))
             .map_err(RepositoryError::ValidationError)
@@ -354,14 +352,12 @@ impl UserRepository for UserRepositoryImpl {
             .map_err(RepositoryError::Db)?;
 
         user_do
-            .map(|user_do| UserDataConverter::make_from_do(user_do))
+            .map(UserDataConverter::make_from_do)
             .transpose()
-            .map(|user| {
+            .inspect(|user| {
                 if let Some(user) = user.clone() {
                     self.aggregate_manager.lock().unwrap().attach(user);
                 }
-
-                user
             })
             .context(format!(
                 "failed to validation user with identity card id: {}",
