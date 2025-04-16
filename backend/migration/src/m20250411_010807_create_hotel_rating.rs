@@ -37,12 +37,14 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelRating::Table, HotelRating::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelRating::Table, HotelRating::HotelId)
-                            .to(Hotel::Table, Hotel::Id),
+                            .to(Hotel::Table, Hotel::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

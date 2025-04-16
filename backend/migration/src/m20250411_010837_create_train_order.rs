@@ -58,37 +58,44 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::TrainId)
-                            .to(Train::Table, Train::Id),
+                            .to(Train::Table, Train::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::SeatTypeId)
-                            .to(SeatType::Table, SeatType::Id),
+                            .to(SeatType::Table, SeatType::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::BeginStationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::EndStationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::PersonInfoId)
-                            .to(PersonInfo::Table, PersonInfo::Id),
+                            .to(PersonInfo::Table, PersonInfo::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::PayTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::RefundTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

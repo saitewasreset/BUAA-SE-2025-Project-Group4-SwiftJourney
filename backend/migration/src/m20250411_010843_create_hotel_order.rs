@@ -55,27 +55,32 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelOrder::Table, HotelOrder::HotelId)
-                            .to(Hotel::Table, Hotel::Id),
+                            .to(Hotel::Table, Hotel::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelOrder::Table, HotelOrder::HotelRoomTypeId)
-                            .to(HotelRoomType::Table, HotelRoomType::Id),
+                            .to(HotelRoomType::Table, HotelRoomType::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelOrder::Table, HotelOrder::PersonInfoId)
-                            .to(PersonInfo::Table, PersonInfo::Id),
+                            .to(PersonInfo::Table, PersonInfo::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelOrder::Table, HotelOrder::PayTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelOrder::Table, HotelOrder::RefundTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

@@ -38,7 +38,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelRoomType::Table, HotelRoomType::HotelId)
-                            .to(Hotel::Table, Hotel::Id),
+                            .to(Hotel::Table, Hotel::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
