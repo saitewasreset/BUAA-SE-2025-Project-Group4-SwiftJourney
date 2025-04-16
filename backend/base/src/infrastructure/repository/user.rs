@@ -15,8 +15,7 @@ use crate::domain::{
     AggregateManager, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, Repository,
     RepositoryError, TypedDiff,
 };
-use anyhow::{Context, anyhow};
-use argon2::password_hash::PasswordHashString;
+use anyhow::Context;
 use email_address::EmailAddress;
 use sea_orm::ColumnTrait;
 use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
@@ -39,24 +38,6 @@ pub struct UserRepositoryImpl {
 pub struct UserDataConverter;
 
 impl UserDataConverter {
-    /// 将`Vec<u8>`解析为密码哈希字符串
-    ///
-    /// # Arguments
-    /// * `bytes` - 存储的密码哈希字节
-    ///
-    /// # Errors
-    /// 当字节不是有效的UTF-8字符串或不符合密码哈希格式时返回错误
-    fn parse_bytes_to_password_hash_string(bytes: Vec<u8>) -> anyhow::Result<PasswordHashString> {
-        let password_hash_string = String::from_utf8(bytes)?;
-        PasswordHashString::new(&password_hash_string).map_err(|e| {
-            anyhow!(
-                "cannot parse password hash string: {} {}",
-                password_hash_string,
-                e
-            )
-        })
-    }
-
     /// 将领域模型转换为数据库`Active Model`
     ///
     /// # Arguments

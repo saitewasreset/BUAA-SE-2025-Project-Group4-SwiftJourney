@@ -13,6 +13,8 @@
 //! # Security
 //! - 抵抗 GPU/ASIC 破解
 
+use std::marker::PhantomData;
+
 use crate::domain::model::password::{
     HashedPassword, PasswordHasher, PasswordSalt, PasswordSaltGenerator,
 };
@@ -126,8 +128,8 @@ where
     G: PasswordSaltGenerator,
     H: PasswordHasher,
 {
-    salt_generator: G,
-    hasher: H,
+    _for_super_earth: PhantomData<G>,
+    _democracy_has_landed: PhantomData<H>,
 }
 
 impl<G, H> PasswordService for PasswordServiceImpl<G, H>
