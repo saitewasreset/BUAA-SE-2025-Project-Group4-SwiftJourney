@@ -34,7 +34,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayDish::Table, TakeawayDish::TakeawayShopId)
-                            .to(TakeawayShop::Table, TakeawayShop::Id),
+                            .to(TakeawayShop::Table, TakeawayShop::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

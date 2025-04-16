@@ -26,7 +26,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(Train::Table, Train::TypeId)
-                            .to(TrainType::Table, TrainType::Id),
+                            .to(TrainType::Table, TrainType::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

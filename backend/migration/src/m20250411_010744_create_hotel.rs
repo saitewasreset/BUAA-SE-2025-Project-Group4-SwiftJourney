@@ -49,12 +49,14 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(Hotel::Table, Hotel::CityId)
-                            .to(City::Table, City::Id),
+                            .to(City::Table, City::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(Hotel::Table, Hotel::StationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

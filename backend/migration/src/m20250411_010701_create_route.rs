@@ -44,7 +44,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(Route::Table, Route::StationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

@@ -55,27 +55,32 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(DishOrder::Table, DishOrder::TrainOrderId)
-                            .to(TrainOrder::Table, TrainOrder::Id),
+                            .to(TrainOrder::Table, TrainOrder::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(DishOrder::Table, DishOrder::DishId)
-                            .to(Dish::Table, Dish::Id),
+                            .to(Dish::Table, Dish::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(DishOrder::Table, DishOrder::PersonInfoId)
-                            .to(PersonInfo::Table, PersonInfo::Id),
+                            .to(PersonInfo::Table, PersonInfo::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(DishOrder::Table, DishOrder::PayTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(DishOrder::Table, DishOrder::RefundTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

@@ -49,27 +49,32 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedSeat::Table, OccupiedSeat::TrainId)
-                            .to(Train::Table, Train::Id),
+                            .to(Train::Table, Train::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedSeat::Table, OccupiedSeat::SeatTypeId)
-                            .to(SeatType::Table, SeatType::Id),
+                            .to(SeatType::Table, SeatType::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedSeat::Table, OccupiedSeat::BeginStationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedSeat::Table, OccupiedSeat::EndStationId)
-                            .to(Station::Table, Station::Id),
+                            .to(Station::Table, Station::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedSeat::Table, OccupiedSeat::PersonInfoId)
-                            .to(PersonInfo::Table, PersonInfo::Id),
+                            .to(PersonInfo::Table, PersonInfo::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

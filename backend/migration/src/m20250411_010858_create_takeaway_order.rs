@@ -55,27 +55,32 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayOrder::Table, TakeawayOrder::TrainOrderId)
-                            .to(TrainOrder::Table, TrainOrder::Id),
+                            .to(TrainOrder::Table, TrainOrder::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayOrder::Table, TakeawayOrder::TakeawayDishId)
-                            .to(TakeawayDish::Table, TakeawayDish::Id),
+                            .to(TakeawayDish::Table, TakeawayDish::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayOrder::Table, TakeawayOrder::PersonInfoId)
-                            .to(PersonInfo::Table, PersonInfo::Id),
+                            .to(PersonInfo::Table, PersonInfo::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayOrder::Table, TakeawayOrder::PayTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayOrder::Table, TakeawayOrder::RefundTransactionId)
-                            .to(Transaction::Table, Transaction::Id),
+                            .to(Transaction::Table, Transaction::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
