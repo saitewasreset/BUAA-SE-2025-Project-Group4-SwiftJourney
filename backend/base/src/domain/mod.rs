@@ -34,6 +34,7 @@
 //! - `Entity`: 实体基础特征
 //! - `Aggregate`: 聚合根特征
 //! - `Repository`: 仓储接口
+//! - `SnapshottingRepository`： 支持快照的仓储接口
 //! - `DbRepositorySupport`: 数据库仓储支持特性
 //!
 //! ## Examples
@@ -587,6 +588,14 @@ where
     }
 }
 
+/// 快照仓储接口，定义了对聚合根(AG)的支持快照的持久化操作
+///
+/// # 泛型参数
+/// - `AG`: 实现`Aggregate`特征的聚合根类型
+///
+/// # 方法
+/// - `attach`: 将聚合根附加到仓储聚合根管理器中
+/// - `detach`: 从仓储仓储聚合根管理器中分离聚合根
 impl<AG, T> SnapshottingRepository<AG> for T
 where
     T: DbRepositorySupport<AG> + Send + Sync,
