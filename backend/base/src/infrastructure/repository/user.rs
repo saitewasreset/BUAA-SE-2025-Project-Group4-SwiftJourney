@@ -349,4 +349,30 @@ impl UserRepository for UserRepositoryImpl {
             .context(format!("failed to validation user with phone: {}", phone))
             .map_err(RepositoryError::ValidationError)
     }
+
+    async fn find_by_identity_card_id(
+        &self,
+        identity_card_id: IdentityCardId,
+    ) -> Result<Option<User>, RepositoryError> {
+        let identity_card_id: String = identity_card_id.into();
+
+        let user_do = crate::models::user::Entity::find()
+            .filter(crate::models::user::Column::IdentityCardId.eq(identity_card_id.clone()))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to find user with identity card id: {}",
+                identity_card_id
+            ))
+            .map_err(RepositoryError::Db)?;
+
+        user_do
+            .map(|user_do| UserDataConverter::make_from_do(user_do))
+            .transpose()
+            .context(format!(
+                "failed to validation user with identity card id: {}",
+                identity_card_id
+            ))
+            .map_err(RepositoryError::ValidationError)
+    }
 }
