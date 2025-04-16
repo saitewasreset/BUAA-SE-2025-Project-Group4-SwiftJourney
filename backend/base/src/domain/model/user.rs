@@ -664,14 +664,34 @@ impl User {
         &self.hashed_payment_password
     }
 
+    /// 设置密码
+    pub fn set_hashed_password(&mut self, hashed_password: HashedPassword) {
+        self.hashed_password = hashed_password;
+    }
+
+    /// 设置支付密码
+    pub fn set_hashed_payment_password(&mut self, hashed_payment_password: Option<HashedPassword>) {
+        self.hashed_payment_password = hashed_payment_password;
+    }
+
     /// 获取支付密码错误尝试次数
     pub fn wrong_payment_password_tried(&self) -> PasswordAttempts {
         self.wrong_payment_password_tried
     }
 
+    /// 获取支付密码错误尝试次数的可变借用
+    pub fn wrong_payment_password_tried_mut(&mut self) -> &mut PasswordAttempts {
+        &mut self.wrong_payment_password_tried
+    }
+
     /// 获取用户详细信息
     pub fn user_info(&self) -> &UserInfo {
         &self.info
+    }
+
+    /// 设置用户详细信息
+    pub fn set_user_info(&mut self, user_info: UserInfo) {
+        self.info = user_info;
     }
 }
 
@@ -1027,7 +1047,7 @@ mod tests {
 
     mod payment_password {
         use super::*;
-        use claims::{assert_err, assert_ok}; // 可以使用 claims crate 更清晰的断言
+        use claims::assert_ok; // 可以使用 claims crate 更清晰的断言
 
         /// 测试有效支付密码的创建
         #[test]
