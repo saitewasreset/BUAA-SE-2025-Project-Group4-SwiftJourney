@@ -11,4 +11,9 @@ pub trait UserRepository: Repository<User> {
         &self,
         identity_card_id: IdentityCardId,
     ) -> impl Future<Output = Result<Option<User>, RepositoryError>> + Send;
+
+    fn remove_by_phone(
+        &self,
+        phone: Phone,
+    ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }

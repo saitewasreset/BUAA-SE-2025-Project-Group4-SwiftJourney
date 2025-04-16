@@ -12,15 +12,14 @@ use crate::domain::model::user::{
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
-    DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
+    AggregateManager, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, Repository,
+    RepositoryError, TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use argon2::password_hash::PasswordHashString;
 use email_address::EmailAddress;
 use sea_orm::ColumnTrait;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, DatabaseConnection, EntityOrSelect, EntityTrait, QueryFilter,
-};
+use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -346,6 +345,13 @@ impl UserRepository for UserRepositoryImpl {
         user_do
             .map(|user_do| UserDataConverter::make_from_do(user_do))
             .transpose()
+            .map(|user| {
+                if let Some(user) = user.clone() {
+                    self.aggregate_manager.lock().unwrap().attach(user);
+                }
+
+                user
+            })
             .context(format!("failed to validation user with phone: {}", phone))
             .map_err(RepositoryError::ValidationError)
     }
@@ -369,10 +375,28 @@ impl UserRepository for UserRepositoryImpl {
         user_do
             .map(|user_do| UserDataConverter::make_from_do(user_do))
             .transpose()
+            .map(|user| {
+                if let Some(user) = user.clone() {
+                    self.aggregate_manager.lock().unwrap().attach(user);
+                }
+
+                user
+            })
             .context(format!(
                 "failed to validation user with identity card id: {}",
                 identity_card_id
             ))
             .map_err(RepositoryError::ValidationError)
+    }
+
+    async fn remove_by_phone(&self, phone: Phone) -> Result<(), RepositoryError> {
+        let user = self.find_by_phone(phone).await?;
+
+        if let Some(user) = user {
+            self.aggregate_manager.lock().unwrap().detach(&user);
+            self.remove(user).await?;
+        }
+
+        Ok(())
     }
 }
