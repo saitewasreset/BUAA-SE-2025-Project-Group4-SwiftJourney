@@ -86,8 +86,13 @@
 //! - 差异检测函数应避免复杂计算
 //! - 大规模聚合根集合应考虑分片管理
 
+pub mod password;
+pub mod session;
+pub mod user;
+
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff};
 use std::collections::HashMap;
+use thiserror::Error;
 
 pub struct DiffInfo<AG>
 where
@@ -215,6 +220,12 @@ where
 
         (self.detect_changes_fn)(DiffInfo::new(old, aggregate))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ServiceError {
+    #[error("database error: {0}")]
+    DbError(anyhow::Error),
 }
 
 #[cfg(test)]
