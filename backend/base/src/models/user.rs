@@ -10,8 +10,8 @@ pub struct Model {
     pub username: String,
     #[sea_orm(column_type = "VarBinary(StringLen::None)")]
     pub hashed_password: Vec<u8>,
-    #[sea_orm(column_type = "VarBinary(StringLen::None)")]
-    pub hashed_payment_password: Vec<u8>,
+    #[sea_orm(column_type = "VarBinary(StringLen::None)", nullable)]
+    pub hashed_payment_password: Option<Vec<u8>>,
     #[sea_orm(column_type = "VarBinary(StringLen::None)")]
     pub salt: Vec<u8>,
     pub wrong_payment_password_tried: i32,

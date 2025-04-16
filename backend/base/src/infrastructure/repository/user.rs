@@ -5,6 +5,7 @@
 //! - 领域模型与数据库模型之间的转换
 //! - 变更追踪与聚合管理
 
+use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, User, UserId, UserInfo,
 };
@@ -62,24 +63,14 @@ impl UserDataConverter {
     /// 返回可用于数据库操作的SeaORM`Active Model`
     ///
     /// # Notes
-    /// 用于password和payment_password的盐**必须相同**，具体地，数据库中只存储payment_password的盐
+    /// 用于password和payment_password的盐**必须相同**，具体地，数据库中只存储password的盐
     pub fn transform_to_do(user: User) -> crate::models::user::ActiveModel {
         let mut model = crate::models::user::ActiveModel {
             id: ActiveValue::NotSet,
             username: ActiveValue::Set(user.username().to_owned()),
-            hashed_password: ActiveValue::Set(user.hashed_password().as_bytes().to_vec()),
-            hashed_payment_password: ActiveValue::Set(
-                user.hashed_payment_password().as_bytes().to_vec(),
-            ),
-            salt: ActiveValue::Set(
-                user.hashed_payment_password()
-                    .password_hash()
-                    .salt
-                    .unwrap()
-                    .as_str()
-                    .as_bytes()
-                    .to_vec(),
-            ),
+            hashed_password: ActiveValue::Set(user.hashed_password().hashed_password.clone()),
+            hashed_payment_password: ActiveValue::NotSet,
+            salt: ActiveValue::Set(user.hashed_password().salt.clone().into()),
             wrong_payment_password_tried: ActiveValue::Set(u8::from(
                 user.wrong_payment_password_tried(),
             ) as i32),
@@ -104,6 +95,11 @@ impl UserDataConverter {
             model.id = ActiveValue::Set(u64::from(id) as i32);
         }
 
+        if let Some(payment_password) = user.hashed_payment_password() {
+            model.hashed_payment_password =
+                ActiveValue::Set(Some(payment_password.hashed_password.clone()));
+        }
+
         model
     }
 
@@ -120,12 +116,6 @@ impl UserDataConverter {
     pub fn make_from_do(user_do: crate::models::user::Model) -> anyhow::Result<User> {
         let user_id: UserId = (user_do.id as u64).into();
         let username: String = user_do.username;
-
-        let hashed_password_string =
-            Self::parse_bytes_to_password_hash_string(user_do.hashed_password)?;
-
-        let hashed_payment_password_string =
-            Self::parse_bytes_to_password_hash_string(user_do.hashed_payment_password)?;
 
         let wrong_payment_password_tried: PasswordAttempts =
             user_do.wrong_payment_password_tried.try_into()?;
@@ -150,11 +140,23 @@ impl UserDataConverter {
 
         let user_info = UserInfo::new(name, gender, age, phone, email, identity_card_id);
 
+        let salt = user_do.salt;
+
+        let hashed_password = HashedPassword {
+            hashed_password: user_do.hashed_password,
+            salt: salt.clone().into(),
+        };
+
+        let hashed_payment_password = user_do.hashed_payment_password.map(|p| HashedPassword {
+            hashed_password: p,
+            salt: salt.clone().into(),
+        });
+
         let user = User::new(
             Some(user_id),
             username,
-            hashed_password_string,
-            hashed_payment_password_string,
+            hashed_password,
+            hashed_payment_password,
             wrong_payment_password_tried,
             user_info,
         );

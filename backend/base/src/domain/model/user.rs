@@ -34,6 +34,7 @@
 //! # use base::domain::model::user::{User, UserInfo, Phone, IdentityCardId};
 //! # use std::convert::TryFrom;
 //! # use argon2::password_hash::PasswordHashString;
+//! use base::domain::model::password::HashedPassword;
 //!
 //! // 创建值对象
 //! let phone = Phone::try_from("13812345678".to_string()).unwrap();
@@ -53,8 +54,11 @@
 //! let user = User::new(
 //!     None,
 //!     "Scout".to_string(),
-//!     PasswordHashString::new("$argon2id$v=19$m=65536,t=2,p=1$gZiV/M1gPc22ElAH/Jh1Hw$CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno").unwrap(),
-//!     PasswordHashString::new("$argon2id$v=19$m=65536,t=2,p=1$gZiV/M1gPc22ElAH/Jh1Hw$CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno").unwrap(),
+//!     HashedPassword {
+//!         hashed_password: vec![0u8; 32],
+//!         salt: vec![0u8; 32].into(),
+//!     },
+//!     None,
 //!     0.try_into().unwrap(),
 //!     info,
 //! );
@@ -65,8 +69,8 @@
 //! - 密码始终以哈希形式存储
 //! - 敏感信息如身份证号、手机号有严格格式验证
 //! - 密码尝试次数有上限控制
+use crate::domain::model::password::HashedPassword;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
-use argon2::password_hash::PasswordHashString;
 use email_address::EmailAddress;
 use shared::{PHONE_PREFIX_SET, PHONE_REGEX};
 use std::fmt::{Debug, Display, Formatter};
@@ -605,9 +609,9 @@ pub struct User {
     /// 用户名，用于显示
     username: String,
     /// 经过哈希处理的登录密码
-    hashed_password: PasswordHashString,
+    hashed_password: HashedPassword,
     /// 经过哈希处理的支付密码
-    hashed_payment_password: PasswordHashString,
+    hashed_payment_password: Option<HashedPassword>,
     /// 支付密码错误尝试次数
     wrong_payment_password_tried: PasswordAttempts,
     /// 用户详细信息
@@ -630,8 +634,8 @@ impl User {
     pub fn new(
         id: Option<UserId>,
         username: String,
-        hashed_password: PasswordHashString,
-        hashed_payment_password: PasswordHashString,
+        hashed_password: HashedPassword,
+        hashed_payment_password: Option<HashedPassword>,
         wrong_payment_password_tried: PasswordAttempts,
         info: UserInfo,
     ) -> Self {
@@ -651,12 +655,12 @@ impl User {
     }
 
     /// 获取哈希后的登录密码
-    pub fn hashed_password(&self) -> &PasswordHashString {
+    pub fn hashed_password(&self) -> &HashedPassword {
         &self.hashed_password
     }
 
     /// 获取哈希后的支付密码
-    pub fn hashed_payment_password(&self) -> &PasswordHashString {
+    pub fn hashed_payment_password(&self) -> &Option<HashedPassword> {
         &self.hashed_payment_password
     }
 
