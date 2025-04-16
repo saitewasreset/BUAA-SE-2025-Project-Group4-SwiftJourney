@@ -9,6 +9,7 @@ use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, User, UserId, UserInfo,
 };
+use crate::domain::repository::user::UserRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
     DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
@@ -16,7 +17,10 @@ use crate::domain::{
 use anyhow::{Context, anyhow};
 use argon2::password_hash::PasswordHashString;
 use email_address::EmailAddress;
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait};
+use sea_orm::ColumnTrait;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, DatabaseConnection, EntityOrSelect, EntityTrait, QueryFilter,
+};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -325,5 +329,24 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+impl UserRepository for UserRepositoryImpl {
+    async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
+        let phone: String = phone.into();
+
+        let user_do = crate::models::user::Entity::find()
+            .filter(crate::models::user::Column::Phone.eq(phone.clone()))
+            .one(&self.db)
+            .await
+            .context(format!("failed to find user with phone: {}", phone))
+            .map_err(RepositoryError::Db)?;
+
+        user_do
+            .map(|user_do| UserDataConverter::make_from_do(user_do))
+            .transpose()
+            .context(format!("failed to validation user with phone: {}", phone))
+            .map_err(RepositoryError::ValidationError)
     }
 }
