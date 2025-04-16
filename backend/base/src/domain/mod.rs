@@ -1,3 +1,84 @@
+//! 领域驱动设计(DDD)的核心领域层实现
+//!
+//! 本模块提供了领域驱动设计中领域层的基础结构和特征定义，包括：
+//! - 实体(Entity)和聚合根(Aggregate)的核心特征
+//! - 变更追踪和状态管理
+//! - 仓储(Repository)抽象接口
+//! - 领域服务的基础设施
+//!
+//! ## 模块结构
+//! - `model`: 包含领域模型定义
+//! - `repository`: 定义仓储接口和实现
+//! - `service`: 领域服务相关实现
+//!
+//! ## 核心概念
+//!
+//! ### 实体(Entity)
+//! - 具有唯一标识的对象
+//! - 通过`Entity`和`Identifiable`特征定义
+//! - 生命周期内可追踪状态变化
+//!
+//! ### 聚合根(Aggregate)
+//! - 作为聚合的入口点和一致性边界
+//! - 通过`Aggregate`特征定义
+//! - 提供变更检测和状态管理功能
+//!
+//! ### 仓储(Repository)
+//! - 提供聚合根的持久化抽象
+//! - 支持基本的CRUD操作
+//! - 提供自动变更追踪功能
+//!
+//! ## 主要特征
+//! - `Identifier`: 标识符类型的特征约束
+//! - `Identifiable`: 可标识对象的特征
+//! - `Entity`: 实体基础特征
+//! - `Aggregate`: 聚合根特征
+//! - `Repository`: 仓储接口
+//! - `DbRepositorySupport`: 数据库仓储支持特性
+//!
+//! ## Examples
+//! ```
+//! use base::domain::{Aggregate, Entity, Identifiable, Identifier};
+//!
+//! // 定义标识符类型
+//! #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+//! struct UserId(u64);
+//! impl Identifier for UserId {}
+//!
+//! // 定义领域实体
+//! #[derive(Debug, Clone)]
+//! struct User {
+//!     id: UserId,
+//!     name: String,
+//! }
+//!
+//! impl Identifiable for User {
+//!     type ID = UserId;
+//!     fn get_id(&self) -> Option<Self::ID> {
+//!         Some(self.id)
+//!     }
+//! }
+//!
+//! impl Entity for User {}
+//! impl Aggregate for User {}
+//! ```
+//!
+//! ## 设计原则
+//! 1. 明确的领域边界
+//! 2. 丰富的领域模型
+//! 3. 与技术实现解耦
+//! 4. 通过特征明确约束
+//!
+//! ## 注意事项
+//! - 实体和聚合根需要实现`'static`生命周期约束
+//! - 变更检测依赖于`TypeId`机制
+//! - 线程安全通过`Send`和`Sync`特征保证
+//!
+//! ## 相关模块
+//! - `application`: 应用层服务
+//! - `infrastructure`: 基础设施实现
+//! - `models`: 数据库Data Object定义
+
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -109,22 +190,17 @@ pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 ///
 /// # Examples
 /// ```
-///
-/// use base::domain::{Aggregate, Entity, Identifiable, Identifier};
-///
+/// # use base::domain::{Aggregate, Entity, Identifiable, Identifier};
 /// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 /// # pub struct OrderId(u64);
 /// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 /// # pub struct OrderItemId(u64);
-///
 /// # impl Identifier for OrderId {}
 /// # impl Identifier for OrderItemId {}
-///
 /// # #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// # pub struct OrderItem {
 /// #    item_id: OrderItemId,
 /// # }
-///
 /// # impl Identifiable for OrderItem {
 /// #    type ID = OrderItemId;
 /// #
@@ -132,14 +208,11 @@ pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 /// #        todo!()
 /// #   }
 /// # }
-///
-///
 /// #[derive(Debug, Clone)]
 /// struct Order {
 ///     id: OrderId,
 ///     items: Vec<OrderItem>,
 /// }
-///
 /// # impl Identifiable for Order {
 /// #     type ID = OrderId;
 /// #
@@ -147,10 +220,8 @@ pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 /// #       todo!()
 /// #   }
 /// # }
-///
 /// # impl Entity for OrderItem {}
 /// # impl Entity for Order {}
-///
 /// impl Aggregate for Order {}
 /// ```
 pub trait Aggregate: Entity {}

@@ -1,3 +1,70 @@
+//! 用户领域模型模块
+//!
+//! 本模块实现了领域驱动设计(DDD)中的用户相关实体和值对象，
+//! 包含用户核心实体、身份验证信息、个人资料等核心领域概念。
+//!
+//! # 主要组件
+//!
+//! - **实体(Entities)**:
+//!   - [`User`][]: 系统用户的核心实体，包含认证信息和基本资料
+//!   - [`UserInfo`][]: 用户的详细个人信息
+//!
+//! - **值对象(Value Objects)**:
+//!   - [`UserId`][]: 用户的唯一标识符
+//!   - [`Gender`][]: 性别枚举
+//!   - [`Age`][]: 年龄值对象，带有验证逻辑
+//!   - [`Phone`][]: 已验证的手机号码
+//!   - [`IdentityCardId`][]: 符合中国标准的身份证号码
+//!   - [`PasswordAttempts`][]: 密码错误尝试计数器
+//!
+//! - **错误类型**:
+//!   - 为各值对象提供了详细的错误枚举类型
+//!
+//! # 设计原则
+//!
+//! 1. **强类型验证**：所有值对象都通过构造函数或TryFrom实现验证逻辑
+//! 2. **不变性保证**：核心字段均为私有，通过方法提供访问
+//! 3. **领域完整性**：封装了业务规则如密码尝试次数限制、身份证验证等
+//!
+//! # Examples
+//!
+//! 创建用户基本示例：
+//!
+//! ```
+//! # use base::domain::model::user::{User, UserInfo, Phone, IdentityCardId};
+//! # use std::convert::TryFrom;
+//! # use argon2::password_hash::PasswordHashString;
+//!
+//! // 创建值对象
+//! let phone = Phone::try_from("13812345678".to_string()).unwrap();
+//! let id_card = IdentityCardId::try_from("11010519491231002X".to_string()).unwrap();
+//!
+//! // 构建用户信息
+//! let info = UserInfo::new(
+//!     "张三".to_string(),
+//!     None,
+//!     None,
+//!     phone,
+//!     None,
+//!     id_card,
+//! );
+//!
+//! // 创建用户实体
+//! let user = User::new(
+//!     None,
+//!     "Scout".to_string(),
+//!     PasswordHashString::new("$argon2id$v=19$m=65536,t=2,p=1$gZiV/M1gPc22ElAH/Jh1Hw$CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno").unwrap(),
+//!     PasswordHashString::new("$argon2id$v=19$m=65536,t=2,p=1$gZiV/M1gPc22ElAH/Jh1Hw$CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno").unwrap(),
+//!     0.try_into().unwrap(),
+//!     info,
+//! );
+//! ```
+//!
+//! # 安全性考虑
+//!
+//! - 密码始终以哈希形式存储
+//! - 敏感信息如身份证号、手机号有严格格式验证
+//! - 密码尝试次数有上限控制
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use argon2::password_hash::PasswordHashString;
 use email_address::EmailAddress;
@@ -401,24 +468,56 @@ pub enum PasswordError {
     MaxAttemptsExceeded(u8),
 }
 
+/// 密码尝试次数相关的错误类型
 #[derive(Error, Debug)]
 pub enum PasswordAttemptsError {
+    /// 输入值超过最大尝试次数限制
     #[error("input {0} exceed max attempts {1}")]
     ExceedMaxAttempts(u8, u8),
+    /// 输入值过大（超过u8范围）
+    #[error("value: {0} is too large")]
+    ValueTooLarge(i32),
+    /// 输入值为负数
     #[error("password attempts cannot be negative: {0}")]
     NegativeValue(i32),
 }
 
+/// 密码错误尝试次数
+///
+/// 该类型用于安全地管理密码验证时的错误尝试次数，
+/// 确保次数不会超过最大限制且不会出现非法值。
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PasswordAttempts(u8);
 
 impl PasswordAttempts {
+    /// 允许的最大密码尝试次数
     pub const MAX: u8 = 5;
 
+    /// 创建一个新的密码尝试计数器，初始值为0
+    ///
+    /// # Examples
+    /// ```
+    /// # use base::domain::model::user::PasswordAttempts;
+    /// let attempts = PasswordAttempts::new();
+    /// assert_eq!(u8::from(attempts), 0);
+    /// ```
     pub fn new() -> Self {
         Self(0)
     }
 
+    /// 增加尝试次数
+    ///
+    /// 如果当前次数已经达到最大值，则返回错误
+    ///
+    /// # Errors
+    /// 当尝试次数超过最大值时返回`PasswordError::MaxAttemptsExceeded`
+    ///
+    /// # Examples
+    /// ```
+    /// # use base::domain::model::user::PasswordAttempts;
+    /// let mut attempts = PasswordAttempts::new();
+    /// assert!(attempts.increment().is_ok());
+    /// ```
     pub fn increment(&mut self) -> Result<(), PasswordError> {
         if self.0 >= Self::MAX {
             return Err(PasswordError::MaxAttemptsExceeded(Self::MAX));
@@ -431,6 +530,17 @@ impl PasswordAttempts {
 impl TryFrom<u8> for PasswordAttempts {
     type Error = PasswordAttemptsError;
 
+    /// 从u8类型创建PasswordAttempts
+    ///
+    /// # Errors
+    /// 如果输入值超过最大尝试次数限制，返回`PasswordAttemptsError::ExceedMaxAttempts`
+    ///
+    /// # Examples
+    /// ```
+    /// # use base::domain::model::user::PasswordAttempts;
+    /// let attempts = PasswordAttempts::try_from(3);
+    /// assert!(attempts.is_ok());
+    /// ```
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value > Self::MAX {
             return Err(PasswordAttemptsError::ExceedMaxAttempts(value, Self::MAX));
@@ -443,13 +553,26 @@ impl TryFrom<u8> for PasswordAttempts {
 impl TryFrom<i32> for PasswordAttempts {
     type Error = PasswordAttemptsError;
 
+    /// 从i32类型创建PasswordAttempts
+    ///
+    /// # Errors
+    /// 如果输入值为负数，返回`PasswordAttemptsError::NegativeValue`
+    /// 如果输入值超过u8范围，返回`PasswordAttemptsError::ValueTooLarge`
+    /// 如果输入值超过最大尝试次数限制，返回`PasswordAttemptsError::ExceedMaxAttempts`
+    ///
+    /// # Examples
+    /// ```
+    /// # use base::domain::model::user::PasswordAttempts;
+    /// let attempts = PasswordAttempts::try_from(3i32);
+    /// assert!(attempts.is_ok());
+    /// ```
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         if value < 0 {
             return Err(PasswordAttemptsError::NegativeValue(value));
         }
 
         if value > u8::MAX as i32 {
-            return Err(PasswordAttemptsError::ExceedMaxAttempts(u8::MAX, Self::MAX));
+            return Err(PasswordAttemptsError::ValueTooLarge(value));
         }
 
         PasswordAttempts::try_from(value as u8)
@@ -457,22 +580,53 @@ impl TryFrom<i32> for PasswordAttempts {
 }
 
 impl From<PasswordAttempts> for u8 {
+    /// 将PasswordAttempts转换回u8类型
+    ///
+    /// # Examples
+    /// ```
+    /// # use base::domain::model::user::PasswordAttempts;
+    ///
+    /// let attempts = PasswordAttempts::new();
+    /// let count: u8 = attempts.into();
+    /// assert_eq!(count, 0);
+    /// ```
     fn from(value: PasswordAttempts) -> Self {
         value.0
     }
 }
 
+/// 表示系统用户的实体
+///
+/// 包含用户的基本信息、认证信息和支付密码相关信息
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct User {
+    /// 用户ID，新用户创建时为None
     id: Option<UserId>,
+    /// 用户名，用于显示
     username: String,
+    /// 经过哈希处理的登录密码
     hashed_password: PasswordHashString,
+    /// 经过哈希处理的支付密码
     hashed_payment_password: PasswordHashString,
+    /// 支付密码错误尝试次数
     wrong_payment_password_tried: PasswordAttempts,
+    /// 用户详细信息
     info: UserInfo,
 }
 
 impl User {
+    /// 创建一个新的User实例
+    ///
+    /// # Arguments
+    /// * `id` - 用户ID，新用户时为None
+    /// * `username` - 用户名
+    /// * `hashed_password` - 已哈希的登录密码
+    /// * `hashed_payment_password` - 已哈希的支付密码
+    /// * `wrong_payment_password_tried` - 支付密码错误尝试次数
+    /// * `info` - 用户详细信息
+    ///
+    /// # Returns
+    /// 返回构建好的User实例
     pub fn new(
         id: Option<UserId>,
         username: String,
@@ -491,22 +645,27 @@ impl User {
         }
     }
 
+    /// 获取用户名
     pub fn username(&self) -> &str {
         &self.username
     }
 
+    /// 获取哈希后的登录密码
     pub fn hashed_password(&self) -> &PasswordHashString {
         &self.hashed_password
     }
 
+    /// 获取哈希后的支付密码
     pub fn hashed_payment_password(&self) -> &PasswordHashString {
         &self.hashed_payment_password
     }
 
+    /// 获取支付密码错误尝试次数
     pub fn wrong_payment_password_tried(&self) -> PasswordAttempts {
         self.wrong_payment_password_tried
     }
 
+    /// 获取用户详细信息
     pub fn user_info(&self) -> &UserInfo {
         &self.info
     }
@@ -522,17 +681,38 @@ impl Identifiable for User {
 impl Entity for User {}
 
 impl Aggregate for User {}
+/// 用户的详细信息
+///
+/// 包含用户的个人身份信息和联系方式
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserInfo {
+    /// 用户真实姓名
     pub name: String,
+    /// 用户性别(可选)
     pub gender: Option<Gender>,
+    /// 用户年龄(可选)
     pub age: Option<Age>,
+    /// 用户手机号码
     pub phone: Phone,
+    /// 用户电子邮箱(可选)
     pub email: Option<EmailAddress>,
+    /// 用户身份证号
     pub identity_card_id: IdentityCardId,
 }
 
 impl UserInfo {
+    /// 创建新的UserInfo实例
+    ///
+    /// # Arguments
+    /// * `name` - 真实姓名
+    /// * `gender` - 性别(可选)
+    /// * `age` - 年龄(可选)
+    /// * `phone` - 手机号码
+    /// * `email` - 电子邮箱(可选)
+    /// * `identity_card_id` - 身份证号
+    ///
+    /// # Returns
+    /// 返回构建好的UserInfo实例
     pub fn new(
         name: String,
         gender: Option<Gender>,

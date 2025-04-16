@@ -1,3 +1,91 @@
+//! 领域服务模块 - 实现领域驱动设计中的领域服务层
+//!
+//! 本模块提供领域服务的基础实现，特别是聚合根状态管理的核心功能。
+//! 作为领域模型的操作者和协调者，领域服务封装了不自然属于实体或值对象的领域逻辑。
+//!
+//! ## 核心组件
+//!
+//! ### `AggregateManagerImpl`
+//! 聚合根管理器的默认实现，提供以下功能：
+//! - 聚合根状态的跟踪与维护
+//! - 变更检测与差异报告生成
+//! - 聚合根生命周期的管理（附加/分离）
+//!
+//! ## 主要特性
+//!
+//! ### 状态管理
+//! - 使用`HashMap`内部维护聚合根状态
+//! - 通过唯一标识符快速查找聚合根
+//! - 支持显式的状态合并策略
+//!
+//! ### 变更检测
+//! - 可配置的差异检测策略（通过构造函数注入）
+//! - 灵活的状态对比机制
+//! - 生成详细的变更报告(`MultiEntityDiff`)
+//!
+//! ### 线程安全
+//! - 所有操作均为线程安全设计
+//! - 差异检测函数要求`Sync + Send`约束
+//!
+//! ## 架构说明
+//!
+//! 本实现遵循以下设计原则：
+//! 1. **单一职责**：专注于聚合根状态管理
+//! 2. **开闭原则**：通过函数注入支持扩展
+//! 3. **显式状态**：所有变更必须显式提交
+//!
+//! ## Examples
+//! ```
+//! use base::domain::{Aggregate, AggregateManager, Entity, Identifiable, Identifier};
+//! use base::domain::service::{AggregateManagerImpl, DiffInfo};
+//! use base::domain::MultiEntityDiff;
+//!
+//! #[derive(Debug, Clone, PartialEq)]
+//! struct Order {
+//!     id: OrderId,
+//!     items: Vec<String>,
+//! }
+//!
+//! #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+//! struct OrderId(i32);
+//!
+//! // 实现必要的特征
+//! impl Identifier for OrderId {}
+//! impl Identifiable for Order {
+//!     type ID = OrderId;
+//!     fn get_id(&self) -> Option<Self::ID> { Some(self.id) }
+//! }
+//! impl Entity for Order {}
+//! impl Aggregate for Order {}
+//!
+//! // 创建差异检测函数
+//! let diff_fn = Box::new(|info: DiffInfo<Order>| {
+//!     let mut diff = MultiEntityDiff::new();
+//!     // 实现实际的差异检测逻辑...
+//!     diff
+//! });
+//!
+//! // 初始化管理器
+//! let mut manager = AggregateManagerImpl::new(diff_fn);
+//!
+//! // 使用示例
+//! let order = Order { id: OrderId(1), items: vec!["item1".into()] };
+//! manager.attach(order.clone());
+//! let changes = manager.detect_changes(order);
+//! ```
+//!
+//! ## 注意事项
+//!
+//! - 聚合根必须实现`Clone`特征以支持状态快照
+//! - 差异检测函数应保持无状态
+//! - 管理器不自动持久化变更，需显式调用仓储接口
+//!
+//! ## 性能考虑
+//!
+//! - 内部使用`HashMap`保证O(1)查找性能
+//! - 差异检测函数应避免复杂计算
+//! - 大规模聚合根集合应考虑分片管理
+
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff};
 use std::collections::HashMap;
 
@@ -108,7 +196,7 @@ where
     /// 合并聚合根状态（当前实现为替换策略）
     ///
     /// # 实现细节
-    /// 直接调用 [`attach`] 方法，用新实例完全替换旧状态
+    /// 直接调用 [self.attach] 方法，用新实例完全替换旧状态
     fn merge(&mut self, aggregate: AG) {
         self.attach(aggregate);
     }

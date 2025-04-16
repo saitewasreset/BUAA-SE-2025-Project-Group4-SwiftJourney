@@ -1,3 +1,10 @@
+//! 用户仓储实现模块
+//!
+//! 本模块提供了用户实体的数据库仓储实现，包括：
+//! - 用户数据的数据库操作（增删改查）
+//! - 领域模型与数据库模型之间的转换
+//! - 变更追踪与聚合管理
+
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, User, UserId, UserInfo,
 };
@@ -12,14 +19,29 @@ use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
+/// 用户仓储实现结构体
+///
+/// 负责用户实体的持久化操作，包含：
+/// - 数据库连接
+/// - 聚合管理器（用于跟踪实体变更）
 pub struct UserRepositoryImpl {
     db: DatabaseConnection,
     aggregate_manager: Arc<Mutex<AggregateManagerImpl<User>>>,
 }
 
+/// 用户数据转换器
+///
+/// 提供领域模型(`User`)与数据库模型之间的双向转换功能
 pub struct UserDataConverter;
 
 impl UserDataConverter {
+    /// 将`Vec<u8>`解析为密码哈希字符串
+    ///
+    /// # Arguments
+    /// * `bytes` - 存储的密码哈希字节
+    ///
+    /// # Errors
+    /// 当字节不是有效的UTF-8字符串或不符合密码哈希格式时返回错误
     fn parse_bytes_to_password_hash_string(bytes: Vec<u8>) -> anyhow::Result<PasswordHashString> {
         let password_hash_string = String::from_utf8(bytes)?;
         PasswordHashString::new(&password_hash_string).map_err(|e| {
@@ -31,6 +53,13 @@ impl UserDataConverter {
         })
     }
 
+    /// 将领域模型转换为数据库`Active Model`
+    ///
+    /// # Arguments
+    /// * `user` - 用户领域模型
+    ///
+    /// # Returns
+    /// 返回可用于数据库操作的SeaORM`Active Model`
     pub fn transform_to_do(user: User) -> crate::models::user::ActiveModel {
         let mut model = crate::models::user::ActiveModel {
             id: ActiveValue::NotSet,
@@ -75,6 +104,16 @@ impl UserDataConverter {
         model
     }
 
+    /// 从数据库模型创建领域模型
+    ///
+    /// # Arguments
+    /// * `user_do` - 数据库中的用户`Data Object`
+    ///
+    /// # Errors
+    /// 当数据转换或验证失败时返回错误
+    ///
+    /// # Returns
+    /// 返回构建成功的用户领域模型
     pub fn make_from_do(user_do: crate::models::user::Model) -> anyhow::Result<User> {
         let user_id: UserId = (user_do.id as u64).into();
         let username: String = user_do.username;
@@ -122,6 +161,13 @@ impl UserDataConverter {
 }
 
 impl UserRepositoryImpl {
+    /// 创建新的用户仓储实例
+    ///
+    /// # Arguments
+    /// * `db` - 数据库连接
+    ///
+    /// # Returns
+    /// 返回初始化好的用户仓储实例
     pub fn new(db: DatabaseConnection) -> Self {
         let detect_changes_fn = |diff: DiffInfo<User>| {
             let mut result = MultiEntityDiff::new();
@@ -163,6 +209,13 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
         Arc::clone(&self.aggregate_manager)
     }
 
+    /// 插入新用户到数据库
+    ///
+    /// # Arguments
+    /// * `aggregate` - 要插入的用户领域模型
+    ///
+    /// # Errors
+    /// 当数据库操作失败时返回错误
     async fn on_insert(&self, aggregate: User) -> Result<(), RepositoryError> {
         let id = aggregate.get_id();
 
@@ -177,6 +230,16 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
         Ok(())
     }
 
+    /// 根据ID查询用户
+    ///
+    /// # Arguments
+    /// * `id` - 用户ID
+    ///
+    /// # Errors
+    /// 当数据库操作或数据验证失败时返回错误
+    ///
+    /// # Returns
+    /// 返回查询到的用户领域模型（如果存在）
     async fn on_select(&self, id: UserId) -> Result<Option<User>, RepositoryError> {
         let id: i32 = u64::from(id) as i32;
 
@@ -192,6 +255,13 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
             .map_err(RepositoryError::ValidationError)
     }
 
+    /// 更新用户变更到数据库
+    ///
+    /// # Arguments
+    /// * `diff` - 包含变更信息的差异对象
+    ///
+    /// # Errors
+    /// 当数据库操作失败时返回错误
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
         for changes in diff.get_changes::<User>() {
             match changes.diff_type {
@@ -231,6 +301,13 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
         Ok(())
     }
 
+    /// 从数据库删除用户
+    ///
+    /// # Arguments
+    /// * `aggregate` - 要删除的用户领域模型
+    ///
+    /// # Errors
+    /// 当数据库操作失败时返回错误
     async fn on_delete(&self, aggregate: User) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             let id = u64::from(id) as i32;
