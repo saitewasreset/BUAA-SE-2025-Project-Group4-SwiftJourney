@@ -21,7 +21,12 @@ const router = createRouter({
       path: '/homepage',
       name: 'homepage',
       component: () => import('../views/HomePage/HomePageView.vue'),
-    }
+    },
+    {
+      path: '/traintacket',
+      name: 'traintacket',
+      component: () => import('../views/TrainTacket/TrainTacketView.vue'),
+    },
   ],
 })
 
