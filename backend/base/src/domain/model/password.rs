@@ -48,7 +48,7 @@ pub trait PasswordHasher {
 /// ```
 /// use base::domain::model::password::PasswordSalt;
 /// let salt = PasswordSalt::from(vec![0u8; 32]);
-/// assert_eq!(salt.into().len(), 32);
+/// assert_eq!(Vec::from(salt).len(), 32);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PasswordSalt(Vec<u8>);
