@@ -54,6 +54,7 @@
 //! impl Identifiable for Order {
 //!     type ID = OrderId;
 //!     fn get_id(&self) -> Option<Self::ID> { Some(self.id) }
+//!     fn set_id(&mut self, id: Self::ID) { self.id = id; }
 //! }
 //! impl Entity for Order {}
 //! impl Aggregate for Order {}
@@ -154,8 +155,11 @@ where
     /// # impl Identifier for UserId {}
     /// # impl Identifiable for User {
     ///     type ID = UserId;
-    ///     fn get_id(&self) -> Option<Self::ID> {
+    ///         fn get_id(&self) -> Option<Self::ID> {
     ///         Some(self.0)
+    ///     }
+    ///         fn set_id(&mut self, id: Self::ID) {
+    ///         self.0 = id;
     ///     }
     /// }
     /// # impl Entity for User {}
@@ -254,6 +258,10 @@ mod tests {
 
         fn get_id(&self) -> Option<Self::ID> {
             self.id
+        }
+
+        fn set_id(&mut self, id: Self::ID) {
+            self.id = Some(id);
         }
     }
 
@@ -369,6 +377,10 @@ mod tests {
             fn get_id(&self) -> Option<Self::ID> {
                 self.id
             }
+
+            fn set_id(&mut self, id: Self::ID) {
+                self.id = Some(id);
+            }
         }
 
         impl Identifiable for Order {
@@ -376,6 +388,10 @@ mod tests {
 
             fn get_id(&self) -> Option<Self::ID> {
                 self.id
+            }
+
+            fn set_id(&mut self, id: Self::ID) {
+                self.id = Some(id);
             }
         }
 
