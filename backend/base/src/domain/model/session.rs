@@ -97,6 +97,10 @@ impl Identifiable for Session {
     fn get_id(&self) -> Option<Self::ID> {
         Some(self.id)
     }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = id;
+    }
 }
 
 impl Entity for Session {}

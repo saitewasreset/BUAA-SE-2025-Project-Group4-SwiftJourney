@@ -58,6 +58,9 @@
 //!     fn get_id(&self) -> Option<Self::ID> {
 //!         Some(self.id)
 //!     }
+//!     fn set_id(&mut self, id: Self::ID) {
+//!        self.id = id;
+//!    }
 //! }
 //!
 //! impl Entity for User {}
@@ -140,11 +143,16 @@ pub trait Identifier: Debug + 'static + Send + Copy + Clone + PartialEq + Eq + H
 ///     fn get_id(&self) -> Option<Self::ID> {
 ///         Some(self.id)
 ///     }
+///     fn set_id(&mut self, id: Self::ID) {
+///        self.id = id;
+///    }
 /// }
 /// ```
 pub trait Identifiable {
     type ID: Identifier;
     fn get_id(&self) -> Option<Self::ID>;
+
+    fn set_id(&mut self, id: Self::ID);
 }
 
 /// 实体特征，表示领域模型中的基本实体
@@ -175,7 +183,10 @@ pub trait Identifiable {
 /// #
 /// #    fn get_id(&self) -> Option<Self::ID> {
 /// #       todo!()
-/// #       }
+/// #     }
+/// #     fn set_id(&mut self, id: Self::ID) {
+/// #        todo!()
+/// #    }
 /// # }
 /// impl Entity for User {}
 /// ```
@@ -208,6 +219,9 @@ pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 /// #    fn get_id(&self) -> Option<Self::ID> {
 /// #        todo!()
 /// #   }
+/// #    fn set_id(&mut self, id: Self::ID) {
+/// #        todo!()
+/// #   }
 /// # }
 /// #[derive(Debug, Clone)]
 /// struct Order {
@@ -220,6 +234,9 @@ pub trait Entity: Debug + Identifiable + 'static + Send + Clone {}
 /// #    fn get_id(&self) -> Option<Self::ID> {
 /// #       todo!()
 /// #   }
+/// #     fn set_id(&mut self, id: Self::ID) {
+/// #        todo!()
+/// #    }
 /// # }
 /// # impl Entity for OrderItem {}
 /// # impl Entity for Order {}
@@ -347,6 +364,9 @@ where
 /// #     fn get_id(&self) -> Option<Self::ID> {
 /// #        todo!()
 /// #    }
+/// #     fn set_id(&mut self, id: Self::ID) {
+/// #       todo!()
+/// #   }
 /// # }
 /// #
 /// # impl User {
