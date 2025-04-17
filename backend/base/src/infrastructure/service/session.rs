@@ -89,7 +89,7 @@ where
             }
         }
 
-        let session = Session::new(user_id, created_at, expires_at);
+        let mut session = Session::new(user_id, created_at, expires_at);
 
         // 更新会话映射
         self.user_id_to_session
@@ -97,7 +97,7 @@ where
             .or_default()
             .push_back(session.session_id());
 
-        self.session_repository.save(session.clone()).await?;
+        self.session_repository.save(&mut session).await?;
         Ok(session)
     }
 

@@ -119,14 +119,17 @@ impl Repository<Session> for SessionRepositoryImpl {
     /// - 自动覆盖同名会话
     fn save(
         &self,
-        aggregate: Session,
+        aggregate: &mut Session,
     ) -> impl Future<Output = Result<SessionId, RepositoryError>> + Send {
         if let Some(session_id) = aggregate.get_id() {
-            self.session_map.insert(session_id, aggregate);
+            self.session_map.insert(session_id, aggregate.clone());
             future::ready(Ok(session_id))
         } else {
             let session_id = SessionId::random();
-            self.session_map.insert(session_id, aggregate);
+
+            aggregate.set_id(session_id);
+
+            self.session_map.insert(session_id, aggregate.clone());
             future::ready(Ok(session_id))
         }
     }
