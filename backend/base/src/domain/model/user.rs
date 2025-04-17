@@ -694,6 +694,11 @@ impl User {
         &self.info
     }
 
+    /// 获取用户详细信息的可变借用
+    pub fn user_info_mut(&mut self) -> &mut UserInfo {
+        &mut self.info
+    }
+
     /// 设置用户详细信息
     pub fn set_user_info(&mut self, user_info: UserInfo) {
         self.info = user_info;
