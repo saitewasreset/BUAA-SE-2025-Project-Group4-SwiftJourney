@@ -2,10 +2,10 @@
     <div class="TitleBar">
         <el-menu
         :default-active="activeIndex"
-        class="el-menu-demo"
+        class="el-menu"
         mode="horizontal"
         :ellipsis="false"
-        @select="handleSelect"
+        router
         >
             <el-menu-item index="0">
             <div class="webside_title">
@@ -14,29 +14,25 @@
             </div>
             </el-menu-item>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
-            <el-menu-item index="1">首页</el-menu-item>
-            <el-menu-item index="2">车票</el-menu-item>
-            <el-menu-item index="3">酒店</el-menu-item>
-            <el-menu-item index="4">火车餐</el-menu-item>
-            <div class="TitleBarButton">
-                <el-menu-item index="5" style="padding: 0;">
-                    <el-button type="primary" plain>登录</el-button>
-                </el-menu-item>
-                <el-menu-item index="6" style="padding: 10px;">
-                    <el-button type="success" plain>注册</el-button>
-                </el-menu-item>
-            </div>
+            <el-menu-item index="homepage">首页</el-menu-item>
+            <el-menu-item index="traintacket">车票</el-menu-item>
+            <el-menu-item index="hotel">酒店</el-menu-item>
+            <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
+        <div class="TitleBarButton">
+            <el-button type="primary" plain>登录</el-button>
+            <el-button class="TailButton" type="success" plain>注册</el-button>
+        </div>
     </div>
 </template>
   
 <script lang="ts" setup>
     import { ref } from 'vue'
+    import { RouterLink, RouterView } from 'vue-router'
+    import { useRouter } from 'vue-router'
+    const router = useRouter()
 
-    const activeIndex = ref('1')
-    const handleSelect = (key: string, keyPath: string[]) => {
-    console.log(key, keyPath)
-}
+    const activeIndex = ref('homepage')
 </script>
 
 <style lang="css" scoped>
@@ -49,8 +45,14 @@
     z-index: 1000;
     background-color: #fff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
+.el-menu {
+    display: flex;
+}
 .webside_title {
     display: flex;
     align-items: center;
@@ -71,11 +73,6 @@
 .TitleBarButton {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 0;
-}
-
-.el-menu--horizontal > .el-menu-item:nth-child(6) {
-    margin-right: auto;
+    margin-right: 10px;
 }
 </style>
