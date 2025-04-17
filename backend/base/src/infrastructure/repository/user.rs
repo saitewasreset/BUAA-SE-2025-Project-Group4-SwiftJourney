@@ -203,20 +203,22 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
     /// # Arguments
     /// * `aggregate` - 要插入的用户领域模型
     ///
+    /// /// # Returns
+    /// 返回插入后生成的用户ID
     /// # Errors
     /// 当数据库操作失败时返回错误
-    async fn on_insert(&self, aggregate: User) -> Result<(), RepositoryError> {
+    async fn on_insert(&self, aggregate: User) -> Result<UserId, RepositoryError> {
         let id = aggregate.get_id();
 
         let model = UserDataConverter::transform_to_do(aggregate);
 
-        model
+        let result_model = model
             .insert(&self.db)
             .await
             .context(format!("failed to insert user with id: {:?}", id))
             .map_err(RepositoryError::Db)?;
 
-        Ok(())
+        Ok((result_model.id as u64).into())
     }
 
     /// 根据ID查询用户

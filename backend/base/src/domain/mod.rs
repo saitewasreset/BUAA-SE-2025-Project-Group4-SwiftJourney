@@ -477,7 +477,7 @@ where
 {
     fn find(&self, id: AG::ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
     fn remove(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
-    fn save(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+    fn save(&self, aggregate: AG) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
 }
 
 pub trait SnapshottingRepository<AG>: Repository<AG>
@@ -510,7 +510,10 @@ where
     type Manager: AggregateManager<AG>;
 
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>>;
-    fn on_insert(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+    fn on_insert(
+        &self,
+        aggregate: AG,
+    ) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
     fn on_select(
         &self,
         id: AG::ID,
@@ -562,15 +565,8 @@ where
         self.on_delete(aggregate).await
     }
 
-    async fn save(&self, aggregate: AG) -> Result<(), RepositoryError> {
-        if aggregate.get_id().is_none() {
-            self.on_insert(aggregate.clone()).await?;
-
-            self.get_aggregate_manager()
-                .lock()
-                .unwrap()
-                .attach(aggregate);
-        } else {
+    async fn save(&self, aggregate: AG) -> Result<AG::ID, RepositoryError> {
+        if let Some(id) = aggregate.get_id() {
             let diff = self
                 .get_aggregate_manager()
                 .lock()
@@ -583,8 +579,17 @@ where
                     .unwrap()
                     .merge(aggregate);
             }
+            Ok(id)
+        } else {
+            let id = self.on_insert(aggregate.clone()).await?;
+
+            self.get_aggregate_manager()
+                .lock()
+                .unwrap()
+                .attach(aggregate);
+
+            Ok(id)
         }
-        Ok(())
     }
 }
 
