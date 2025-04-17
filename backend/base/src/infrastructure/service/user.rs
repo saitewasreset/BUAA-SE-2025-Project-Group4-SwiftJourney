@@ -104,7 +104,7 @@ where
 
         let hashed_password = P::hash_password(raw_password.as_bytes(), salt.clone()).unwrap();
 
-        let user = User::new(
+        let mut user = User::new(
             None,
             username,
             hashed_password,
@@ -113,7 +113,7 @@ where
             user_info,
         );
 
-        self.repository.save(user).await?;
+        self.repository.save(&mut user).await?;
 
         Ok(())
     }
@@ -159,7 +159,7 @@ where
 
             user.set_hashed_password(new_password);
 
-            self.repository.save(user).await?;
+            self.repository.save(&mut user).await?;
 
             Ok(())
         } else {
@@ -196,7 +196,7 @@ where
 
             user.set_hashed_payment_password(new_password);
 
-            self.repository.save(user).await?;
+            self.repository.save(&mut user).await?;
 
             Ok(())
         } else {
@@ -221,7 +221,7 @@ where
         if let Some(mut user) = self.repository.find(user_id).await? {
             *user.wrong_payment_password_tried_mut() = password_attempts;
 
-            self.repository.save(user).await?;
+            self.repository.save(&mut user).await?;
 
             Ok(())
         } else {
@@ -261,7 +261,7 @@ where
         if let Some(mut user) = self.repository.find(user_id).await? {
             user.wrong_payment_password_tried_mut().increment()?;
 
-            self.repository.save(user).await?;
+            self.repository.save(&mut user).await?;
 
             Ok(())
         } else {
@@ -286,7 +286,7 @@ where
         if let Some(mut user) = self.repository.find(user_id).await? {
             user.set_user_info(user_info);
 
-            self.repository.save(user).await?;
+            self.repository.save(&mut user).await?;
 
             Ok(())
         } else {

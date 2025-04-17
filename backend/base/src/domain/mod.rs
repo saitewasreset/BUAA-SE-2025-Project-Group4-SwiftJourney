@@ -497,7 +497,10 @@ where
 {
     fn find(&self, id: AG::ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
     fn remove(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
-    fn save(&self, aggregate: AG) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
+    fn save(
+        &self,
+        aggregate: &mut AG,
+    ) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
 }
 
 pub trait SnapshottingRepository<AG>: Repository<AG>
@@ -585,7 +588,7 @@ where
         self.on_delete(aggregate).await
     }
 
-    async fn save(&self, aggregate: AG) -> Result<AG::ID, RepositoryError> {
+    async fn save(&self, aggregate: &mut AG) -> Result<AG::ID, RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             let diff = self
                 .get_aggregate_manager()
@@ -597,16 +600,18 @@ where
                 self.get_aggregate_manager()
                     .lock()
                     .unwrap()
-                    .merge(aggregate);
+                    .merge(aggregate.clone());
             }
             Ok(id)
         } else {
             let id = self.on_insert(aggregate.clone()).await?;
 
+            aggregate.set_id(id);
+
             self.get_aggregate_manager()
                 .lock()
                 .unwrap()
-                .attach(aggregate);
+                .attach(aggregate.clone());
 
             Ok(id)
         }
