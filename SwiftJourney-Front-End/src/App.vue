@@ -4,11 +4,19 @@ import TitleBar from './components/TitleBar/TitleBar.vue';
 </script>
 
 <template>
-  <TitleBar />
-  <RouterView />
+  <div style="width: 100%; height: 100%; padding: 0%; margin: 0%;">
+    <TitleBar />
+    <RouterView />
+  </div>
 </template>
 
 <style scoped>
+#app {
+  height: 100%;
+  width: 100%;
+  padding: 0%;
+  margin: 0%;
+}
 header {
   line-height: 1.5;
   max-height: 100vh;
