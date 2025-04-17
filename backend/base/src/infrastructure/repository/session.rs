@@ -112,13 +112,22 @@ impl Repository<Session> for SessionRepositoryImpl {
     /// # Arguments
     /// - `aggregate`: 要保存的会话实体
     ///
+    /// # Returns
+    /// - 会话ID
+    ///
     /// # Notes
     /// - 自动覆盖同名会话
-    fn save(&self, aggregate: Session) -> impl Future<Output = Result<(), RepositoryError>> + Send {
+    fn save(
+        &self,
+        aggregate: Session,
+    ) -> impl Future<Output = Result<SessionId, RepositoryError>> + Send {
         if let Some(session_id) = aggregate.get_id() {
             self.session_map.insert(session_id, aggregate);
+            future::ready(Ok(session_id))
+        } else {
+            let session_id = SessionId::random();
+            self.session_map.insert(session_id, aggregate);
+            future::ready(Ok(session_id))
         }
-
-        future::ready(Ok(()))
     }
 }

@@ -649,6 +649,11 @@ impl User {
         }
     }
 
+    /// 获取用户ID的可变借用
+    pub fn id_mut(&mut self) -> &mut Option<UserId> {
+        &mut self.id
+    }
+
     /// 获取用户名
     pub fn username(&self) -> &str {
         &self.username
