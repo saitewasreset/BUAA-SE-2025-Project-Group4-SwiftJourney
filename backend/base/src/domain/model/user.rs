@@ -705,6 +705,10 @@ impl Identifiable for User {
     fn get_id(&self) -> Option<UserId> {
         self.id
     }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id);
+    }
 }
 
 /// 支付密码
