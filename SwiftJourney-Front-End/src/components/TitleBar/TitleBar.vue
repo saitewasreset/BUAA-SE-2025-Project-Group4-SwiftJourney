@@ -15,7 +15,7 @@
             </el-menu-item>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
             <el-menu-item index="homepage">首页</el-menu-item>
-            <el-menu-item index="traintacket">车票</el-menu-item>
+            <el-menu-item index="trainTicket">车票</el-menu-item>
             <el-menu-item index="hotel">酒店</el-menu-item>
             <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
