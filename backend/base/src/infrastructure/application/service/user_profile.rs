@@ -18,11 +18,9 @@
 //! - 所有操作都需要有效的会话ID
 //! - 更新操作会验证输入数据的有效性
 //! - 错误处理遵循应用层定义的错误规范
-use crate::application::ApplicationError;
 use crate::application::commands::user_profile::{SetUserProfileCommand, UserProfileQuery};
-use crate::application::service::user_profile::{
-    UserProfileDTO, UserProfileError, UserProfileService,
-};
+use crate::application::service::user_profile::{UserProfileDTO, UserProfileService};
+use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
 use crate::domain::model::user::{Age, Gender, User};
 use crate::domain::repository::user::UserRepository;
@@ -86,28 +84,28 @@ where
     /// - `Err(Box<dyn ApplicationError>)`: 错误信息
     ///
     /// # Errors
-    /// - `UserProfileError::InvalidSessionId`: 无效的会话ID
-    /// - `UserProfileError::InternalServerError`: 内部服务错误
+    /// - `GeneralError::InvalidSessionId`: 无效的会话ID
+    /// - `GeneralError::InternalServerError`: 内部服务错误
     async fn get_user_entity_by_session_id(
         &self,
         session_id: &str,
     ) -> Result<User, Box<dyn ApplicationError>> {
         let session_id = SessionId::try_from(session_id)
-            .map_err(|_for_super_earth| UserProfileError::InvalidSessionId)?;
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
 
         let user_id = self
             .session_manager
             .get_user_id_by_session(session_id)
             .await
-            .map_err(|_for_super_earth| UserProfileError::InternalServerError)?
-            .ok_or(UserProfileError::InvalidSessionId)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::InvalidSessionId)?;
 
         let user = self
             .user_repository
             .find(user_id)
             .await
-            .map_err(|_for_super_earth| UserProfileError::InternalServerError)?
-            .ok_or(UserProfileError::InvalidSessionId)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::InvalidSessionId)?;
 
         Ok(user)
     }
@@ -131,8 +129,8 @@ where
     /// - `Err(Box<dyn ApplicationError>)`: 错误信息
     ///
     /// # Errors
-    /// - `UserProfileError::InvalidSessionId`: 无效的会话ID
-    /// - `UserProfileError::InternalServerError`: 内部服务错误c
+    /// - `GeneralError::InvalidSessionId`: 无效的会话ID
+    /// - `GeneralError::InternalServerError`: 内部服务错误c
     async fn get_profile(
         &self,
         query: UserProfileQuery,
@@ -155,9 +153,9 @@ where
     /// - `Err(Box<dyn ApplicationError>)`: 错误信息
     ///
     /// # Errors
-    /// - `UserProfileError::InvalidSessionId`: 无效的会话ID
-    /// - `UserProfileError::BadRequest`: 无效的输入数据
-    /// - `UserProfileError::InternalServerError`: 内部服务错误
+    /// - `GeneralError::InvalidSessionId`: 无效的会话ID
+    /// - `GeneralError::BadRequest`: 无效的输入数据
+    /// - `GeneralError::InternalServerError`: 内部服务错误
     async fn set_profile(
         &self,
         command: SetUserProfileCommand,
@@ -170,16 +168,16 @@ where
             .gender
             .map(|gender| Gender::try_from(gender.as_str()))
             .transpose()
-            .map_err(|e| UserProfileError::BadRequest(e.to_string()))?;
+            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
 
         let age = command
             .age
             .map(|age| Age::try_from(age as i32))
             .transpose()
-            .map_err(|e| UserProfileError::BadRequest(e.to_string()))?;
+            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
 
         let email = EmailAddress::from_str(command.email.as_str())
-            .map_err(|e| UserProfileError::BadRequest(e.to_string()))?;
+            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
 
         user.user_info_mut().gender = gender;
         user.user_info_mut().age = age;
@@ -188,7 +186,7 @@ where
         self.user_repository
             .save(&mut user)
             .await
-            .map_err(|_for_super_earth| UserProfileError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(())
     }
@@ -335,7 +333,7 @@ mod tests {
 
         assert!(matches!(
             (result.unwrap_err() as Box<dyn std::error::Error>).downcast_ref(),
-            Some(UserProfileError::InvalidSessionId)
+            Some(GeneralError::InvalidSessionId)
         ));
     }
 
@@ -420,8 +418,8 @@ mod tests {
             .await;
 
         assert!(matches!(
-            (result.unwrap_err() as Box<dyn std::error::Error>).downcast_ref::<UserProfileError>(),
-            Some(UserProfileError::BadRequest(_))
+            (result.unwrap_err() as Box<dyn std::error::Error>).downcast_ref::<GeneralError>(),
+            Some(GeneralError::BadRequest(_))
         ));
     }
 
@@ -458,8 +456,8 @@ mod tests {
             .await;
 
         assert!(matches!(
-            (result.unwrap_err() as Box<dyn std::error::Error>).downcast_ref::<UserProfileError>(),
-            Some(UserProfileError::InternalServerError)
+            (result.unwrap_err() as Box<dyn std::error::Error>).downcast_ref::<GeneralError>(),
+            Some(GeneralError::InternalServerError)
         ));
     }
 }
