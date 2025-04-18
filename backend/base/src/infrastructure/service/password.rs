@@ -157,3 +157,30 @@ where
 /// - `Argon2PasswordHasher`
 pub type Argon2PasswordServiceImpl =
     PasswordServiceImpl<Argon2PasswordSaltGenerator, Argon2PasswordHasher>;
+
+pub struct MockPasswordServiceImpl {}
+
+impl PasswordService for MockPasswordServiceImpl {
+    fn generate_salt() -> PasswordSalt {
+        PasswordSalt::from(vec![0u8; 32])
+    }
+
+    fn hash_password(raw_password: &[u8], salt: PasswordSalt) -> anyhow::Result<HashedPassword> {
+        Ok(HashedPassword {
+            hashed_password: raw_password.to_owned(),
+            salt,
+        })
+    }
+
+    fn verify(raw_password: &[u8], _hashed_password: HashedPassword) -> anyhow::Result<bool> {
+        if let Some(first_byte) = raw_password.first() {
+            if *first_byte == 0 {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(true)
+        }
+    }
+}
