@@ -103,7 +103,13 @@ where
 
     /// 删除指定会话
     async fn delete_session(&self, session: Session) -> Result<(), RepositoryError> {
-        self.session_repository.remove(session).await
+        if let Some(mut user_sessions) = self.user_id_to_session.get_mut(&session.user_id()) {
+            user_sessions.retain(|session_id| *session_id != session.session_id());
+        }
+
+        self.session_repository.remove(session).await?;
+
+        Ok(())
     }
 
     /// 查询会话详情
