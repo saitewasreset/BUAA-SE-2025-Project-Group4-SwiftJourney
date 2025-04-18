@@ -42,7 +42,7 @@ pub trait SessionManagerService {
     fn create_session(
         &self,
         user_id: UserId,
-    ) -> impl Future<Output = Result<Session, RepositoryError>>;
+    ) -> impl Future<Output = Result<Session, RepositoryError>> + Send;
 
     /// 删除会话
     ///
@@ -52,8 +52,10 @@ pub trait SessionManagerService {
     /// # 返回
     /// - `Ok(())`: 删除成功
     /// - `Err(RepositoryError)`: 如果删除失败
-    fn delete_session(&self, session: Session)
-    -> impl Future<Output = Result<(), RepositoryError>>;
+    fn delete_session(
+        &self,
+        session: Session,
+    ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 
     /// 查询会话详情
     ///
@@ -67,7 +69,7 @@ pub trait SessionManagerService {
     fn get_session(
         &self,
         session_id: SessionId,
-    ) -> impl Future<Output = Result<Option<Session>, RepositoryError>>;
+    ) -> impl Future<Output = Result<Option<Session>, RepositoryError>> + Send;
 
     /// 通过会话ID获取用户ID
     ///
@@ -81,5 +83,5 @@ pub trait SessionManagerService {
     fn get_user_id_by_session(
         &self,
         session_id: SessionId,
-    ) -> impl Future<Output = Result<Option<UserId>, RepositoryError>>;
+    ) -> impl Future<Output = Result<Option<UserId>, RepositoryError>> + Send;
 }
