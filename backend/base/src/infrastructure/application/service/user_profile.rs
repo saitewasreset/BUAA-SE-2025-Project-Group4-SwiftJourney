@@ -27,6 +27,7 @@ use crate::domain::model::session::SessionId;
 use crate::domain::model::user::{Age, Gender, User};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
+use async_trait::async_trait;
 use email_address::EmailAddress;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -112,6 +113,7 @@ where
     }
 }
 
+#[async_trait]
 impl<S, U> UserProfileService for UserProfileServiceImpl<S, U>
 where
     S: SessionManagerService + 'static + Send + Sync,
