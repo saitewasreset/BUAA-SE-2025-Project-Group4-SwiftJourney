@@ -137,6 +137,32 @@ where
         Ok(())
     }
 
+    /// 验证用户登录密码实现
+    ///
+    /// # Arguments
+    /// * `user` - 用户实体
+    /// * `raw_password` - 用户提供的明文密码
+    ///
+    /// # Errors
+    /// * `NoSuchUser` - 用户不存在
+    /// * `InfrastructureError` - 基础设施或密码服务错误
+    async fn verify_password(
+        &self,
+        user: &User,
+        raw_password: String,
+    ) -> Result<(), UserServiceError> {
+        let pass =
+            P::verify(raw_password.as_bytes(), user.hashed_password().clone()).map_err(|e| {
+                UserServiceError::InfrastructureError(ServiceError::RelatedServiceError(e))
+            })?;
+
+        if !pass {
+            Err(UserServiceError::InvalidPassword)
+        } else {
+            Ok(())
+        }
+    }
+
     /// 设置登录密码实现
     ///
     /// # Arguments
