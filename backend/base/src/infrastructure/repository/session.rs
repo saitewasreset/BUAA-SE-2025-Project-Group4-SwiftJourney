@@ -8,7 +8,7 @@
 //! - 配置驱动的清理策略
 
 use crate::domain::model::session::{Session, SessionId};
-use crate::domain::repository::session::SessionRepositoryConfig;
+use crate::domain::repository::session::{SessionRepository, SessionRepositoryConfig};
 use crate::domain::{Identifiable, Repository, RepositoryError};
 use dashmap::DashMap;
 use std::future;
@@ -134,3 +134,5 @@ impl Repository<Session> for SessionRepositoryImpl {
         }
     }
 }
+
+impl SessionRepository for SessionRepositoryImpl {}
