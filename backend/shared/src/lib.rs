@@ -13,3 +13,13 @@ pub static PHONE_PREFIX_SET: Set<&'static str> = phf_set! {
 "155", "156", "166", "167", "171", "175", "176", "185", "186", "196", "133",
 "141", "149", "153", "162", "173", "174", "177", "180", "181", "189", "190",
 "191", "193", "199", "192"};
+
+pub const API_SUCCESS_CODE: u32 = 200;
+pub const API_SUCCESS_MESSAGE: &str = "For Super Earth!";
+
+pub const API_FORBIDDEN_MESSAGE_TEMPLATE: &str =
+    "Sorry, but this was meant to be a private game: {}";
+pub const API_BAD_REQUEST_MESSAGE_TEMPLATE: &str = "{}";
+
+pub const API_INTERNAL_SERVER_ERROR_MESSAGE: &str =
+    "Multiplayer Session Ended: an internal server error has occurred";
