@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionConfig {
     pub default_ttl: std::time::Duration,
     pub max_concurrent_sessions_per_user: usize,

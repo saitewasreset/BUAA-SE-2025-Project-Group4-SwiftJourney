@@ -29,6 +29,8 @@ use crate::domain::model::session::Session;
 ///     session_cleanup_interval: Duration::from_secs(60), // 1分钟清理一次
 /// };
 /// ```
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionRepositoryConfig {
     /// 清理过期会话的时间间隔
     pub session_cleanup_interval: std::time::Duration,
