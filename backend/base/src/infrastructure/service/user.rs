@@ -294,3 +294,208 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::password::{HashedPassword, PasswordSalt};
+    use crate::domain::{Identifiable, Repository, RepositoryError};
+    use crate::infrastructure::service::password::{
+        Argon2PasswordServiceImpl, MockPasswordServiceImpl,
+    };
+    use mockall::mock;
+
+    mock! {
+        UserRepo {}
+
+        impl Repository<User> for UserRepo {
+            async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
+            async fn save(&self, user: &mut User) -> Result<UserId, RepositoryError>;
+            async fn remove(&self, aggregate: User) -> Result<(), RepositoryError>;
+        }
+
+        impl UserRepository for UserRepo {
+            async fn find_by_phone(&self,phone: Phone,) -> Result<Option<User>, RepositoryError>;
+
+            async fn find_by_identity_card_id(&self,identity_card_id: IdentityCardId,) -> Result<Option<User>, RepositoryError>;
+
+            async fn remove_by_phone(&self,phone: Phone,) -> Result<(), RepositoryError>;
+        }
+    }
+
+    type MockRepo = MockUserRepo;
+
+    fn default_test_user() -> User {
+        let salt: PasswordSalt = vec![0u8; 32].into();
+        let hashed_password: HashedPassword = HashedPassword {
+            hashed_password: vec![0u8; 32],
+            salt,
+        };
+
+        User::new(
+            None,
+            "For Super Earth!".to_owned(),
+            hashed_password,
+            None,
+            PasswordAttempts::default(),
+            UserInfo::new(
+                "No Diver Left Behind!".to_owned(),
+                None,
+                None,
+                Phone::try_from("13800000000".to_string()).unwrap(),
+                None,
+                IdentityCardId::try_from("110108197703065171".to_string()).unwrap(),
+            ),
+        )
+    }
+
+    // 注册测试
+    #[tokio::test]
+    async fn register_success() {
+        let username = "For Super Earth!";
+        let raw_password = "";
+        let name = "No Diver Left Behind!";
+        let phone = "13800000000";
+        let identity_card_id = "110108197703065171";
+
+        let mut repo = MockRepo::new();
+
+        repo.expect_find().returning(|_| Ok(None));
+        repo.expect_find_by_phone().returning(|_| Ok(None));
+        repo.expect_find_by_identity_card_id()
+            .returning(|_| Ok(None));
+
+        repo.expect_save()
+            .withf(move |user| {
+                user.username() == username
+                    && user.user_info().name == name
+                    && &*user.user_info().phone == phone
+                    && &*user.user_info().identity_card_id == identity_card_id
+            })
+            .times(1)
+            .returning(|_| Ok(UserId::from(1)));
+
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+
+        let result = service
+            .register(
+                username.to_string(),
+                raw_password.to_string(),
+                name.to_string(),
+                Phone::try_from(phone.to_string()).unwrap(),
+                IdentityCardId::try_from(identity_card_id.to_string()).unwrap(),
+            )
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn register_phone_exists() {
+        let mut repo = MockRepo::new();
+
+        repo.expect_find().returning(|_| Ok(None));
+        repo.expect_find_by_phone()
+            .returning(|_| Ok(Some(default_test_user())));
+        repo.expect_find_by_identity_card_id()
+            .returning(|_| Ok(None));
+
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+
+        let default_user = default_test_user();
+
+        let result = service
+            .register(
+                default_user.username().to_owned(),
+                "".to_owned(),
+                default_user.user_info().name.to_owned(),
+                default_user.user_info().phone.clone(),
+                default_user.user_info().identity_card_id.clone(),
+            )
+            .await;
+
+        assert!(matches!(result, Err(UserServiceError::UserExists(_, _))));
+    }
+
+    // 删除用户测试
+    #[tokio::test]
+    async fn delete_success() {
+        let mut repo = MockUserRepo::new();
+        repo.expect_remove_by_phone()
+            .withf(|x| {
+                let default_user = default_test_user();
+
+                let actual: &str = x.as_ref();
+                let expected: &str = default_user.user_info().phone.as_ref();
+
+                expected == actual
+            })
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+
+        let result = service
+            .delete(default_test_user().user_info().phone.to_owned())
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // 设置密码测试
+    #[tokio::test]
+    async fn set_password_success() {
+        let user = default_test_user();
+
+        let mut repo = MockUserRepo::new();
+
+        let prev_hashed_password = user.hashed_password().clone();
+        {
+            let user = user.clone();
+            repo.expect_find()
+                .returning(move |_| Ok(Some(user.clone())));
+        }
+
+        repo.expect_save()
+            .withf(move |u| {
+                let current_hashed_password = u.hashed_password().clone();
+                current_hashed_password.hashed_password != prev_hashed_password.hashed_password
+                    && current_hashed_password.salt == prev_hashed_password.salt
+            })
+            .times(1)
+            .returning(|_| Ok(UserId::from(1)));
+
+        let service = UserServiceImpl::<_, MockPasswordServiceImpl>::new(repo);
+
+        let result = service
+            .set_password(UserId::from(1), "new_password".to_string())
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // 支付密码错误尝试测试
+    #[tokio::test]
+    async fn increment_payment_attempts_exceed() {
+        let mut user = default_test_user();
+
+        user.set_id(UserId::from(1));
+
+        let user_id = user.get_id().unwrap();
+
+        *user.wrong_payment_password_tried_mut() =
+            PasswordAttempts::try_from(PasswordAttempts::MAX).unwrap();
+
+        let mut repo = MockUserRepo::new();
+        repo.expect_find()
+            .returning(move |_| Ok(Some(user.clone())));
+
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+
+        let result = service
+            .increment_wrong_payment_password_tried(user_id)
+            .await;
+        assert!(matches!(
+            result,
+            Err(UserServiceError::PaymentPasswordMaxAttemptsExceed(_))
+        ));
+    }
+}
