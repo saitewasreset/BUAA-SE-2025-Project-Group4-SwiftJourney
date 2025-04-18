@@ -7,7 +7,19 @@ edition = "2024"
 
 base = { path = "../../base" }
 shared = { path = "../../shared" }
+migration = { path = "../../migration" }
+
+thiserror = "2.0"
+dyn-fmt = "0.4"
+
+sea-orm = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
 
 actix-web = { version = "4.9", features = ["cookies"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+tracing = "0.1"

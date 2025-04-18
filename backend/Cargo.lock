@@ -325,10 +325,13 @@ dependencies = [
  "actix-web",
  "base",
  "dyn-fmt",
+ "migration",
+ "sea-orm",
  "serde",
  "serde_json",
  "shared",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
