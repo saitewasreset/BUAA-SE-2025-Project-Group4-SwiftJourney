@@ -12,7 +12,7 @@ use crate::application::commands::user_profile::{SetUserProfileCommand, UserProf
 use crate::domain::model::user::User;
 use async_trait::async_trait;
 use dyn_fmt::AsStrFormatExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use shared::{
     API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_MESSAGE_TEMPLATE,
     API_INTERNAL_SERVER_ERROR_MESSAGE,
@@ -33,7 +33,7 @@ use thiserror::Error;
 /// - `have_payment_password_set`: 是否设置了支付密码
 /// - `name`: 真实姓名
 /// - `identity_card_id`: 身份证号
-#[derive(Serialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct UserProfileDTO {
     pub username: String,
     pub gender: Option<String>,
@@ -45,6 +45,14 @@ pub struct UserProfileDTO {
     pub name: String,
     #[serde(rename = "identityCardId")]
     pub identity_card_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct SetUserProfileDTO {
+    pub username: String,
+    pub gender: Option<String>,
+    pub age: Option<u16>,
+    pub email: String,
 }
 
 impl From<User> for UserProfileDTO {
