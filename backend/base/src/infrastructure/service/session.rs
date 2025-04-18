@@ -37,7 +37,7 @@ use crate::domain::{
 /// 使用`Arc<DashMap>`保证线程安全，适合多线程环境。
 pub struct SessionManagerServiceImpl<R>
 where
-    R: SessionRepository,
+    R: SessionRepository + 'static + Send + Sync,
 {
     /// 会话存储仓库
     session_repository: R,
@@ -49,7 +49,7 @@ where
 
 impl<R> SessionManagerServiceImpl<R>
 where
-    R: SessionRepository,
+    R: SessionRepository + 'static + Send + Sync,
 {
     /// 创建新的会话管理器
     ///
@@ -67,7 +67,7 @@ where
 
 impl<R> SessionManagerService for SessionManagerServiceImpl<R>
 where
-    R: SessionRepository,
+    R: SessionRepository + 'static + Send + Sync,
 {
     /// 创建新会话(自动管理会话限制)
     ///
