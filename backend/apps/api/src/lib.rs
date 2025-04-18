@@ -132,12 +132,6 @@ impl ApplicationError for SessionIdError {
     }
 }
 
-impl From<SessionIdError> for Box<dyn ApplicationError> {
-    fn from(err: SessionIdError) -> Self {
-        Box::new(err)
-    }
-}
-
 pub fn get_session_id(request: &HttpRequest) -> Result<String, Box<dyn ApplicationError>> {
     if let Some(provided_session_id) = request.cookie("session_id") {
         Ok(provided_session_id.value().to_string())
