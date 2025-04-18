@@ -132,3 +132,246 @@ where
             .map(|session| session.map(|s| s.user_id()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::Repository;
+    use chrono::{Duration, Utc};
+    use mockall::predicate::*;
+    use mockall::*;
+    use tokio::test;
+
+    mock! {
+        pub SessionRepository {}
+        impl Repository<Session> for SessionRepository {
+            async fn find(&self, id: SessionId) -> Result<Option<Session>, RepositoryError>;
+            async fn remove(&self, aggregate: Session) -> Result<(), RepositoryError>;
+            async fn save(&self, aggregate: &mut Session) ->Result<SessionId, RepositoryError>;
+        }
+        impl SessionRepository for SessionRepository {}
+    }
+
+    fn create_test_config() -> SessionConfig {
+        SessionConfig {
+            max_concurrent_sessions_per_user: 2,
+            default_ttl: std::time::Duration::from_secs(3600),
+        }
+    }
+
+    #[test]
+    async fn test_create_session_within_limit() {
+        let config = create_test_config();
+        let user_id = UserId::from(1);
+
+        // 设置mock的save方法
+        let mut mock_repo = MockSessionRepository::new();
+        mock_repo
+            .expect_save()
+            .times(2)
+            .returning(|_| Ok(SessionId::random()));
+
+        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+
+        let session1 = manager.create_session(user_id).await.unwrap();
+        let session2 = manager.create_session(user_id).await.unwrap();
+
+        // 检查用户会话映射
+        let sessions = manager.user_id_to_session.get(&user_id).unwrap();
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0], session1.session_id());
+        assert_eq!(sessions[1], session2.session_id());
+    }
+
+    #[test]
+    async fn test_create_session_exceeds_limit_evicts_oldest() {
+        let user_id = UserId::from(1);
+        let config = SessionConfig {
+            max_concurrent_sessions_per_user: 1,
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+
+        // 第一次创建会话
+        let mut mock_repo1 = MockSessionRepository::new();
+        mock_repo1
+            .expect_save()
+            .return_once(|_| Ok(SessionId::random()));
+        let manager = SessionManagerServiceImpl::new(mock_repo1, config);
+        let session1 = manager.create_session(user_id).await.unwrap();
+
+        // 第二次创建会话，触发淘汰
+        let mut mock_repo2 = MockSessionRepository::new();
+        {
+            let session1 = session1.clone();
+            mock_repo2
+                .expect_find()
+                .with(eq(session1.session_id()))
+                .return_once(move |_| Ok(Some(session1)));
+        }
+
+        mock_repo2
+            .expect_remove()
+            .with(eq(session1.clone()))
+            .return_once(|_| Ok(()));
+        mock_repo2
+            .expect_save()
+            .return_once(|_| Ok(SessionId::random()));
+        let manager = SessionManagerServiceImpl::new(mock_repo2, config);
+
+        let session2 = manager.create_session(user_id).await.unwrap();
+
+        // 验证映射更新
+        let sessions = manager.user_id_to_session.get(&user_id).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0], session2.session_id());
+    }
+
+    #[test]
+    async fn test_delete_session_calls_repository_remove() {
+        let mut mock_repo = MockSessionRepository::new();
+
+        mock_repo
+            .expect_remove()
+            .withf(|session| u64::from(session.user_id()) == 1)
+            .return_once(|_| Ok(()));
+
+        let config = create_test_config();
+        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let session = Session::new(UserId::from(1), Utc::now(), Utc::now() + Duration::hours(1));
+
+        manager.delete_session(session).await.unwrap();
+    }
+
+    #[test]
+    async fn test_get_session_returns_repository_result() {
+        let session_id = SessionId::random();
+        let mut mock_repo = MockSessionRepository::new();
+        let config = create_test_config();
+
+        let mut seq = Sequence::new();
+
+        // 测试找到会话
+        let expected_session =
+            Session::new(UserId::from(1), Utc::now(), Utc::now() + Duration::hours(1));
+        {
+            let expected_session = expected_session.clone();
+            mock_repo
+                .expect_find()
+                .with(eq(session_id))
+                .times(1)
+                .in_sequence(&mut seq)
+                .return_once(move |_| Ok(Some(expected_session)));
+        }
+
+        // 测试未找到会话
+        mock_repo
+            .expect_find()
+            .with(eq(session_id))
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_once(|_| Ok(None));
+
+        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+
+        let result = manager.get_session(session_id).await.unwrap();
+        assert_eq!(result, Some(expected_session));
+
+        let result = manager.get_session(session_id).await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    async fn test_get_user_id_by_session_returns_correct_user_id() {
+        let session_id = SessionId::random();
+        let user_id = UserId::from(1);
+        let mut mock_repo = MockSessionRepository::new();
+        let config = create_test_config();
+
+        let mut seq = Sequence::new();
+
+        // 存在有效会话
+        let session = Session::new(user_id, Utc::now(), Utc::now() + Duration::hours(1));
+        mock_repo
+            .expect_find()
+            .with(eq(session_id))
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_once(|_| Ok(Some(session)));
+
+        // 会话不存在
+        mock_repo
+            .expect_find()
+            .with(eq(session_id))
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_once(|_| Ok(None));
+
+        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+
+        let result = manager.get_user_id_by_session(session_id).await.unwrap();
+        assert_eq!(result, Some(user_id));
+
+        let result = manager.get_user_id_by_session(session_id).await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    async fn test_session_expiration_not_checked_in_get_user_id() {
+        let session_id = SessionId::random();
+        let user_id = UserId::from(1);
+        let mut mock_repo = MockSessionRepository::new();
+        let config = create_test_config();
+
+        // 已过期的会话仍返回用户ID（根据当前实现）
+        let expired_session = Session::new(
+            user_id,
+            Utc::now() - Duration::hours(2),
+            Utc::now() - Duration::hours(1),
+        );
+
+        mock_repo
+            .expect_find()
+            .with(eq(session_id))
+            .return_once(|_| Ok(Some(expired_session)));
+
+        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+
+        let result = manager.get_user_id_by_session(session_id).await.unwrap();
+        assert_eq!(result, Some(user_id));
+    }
+
+    #[test]
+    async fn test_evict_nonexistent_session_handled_gracefully() {
+        let user_id = UserId::from(1);
+        let config = SessionConfig {
+            max_concurrent_sessions_per_user: 1,
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+
+        // 第一次创建会话
+        let mut mock_repo1 = MockSessionRepository::new();
+        mock_repo1
+            .expect_save()
+            .return_once(|_| Ok(SessionId::random()));
+        let manager = SessionManagerServiceImpl::new(mock_repo1, config);
+        let session1 = manager.create_session(user_id).await.unwrap();
+
+        // 第二次创建会话，触发淘汰但旧会话不存在
+        let mut mock_repo2 = MockSessionRepository::new();
+        mock_repo2
+            .expect_find()
+            .with(eq(session1.session_id()))
+            .return_once(|_| Ok(None));
+        mock_repo2
+            .expect_save()
+            .return_once(|_| Ok(SessionId::random()));
+        let manager = SessionManagerServiceImpl::new(mock_repo2, config);
+
+        let session2 = manager.create_session(user_id).await.unwrap();
+
+        // 验证新会话被添加，旧会话未被删除
+        let sessions = manager.user_id_to_session.get(&user_id).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0], session2.session_id());
+    }
+}
