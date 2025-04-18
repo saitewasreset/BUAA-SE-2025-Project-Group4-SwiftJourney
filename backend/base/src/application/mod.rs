@@ -13,6 +13,15 @@ pub trait ApplicationError: std::error::Error + 'static {
     fn error_message(&self) -> String;
 }
 
+impl<T> From<T> for Box<dyn ApplicationError>
+where
+    T: ApplicationError,
+{
+    fn from(value: T) -> Self {
+        Box::new(value)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum GeneralError {
     /// 会话ID无效
@@ -24,12 +33,6 @@ pub enum GeneralError {
     /// 服务器内部错误
     #[error("an internal server error occurred")]
     InternalServerError,
-}
-
-impl From<GeneralError> for Box<dyn ApplicationError> {
-    fn from(err: GeneralError) -> Self {
-        Box::new(err)
-    }
 }
 
 impl ApplicationError for GeneralError {
