@@ -90,12 +90,6 @@ pub enum UserProfileError {
     InternalServerError,
 }
 
-impl From<UserProfileError> for Box<dyn ApplicationError> {
-    fn from(err: UserProfileError) -> Self {
-        Box::new(err)
-    }
-}
-
 impl ApplicationError for UserProfileError {
     fn error_code(&self) -> u32 {
         match self {
