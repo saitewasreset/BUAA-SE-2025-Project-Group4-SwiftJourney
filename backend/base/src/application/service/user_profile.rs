@@ -10,6 +10,7 @@
 use crate::application::ApplicationError;
 use crate::application::commands::user_profile::{SetUserProfileCommand, UserProfileQuery};
 use crate::domain::model::user::User;
+use async_trait::async_trait;
 use dyn_fmt::AsStrFormatExt;
 use serde::Serialize;
 use shared::{
@@ -120,14 +121,16 @@ impl ApplicationError for UserProfileError {
 /// - `UserProfileError::InvalidSessionId`: 当会话无效时
 /// - `UserProfileError::BadRequest`: 当请求参数无效时
 /// - `UserProfileError::InternalServerError`: 当服务器内部错误时
-pub trait UserProfileService: 'static + Sync {
-    fn get_profile(
+
+#[async_trait]
+pub trait UserProfileService {
+    async fn get_profile(
         &self,
         query: UserProfileQuery,
-    ) -> impl Future<Output = Result<UserProfileDTO, Box<dyn ApplicationError>>> + Send;
+    ) -> Result<UserProfileDTO, Box<dyn ApplicationError>>;
 
-    fn set_profile(
+    async fn set_profile(
         &self,
         command: SetUserProfileCommand,
-    ) -> impl Future<Output = Result<(), Box<dyn ApplicationError>>> + Send;
+    ) -> Result<(), Box<dyn ApplicationError>>;
 }
