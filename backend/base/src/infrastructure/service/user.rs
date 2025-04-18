@@ -10,6 +10,7 @@ use crate::domain::service::ServiceError;
 use crate::domain::service::password::PasswordService;
 use crate::domain::service::user::{UserService, UserServiceError};
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// 用户服务具体实现
 ///
@@ -26,7 +27,7 @@ where
     P: PasswordService,
 {
     /// 用户仓储实例
-    repository: R,
+    repository: Arc<R>,
     /// 用于标记密码服务类型的PhantomData
     _for_super_earth: PhantomData<P>,
 }
@@ -40,7 +41,7 @@ where
     ///
     /// # Arguments
     /// * `repository` - 用户仓储实现
-    pub fn new(repository: R) -> Self {
+    pub fn new(repository: Arc<R>) -> Self {
         Self {
             repository,
             _for_super_earth: PhantomData,
@@ -375,7 +376,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(UserId::from(1)));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
 
         let result = service
             .register(
@@ -400,7 +401,7 @@ mod tests {
         repo.expect_find_by_identity_card_id()
             .returning(|_| Ok(None));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
 
         let default_user = default_test_user();
 
@@ -433,7 +434,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
 
         let result = service
             .delete(default_test_user().user_info().phone.to_owned())
@@ -464,7 +465,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(UserId::from(1)));
 
-        let service = UserServiceImpl::<_, MockPasswordServiceImpl>::new(repo);
+        let service = UserServiceImpl::<_, MockPasswordServiceImpl>::new(Arc::new(repo));
 
         let result = service
             .set_password(UserId::from(1), "new_password".to_string())
@@ -488,7 +489,7 @@ mod tests {
         repo.expect_find()
             .returning(move |_| Ok(Some(user.clone())));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(repo);
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
 
         let result = service
             .increment_wrong_payment_password_tried(user_id)
