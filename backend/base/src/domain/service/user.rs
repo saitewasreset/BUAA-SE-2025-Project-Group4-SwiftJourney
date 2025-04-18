@@ -5,7 +5,7 @@
 
 use crate::domain::RepositoryError;
 use crate::domain::model::user::{
-    IdentityCardId, PasswordAttempts, PasswordError, PaymentPassword, Phone, UserId, UserInfo,
+    IdentityCardId, PasswordAttempts, PasswordError, PaymentPassword, Phone, User, UserId, UserInfo,
 };
 use crate::domain::service::ServiceError;
 use thiserror::Error;
@@ -74,6 +74,7 @@ pub trait UserService {
     /// # Errors
     /// * `UserExists` - 手机号或身份证号已存在
     /// * `InfrastructureError` - 基础设施错误（如数据库访问失败）
+    /// * `InvalidPassword` - 密码错误
     fn register(
         &self,
         username: String,
@@ -96,6 +97,21 @@ pub trait UserService {
     /// * `NoSuchUser` - 指定手机号的用户不存在
     /// * `InfrastructureError` - 基础设施错误
     fn delete(&self, phone: Phone) -> impl Future<Output = Result<(), UserServiceError>> + Send;
+
+    /// 验证用户登录密码
+    ///
+    /// # Arguments
+    /// * `user` - 用户实体
+    /// * `raw_password` - 用户提供的明文密码
+    ///
+    /// # Errors
+    /// * `NoSuchUser` - 用户不存在
+    /// * `InfrastructureError` - 基础设施或密码服务错误
+    fn verify_password(
+        &self,
+        user: &User,
+        raw_password: String,
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 设置用户登录密码
     ///
