@@ -324,9 +324,11 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "base",
+ "dyn-fmt",
  "serde",
  "serde_json",
  "shared",
+ "thiserror",
 ]
 
 [[package]]
@@ -547,6 +549,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-trait",
  "chrono",
  "claims",
  "dashmap",

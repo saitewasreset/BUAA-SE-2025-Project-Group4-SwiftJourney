@@ -23,6 +23,7 @@ dashmap = "6.1"
 chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 
+async-trait = "0.1"
 dyn-fmt = "0.4"
 
 [dev-dependencies]
