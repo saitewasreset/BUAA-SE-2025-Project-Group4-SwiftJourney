@@ -40,7 +40,7 @@ where
     R: SessionRepository + 'static + Send + Sync,
 {
     /// 会话存储仓库
-    session_repository: R,
+    session_repository: Arc<R>,
     /// 会话管理配置
     session_config: SessionConfig,
     /// 用户ID到会话ID的映射
@@ -56,7 +56,7 @@ where
     /// # 参数
     /// - `session_repository`: 会话存储实现
     /// - `config`: 会话配置参数
-    pub fn new(session_repository: R, config: SessionConfig) -> Self {
+    pub fn new(session_repository: Arc<R>, config: SessionConfig) -> Self {
         Self {
             session_repository,
             session_config: config,
@@ -171,7 +171,7 @@ mod tests {
             .times(2)
             .returning(|_| Ok(SessionId::random()));
 
-        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo), config);
 
         let session1 = manager.create_session(user_id).await.unwrap();
         let session2 = manager.create_session(user_id).await.unwrap();
@@ -196,7 +196,7 @@ mod tests {
         mock_repo1
             .expect_save()
             .return_once(|_| Ok(SessionId::random()));
-        let manager = SessionManagerServiceImpl::new(mock_repo1, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo1), config);
         let session1 = manager.create_session(user_id).await.unwrap();
 
         // 第二次创建会话，触发淘汰
@@ -216,7 +216,7 @@ mod tests {
         mock_repo2
             .expect_save()
             .return_once(|_| Ok(SessionId::random()));
-        let manager = SessionManagerServiceImpl::new(mock_repo2, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo2), config);
 
         let session2 = manager.create_session(user_id).await.unwrap();
 
@@ -236,7 +236,7 @@ mod tests {
             .return_once(|_| Ok(()));
 
         let config = create_test_config();
-        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo), config);
         let session = Session::new(UserId::from(1), Utc::now(), Utc::now() + Duration::hours(1));
 
         manager.delete_session(session).await.unwrap();
@@ -271,7 +271,7 @@ mod tests {
             .in_sequence(&mut seq)
             .return_once(|_| Ok(None));
 
-        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo), config);
 
         let result = manager.get_session(session_id).await.unwrap();
         assert_eq!(result, Some(expected_session));
@@ -306,7 +306,7 @@ mod tests {
             .in_sequence(&mut seq)
             .return_once(|_| Ok(None));
 
-        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo), config);
 
         let result = manager.get_user_id_by_session(session_id).await.unwrap();
         assert_eq!(result, Some(user_id));
@@ -334,7 +334,7 @@ mod tests {
             .with(eq(session_id))
             .return_once(|_| Ok(Some(expired_session)));
 
-        let manager = SessionManagerServiceImpl::new(mock_repo, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo), config);
 
         let result = manager.get_user_id_by_session(session_id).await.unwrap();
         assert_eq!(result, Some(user_id));
@@ -353,7 +353,7 @@ mod tests {
         mock_repo1
             .expect_save()
             .return_once(|_| Ok(SessionId::random()));
-        let manager = SessionManagerServiceImpl::new(mock_repo1, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo1), config);
         let session1 = manager.create_session(user_id).await.unwrap();
 
         // 第二次创建会话，触发淘汰但旧会话不存在
@@ -365,7 +365,7 @@ mod tests {
         mock_repo2
             .expect_save()
             .return_once(|_| Ok(SessionId::random()));
-        let manager = SessionManagerServiceImpl::new(mock_repo2, config);
+        let manager = SessionManagerServiceImpl::new(Arc::new(mock_repo2), config);
 
         let session2 = manager.create_session(user_id).await.unwrap();
 
