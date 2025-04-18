@@ -74,6 +74,7 @@ use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use email_address::EmailAddress;
 use shared::{PHONE_PREFIX_SET, PHONE_REGEX};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Deref;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -199,6 +200,13 @@ pub struct Phone(String);
 impl Display for Phone {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl Deref for Phone {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -328,6 +336,14 @@ pub struct IdentityCardId(String);
 impl Display for IdentityCardId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl Deref for IdentityCardId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
