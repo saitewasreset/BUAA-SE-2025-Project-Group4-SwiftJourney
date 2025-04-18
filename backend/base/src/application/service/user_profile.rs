@@ -11,13 +11,7 @@ use crate::application::ApplicationError;
 use crate::application::commands::user_profile::{SetUserProfileCommand, UserProfileQuery};
 use crate::domain::model::user::User;
 use async_trait::async_trait;
-use dyn_fmt::AsStrFormatExt;
 use serde::{Deserialize, Serialize};
-use shared::{
-    API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_MESSAGE_TEMPLATE,
-    API_INTERNAL_SERVER_ERROR_MESSAGE,
-};
-use thiserror::Error;
 
 /// 用户资料数据传输对象(DTO)
 ///
@@ -70,48 +64,6 @@ impl From<User> for UserProfileDTO {
             have_payment_password_set: value.hashed_payment_password().is_some(),
             name: value.user_info().name.to_string(),
             identity_card_id: value.user_info().identity_card_id.to_string(),
-        }
-    }
-}
-
-/// 用户资料服务错误类型
-///
-/// 定义了在用户资料操作过程中可能发生的错误
-#[derive(Error, Debug)]
-pub enum UserProfileError {
-    /// 会话ID无效
-    #[error("invalid session id")]
-    InvalidSessionId,
-    /// 请求参数无效
-    #[error("{0}")]
-    BadRequest(String),
-    /// 服务器内部错误
-    #[error("an internal server error occurred")]
-    InternalServerError,
-}
-
-impl From<UserProfileError> for Box<dyn ApplicationError> {
-    fn from(err: UserProfileError) -> Self {
-        Box::new(err)
-    }
-}
-
-impl ApplicationError for UserProfileError {
-    fn error_code(&self) -> u32 {
-        match self {
-            UserProfileError::BadRequest(_) => 400,
-            UserProfileError::InvalidSessionId => 403,
-            UserProfileError::InternalServerError => 500,
-        }
-    }
-
-    fn error_message(&self) -> String {
-        match self {
-            UserProfileError::BadRequest(info) => API_BAD_REQUEST_MESSAGE_TEMPLATE.format(&[info]),
-            UserProfileError::InvalidSessionId => {
-                API_FORBIDDEN_MESSAGE_TEMPLATE.format(&["invalid session id"])
-            }
-            UserProfileError::InternalServerError => API_INTERNAL_SERVER_ERROR_MESSAGE.to_owned(),
         }
     }
 }
