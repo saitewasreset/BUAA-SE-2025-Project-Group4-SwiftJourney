@@ -18,11 +18,30 @@
           :allowClear="true"
           placeholder="手机号"
           class="input"
+          :status="inputPhoneStatus"
+          @input="checkPhoneNumber"
+          @change="checkPhoneNumber"
+        >
+          <template #prefix>
+            <TabletOutlined class="icon" />
+          </template>
+        </a-input>
+        <p class="input-error" v-if="inputPhoneError">{{ phoneErrorMsg }}</p>
+        <a-input
+          v-model:value="inputNickName"
+          type="string"
+          :allowClear="true"
+          placeholder="用户名"
+          class="input"
+          :status="inputNickNameStatus"
+          @input="checkNickName"
+          @change="checkNickName"
         >
           <template #prefix>
             <UserOutlined class="icon" />
           </template>
         </a-input>
+        <p class="input-error" v-if="inputNickNameError">{{ nickNameErrorMsg }}</p>
         <a-tooltip
           title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的三种，且不能包含空格"
           placement="right"
@@ -103,6 +122,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
+  TabletOutlined,
   UserOutlined,
   LockOutlined,
   ArrowLeftOutlined,
@@ -112,6 +132,7 @@ import {
 import { useRouter } from 'vue-router'
 
 const inputPhone = ref('')
+const inputNickName = ref('')
 const inputPassword = ref('')
 const inputConfirmPassword = ref('')
 const inputName = ref('')
@@ -143,18 +164,141 @@ function postRegisterMsg() {
   // TODO
 }
 
+// -------------------- 手机号检查 --------------------
+
+const inputPhoneStatus = ref('')
+const inputPhoneError = ref(false)
+const phoneErrorMsg = ref('')
+
+function checkPhoneNumber() {
+  const validPrefixes = [
+    '134',
+    '135',
+    '136',
+    '137',
+    '138',
+    '139',
+    '144',
+    '147',
+    '148',
+    '150',
+    '151',
+    '152',
+    '157',
+    '158',
+    '159',
+    '165',
+    '170',
+    '172',
+    '178',
+    '182',
+    '183',
+    '184',
+    '187',
+    '188',
+    '195',
+    '197',
+    '198',
+    '130',
+    '131',
+    '132',
+    '140',
+    '145',
+    '146',
+    '155',
+    '156',
+    '166',
+    '167',
+    '171',
+    '175',
+    '176',
+    '185',
+    '186',
+    '196',
+    '133',
+    '141',
+    '149',
+    '153',
+    '162',
+    '173',
+    '174',
+    '177',
+    '180',
+    '181',
+    '189',
+    '190',
+    '191',
+    '193',
+    '199',
+    '192',
+  ]
+
+  inputPhoneStatus.value = ''
+  inputPhoneError.value = false
+  phoneErrorMsg.value = ''
+
+  if (inputPhone.value === '') {
+    return
+  }
+
+  if (inputPhone.value.length !== 11) {
+    inputPhoneStatus.value = 'error'
+    inputPhoneError.value = true
+    phoneErrorMsg.value = '手机号长度应为11位'
+    return 
+  }
+
+  const regex = /^1[3-9]\d{9}$/
+  if (!regex.test(inputPhone.value)) {
+    inputPhoneStatus.value = 'error'
+    inputPhoneError.value = true
+    phoneErrorMsg.value = '手机号格式不正确'
+    return 
+  }
+
+  const prefix = inputPhone.value.substring(0, 3)
+  if (!validPrefixes.includes(prefix)) {
+    inputPhoneStatus.value = 'error'
+    inputPhoneError.value = true
+    phoneErrorMsg.value = '手机号无效'
+  }
+}
+
+// -------------------- 昵称检查 --------------------
+
+const inputNickNameStatus = ref('')
+const inputNickNameError = ref(false)
+const nickNameErrorMsg = ref('')
+
+function checkNickName() {
+  inputNickNameStatus.value = ''
+  inputNickNameError.value = false
+  nickNameErrorMsg.value = ''
+
+  if (inputNickName.value === '') {
+    return
+  }
+
+  if (inputNickName.value.length > 16) {
+    inputNickNameStatus.value = 'error'
+    inputNickNameError.value = true
+    nickNameErrorMsg.value = '昵称长度应小于 16'
+    return
+  }
+}
+
 // -------------------- 输入框状态检查 --------------------
 
 const inputPasswordStatus = ref('')
-const inputConfirmPasswordStatus = ref('')
-const inputIdNumberStatus = ref('')
-
 const inputPasswordError = ref(false)
-const inputConfirmPasswordError = ref(false)
-const inputIdNumberError = ref(false)
-
 const passwordErrorMsg = ref('')
+
+const inputConfirmPasswordStatus = ref('')
+const inputConfirmPasswordError = ref(false)
 const confirmPasswordErrorMsg = ref('')
+
+const inputIdNumberStatus = ref('')
+const inputIdNumberError = ref(false)
 const idNumberErrorMsg = ref('')
 
 function checkInput() {
@@ -276,7 +420,10 @@ const disableRegister = computed(() => {
     inputPassword.value === '' ||
     inputConfirmPassword.value === '' ||
     inputPasswordError.value ||
-    inputConfirmPasswordError.value
+    inputConfirmPasswordError.value ||
+    inputPhoneError.value ||
+    inputNickNameError.value ||
+    inputIdNumberError.value
   )
 })
 </script>
