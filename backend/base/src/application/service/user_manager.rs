@@ -30,6 +30,12 @@ pub enum UserManagerError {
     UserAlreadyExists(String),
     #[error("Invalid phone number of password")]
     InvalidPhoneNumberOrPassword,
+    #[error("Invalid username")]
+    InvalidUsernameFormat,
+    #[error("Invalid password")]
+    InvalidPasswordFormat,
+    #[error("Invalid name")]
+    InvalidNameFormat,
 }
 
 impl ApplicationError for UserManagerError {
@@ -37,6 +43,9 @@ impl ApplicationError for UserManagerError {
         match self {
             UserManagerError::UserAlreadyExists(_) => 15001,
             UserManagerError::InvalidPhoneNumberOrPassword => 15002,
+            UserManagerError::InvalidUsernameFormat => 15003,
+            UserManagerError::InvalidPasswordFormat => 15004,
+            UserManagerError::InvalidNameFormat => 15005,
         }
     }
 
