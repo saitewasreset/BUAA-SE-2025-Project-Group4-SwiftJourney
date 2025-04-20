@@ -1,45 +1,47 @@
 <template>
-  <div class="left-area">
-    <img src="../../assets/railway.svg" class="logo" />
-    <p class="title">风行旅途</p>
-  </div>
-  <a-card class="card">
-    <div class="card-title">
-      <a-tooltip title="返回首页">
-        <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
-      </a-tooltip>
-      <p class="card-title text">登录</p>
+  <div class="root">
+    <div class="left-area">
+      <img src="../../assets/railway.svg" class="logo" />
+      <p class="title">风行旅途</p>
     </div>
-    <div>
-      <a-input
-        v-model:value="inputPhone"
-        type="string"
-        :allowClear="true"
-        placeholder="手机号"
-        class="input"
-      >
-        <template #prefix>
-          <UserOutlined class="icon" />
-        </template>
-      </a-input>
-      <a-input-password
-        v-model:value="inputPassword"
-        type="string"
-        :allowClear="true"
-        placeholder="密码"
-        class="input"
-      >
-        <template #prefix>
-          <LockOutlined class="icon" />
-        </template>
-      </a-input-password>
-    </div>
+    <a-card class="card">
+      <div class="card-title">
+        <a-tooltip title="返回首页">
+          <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
+        </a-tooltip>
+        <p class="card-title text">登录</p>
+      </div>
+      <div>
+        <a-input
+          v-model:value="inputPhone"
+          type="string"
+          :allowClear="true"
+          placeholder="手机号"
+          class="input"
+        >
+          <template #prefix>
+            <UserOutlined class="icon" />
+          </template>
+        </a-input>
+        <a-input-password
+          v-model:value="inputPassword"
+          type="string"
+          :allowClear="true"
+          placeholder="密码"
+          class="input"
+        >
+          <template #prefix>
+            <LockOutlined class="icon" />
+          </template>
+        </a-input-password>
+      </div>
 
-    <div>
-      <a-button @click="goToRegisterPage" class="button left">注册</a-button>
-      <a-button type="primary" @click="postLoginMsg" class="button right">登录</a-button>
-    </div>
-  </a-card>
+      <div>
+        <a-button @click="goToRegisterPage" class="button left">注册</a-button>
+        <a-button type="primary" @click="postLoginMsg" class="button right">登录</a-button>
+      </div>
+    </a-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -76,9 +78,15 @@ body {
   background-color: #f0f2f5;
 }
 
+.root {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 /* 左侧元素样式 */
 .left-area {
   align-self: center;
+  margin-left: 40%;
 }
 
 .logo {
@@ -99,6 +107,7 @@ body {
   padding: 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   background-color: white;
+  margin-left: 5%;
 }
 
 .card-title {
