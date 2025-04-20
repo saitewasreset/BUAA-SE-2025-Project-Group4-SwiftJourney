@@ -6,17 +6,18 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      // name: 'home',
+      // component: HomeView,
+      redirect: '/homepage',
     },
-    {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
-    },
+    // {
+    //   path: '/about',
+    //   name: 'about',
+    //   // route level code-splitting
+    //   // this generates a separate chunk (About.[hash].js) for this route
+    //   // which is lazy-loaded when the route is visited.
+    //   component: () => import('../views/AboutView.vue'),
+    // },
     {
       path: '/homepage',
       name: 'homepage',
@@ -26,6 +27,16 @@ const router = createRouter({
       path: '/trainTicket',
       name: 'trainTicket',
       component: () => import('../views/TrainTicket/TrainTicketView.vue'),
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginPage/LoginPageView.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterPage/RegisterPageView.vue'),
     },
   ],
 })
