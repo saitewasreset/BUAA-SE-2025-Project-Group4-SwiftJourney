@@ -19,7 +19,9 @@
 //! - 更新操作会验证输入数据的有效性
 //! - 错误处理遵循应用层定义的错误规范
 use crate::application::commands::user_profile::{SetUserProfileCommand, UserProfileQuery};
-use crate::application::service::user_profile::{UserProfileDTO, UserProfileService};
+use crate::application::service::user_profile::{
+    UserProfileDTO, UserProfileError, UserProfileService,
+};
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
 use crate::domain::model::user::{Age, Gender, User};
@@ -174,10 +176,10 @@ where
             .age
             .map(|age| Age::try_from(age as i32))
             .transpose()
-            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
+            .map_err(|_for_super_earth| UserProfileError::InvalidAge)?;
 
         let email = EmailAddress::from_str(command.email.as_str())
-            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
+            .map_err(|_for_super_earth| UserProfileError::InvalidEmail)?;
 
         user.user_info_mut().gender = gender;
         user.user_info_mut().age = age;

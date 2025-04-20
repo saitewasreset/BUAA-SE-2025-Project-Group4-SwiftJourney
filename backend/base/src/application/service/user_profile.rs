@@ -12,6 +12,7 @@ use crate::application::commands::user_profile::{SetUserProfileCommand, UserProf
 use crate::domain::model::user::User;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// 用户资料数据传输对象(DTO)
 ///
@@ -93,4 +94,25 @@ pub trait UserProfileService {
         &self,
         command: SetUserProfileCommand,
     ) -> Result<(), Box<dyn ApplicationError>>;
+}
+
+#[derive(Error, Debug)]
+pub enum UserProfileError {
+    #[error("Invalid age")]
+    InvalidAge,
+    #[error("Invalid email")]
+    InvalidEmail,
+}
+
+impl ApplicationError for UserProfileError {
+    fn error_code(&self) -> u32 {
+        match self {
+            UserProfileError::InvalidAge => 15006,
+            UserProfileError::InvalidEmail => 15007,
+        }
+    }
+
+    fn error_message(&self) -> String {
+        self.to_string()
+    }
 }
