@@ -31,7 +31,7 @@
 //! 创建用户基本示例：
 //!
 //! ```
-//! # use base::domain::model::user::{User, UserInfo, Phone, IdentityCardId};
+//! # use base::domain::model::user::{User, RealName, UserInfo, Phone, IdentityCardId, Username};
 //! # use std::convert::TryFrom;
 //! # use argon2::password_hash::PasswordHashString;
 //! use base::domain::model::password::HashedPassword;
@@ -42,7 +42,7 @@
 //!
 //! // 构建用户信息
 //! let info = UserInfo::new(
-//!     "张三".to_string(),
+//!     RealName::try_from("张三".to_string()).unwrap(),
 //!     None,
 //!     None,
 //!     phone,
@@ -53,7 +53,7 @@
 //! // 创建用户实体
 //! let user = User::new(
 //!     None,
-//!     "Scout".to_string(),
+//!     Username::try_from("Scout".to_string()).unwrap(),
 //!     HashedPassword {
 //!         hashed_password: vec![0u8; 32],
 //!         salt: vec![0u8; 32].into(),
@@ -615,6 +615,134 @@ impl From<PasswordAttempts> for u8 {
     }
 }
 
+/// 用户名
+///
+/// 该类型用于安全地用户名，
+/// 确保其符合要求。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Username(String);
+
+#[derive(Error, Debug)]
+pub enum UsernameError {
+    #[error("invalid username length: {0}")]
+    InvalidLength(usize),
+}
+
+impl Username {
+    const MAX_LENGTH: usize = 64;
+}
+
+impl Deref for Username {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Username> for String {
+    fn from(value: Username) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<String> for Username {
+    type Error = UsernameError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.len() > Username::MAX_LENGTH {
+            return Err(UsernameError::InvalidLength(value.len()));
+        }
+
+        Ok(Self(value))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RawPassword(String);
+
+#[derive(Error, Debug)]
+pub enum RawPasswordError {
+    #[error("invalid password length: {0}")]
+    InvalidLength(usize),
+    #[error("password contains invalid character: {0}")]
+    InvalidCharacter(char),
+}
+
+impl RawPassword {
+    const MAX_LENGTH: usize = 64;
+}
+
+impl Deref for RawPassword {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<RawPassword> for String {
+    fn from(value: RawPassword) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<String> for RawPassword {
+    type Error = RawPasswordError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.len() > RawPassword::MAX_LENGTH {
+            return Err(RawPasswordError::InvalidLength(value.len()));
+        }
+
+        for ch in value.chars() {
+            if !ch.is_ascii() {
+                return Err(RawPasswordError::InvalidCharacter(ch));
+            }
+        }
+
+        Ok(Self(value))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RealName(String);
+
+#[derive(Error, Debug)]
+pub enum RealNameError {
+    #[error("invalid name length: {0}")]
+    InvalidLength(usize),
+}
+
+impl RealName {
+    const MIN_LENGTH: usize = 2;
+    const MAX_LENGTH: usize = 16;
+}
+
+impl Deref for RealName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<RealName> for String {
+    fn from(value: RealName) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<String> for RealName {
+    type Error = RealNameError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.len() < RealName::MIN_LENGTH || value.len() > RealName::MAX_LENGTH {
+            return Err(RealNameError::InvalidLength(value.len()));
+        }
+
+        Ok(Self(value))
+    }
+}
+
 /// 表示系统用户的实体
 ///
 /// 包含用户的基本信息、认证信息和支付密码相关信息
@@ -623,7 +751,7 @@ pub struct User {
     /// 用户ID，新用户创建时为None
     id: Option<UserId>,
     /// 用户名，用于显示
-    username: String,
+    username: Username,
     /// 经过哈希处理的登录密码
     hashed_password: HashedPassword,
     /// 经过哈希处理的支付密码
@@ -649,7 +777,7 @@ impl User {
     /// 返回构建好的User实例
     pub fn new(
         id: Option<UserId>,
-        username: String,
+        username: Username,
         hashed_password: HashedPassword,
         hashed_payment_password: Option<HashedPassword>,
         wrong_payment_password_tried: PasswordAttempts,
@@ -827,7 +955,7 @@ impl Aggregate for User {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserInfo {
     /// 用户真实姓名
-    pub name: String,
+    pub name: RealName,
     /// 用户性别(可选)
     pub gender: Option<Gender>,
     /// 用户年龄(可选)
@@ -854,7 +982,7 @@ impl UserInfo {
     /// # Returns
     /// 返回构建好的UserInfo实例
     pub fn new(
-        name: String,
+        name: RealName,
         gender: Option<Gender>,
         age: Option<Age>,
         phone: Phone,
