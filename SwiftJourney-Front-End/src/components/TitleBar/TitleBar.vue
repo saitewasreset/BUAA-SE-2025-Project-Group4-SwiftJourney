@@ -7,12 +7,10 @@
         :ellipsis="false"
         router
         >
-            <el-menu-item index="0">
             <div class="webside_title">
-                <img src="./logo/railway.svg" width="30" height="30" />
+                <img src="../../assets/railway.svg" width="30" height="30" />
                 <p style="font-size: larger">风行旅途</p>
             </div>
-            </el-menu-item>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
             <el-menu-item index="homepage">首页</el-menu-item>
             <el-menu-item index="traintacket">车票</el-menu-item>
@@ -20,19 +18,27 @@
             <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
-            <el-button type="primary" plain>登录</el-button>
-            <el-button class="TailButton" type="success" plain>注册</el-button>
+            <el-button @click="goToLoginPage" type="primary" plain>登录</el-button>
+            <el-button @click="goToRegisterPage" class="TailButton" type="success" plain>注册</el-button>
         </div>
     </div>
 </template>
   
 <script lang="ts" setup>
-    import { ref } from 'vue'
-    import { RouterLink, RouterView } from 'vue-router'
-    import { useRouter } from 'vue-router'
-    const router = useRouter()
+    import { ref } from 'vue';
+    import { RouterLink, RouterView } from 'vue-router';
+    import { useRouter } from 'vue-router';
+    const router = useRouter();
 
-    const activeIndex = ref('homepage')
+    const activeIndex = ref('homepage');
+
+    function goToLoginPage() {
+        router.push({ name: 'login' });
+    }
+
+    function goToRegisterPage() {
+        router.push({ name: 'register' });
+    }
 </script>
 
 <style lang="css" scoped>
@@ -54,6 +60,7 @@
     display: flex;
 }
 .webside_title {
+    margin: auto 10px auto 30px;
     display: flex;
     align-items: center;
     gap: 10px;
