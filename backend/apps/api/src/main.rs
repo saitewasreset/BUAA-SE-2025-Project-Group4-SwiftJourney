@@ -1,7 +1,35 @@
+/*
+ * Super Earth.
+ * Our home.
+ * Prosperity.
+ * Liberty.
+ * (Hi there)
+ * (Hey)
+ * Democracy.
+ * Our way of life.
+ * (Hello)
+ * But freedom doesn't come free.
+ * No...
+ * sweet Liberty...
+ * NOOOO!
+ * (laughs) Look familiar?
+ * Scenes like these are happening all over the galaxy, right now!
+ * You could be next.
+ * That is, unless you make the most important decision of your life.
+ * Prove to yourself that you have the strength and the courage to be free.
+ * Join...the Helldivers.
+ *  Become part of an elite peacekeeping force!
+ * See exotic new lifeforms.
+ * And spread Managed Democracy throughout the galaxy.
+ * Become a HERO.
+ * Become a LEGEND.
+ * Become a Helldiver!
+ */
 use actix_web::{App, HttpServer, web};
 use api::MAX_BODY_LENGTH;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
+use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
@@ -39,11 +67,18 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&user_repository),
     ));
 
+    let user_manager_service = web::Data::new(UserManagerServiceImpl::new(
+        Arc::clone(&user_service),
+        Arc::clone(&user_repository),
+        Arc::clone(&session_manager_service),
+    ));
+
     HttpServer::new(move || {
         App::new()
             .app_data(session_manager_service.clone())
             .app_data(user_repository.clone())
             .app_data(user_service.clone())
+            .app_data(user_manager_service.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .service(
                 web::scope("/api").service(web::scope("/user").configure(api::user::scoped_config)),
