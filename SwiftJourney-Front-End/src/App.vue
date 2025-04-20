@@ -1,14 +1,26 @@
-<script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import TitleBar from './components/TitleBar/TitleBar.vue';
-</script>
-
 <template>
   <div style="width: 100%; height: 100%; padding: 0%; margin: 0%;">
-    <TitleBar />
+    <TitleBar v-if="shouldTitleBarDisplay" />
     <RouterView />
   </div>
 </template>
+
+<script setup lang="ts">
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import TitleBar from './components/TitleBar/TitleBar.vue';
+import { computed } from 'vue';
+
+const route = useRoute();
+
+const undisplayTitleBar : string[] = ["login", "register"];
+
+const shouldTitleBarDisplay = computed(() => {
+  if (undisplayTitleBar.includes(route.name as string)) {
+    return false;
+  }
+  return true;
+});
+</script>
 
 <style scoped>
 #app {
