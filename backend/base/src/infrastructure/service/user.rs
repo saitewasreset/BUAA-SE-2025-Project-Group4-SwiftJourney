@@ -3,7 +3,8 @@
 //! 提供`UserService` trait的具体实现，将领域逻辑与基础设施(数据库、密码服务等)连接起来。
 //! 本实现是泛型的，可以适配不同的仓储和密码服务实现。
 use crate::domain::model::user::{
-    IdentityCardId, PasswordAttempts, PaymentPassword, Phone, User, UserId, UserInfo,
+    IdentityCardId, PasswordAttempts, PaymentPassword, Phone, RawPassword, RealName, User, UserId,
+    UserInfo, Username,
 };
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::ServiceError;
@@ -72,9 +73,9 @@ where
     /// * `InfrastructureError` - 密码哈希失败或存储错误
     async fn register(
         &self,
-        username: String,
-        raw_password: String,
-        name: String,
+        username: Username,
+        raw_password: RawPassword,
+        name: RealName,
         phone: Phone,
         identity_card_id: IdentityCardId,
     ) -> Result<(), UserServiceError> {
@@ -361,12 +362,12 @@ mod tests {
 
         User::new(
             None,
-            "For Super Earth!".to_owned(),
+            Username::try_from("For Super Earth!".to_owned()).unwrap(),
             hashed_password,
             None,
             PasswordAttempts::default(),
             UserInfo::new(
-                "No Diver Left Behind!".to_owned(),
+                RealName::try_from("DemoHasLanded".to_owned()).unwrap(),
                 None,
                 None,
                 Phone::try_from("13800000000".to_string()).unwrap(),
@@ -381,7 +382,7 @@ mod tests {
     async fn register_success() {
         let username = "For Super Earth!";
         let raw_password = "";
-        let name = "No Diver Left Behind!";
+        let name = "DemoHasLanded";
         let phone = "13800000000";
         let identity_card_id = "110108197703065171";
 
@@ -395,7 +396,7 @@ mod tests {
         repo.expect_save()
             .withf(move |user| {
                 user.username() == username
-                    && user.user_info().name == name
+                    && &*user.user_info().name == name
                     && &*user.user_info().phone == phone
                     && &*user.user_info().identity_card_id == identity_card_id
             })
@@ -406,9 +407,9 @@ mod tests {
 
         let result = service
             .register(
-                username.to_string(),
-                raw_password.to_string(),
-                name.to_string(),
+                Username::try_from(username.to_string()).unwrap(),
+                RawPassword::try_from(raw_password.to_string()).unwrap(),
+                RealName::try_from(name.to_string()).unwrap(),
                 Phone::try_from(phone.to_string()).unwrap(),
                 IdentityCardId::try_from(identity_card_id.to_string()).unwrap(),
             )
@@ -433,8 +434,8 @@ mod tests {
 
         let result = service
             .register(
-                default_user.username().to_owned(),
-                "".to_owned(),
+                Username::try_from(default_user.username().to_owned()).unwrap(),
+                RawPassword::try_from("".to_owned()).unwrap(),
                 default_user.user_info().name.to_owned(),
                 default_user.user_info().phone.clone(),
                 default_user.user_info().identity_card_id.clone(),
