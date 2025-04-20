@@ -419,6 +419,9 @@ const disableRegister = computed(() => {
     inputPhone.value === '' ||
     inputPassword.value === '' ||
     inputConfirmPassword.value === '' ||
+    inputNickName.value === '' ||
+    inputIdNumber.value === '' ||
+    inputName.value === '' ||
     inputPasswordError.value ||
     inputConfirmPasswordError.value ||
     inputPhoneError.value ||
