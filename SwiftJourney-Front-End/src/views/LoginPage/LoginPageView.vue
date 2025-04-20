@@ -72,7 +72,7 @@ function postLoginMsg() {
 }
 </script>
 
-<style lang="css">
+<style lang="css" scoped>
 /* 整体背景颜色 */
 body {
   background-color: #f0f2f5;
