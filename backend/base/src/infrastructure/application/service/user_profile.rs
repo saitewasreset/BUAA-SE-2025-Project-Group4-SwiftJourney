@@ -198,7 +198,9 @@ mod tests {
     use crate::domain::model::password::{HashedPassword, PasswordSalt};
     use crate::domain::model::session::Session;
     use crate::domain::model::session::SessionId;
-    use crate::domain::model::user::{IdentityCardId, PasswordAttempts, Phone, UserId, UserInfo};
+    use crate::domain::model::user::{
+        IdentityCardId, PasswordAttempts, Phone, RealName, UserId, UserInfo, Username,
+    };
     use crate::domain::{Repository, RepositoryError};
     use anyhow::anyhow;
     use chrono::Utc;
@@ -239,12 +241,12 @@ mod tests {
 
         User::new(
             None,
-            "For Super Earth!".to_owned(),
+            Username::try_from("For Super Earth!".to_owned()).unwrap(),
             hashed_password,
             None,
             PasswordAttempts::default(),
             UserInfo::new(
-                "No Diver Left Behind!".to_owned(),
+                RealName::try_from("DemoHasLanded".to_owned()).unwrap(),
                 None,
                 None,
                 Phone::try_from("13800000000".to_string()).unwrap(),

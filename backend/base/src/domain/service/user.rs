@@ -5,7 +5,8 @@
 
 use crate::domain::RepositoryError;
 use crate::domain::model::user::{
-    IdentityCardId, PasswordAttempts, PasswordError, PaymentPassword, Phone, User, UserId, UserInfo,
+    IdentityCardId, PasswordAttempts, PasswordError, PaymentPassword, Phone, RawPassword, RealName,
+    User, UserId, UserInfo, Username,
 };
 use crate::domain::service::ServiceError;
 use thiserror::Error;
@@ -77,9 +78,9 @@ pub trait UserService {
     /// * `InvalidPassword` - 密码错误
     fn register(
         &self,
-        username: String,
-        raw_password: String,
-        name: String,
+        username: Username,
+        raw_password: RawPassword,
+        name: RealName,
         phone: Phone,
         identity_card_id: IdentityCardId,
     ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
