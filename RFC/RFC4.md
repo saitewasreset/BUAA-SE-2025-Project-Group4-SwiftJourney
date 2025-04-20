@@ -1,9 +1,12 @@
 # Request For Comments 4: API 文档
 
-Version: 3 (2025-04-12 15:05:00)
+Version: 4 (2025-04-20 11:15:00)
 
 最近变更：
 
+- Version 4
+  - 用户注册：新增了部分校验失败的错误代码
+  - 设置个人资料：新增了部分校验失败的错误代码
 - Version 3
   - 用户注册：要求填写姓名以及身份证号
   - 用户登录：移除判断是否是第一次登录功能，响应数据变为`null`
@@ -157,6 +160,9 @@ interface UserRegisterRequest {
 | 200   | `For Super Earth!`             | 注册成功                   |
 | 13001 | `Identity card id format`      | 身份证号格式错误           |
 | 15001 | `Phone {phone} already exists` | 该手机号对应的用户已经存在 |
+| 15003 | `Invalid username`             | 用户名格式错误             |
+| 15004 | `Invalid password`             | 密码格式错误               |
+| 15005 | `Invalid name`                 | 姓名格式错误               |
 
 响应**数据**：
 
@@ -294,10 +300,13 @@ interface UserUpdateInfo {
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                       | 含义                             |
-| ---- | -------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 15003 | `Invalid username`                                                   | 用户名格式错误                   |
+| 15006 | `Invalid age`                                                        | 年龄格式错误                     |
+| 15007 | `Invalid age`                                                        | 邮箱格式错误                     |
 
 响应**数据**：
 
