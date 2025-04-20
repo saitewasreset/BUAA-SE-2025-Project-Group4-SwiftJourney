@@ -1,101 +1,103 @@
 <template>
-  <div class="left-area">
-    <img src="../../assets/railway.svg" class="logo" />
-    <p class="title">风行旅途</p>
-  </div>
-  <a-card class="card">
-    <div class="card-title">
-      <a-tooltip title="返回首页">
-        <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
-      </a-tooltip>
-      <p class="card-title text">注册</p>
+  <div class="root">
+    <div class="left-area">
+      <img src="../../assets/railway.svg" class="logo" />
+      <p class="title">风行旅途</p>
     </div>
-    <div>
-      <a-input
-        v-model:value="inputPhone"
-        type="string"
-        :allowClear="true"
-        placeholder="手机号"
-        class="input"
-      >
-        <template #prefix>
-          <UserOutlined class="icon" />
-        </template>
-      </a-input>
-      <a-tooltip
-        title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的三种，且不能包含空格"
-        placement="right"
-      >
-        <a-input-password
-          v-model:value="inputPassword"
+    <a-card class="card">
+      <div class="card-title">
+        <a-tooltip title="返回首页">
+          <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
+        </a-tooltip>
+        <p class="card-title text">注册</p>
+      </div>
+      <div>
+        <a-input
+          v-model:value="inputPhone"
           type="string"
           :allowClear="true"
-          placeholder="密码"
+          placeholder="手机号"
+          class="input"
+        >
+          <template #prefix>
+            <UserOutlined class="icon" />
+          </template>
+        </a-input>
+        <a-tooltip
+          title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的三种，且不能包含空格"
+          placement="right"
+        >
+          <a-input-password
+            v-model:value="inputPassword"
+            type="string"
+            :allowClear="true"
+            placeholder="密码"
+            class="input"
+            @input="checkInput"
+            @change="checkInput"
+            :status="inputPasswordStatus"
+          >
+            <template #prefix>
+              <LockOutlined class="icon" />
+            </template>
+          </a-input-password>
+        </a-tooltip>
+        <p class="input-error" v-if="inputPasswordError">{{ passwordErrorMsg }}</p>
+        <a-input-password
+          v-model:value="inputConfirmPassword"
+          type="string"
+          :allowClear="true"
+          placeholder="确认密码"
           class="input"
           @input="checkInput"
           @change="checkInput"
-          :status="inputPasswordStatus"
+          :status="inputConfirmPasswordStatus"
         >
           <template #prefix>
             <LockOutlined class="icon" />
           </template>
         </a-input-password>
-      </a-tooltip>
-      <p class="input-error" v-if="inputPasswordError">{{ passwordErrorMsg }}</p>
-      <a-input-password
-        v-model:value="inputConfirmPassword"
-        type="string"
-        :allowClear="true"
-        placeholder="确认密码"
-        class="input"
-        @input="checkInput"
-        @change="checkInput"
-        :status="inputConfirmPasswordStatus"
-      >
-        <template #prefix>
-          <LockOutlined class="icon" />
-        </template>
-      </a-input-password>
-      <p class="input-error" v-if="inputConfirmPasswordError">{{ confirmPasswordErrorMsg }}</p>
-      <a-input
-        v-model:value="inputName"
-        type="string"
-        :allowClear="true"
-        placeholder="真实姓名"
-        class="input"
-      >
-        <template #prefix>
-          <TagOutlined class="icon" />
-        </template>
-      </a-input>
-      <a-input
-        v-model:value="inputIdNumber"
-        type="string"
-        :allowClear="true"
-        placeholder="身份证号"
-        class="input"
-        :status="inputIdNumberStatus"
-        @input="checkIdNumber"
-        @change="checkIdNumber"
-      >
-        <template #prefix>
-          <IdcardOutlined class="icon" />
-        </template>
-      </a-input>
-      <p class="input-error" v-if="inputIdNumberError">{{ idNumberErrorMsg }}</p>
-    </div>
+        <p class="input-error" v-if="inputConfirmPasswordError">{{ confirmPasswordErrorMsg }}</p>
+        <a-input
+          v-model:value="inputName"
+          type="string"
+          :allowClear="true"
+          placeholder="真实姓名"
+          class="input"
+        >
+          <template #prefix>
+            <TagOutlined class="icon" />
+          </template>
+        </a-input>
+        <a-input
+          v-model:value="inputIdNumber"
+          type="string"
+          :allowClear="true"
+          placeholder="身份证号"
+          class="input"
+          :status="inputIdNumberStatus"
+          @input="checkIdNumber"
+          @change="checkIdNumber"
+        >
+          <template #prefix>
+            <IdcardOutlined class="icon" />
+          </template>
+        </a-input>
+        <p class="input-error" v-if="inputIdNumberError">{{ idNumberErrorMsg }}</p>
+      </div>
 
-    <div>
-      <a-button @click="goToLoginPage" class="button left">登录</a-button>
-      <a-button
-        type="primary"
-        @click="postRegisterMsg"
-        class="button right"
-        :disabled="disableRegister"
-        >注册</a-button
-      >
-    </div>
-  </a-card>
+      <div>
+        <a-button @click="goToLoginPage" class="button left">登录</a-button>
+        <a-button
+          type="primary"
+          @click="postRegisterMsg"
+          class="button right"
+          :disabled="disableRegister"
+          >注册</a-button
+        >
+      </div>
+    </a-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -285,9 +287,15 @@ body {
   background-color: #f0f2f5;
 }
 
+.root {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 /* 左侧元素样式 */
 .left-area {
   align-self: center;
+  margin-left: 40%;
 }
 
 .logo {
@@ -308,6 +316,7 @@ body {
   padding: 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   background-color: white;
+  margin-left: 5%;
 }
 
 .card-title {
