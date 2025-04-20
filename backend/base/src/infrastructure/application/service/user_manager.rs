@@ -5,7 +5,7 @@ use crate::application::service::user_manager::{UserManagerError, UserManagerSer
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
 use crate::domain::model::session::SessionId;
-use crate::domain::model::user::{IdentityCardId, Phone};
+use crate::domain::model::user::{IdentityCardId, Phone, RawPassword, RealName, Username};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::user::UserService;
@@ -54,14 +54,16 @@ where
         let identity_card_id = IdentityCardId::try_from(command.identity_card_id)
             .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
 
+        let username = Username::try_from(command.username)
+            .map_err(|_for_super_earth| UserManagerError::InvalidUsernameFormat)?;
+        let raw_password = RawPassword::try_from(command.password)
+            .map_err(|_for_super_earth| UserManagerError::InvalidPasswordFormat)?;
+
+        let name = RealName::try_from(command.name)
+            .map_err(|_for_super_earth| UserManagerError::InvalidNameFormat)?;
+
         self.user_service
-            .register(
-                command.username,
-                command.password,
-                command.name,
-                phone,
-                identity_card_id,
-            )
+            .register(username, raw_password, name, phone, identity_card_id)
             .await
             .map_err(|e| e.into())
     }
