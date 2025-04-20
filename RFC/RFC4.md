@@ -306,7 +306,7 @@ interface UserUpdateInfo {
 | 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
 | 15003 | `Invalid username`                                                   | 用户名格式错误                   |
 | 15006 | `Invalid age`                                                        | 年龄格式错误                     |
-| 15007 | `Invalid age`                                                        | 邮箱格式错误                     |
+| 15007 | `Invalid email`                                                      | 邮箱格式错误                     |
 
 响应**数据**：
 
