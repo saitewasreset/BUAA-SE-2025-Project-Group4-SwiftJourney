@@ -23,12 +23,6 @@ const shouldTitleBarDisplay = computed(() => {
 </script>
 
 <style scoped>
-#app {
-  height: 100%;
-  width: 100%;
-  padding: 0%;
-  margin: 0%;
-}
 header {
   line-height: 1.5;
   max-height: 100vh;
