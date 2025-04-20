@@ -181,7 +181,7 @@ impl<T> Pipe for T {}
 mod tests {
     use super::*;
     use crate::domain::model::password::{HashedPassword, PasswordSalt};
-    use crate::domain::model::user::{Gender, PasswordAttempts, UserInfo};
+    use crate::domain::model::user::{Gender, PasswordAttempts, RealName, UserInfo, Username};
 
     const IDENTITY_CARD_ID_STR: [&str; 100] = [
         "110108197703065171",
@@ -296,7 +296,7 @@ mod tests {
         };
 
         let user_info = UserInfo::new(
-            "Test User".into(),
+            RealName::try_from("Test User".to_string()).unwrap(),
             Some(Gender::Male),
             Some(30.try_into().unwrap()),
             Phone::try_from(phone.to_owned()).unwrap(),
@@ -306,7 +306,7 @@ mod tests {
 
         User::new(
             None,
-            "test_user".into(),
+            Username::try_from("test_user".to_string()).unwrap(),
             hashed_password,
             None,
             PasswordAttempts::new(),
