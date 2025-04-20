@@ -29,6 +29,7 @@ use actix_web::{App, HttpServer, web};
 use api::MAX_BODY_LENGTH;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
+use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
@@ -66,11 +67,18 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&user_repository),
     ));
 
+    let user_manager_service = web::Data::new(UserManagerServiceImpl::new(
+        Arc::clone(&user_service),
+        Arc::clone(&user_repository),
+        Arc::clone(&session_manager_service),
+    ));
+
     HttpServer::new(move || {
         App::new()
             .app_data(session_manager_service.clone())
             .app_data(user_repository.clone())
             .app_data(user_service.clone())
+            .app_data(user_manager_service.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .service(
                 web::scope("/api").service(web::scope("/user").configure(api::user::scoped_config)),
