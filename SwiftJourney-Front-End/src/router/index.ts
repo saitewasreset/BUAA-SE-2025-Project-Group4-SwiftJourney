@@ -27,6 +27,11 @@ const router = createRouter({
       name: 'traintacket',
       component: () => import('../views/TrainTacket/TrainTacketView.vue'),
     },
+    {
+      path: '/personalhomepage',
+      name: 'personalhomepage',
+      component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
+    },
   ],
 })
 
