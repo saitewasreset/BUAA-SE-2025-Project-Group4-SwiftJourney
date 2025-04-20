@@ -7,7 +7,8 @@
 
 use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
-    Age, Gender, IdentityCardId, PasswordAttempts, Phone, User, UserId, UserInfo,
+    Age, Gender, IdentityCardId, PasswordAttempts, Phone, RealName, User, UserId, UserInfo,
+    Username,
 };
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
@@ -99,12 +100,12 @@ impl UserDataConverter {
     /// 返回构建成功的用户领域模型
     pub fn make_from_do(user_do: crate::models::user::Model) -> anyhow::Result<User> {
         let user_id: UserId = (user_do.id as u64).into();
-        let username: String = user_do.username;
+        let username = Username::try_from(user_do.username)?;
 
         let wrong_payment_password_tried: PasswordAttempts =
             user_do.wrong_payment_password_tried.try_into()?;
 
-        let name: String = user_do.name;
+        let name = RealName::try_from(user_do.name)?;
 
         let gender: Option<Gender> = user_do
             .gender
