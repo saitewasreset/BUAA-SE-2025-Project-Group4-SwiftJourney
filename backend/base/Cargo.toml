@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../shared" }
+id_macro = { path = "../id_macro" }
 
 tokio = { version = "1", features = ["full"] }
 sea-orm = { version = "1.1", features = [
