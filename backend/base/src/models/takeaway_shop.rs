@@ -18,7 +18,7 @@ pub enum Relation {
         from = "Column::StationId",
         to = "super::station::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Station,
     #[sea_orm(has_many = "super::takeaway_dish::Entity")]

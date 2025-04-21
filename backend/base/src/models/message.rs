@@ -19,7 +19,7 @@ pub enum Relation {
         from = "Column::UserId",
         to = "super::user::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     User,
 }

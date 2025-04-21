@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub create_time: DateTimeWithTimeZone,
-    pub finish_time: DateTimeWithTimeZone,
+    pub finish_time: Option<DateTimeWithTimeZone>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub amount: Decimal,
     pub status: String,
@@ -22,7 +22,7 @@ pub enum Relation {
         from = "Column::UserId",
         to = "super::user::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     User,
 }
