@@ -18,7 +18,7 @@ pub enum Relation {
         from = "Column::SeatTypeId",
         to = "super::seat_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     SeatType,
     #[sea_orm(
@@ -26,7 +26,7 @@ pub enum Relation {
         from = "Column::TrainTypeId",
         to = "super::train_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     TrainType,
 }

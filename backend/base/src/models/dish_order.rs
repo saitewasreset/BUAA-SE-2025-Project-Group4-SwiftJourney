@@ -28,7 +28,7 @@ pub enum Relation {
         from = "Column::DishId",
         to = "super::dish::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Dish,
     #[sea_orm(
@@ -36,7 +36,7 @@ pub enum Relation {
         from = "Column::PersonInfoId",
         to = "super::person_info::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     PersonInfo,
     #[sea_orm(
@@ -44,7 +44,7 @@ pub enum Relation {
         from = "Column::TrainOrderId",
         to = "super::train_order::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     TrainOrder,
     #[sea_orm(
@@ -52,7 +52,7 @@ pub enum Relation {
         from = "Column::PayTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction2,
     #[sea_orm(
@@ -60,7 +60,7 @@ pub enum Relation {
         from = "Column::RefundTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction1,
 }
