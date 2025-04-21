@@ -26,6 +26,7 @@ mod m20250411_010858_create_takeaway_order;
 mod m20250411_010905_create_message;
 mod m20250411_011731_seat_type_mapping;
 mod m20250416_064747_modify_user_hashed_payment_password_as_nullable;
+mod m20250421_023554_modify_transaction_time_as_nullable;
 
 pub struct Migrator;
 
@@ -59,6 +60,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250411_010905_create_message::Migration),
             Box::new(m20250411_011731_seat_type_mapping::Migration),
             Box::new(m20250416_064747_modify_user_hashed_payment_password_as_nullable::Migration),
+            Box::new(m20250421_023554_modify_transaction_time_as_nullable::Migration),
         ]
     }
 }

@@ -25,7 +25,7 @@ pub enum Relation {
         from = "Column::TrainId",
         to = "super::train::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Train,
 }
