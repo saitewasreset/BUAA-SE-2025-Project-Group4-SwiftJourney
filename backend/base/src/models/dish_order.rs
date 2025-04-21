@@ -10,8 +10,8 @@ pub struct Model {
     pub train_order_id: i64,
     pub dish_id: i64,
     pub person_info_id: i64,
-    pub pay_transaction_id: i64,
-    pub refund_transaction_id: i64,
+    pub pay_transaction_id: Option<i64>,
+    pub refund_transaction_id: Option<i64>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub amount: i32,
