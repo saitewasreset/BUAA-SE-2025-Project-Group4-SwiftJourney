@@ -14,8 +14,8 @@ pub struct Model {
     pub begin_station_id: i64,
     pub end_station_id: i64,
     pub person_info_id: i64,
-    pub pay_transaction_id: i64,
-    pub refund_transaction_id: i64,
+    pub pay_transaction_id: Option<i64>,
+    pub refund_transaction_id: Option<i64>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub create_time: DateTimeWithTimeZone,
