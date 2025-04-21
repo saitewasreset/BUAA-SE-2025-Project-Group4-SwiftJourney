@@ -558,6 +558,7 @@ dependencies = [
  "dashmap",
  "dyn-fmt",
  "email_address",
+ "id_macro",
  "mockall",
  "phf",
  "regex",
@@ -1628,6 +1629,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+]
+
+[[package]]
+name = "id_macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.100",
+ "thiserror",
 ]
 
 [[package]]

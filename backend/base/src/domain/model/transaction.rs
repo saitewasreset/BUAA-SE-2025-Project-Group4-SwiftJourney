@@ -1,5 +1,6 @@
 use crate::domain::Identifier;
 use crate::domain::model::user::UserId;
+use id_macro::define_id_type;
 use sea_orm::prelude::{DateTimeWithTimeZone, Decimal};
 use std::fmt::{Display, Formatter};
 use thiserror::Error;
@@ -46,40 +47,7 @@ impl TryFrom<&str> for TransactionStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TransactionId(u64);
-
-#[derive(Error, Debug)]
-pub enum TransactionIdError {
-    #[error("Invalid negative value for transaction id")]
-    NegativeValue,
-}
-
-impl TryFrom<i32> for TransactionId {
-    type Error = TransactionIdError;
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value < 0 {
-            Err(TransactionIdError::NegativeValue)
-        } else {
-            Ok(TransactionId(value as u64))
-        }
-    }
-}
-
-impl From<u64> for TransactionId {
-    fn from(value: u64) -> Self {
-        TransactionId(value)
-    }
-}
-
-impl From<TransactionId> for u64 {
-    fn from(transaction_id: TransactionId) -> Self {
-        transaction_id.0
-    }
-}
-
-impl Identifier for TransactionId {}
+define_id_type!(Transaction);
 
 pub struct Transaction {
     transaction_id: TransactionId,
