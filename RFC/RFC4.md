@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 4 (2025-04-20 11:15:00)
+Version: 5 (2025-04-22 13:25:00)
 
 最近变更：
 
+- Version 5
+  - 订单列表：按交易组合订单，`OrderInfo::status`改为小写
 - Version 4
   - 用户注册：新增了部分校验失败的错误代码
   - 设置个人资料：新增了部分校验失败的错误代码
@@ -859,19 +861,28 @@ type ResponseData = TransactionInfo;
 响应**数据**：
 
 ```typescript
-type ResponseData = OrderInfo[];
+type ResponseData = TransactionData[];
+
+interface TransactionData {
+  // 交易的 UUID
+  transactionId: string;
+  // 交易状态
+  status: "unpaid" | "paid";
+  // 交易创建日期时间
+  createTime: string;
+  // 支付日期时间
+  payTime?: string;
+  // 该交易对应的订单列表
+  orders: OrderInfo[];
+  // 该交易的金额（所有订单金额之和）
+  amount: number;
+}
 
 interface OrderInfo {
   // 订单的 UUID
   orderId: string;
-  // 订单对应的交易的 UUID
-  transactionId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
-  status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
-  // 订单创建日期时间
-  orderTime: string;
-  // 支付日期时间
-  payTime?: string;
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
   // 订单金额
   amount: number;
   // 订单类型
