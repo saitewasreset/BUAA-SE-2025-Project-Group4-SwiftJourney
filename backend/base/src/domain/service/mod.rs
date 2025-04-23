@@ -90,6 +90,7 @@
 pub mod geo;
 pub mod password;
 pub mod session;
+pub mod station;
 pub mod user;
 
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};
