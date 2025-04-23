@@ -1,5 +1,6 @@
 use crate::domain::model::route::RouteId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
+use crate::{Unverified, Verified};
 use id_macro::define_id_type;
 use sea_orm::prelude::Decimal;
 use std::collections::HashMap;
@@ -58,11 +59,6 @@ impl Train {
 }
 
 define_id_type!(SeatType);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Unverified;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Verified;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SeatType<State = Unverified> {
