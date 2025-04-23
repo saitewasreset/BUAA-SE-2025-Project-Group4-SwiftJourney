@@ -2,7 +2,6 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use std::fmt::format;
 use syn::{Ident, LitStr, parse_macro_input};
 
 #[proc_macro]
@@ -13,7 +12,7 @@ pub fn define_id_type(input: TokenStream) -> TokenStream {
 
     let id_struct = Ident::new(&format!("{}Id", x_str), x.span());
 
-    let error_enum = Ident::new(&format!("{}Error", x_str), x.span());
+    let error_enum = Ident::new(&format!("{}IdError", x_str), x.span());
 
     let x_lower = x_str.to_lowercase();
 
