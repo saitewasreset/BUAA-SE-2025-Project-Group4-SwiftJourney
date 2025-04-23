@@ -15,8 +15,7 @@ define_id_type!(TrainSchedule);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StationRange<State = Unverified>(StationId, StationId, PhantomData<State>);
 
-pub type SeatAvailabilityMap =
-    HashMap<StationRange<Verified>, HashMap<SeatType<Verified>, SeatAvailability>>;
+pub type SeatAvailabilityMap = HashMap<StationRange<Verified>, HashMap<SeatType, SeatAvailability>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrainSchedule {
@@ -44,7 +43,7 @@ impl Aggregate for TrainSchedule {}
 impl TrainSchedule {
     fn seat_availability(
         &self,
-        seat_type: &SeatType<Verified>,
+        seat_type: &SeatType,
         station_range: &StationRange<Verified>,
     ) -> &SeatAvailability {
         self.seat_availability
@@ -56,11 +55,11 @@ impl TrainSchedule {
 
     fn seat_availability_mut(
         &mut self,
-        seat_type: &SeatType<Verified>,
+        seat_type: &SeatType,
         station_range: &StationRange<Verified>,
     ) -> &mut SeatAvailability {
         self.seat_availability
-            .get_mut(&station_range)
+            .get_mut(station_range)
             .expect("seat_availability should contain verified station range")
             .get_mut(seat_type)
             .expect("seat_availability should contain verified seat type")
@@ -85,7 +84,7 @@ impl TrainSchedule {
 
     pub fn available_seats_count(
         &self,
-        seat_type: &SeatType<Verified>,
+        seat_type: &SeatType,
         station_range: &StationRange<Verified>,
     ) -> Option<u32> {
         Some(
@@ -94,7 +93,7 @@ impl TrainSchedule {
         )
     }
 
-    pub fn seat_type(&self) -> Vec<SeatType<Verified>> {
+    pub fn seat_type(&self) -> Vec<SeatType> {
         self.seat_availability
             .values()
             .next()
@@ -148,7 +147,7 @@ define_id_type!(SeatAvailability);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeatAvailability {
     id: Option<SeatAvailabilityId>,
-    seat_type: SeatType<Verified>,
+    seat_type: SeatType,
     from_station: StationId,
     to_station: StationId,
     occupied_seat: HashMap<SeatId, OccupiedSeat>,
@@ -226,7 +225,7 @@ define_id_type!(Seat);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Seat {
     id: SeatId,
-    seat_type: SeatType<Verified>,
+    seat_type: SeatType,
     info: SeatLocationInfo,
     status: SeatStatus,
 }
