@@ -87,6 +87,7 @@
 //! - 差异检测函数应避免复杂计算
 //! - 大规模聚合根集合应考虑分片管理
 
+pub mod geo;
 pub mod password;
 pub mod session;
 pub mod user;
