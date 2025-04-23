@@ -1,10 +1,10 @@
 use super::{
     personal_info::PersonalInfoId,
     station::StationId,
-    train::{SeatType, TrainId, Verified},
+    train::{SeatType, TrainId},
 };
-use crate::domain::model::train::Unverified;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
+use crate::{Unverified, Verified};
 use chrono::NaiveDate;
 use id_macro::define_id_type;
 use std::collections::HashMap;
