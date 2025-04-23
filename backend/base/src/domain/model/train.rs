@@ -7,6 +7,22 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SeatTypeName<State = Unverified>(String, PhantomData<State>);
+
+impl From<String> for SeatTypeName<Unverified> {
+    fn from(value: String) -> Self {
+        Self(value, PhantomData)
+    }
+}
+
+impl<State> Deref for SeatTypeName<State> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 define_id_type!(Train);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,7 +30,7 @@ pub struct Train {
     id: Option<TrainId>,
     number: TrainNumber<Verified>,
     train_type: TrainType<Verified>,
-    seats: HashMap<String, SeatType<Verified>>,
+    seats: HashMap<String, SeatType>,
     route_id: RouteId,
 }
 
@@ -37,7 +53,7 @@ impl Train {
     pub fn new(
         number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
-        seats: HashMap<String, SeatType<Verified>>,
+        seats: HashMap<String, SeatType>,
         route_id: RouteId,
     ) -> Self {
         Train {
@@ -61,15 +77,14 @@ impl Train {
 define_id_type!(SeatType);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SeatType<State = Unverified> {
+pub struct SeatType {
     seat_type_id: Option<SeatTypeId>,
-    type_name: String,
+    type_name: SeatTypeName<Verified>,
     capacity: u32,
     price: Decimal,
-    _for_super_earth: PhantomData<State>,
 }
 
-impl SeatType<Verified> {
+impl SeatType {
     pub fn name(&self) -> &str {
         &self.type_name
     }
