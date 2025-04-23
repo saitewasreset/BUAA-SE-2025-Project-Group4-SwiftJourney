@@ -14,6 +14,8 @@ pub enum GeoServiceError {
     InvalidCityName(String),
     #[error("no such city id: {0}")]
     NoSuchCityId(u64),
+    #[error("city {0} already exists")]
+    CityExists(String),
 }
 
 impl From<RepositoryError> for GeoServiceError {
@@ -28,10 +30,12 @@ pub trait GeoService {
 
     async fn get_city_by_name(&self, name: String) -> Result<City, GeoServiceError>;
 
+    // 检查是否重名
     async fn add_city(&self, city: City) -> Result<CityId, GeoServiceError>;
 
     async fn remove_city(&self, city_id: CityId) -> Result<(), GeoServiceError>;
 
+    // 检查是否重名
     async fn modify_city(
         &self,
         city_id: CityId,
