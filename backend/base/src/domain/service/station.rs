@@ -15,6 +15,9 @@ pub enum StationServiceError {
     #[error("invalid geo info: {0}")]
     InvalidGeoInfo(GeoServiceError),
 
+    #[error("invalid station name: {0}")]
+    InvalidStationName(String),
+
     #[error("no such station id: {0}")]
     NoSuchStationId(u64),
 
@@ -43,6 +46,11 @@ pub trait StationService {
         &self,
         city_id: CityId,
     ) -> Result<Vec<Station>, StationServiceError>;
+
+    async fn get_station_by_name(
+        &self,
+        station_name: String,
+    ) -> Result<Station, StationServiceError>;
 
     async fn add_station(
         &self,
