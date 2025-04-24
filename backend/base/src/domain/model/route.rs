@@ -4,7 +4,7 @@ use id_macro::define_id_type;
 
 define_id_type!(Stop);
 pub struct Stop {
-    stop_id: StopId,
+    stop_id: Option<StopId>,
     station_id: StationId,
     arrival_time: u32,
     departure_time: u32,
