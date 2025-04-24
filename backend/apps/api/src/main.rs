@@ -1,3 +1,6 @@
+// Step 1: Read the sentences below.
+// Thinking 1.2.1D - 6: 你认为下面的句子来自哪个游戏？其用意是什么？
+// Thinking 1.2.1D - 7: 什么是“管理式民主”（Managed Democracy）？你认为它是真实的民主吗？
 /*
  * Super Earth.
  * Our home.
@@ -73,16 +76,29 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service),
     ));
 
+    // Step 2: Create instance of your application service,
+    // and wrap it with `web::Data::new`
+    // HINT: You can borrow web::Data<T> as &Arc<T>
+    // that means you can pass a &web::Data<T> to `Arc::clone`
+    // Exercise 1.2.1D - 6: Your code here. (1 / 2)
+
     HttpServer::new(move || {
         App::new()
             .app_data(session_manager_service.clone())
             .app_data(user_repository.clone())
             .app_data(user_service.clone())
             .app_data(user_manager_service.clone())
+            // Step 3: Register your application service using `.app_data` function
+            // Exercise 1.2.1D - 6: Your code here. (2 / 2)
+            // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
+            // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .service(
                 web::scope("/api").service(web::scope("/user").configure(api::user::scoped_config)),
             )
+        // Step 6: Register your endpoint using `.service()` function
+        // Exercise 1.2.1D - 7: Your code here. (5 / 5)
+        // Congratulations! You have finished Task 1.2.1D!
     })
     .bind(("0.0.0.0", 8080))?
     .run()
