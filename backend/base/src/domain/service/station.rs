@@ -42,6 +42,8 @@ impl From<GeoServiceError> for StationServiceError {
 
 #[async_trait]
 pub trait StationService {
+    async fn get_stations(&self) -> Result<Vec<Station>, StationServiceError>;
+
     async fn get_station_by_city(
         &self,
         city_id: CityId,
