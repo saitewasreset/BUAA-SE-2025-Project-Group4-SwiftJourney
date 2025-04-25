@@ -5,6 +5,7 @@ use crate::infrastructure::repository::transform_list;
 use anyhow::Context;
 use async_trait::async_trait;
 use sea_orm::ColumnTrait;
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
 
 pub struct CityRepositoryImpl {
@@ -65,6 +66,14 @@ impl Repository<City> for CityRepositoryImpl {
     async fn save(&self, aggregate: &mut City) -> Result<CityId, RepositoryError> {
         let city_do = CityDataConverter::transform_to_do(aggregate.clone());
         let result = crate::models::city::Entity::insert(city_do)
+            .on_conflict(
+                OnConflict::column(crate::models::city::Column::Id)
+                    .update_columns([
+                        crate::models::city::Column::Name,
+                        crate::models::city::Column::Province,
+                    ])
+                    .to_owned(),
+            )
             .exec(&self.db)
             .await
             .context(format!(
