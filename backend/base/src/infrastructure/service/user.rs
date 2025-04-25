@@ -331,11 +331,13 @@ mod tests {
     use crate::infrastructure::service::password::{
         Argon2PasswordServiceImpl, MockPasswordServiceImpl,
     };
+    use async_trait::async_trait;
     use mockall::mock;
 
     mock! {
         UserRepo {}
 
+        #[async_trait]
         impl Repository<User> for UserRepo {
             async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
             async fn save(&self, user: &mut User) -> Result<UserId, RepositoryError>;

@@ -17,6 +17,7 @@ use crate::domain::{
     RepositoryError, TypedDiff,
 };
 use anyhow::Context;
+use async_trait::async_trait;
 use email_address::EmailAddress;
 use sea_orm::ColumnTrait;
 use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
@@ -192,6 +193,7 @@ impl UserRepositoryImpl {
     }
 }
 
+#[async_trait]
 impl DbRepositorySupport<User> for UserRepositoryImpl {
     type Manager = AggregateManagerImpl<User>;
 
