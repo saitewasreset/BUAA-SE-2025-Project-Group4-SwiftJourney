@@ -1,4 +1,3 @@
-use crate::infrastructure::repository::city::CityDataConverter;
 use anyhow::Context;
 
 pub mod session;
@@ -6,6 +5,7 @@ pub mod user;
 
 pub mod city;
 pub mod mock;
+pub mod station;
 
 pub fn transform_list<T, U, I>(
     list: Vec<T>,

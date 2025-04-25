@@ -27,9 +27,9 @@ impl Entity for Station {}
 impl Aggregate for Station {}
 
 impl Station {
-    pub fn new(name: String, city_id: CityId) -> Self {
+    pub fn new(station_id: Option<StationId>, name: String, city_id: CityId) -> Self {
         Station {
-            station_id: None,
+            station_id,
             name,
             city_id,
         }
