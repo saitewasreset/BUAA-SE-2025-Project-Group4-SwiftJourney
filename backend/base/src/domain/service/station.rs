@@ -49,6 +49,7 @@ pub trait StationService {
         city_id: CityId,
     ) -> Result<Vec<Station>, StationServiceError>;
 
+    // 我们假定，没有重名的车站
     async fn get_station_by_name(
         &self,
         station_name: String,
