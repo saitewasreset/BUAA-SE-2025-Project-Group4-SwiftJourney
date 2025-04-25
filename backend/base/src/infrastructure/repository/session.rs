@@ -10,6 +10,7 @@
 use crate::domain::model::session::{Session, SessionId};
 use crate::domain::repository::session::{SessionRepository, SessionRepositoryConfig};
 use crate::domain::{Identifiable, Repository, RepositoryError};
+use async_trait::async_trait;
 use dashmap::DashMap;
 use std::future;
 use std::sync::Arc;
@@ -73,6 +74,7 @@ impl SessionRepositoryImpl {
     }
 }
 
+#[async_trait]
 impl Repository<Session> for SessionRepositoryImpl {
     /// 查找会话
     ///
@@ -82,11 +84,8 @@ impl Repository<Session> for SessionRepositoryImpl {
     /// # Returns
     /// - `Some(Session)`: 找到且未过期的会话
     /// - `None`: 会话不存在或已过期
-    fn find(
-        &self,
-        id: SessionId,
-    ) -> impl Future<Output = Result<Option<Session>, RepositoryError>> + Send {
-        future::ready(Ok(self.session_map.get(&id).map(|entry| entry.clone())))
+    async fn find(&self, id: SessionId) -> Result<Option<Session>, RepositoryError> {
+        Ok(self.session_map.get(&id).map(|entry| entry.clone()))
     }
 
     /// 删除会话
@@ -96,15 +95,12 @@ impl Repository<Session> for SessionRepositoryImpl {
     ///
     /// # Errors
     /// - 永远不会返回错误（内存操作保证成功）
-    fn remove(
-        &self,
-        aggregate: Session,
-    ) -> impl Future<Output = Result<(), RepositoryError>> + Send {
+    async fn remove(&self, aggregate: Session) -> Result<(), RepositoryError> {
         if let Some(session_id) = aggregate.get_id() {
             self.session_map.remove(&session_id);
         }
 
-        future::ready(Ok(()))
+        Ok(())
     }
 
     /// 保存会话
@@ -117,20 +113,17 @@ impl Repository<Session> for SessionRepositoryImpl {
     ///
     /// # Notes
     /// - 自动覆盖同名会话
-    fn save(
-        &self,
-        aggregate: &mut Session,
-    ) -> impl Future<Output = Result<SessionId, RepositoryError>> + Send {
+    async fn save(&self, aggregate: &mut Session) -> Result<SessionId, RepositoryError> {
         if let Some(session_id) = aggregate.get_id() {
             self.session_map.insert(session_id, aggregate.clone());
-            future::ready(Ok(session_id))
+            Ok(session_id)
         } else {
             let session_id = SessionId::random();
 
             aggregate.set_id(session_id);
 
             self.session_map.insert(session_id, aggregate.clone());
-            future::ready(Ok(session_id))
+            Ok(session_id)
         }
     }
 }

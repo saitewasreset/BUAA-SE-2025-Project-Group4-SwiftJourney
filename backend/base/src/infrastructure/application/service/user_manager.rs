@@ -263,6 +263,7 @@ mod tests {
     // 模拟UserRepository
     mock! {
         UserRepo {}
+        #[async_trait]
         impl Repository<User> for UserRepo {
             async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
             async fn save(&self, entity: &mut User) -> Result<UserId, RepositoryError>;
