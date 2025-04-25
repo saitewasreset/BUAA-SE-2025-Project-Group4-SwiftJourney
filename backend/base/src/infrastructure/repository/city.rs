@@ -24,11 +24,17 @@ impl CityDataConverter {
     }
 
     pub fn transform_to_do(city: City) -> crate::models::city::ActiveModel {
-        crate::models::city::ActiveModel {
+        let mut model = crate::models::city::ActiveModel {
             id: ActiveValue::NotSet,
             name: ActiveValue::Set(city.name().to_string()),
             province: ActiveValue::Set(city.province().to_string()),
+        };
+
+        if let Some(id) = city.get_id() {
+            model.id = ActiveValue::Set(u64::from(id) as i32);
         }
+
+        model
     }
 }
 
