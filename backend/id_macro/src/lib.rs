@@ -43,6 +43,18 @@ pub fn define_id_type(input: TokenStream) -> TokenStream {
             }
         }
 
+        impl TryFrom<i64> for #id_struct {
+            type Error = #error_enum;
+
+            fn try_from(value: i64) -> Result<Self, Self::Error> {
+                if value < 0 {
+                    Err(#error_enum::NegativeValue)
+                } else {
+                    Ok(#id_struct(value as u64))
+                }
+            }
+        }
+
         impl From<u64> for #id_struct {
             fn from(value: u64) -> Self {
                 #id_struct(value)
