@@ -172,6 +172,7 @@
 
 <style lang="css" scoped>
 .TicketSearch {
+    width: 1035px;
     height: 100%;
     display: flex;
     justify-content: center;
@@ -193,19 +194,17 @@
     align-items: center;
     margin-bottom: 20px;
     border-radius: 8px;
-}
-.ModeRadio {
-    .ant-radio-wrapper-checked {
-        span {
-            color: rgb(43,132,255);
-        }
-    }
     span {
         font-size: large;
         color: black;
     }
 }
 
+:deep(.SelectTicketMode .ant-radio-wrapper-checked) {
+    span {
+        color: rgb(43,132,255);
+    }
+}
 .SelectContainer {
     display: flex;
     height: 10%;
