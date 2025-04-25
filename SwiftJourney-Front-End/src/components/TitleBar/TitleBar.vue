@@ -8,7 +8,7 @@
         router
         >
             <div class="webside_title">
-                <img src="../../assets/railway.svg" width="30" height="30" />
+                <img src="@/assets/railway.svg" width="30" height="30" />
                 <p style="font-size: larger">风行旅途</p>
             </div>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
