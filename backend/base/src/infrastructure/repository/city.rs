@@ -1,12 +1,12 @@
 use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
 use crate::domain::repository::city::CityRepository;
-use crate::domain::{Identifiable, Repository, RepositoryError};
+use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
-use anyhow::Context;
+use anyhow::{Context, Error};
 use async_trait::async_trait;
-use sea_orm::ColumnTrait;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, Select};
 
 pub struct CityRepositoryImpl {
     db: DatabaseConnection,
@@ -14,9 +14,24 @@ pub struct CityRepositoryImpl {
 
 pub struct CityDataConverter;
 
+impl DbId for CityId {
+    type DbType = i32;
+
+    fn to_db_value(&self) -> Self::DbType {
+        u64::from(*self) as i32
+    }
+
+    fn from_db_value(value: Self::DbType) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        CityId::try_from(value).map_err(|_| Error::msg(format!("Invalid city id: {}", value)))
+    }
+}
+
 impl CityDataConverter {
     pub fn make_from_do(city_do: crate::models::city::Model) -> anyhow::Result<City> {
-        let city_id = city_do.id.try_into()?;
+        let city_id = CityId::from_db_value(city_do.id)?;
         let name = city_do.name.into();
         let province = city_do.province.into();
 
@@ -31,7 +46,7 @@ impl CityDataConverter {
         };
 
         if let Some(id) = city.get_id() {
-            model.id = ActiveValue::Set(u64::from(id) as i32);
+            model.id = ActiveValue::Set(id.to_db_value());
         }
 
         model
@@ -41,24 +56,24 @@ impl CityDataConverter {
 #[async_trait]
 impl Repository<City> for CityRepositoryImpl {
     async fn find(&self, id: CityId) -> Result<Option<City>, RepositoryError> {
-        let result = crate::models::city::Entity::find_by_id(u64::from(id) as i32)
+        let result = crate::models::city::Entity::find_by_id(id.to_db_value())
             .one(&self.db)
             .await
-            .context(format!("Failed to find city with id: {}", u64::from(id)))?;
+            .context(format!("Failed to find city with id: {}", id.to_db_value()))?;
 
         result
             .map(CityDataConverter::make_from_do)
             .transpose()
             .context(format!(
                 "Failed to validate city with id: {}",
-                u64::from(id)
+                id.to_db_value()
             ))
             .map_err(RepositoryError::ValidationError)
     }
 
     async fn remove(&self, aggregate: City) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
-            let id = u64::from(id) as i32;
+            let id = id.to_db_value();
 
             crate::models::city::Entity::delete_by_id(id)
                 .exec(&self.db)
@@ -97,39 +112,40 @@ impl Repository<City> for CityRepositoryImpl {
 #[async_trait]
 impl CityRepository for CityRepositoryImpl {
     async fn load(&self) -> Result<Vec<City>, RepositoryError> {
-        let do_list = crate::models::city::Entity::find()
-            .all(&self.db)
-            .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
-
-        transform_list(do_list, CityDataConverter::make_from_do, |x| x.id)
-            .context("Failed to transform city list")
-            .map_err(RepositoryError::ValidationError)
+        self.query_cities(|f| f).await
     }
 
     async fn find_by_name(&self, city_name: CityName) -> Result<Vec<City>, RepositoryError> {
-        let do_list = crate::models::city::Entity::find()
-            .filter(crate::models::city::Column::Name.eq(city_name.to_string()))
-            .all(&self.db)
+        self.query_cities(|f| f.filter(crate::models::city::Column::Name.eq(city_name.to_string())))
             .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
-
-        transform_list(do_list, CityDataConverter::make_from_do, |x| x.id)
-            .context("Failed to transform city list")
-            .map_err(RepositoryError::ValidationError)
     }
 
     async fn find_by_province(
         &self,
         province_name: ProvinceName,
     ) -> Result<Vec<City>, RepositoryError> {
-        let do_list = crate::models::city::Entity::find()
-            .filter(crate::models::city::Column::Province.eq(province_name.to_string()))
+        self.query_cities(|f| {
+            f.filter(crate::models::city::Column::Province.eq(province_name.to_string()))
+        })
+        .await
+    }
+}
+
+impl CityRepositoryImpl {
+    pub fn new(db: DatabaseConnection) -> Self {
+        CityRepositoryImpl { db }
+    }
+
+    pub async fn query_cities(
+        &self,
+        builder: impl FnOnce(Select<crate::models::city::Entity>) -> Select<crate::models::city::Entity>,
+    ) -> Result<Vec<City>, RepositoryError> {
+        let query = builder(crate::models::city::Entity::find());
+        let stations = query
             .all(&self.db)
             .await
             .map_err(|e| RepositoryError::Db(e.into()))?;
-
-        transform_list(do_list, CityDataConverter::make_from_do, |x| x.id)
+        transform_list(stations, CityDataConverter::make_from_do, |x| x.id)
             .context("Failed to transform city list")
             .map_err(RepositoryError::ValidationError)
     }

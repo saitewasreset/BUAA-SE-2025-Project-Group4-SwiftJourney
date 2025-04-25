@@ -502,6 +502,15 @@ where
     async fn save(&self, aggregate: &mut AG) -> Result<AG::ID, RepositoryError>;
 }
 
+pub trait DbId {
+    type DbType;
+
+    fn to_db_value(&self) -> Self::DbType;
+    fn from_db_value(value: Self::DbType) -> Result<Self, anyhow::Error>
+    where
+        Self: Sized;
+}
+
 pub trait SnapshottingRepository<AG>: Repository<AG>
 where
     AG: Aggregate,
