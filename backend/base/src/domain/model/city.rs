@@ -1,4 +1,4 @@
-use crate::domain::{Entity, Identifiable, Identifier};
+use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use id_macro::define_id_type;
 use std::ops::Deref;
 
@@ -56,11 +56,12 @@ impl Identifiable for City {
 }
 
 impl Entity for City {}
+impl Aggregate for City {}
 
 impl City {
-    pub fn new(name: CityName, province: ProvinceName) -> Self {
+    pub fn new(city_id: Option<CityId>, name: CityName, province: ProvinceName) -> Self {
         City {
-            city_id: None,
+            city_id,
             name,
             province,
         }
