@@ -78,14 +78,9 @@
     import { onMounted, ref, reactive } from 'vue'
     import city from './city.json'
 
-    const { el } = withDefaults(
-        defineProps<{
-            el?: HTMLElement,
-        }>(),
-        {
-            el: undefined,
-        },
-    )
+    const { el } = defineProps<{
+        el?: HTMLElement,
+    }>()
 
     const activeTag = ref('hotWelcomed')
 
