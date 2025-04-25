@@ -137,6 +137,7 @@ where
 mod tests {
     use super::*;
     use crate::domain::Repository;
+    use async_trait::async_trait;
     use chrono::{Duration, Utc};
     use mockall::predicate::*;
     use mockall::*;
@@ -144,6 +145,7 @@ mod tests {
 
     mock! {
         pub SessionRepository {}
+        #[async_trait]
         impl Repository<Session> for SessionRepository {
             async fn find(&self, id: SessionId) -> Result<Option<Session>, RepositoryError>;
             async fn remove(&self, aggregate: Session) -> Result<(), RepositoryError>;

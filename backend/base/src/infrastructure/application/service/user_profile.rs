@@ -222,6 +222,7 @@ mod tests {
 
     mock! {
         UserRepository {}
+        #[async_trait]
         impl Repository<User> for UserRepository {
             async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
             async fn save(&self, entity: &mut User) -> Result<UserId, RepositoryError>;
