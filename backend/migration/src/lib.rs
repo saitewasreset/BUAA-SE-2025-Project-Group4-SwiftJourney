@@ -34,6 +34,7 @@ mod m20250421_073248_modify_takeaway_order_transaction_as_nullable;
 mod m20250421_083028_modify_city_add_province;
 mod m20250426_031246_modify_station_change_city_id_type;
 mod m20250426_041251_modify_train_change_train_type_id_type;
+mod m20250426_042323_modify_train_route_change_train_id_type;
 
 pub struct Migrator;
 
@@ -75,6 +76,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250421_083028_modify_city_add_province::Migration),
             Box::new(m20250426_031246_modify_station_change_city_id_type::Migration),
             Box::new(m20250426_041251_modify_train_change_train_type_id_type::Migration),
+            Box::new(m20250426_042323_modify_train_route_change_train_id_type::Migration),
         ]
     }
 }
