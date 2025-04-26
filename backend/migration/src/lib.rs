@@ -32,6 +32,7 @@ mod m20250421_073213_modify_hotel_order_transaction_as_nullable;
 mod m20250421_073220_modify_dish_order_transaction_as_nullable;
 mod m20250421_073248_modify_takeaway_order_transaction_as_nullable;
 mod m20250421_083028_modify_city_add_province;
+mod m20250426_031246_modify_station_change_city_id_type;
 
 pub struct Migrator;
 
@@ -71,6 +72,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250421_073220_modify_dish_order_transaction_as_nullable::Migration),
             Box::new(m20250421_073248_modify_takeaway_order_transaction_as_nullable::Migration),
             Box::new(m20250421_083028_modify_city_add_province::Migration),
+            Box::new(m20250426_031246_modify_station_change_city_id_type::Migration),
         ]
     }
 }
