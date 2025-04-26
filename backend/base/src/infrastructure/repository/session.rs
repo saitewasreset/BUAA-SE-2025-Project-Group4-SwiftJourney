@@ -12,7 +12,6 @@ use crate::domain::repository::session::{SessionRepository, SessionRepositoryCon
 use crate::domain::{Identifiable, Repository, RepositoryError};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use std::future;
 use std::sync::Arc;
 
 /// 内存会话仓储实现
