@@ -1,3 +1,4 @@
+use crate::domain::DbId;
 use crate::domain::model::city::CityId;
 use crate::domain::model::station::{Station, StationId};
 use crate::domain::repository::station::StationRepository;
@@ -13,13 +14,15 @@ pub struct StationRepositoryImpl {
     db: DatabaseConnection,
 }
 
+impl_db_id_from_u64!(StationId, i32, "station");
+
 pub struct StationDataConverter;
 
 impl StationDataConverter {
     pub fn make_from_do(station_do: crate::models::station::Model) -> anyhow::Result<Station> {
-        let station_id = station_do.id.try_into()?;
+        let station_id = StationId::from_db_value(station_do.id)?;
         let name = station_do.name;
-        let city_id = station_do.city_id.try_into()?;
+        let city_id = CityId::from_db_value(station_do.city_id)?;
 
         Ok(Station::new(Some(station_id), name, city_id))
     }
@@ -28,11 +31,11 @@ impl StationDataConverter {
         let mut model = crate::models::station::ActiveModel {
             id: ActiveValue::NotSet,
             name: ActiveValue::Set(station.name().to_string()),
-            city_id: ActiveValue::Set(u64::from(station.city_id()) as i64),
+            city_id: ActiveValue::Set(station.city_id().to_db_value()),
         };
 
         if let Some(id) = station.get_id() {
-            model.id = ActiveValue::Set(u64::from(id) as i32);
+            model.id = ActiveValue::Set(id.to_db_value());
         }
 
         model

@@ -14,20 +14,7 @@ pub struct CityRepositoryImpl {
 
 pub struct CityDataConverter;
 
-impl DbId for CityId {
-    type DbType = i32;
-
-    fn to_db_value(&self) -> Self::DbType {
-        u64::from(*self) as i32
-    }
-
-    fn from_db_value(value: Self::DbType) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        CityId::try_from(value).map_err(|_| Error::msg(format!("Invalid city id: {}", value)))
-    }
-}
+impl_db_id_from_u64!(CityId, i32, "city");
 
 impl CityDataConverter {
     pub fn make_from_do(city_do: crate::models::city::Model) -> anyhow::Result<City> {
