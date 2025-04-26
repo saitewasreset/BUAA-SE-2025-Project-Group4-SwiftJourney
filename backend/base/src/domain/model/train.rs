@@ -79,6 +79,10 @@ impl Train {
     pub fn train_type(&self) -> &str {
         &self.train_type
     }
+
+    pub fn route_id(&self) -> RouteId {
+        self.route_id
+    }
 }
 
 define_id_type!(SeatType);
