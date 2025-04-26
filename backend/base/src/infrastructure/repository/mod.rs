@@ -5,7 +5,9 @@ pub mod user;
 
 pub mod city;
 pub mod mock;
+pub mod route;
 pub mod station;
+pub mod train;
 
 pub fn transform_list<T, U, I>(
     list: Vec<T>,
