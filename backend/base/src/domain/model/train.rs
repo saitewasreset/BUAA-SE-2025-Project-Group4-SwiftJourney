@@ -57,13 +57,14 @@ impl Aggregate for Train {}
 
 impl Train {
     pub fn new(
+        train_id: Option<TrainId>,
         number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seats: HashMap<String, SeatType>,
         route_id: RouteId,
     ) -> Self {
         Train {
-            id: None,
+            id: train_id,
             number,
             train_type,
             seats,
@@ -91,6 +92,20 @@ pub struct SeatType {
 }
 
 impl SeatType {
+    pub fn new(
+        seat_type_id: Option<SeatTypeId>,
+        type_name: SeatTypeName<Verified>,
+        capacity: u32,
+        price: Decimal,
+    ) -> Self {
+        Self {
+            seat_type_id,
+            type_name,
+            capacity,
+            price,
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.type_name
     }
