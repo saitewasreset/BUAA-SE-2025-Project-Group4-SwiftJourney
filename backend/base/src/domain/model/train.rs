@@ -10,6 +10,12 @@ use std::ops::Deref;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SeatTypeName<State = Unverified>(String, PhantomData<State>);
 
+impl SeatTypeName {
+    pub fn from_unchecked(value: String) -> SeatTypeName<Verified> {
+        SeatTypeName(value, PhantomData)
+    }
+}
+
 impl From<String> for SeatTypeName<Unverified> {
     fn from(value: String) -> Self {
         Self(value, PhantomData)
@@ -115,6 +121,12 @@ impl Entity for SeatType {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TrainType<State = Unverified>(String, PhantomData<State>);
 
+impl TrainType {
+    pub fn from_unchecked(value: String) -> TrainType<Verified> {
+        TrainType(value, PhantomData)
+    }
+}
+
 impl From<String> for TrainType<Unverified> {
     fn from(value: String) -> Self {
         TrainType(value, PhantomData)
@@ -131,6 +143,12 @@ impl<T> Deref for TrainType<T> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TrainNumber<State = Unverified>(String, PhantomData<State>);
+
+impl TrainNumber {
+    pub fn from_unchecked(value: String) -> TrainNumber<Verified> {
+        TrainNumber(value, PhantomData)
+    }
+}
 
 impl From<String> for TrainNumber<Unverified> {
     fn from(value: String) -> Self {
