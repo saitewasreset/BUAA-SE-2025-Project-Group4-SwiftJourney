@@ -2,7 +2,7 @@ use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
 use crate::domain::repository::city::CityRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
-use anyhow::{Context, Error};
+use anyhow::Context;
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
