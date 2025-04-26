@@ -80,6 +80,10 @@ impl Train {
         &self.train_type
     }
 
+    pub fn seats(&self) -> &HashMap<String, SeatType> {
+        &self.seats
+    }
+
     pub fn route_id(&self) -> RouteId {
         self.route_id
     }
