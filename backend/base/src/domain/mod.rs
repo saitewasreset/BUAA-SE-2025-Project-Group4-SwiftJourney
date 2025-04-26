@@ -479,6 +479,9 @@ pub enum RepositoryError {
 
     #[error("invalid data object from db")]
     ValidationError(#[from] anyhow::Error),
+
+    #[error("inconsistent database state")]
+    InconsistentState(anyhow::Error),
 }
 
 /// 仓储接口，定义了对聚合根(AG)的持久化操作
