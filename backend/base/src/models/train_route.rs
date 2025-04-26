@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "train_route")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub train_id: i64,
+    pub train_id: i32,
     #[sea_orm(primary_key, auto_increment = false)]
     pub line_id: i64,
 }

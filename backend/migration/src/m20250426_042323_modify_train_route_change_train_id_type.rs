@@ -1,5 +1,5 @@
-use crate::m20250411_010603_create_city::City;
-use crate::m20250411_010614_create_station::Station;
+use crate::m20250411_010617_create_train::Train;
+use crate::m20250411_010708_create_train_route::TrainRoute;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -11,8 +11,8 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
-                    .drop_foreign_key(Alias::new("station_city_id_fkey"))
+                    .table(TrainRoute::Table)
+                    .drop_foreign_key(Alias::new("train_route_train_id_fkey"))
                     .to_owned(),
             )
             .await?;
@@ -20,8 +20,8 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
-                    .modify_column(ColumnDef::new(Station::CityId).integer().not_null())
+                    .table(TrainRoute::Table)
+                    .modify_column(ColumnDef::new(TrainRoute::TrainId).integer().not_null())
                     .to_owned(),
             )
             .await?;
@@ -29,13 +29,13 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
+                    .table(TrainRoute::Table)
                     .add_foreign_key(
                         TableForeignKey::new()
-                            .from_tbl(Station::Table)
-                            .from_col(Station::CityId)
-                            .to_tbl(City::Table)
-                            .to_col(City::Id)
+                            .from_tbl(TrainRoute::Table)
+                            .from_col(TrainRoute::TrainId)
+                            .to_tbl(Train::Table)
+                            .to_col(Train::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -49,8 +49,8 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
-                    .drop_foreign_key(Alias::new("station_city_id_fkey"))
+                    .table(TrainRoute::Table)
+                    .drop_foreign_key(Alias::new("train_route_train_id_fkey"))
                     .to_owned(),
             )
             .await?;
@@ -58,8 +58,8 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
-                    .modify_column(ColumnDef::new(Station::CityId).big_integer().not_null())
+                    .table(TrainRoute::Table)
+                    .modify_column(ColumnDef::new(TrainRoute::TrainId).big_integer().not_null())
                     .to_owned(),
             )
             .await?;
@@ -67,13 +67,13 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(Station::Table)
+                    .table(TrainRoute::Table)
                     .add_foreign_key(
                         TableForeignKey::new()
-                            .from_tbl(Station::Table)
-                            .from_col(Station::CityId)
-                            .to_tbl(City::Table)
-                            .to_col(City::Id)
+                            .from_tbl(TrainRoute::Table)
+                            .from_col(TrainRoute::TrainId)
+                            .to_tbl(Train::Table)
+                            .to_col(Train::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
