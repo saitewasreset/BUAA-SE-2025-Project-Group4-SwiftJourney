@@ -1,5 +1,5 @@
 use crate::m20250411_010614_create_station::Station;
-use crate::m20250411_010617_create_train::Train;
+use crate::m20250411_010620_create_train_schedule::TrainSchedule;
 use crate::m20250411_010621_create_seat_type::SeatType;
 use crate::m20250411_010719_create_person_info::PersonInfo;
 use crate::m20250411_010725_create_transaction::Transaction;
@@ -12,8 +12,7 @@ pub struct Migration;
 pub enum TrainOrder {
     Table,
     Id,
-    TrainId,
-    DepartureDate,
+    TrainScheduleId,
     SeatTypeId,
     SeatId,
     BeginStationId,
@@ -37,8 +36,7 @@ impl MigrationTrait for Migration {
                     .table(TrainOrder::Table)
                     .if_not_exists()
                     .col(pk_auto(TrainOrder::Id))
-                    .col(integer(TrainOrder::TrainId).not_null())
-                    .col(date(TrainOrder::DepartureDate).not_null())
+                    .col(integer(TrainOrder::TrainScheduleId).not_null())
                     .col(integer(TrainOrder::SeatTypeId).not_null())
                     .col(integer(TrainOrder::SeatId).not_null())
                     .col(integer(TrainOrder::BeginStationId).not_null())
@@ -57,8 +55,8 @@ impl MigrationTrait for Migration {
                     .col(string(TrainOrder::Status).not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .from(TrainOrder::Table, TrainOrder::TrainId)
-                            .to(Train::Table, Train::Id)
+                            .from(TrainOrder::Table, TrainOrder::TrainScheduleId)
+                            .to(TrainSchedule::Table, TrainSchedule::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
