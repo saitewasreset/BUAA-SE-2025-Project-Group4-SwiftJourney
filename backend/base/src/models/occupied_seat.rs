@@ -7,13 +7,12 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub train_id: i64,
-    pub seat_type_id: i64,
-    pub departure_date: Date,
+    pub seat_type_id: i32,
     pub seat_id: i64,
-    pub begin_station_id: i64,
-    pub end_station_id: i64,
-    pub person_info_id: i64,
+    pub begin_station_id: i32,
+    pub end_station_id: i32,
+    pub person_info_id: i32,
+    pub train_schedule_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -51,13 +50,13 @@ pub enum Relation {
     )]
     Station1,
     #[sea_orm(
-        belongs_to = "super::train::Entity",
-        from = "Column::TrainId",
-        to = "super::train::Column::Id",
+        belongs_to = "super::train_schedule::Entity",
+        from = "Column::TrainScheduleId",
+        to = "super::train_schedule::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
-    Train,
+    TrainSchedule,
 }
 
 impl Related<super::person_info::Entity> for Entity {
@@ -72,9 +71,9 @@ impl Related<super::seat_type::Entity> for Entity {
     }
 }
 
-impl Related<super::train::Entity> for Entity {
+impl Related<super::train_schedule::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Train.def()
+        Relation::TrainSchedule.def()
     }
 }
 
