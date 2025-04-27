@@ -1,5 +1,4 @@
 use crate::Verified;
-use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{
     SeatType, SeatTypeId, SeatTypeName, Train, TrainId, TrainNumber, TrainType,
 };
@@ -22,13 +21,11 @@ impl_db_id_from_u64!(SeatTypeId, i32, "seat type");
 struct TrainDoPack {
     pub train: crate::models::train::Model,
     pub train_type: crate::models::train_type::Model,
-    pub train_route: crate::models::train_route::Model,
     pub seat_type: Vec<crate::models::seat_type::Model>,
 }
 
 struct TrainActiveModelPack {
     pub train: crate::models::train::ActiveModel,
-    pub train_route: crate::models::train_route::ActiveModel,
     pub seat_type: Vec<crate::models::seat_type::ActiveModel>,
     pub seat_type_in_train_type: Vec<crate::models::seat_type_in_train_type::ActiveModel>,
 }
@@ -42,8 +39,6 @@ impl TrainDataConverter {
         let train_number = TrainNumber::from_unchecked(pack.train.number);
 
         let train_type = TrainType::from_unchecked(pack.train_type.type_name);
-
-        let route_id = RouteId::from_db_value(pack.train_route.line_id)?;
 
         let seat_type_list = transform_list(
             pack.seat_type,
@@ -68,13 +63,7 @@ impl TrainDataConverter {
             .map(|x| (x.name().to_string(), x))
             .collect();
 
-        Ok(Train::new(
-            Some(train_id),
-            train_number,
-            train_type,
-            seats,
-            route_id,
-        ))
+        Ok(Train::new(Some(train_id), train_number, train_type, seats))
     }
 
     fn transform_to_do(train: &Train, train_type_id: i32) -> TrainActiveModelPack {
@@ -86,15 +75,6 @@ impl TrainDataConverter {
 
         if let Some(id) = train.get_id() {
             train_model.id = ActiveValue::Set(id.to_db_value());
-        }
-
-        let mut train_route_model = crate::models::train_route::ActiveModel {
-            train_id: ActiveValue::NotSet,
-            line_id: ActiveValue::Set(train.route_id().to_db_value()),
-        };
-
-        if let Some(id) = train.get_id() {
-            train_route_model.train_id = ActiveValue::Set(id.to_db_value())
         }
 
         let mut seat_type_models = Vec::with_capacity(train.seats().len());
@@ -125,7 +105,6 @@ impl TrainDataConverter {
 
         TrainActiveModelPack {
             train: train_model,
-            train_route: train_route_model,
             seat_type: seat_type_models,
             seat_type_in_train_type: seat_type_in_train_type_models,
         }
@@ -154,19 +133,6 @@ impl TrainRepositoryImpl {
                 train.id
             )))?;
 
-        let train_route = train
-            .find_related(crate::models::train_route::Entity)
-            .one(&self.db)
-            .await
-            .context(format!(
-                "failed to find related train route for train id: {}",
-                train.id
-            ))?
-            .ok_or(RepositoryError::InconsistentState(anyhow!(
-                "no train route for train id: {}",
-                train.id
-            )))?;
-
         let seat_type = train_type
             .find_related(crate::models::seat_type::Entity)
             .all(&self.db)
@@ -179,7 +145,6 @@ impl TrainRepositoryImpl {
         let pack = TrainDoPack {
             train,
             train_type,
-            train_route,
             seat_type,
         };
 
@@ -291,21 +256,6 @@ impl Repository<Train> for TrainRepositoryImpl {
 
         let train_id = TrainId::from_db_value(result.last_insert_id)?;
 
-        do_pack.train_route.train_id = ActiveValue::Set(train_id.to_db_value());
-
-        crate::models::train_route::Entity::insert(do_pack.train_route)
-            .on_conflict(
-                OnConflict::column(crate::models::train_route::Column::TrainId)
-                    .update_column(crate::models::train_route::Column::LineId)
-                    .to_owned(),
-            )
-            .exec(&txn)
-            .await
-            .context(format!(
-                "failed to save train route for train id: {:?}",
-                aggregate.get_id()
-            ))?;
-
         txn.commit()
             .await
             .context("cannot commit database transaction")?;
@@ -393,7 +343,6 @@ impl TrainRepositoryImpl {
             Select<crate::models::train::Entity>,
         ) -> Select<crate::models::train::Entity>,
         train_type_map: &HashMap<i32, crate::models::train_type::Model>,
-        train_route_map: &HashMap<i32, crate::models::train_route::Model>,
         seat_type_map: &HashMap<i32, Vec<crate::models::seat_type::Model>>,
     ) -> Result<Vec<Train>, RepositoryError> {
         let train_model_list = builder(crate::models::train::Entity::find())
@@ -412,14 +361,6 @@ impl TrainRepositoryImpl {
                 )))?
                 .clone();
 
-            let train_route = train_route_map
-                .get(&train.id)
-                .ok_or(RepositoryError::InconsistentState(anyhow!(
-                    "no train route for train id: {}",
-                    train.id
-                )))?
-                .clone();
-
             let seat_type = seat_type_map
                 .get(&train.id)
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
@@ -431,7 +372,6 @@ impl TrainRepositoryImpl {
             let pack = TrainDoPack {
                 train,
                 train_type,
-                train_route,
                 seat_type,
             };
 
@@ -493,10 +433,6 @@ impl TrainRepository for TrainRepositoryImpl {
             .cache_table::<crate::models::train_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
             .context("failed to query train type")?;
-        let train_route_map = self
-            .cache_table::<crate::models::train_route::Entity, _, _, _>(|q| q, |m| m.train_id)
-            .await
-            .context("failed to query train route")?;
         let seat_type_map = self
             .cache_table_vec::<crate::models::seat_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
@@ -512,7 +448,6 @@ impl TrainRepository for TrainRepositoryImpl {
             self.query_trains_cached(
                 |q| q.filter(crate::models::train::Column::TypeId.eq(train_type_id)),
                 &train_type_map,
-                &train_route_map,
                 &seat_type_map,
             )
             .await
