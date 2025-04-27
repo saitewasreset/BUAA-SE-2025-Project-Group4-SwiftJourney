@@ -16,12 +16,8 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::dish::Entity")]
     Dish,
-    #[sea_orm(has_many = "super::occupied_seat::Entity")]
-    OccupiedSeat,
-    #[sea_orm(has_many = "super::train_order::Entity")]
-    TrainOrder,
-    #[sea_orm(has_many = "super::train_route::Entity")]
-    TrainRoute,
+    #[sea_orm(has_many = "super::train_schedule::Entity")]
+    TrainSchedule,
     #[sea_orm(
         belongs_to = "super::train_type::Entity",
         from = "Column::TypeId",
@@ -38,21 +34,9 @@ impl Related<super::dish::Entity> for Entity {
     }
 }
 
-impl Related<super::occupied_seat::Entity> for Entity {
+impl Related<super::train_schedule::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::OccupiedSeat.def()
-    }
-}
-
-impl Related<super::train_order::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TrainOrder.def()
-    }
-}
-
-impl Related<super::train_route::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TrainRoute.def()
+        Relation::TrainSchedule.def()
     }
 }
 
