@@ -5,14 +5,15 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "occupied_seat")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub train_schedule_id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub seat_type_id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub seat_id: i64,
     pub begin_station_id: i32,
     pub end_station_id: i32,
     pub person_info_id: i32,
-    pub train_schedule_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -54,7 +55,7 @@ pub enum Relation {
         from = "Column::TrainScheduleId",
         to = "super::train_schedule::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     TrainSchedule,
 }

@@ -7,6 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub train_schedule_id: i32,
     pub seat_type_id: i32,
     pub seat_id: i32,
     pub begin_station_id: i32,
@@ -20,7 +21,6 @@ pub struct Model {
     pub active_time: DateTimeWithTimeZone,
     pub complete_time: DateTimeWithTimeZone,
     pub status: String,
-    pub train_schedule_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -66,7 +66,7 @@ pub enum Relation {
         from = "Column::TrainScheduleId",
         to = "super::train_schedule::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     TrainSchedule,
     #[sea_orm(
