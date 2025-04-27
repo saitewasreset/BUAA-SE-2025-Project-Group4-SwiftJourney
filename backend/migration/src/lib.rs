@@ -36,6 +36,10 @@ mod m20250426_031246_modify_station_change_city_id_type;
 mod m20250426_041251_modify_train_change_train_type_id_type;
 mod m20250426_042323_modify_train_route_change_train_id_type;
 mod m20250426_060711_modify_seat_type_in_train_type_change_type;
+mod m20250427_031546_drop_train_route;
+mod m20250427_031607_create_train_schedule;
+mod m20250427_032702_modify_occupied_seat_use_train_schedule;
+mod m20250427_032709_modify_train_order_use_train_schedule;
 
 pub struct Migrator;
 
@@ -79,6 +83,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20250426_041251_modify_train_change_train_type_id_type::Migration),
             Box::new(m20250426_042323_modify_train_route_change_train_id_type::Migration),
             Box::new(m20250426_060711_modify_seat_type_in_train_type_change_type::Migration),
+            Box::new(m20250427_031546_drop_train_route::Migration),
+            Box::new(m20250427_031607_create_train_schedule::Migration),
+            Box::new(m20250427_032702_modify_occupied_seat_use_train_schedule::Migration),
+            Box::new(m20250427_032709_modify_train_order_use_train_schedule::Migration),
         ]
     }
 }
