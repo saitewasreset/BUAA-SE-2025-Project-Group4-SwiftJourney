@@ -48,6 +48,9 @@
 import { ref } from 'vue'
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue';
+import { userApi } from '@/api/UserApi/userApi'
+import { useUserStore } from '@/stores/user'
 
 const inputPhone = ref('')
 const inputPassword = ref('')
@@ -66,10 +69,23 @@ function goToRegisterPage() {
 
 // -------------------- 处理登录逻辑 --------------------
 
-function postLoginMsg() {
+async function postLoginMsg() {
   console.log('post login message: ' + inputPhone.value + ' ' + inputPassword.value)
-  // TODO
+  await userApi.userLogin({ phone: inputPhone.value, password: inputPassword.value })
+    .then((res) => {
+      if (res.status === 200) {
+        const nowUser = useUserStore();
+        localStorage.setItem('userId', res.data.userId);
+        router.push({ name: 'homepage' });
+      } else {
+        console.error('登录失败')
+      }
+    })
+    .catch((error) => {
+      console.error('登录请求失败:', error)
+    })
 }
+
 </script>
 
 <style lang="css" scoped>
