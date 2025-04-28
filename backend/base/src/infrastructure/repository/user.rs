@@ -163,21 +163,10 @@ impl UserRepositoryImpl {
         let detect_changes_fn = |diff: DiffInfo<User>| {
             let mut result = MultiEntityDiff::new();
 
+            let diff_type = DiffType::from(&diff);
+
             let old = diff.old;
             let new = diff.new;
-
-            let diff_type = match (&old, &new) {
-                (None, None) => DiffType::Unchanged,
-                (None, Some(_)) => DiffType::Added,
-                (Some(_), None) => DiffType::Removed,
-                (Some(old_value), Some(new_value)) => {
-                    if old_value == new_value {
-                        DiffType::Unchanged
-                    } else {
-                        DiffType::Modified
-                    }
-                }
-            };
 
             result.add_change(TypedDiff::new(diff_type, old, new));
 
