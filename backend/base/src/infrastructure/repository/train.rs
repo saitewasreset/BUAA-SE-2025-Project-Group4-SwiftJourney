@@ -202,7 +202,7 @@ impl Repository<Train> for TrainRepositoryImpl {
                 aggregate.get_id()
             )))?;
 
-        let mut do_pack = TrainDataConverter::transform_to_do(aggregate, train_type_model.id);
+        let do_pack = TrainDataConverter::transform_to_do(aggregate, train_type_model.id);
 
         let txn = self
             .db

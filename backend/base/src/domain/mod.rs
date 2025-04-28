@@ -261,6 +261,30 @@ pub enum DiffType {
     Unchanged,
 }
 
+impl DiffType {
+    pub fn from_with_compare_fn<T>(
+        old: Option<&T>,
+        new: Option<&T>,
+        compare_fn: fn(&T, &T) -> bool,
+    ) -> Self
+    where
+        T: Entity + PartialEq + Eq,
+    {
+        match (old, new) {
+            (None, None) => DiffType::Unchanged,
+            (None, Some(_)) => DiffType::Added,
+            (Some(_), None) => DiffType::Removed,
+            (Some(old_value), Some(new_value)) => {
+                if compare_fn(old_value, new_value) {
+                    DiffType::Unchanged
+                } else {
+                    DiffType::Modified
+                }
+            }
+        }
+    }
+}
+
 impl<T> From<&DiffInfo<T>> for DiffType
 where
     T: Aggregate + PartialEq + Eq,
