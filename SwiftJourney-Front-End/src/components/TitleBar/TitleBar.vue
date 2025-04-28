@@ -18,16 +18,68 @@
             <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
-            <el-button @click="goToLoginPage" type="primary" plain>登录</el-button>
-            <el-button @click="goToRegisterPage" class="TailButton" type="success" plain>注册</el-button>
+            <div v-if="!debugUser.isLogin">
+                <el-button @click="goToLoginPage" type="primary" round>登录</el-button>
+                <el-button @click="goToRegisterPage" class="TailButton" type="success" round>注册</el-button>
+            </div>
+            <div v-else>
+                    <el-popover
+                        placement="top"
+                        trigger="hover"
+                        width="220px"
+                    >
+                    <div class="Popover">
+                        <div class="PopoverTitle">
+                            {{ debugUser.name }}
+                        </div>
+                        <div class="PopoverSubTitle">
+                            {{ debugUser.phone }}
+                        </div>
+                        <div class="PopoverContent">
+                            
+                            <div class="RemainingMoney">
+                                <p>账户余额</p>
+                                <div class="Money"> {{ debugUser.remainingMoney }} </div>
+                            </div>
+
+                            <div class="UserButtonLine">
+                                <el-button link plain>个人资料</el-button>
+                                <el-button link plain>余额重置</el-button>
+                            </div>
+
+                            <div class="UserButtonLine">
+                                <el-button link plain>预填信息</el-button>
+                                <el-button link plain>账户安全</el-button>
+                            </div>
+
+                            <div class="UserButtonLine">
+                                <el-button link plain>交易记录</el-button>
+                            </div>
+                        </div>
+                    </div>
+                    <template #reference>
+                        <el-button type="dashed" class="UserInfoButton" round>
+                          {{ debugUser.name }}
+                        </el-button>
+                    </template>
+                </el-popover>
+                <el-button class="LogoutButton" @click="debugUser.logout" type="danger" round>登出</el-button>
+            </div>
         </div>
     </div>
 </template>
   
 <script lang="ts" setup>
+    import { useDebugUserStore } from '@/stores/user';
+    import { useUserStore } from '@/stores/user';
     import { ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
     import { useRouter } from 'vue-router';
+
+    const user = useUserStore();
+
+    const debugUser = useDebugUserStore();
+
     const router = useRouter();
 
     const activeIndex = ref('homepage');
@@ -82,4 +134,53 @@
     align-items: center;
     margin-right: 10px;
 }
+
+.Popover {
+    text-align: center;
+}
+
+.PopoverTitle {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+.PopoverSubTitle {
+    font-size: 13px;
+}
+
+.PopoverContent {
+    .RemainingMoney {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 10px auto;
+        p {
+            font-weight: bold;
+            margin: 0;
+            font-size: 16px;
+        }
+        .Money {
+            margin-left: 30px;
+            font-size: 16px;
+        }
+    }
+    .UserButtonLine {
+        display: flex;
+        justify-content: center;
+        margin-top: 10px;
+        margin-left: 20px;
+        margin-right: 20px;
+        .el-button {
+            font-size: 16px;
+        }
+    }
+}
+
+
+.LogoutButton {
+    margin-left: 20px;
+    margin-right: 10px;
+}
+
 </style>
