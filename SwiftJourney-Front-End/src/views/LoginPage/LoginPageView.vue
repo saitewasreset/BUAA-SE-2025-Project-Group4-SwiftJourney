@@ -76,13 +76,15 @@ async function postLoginMsg() {
       if (res.status === 200) {
         const nowUser = useUserStore();
         localStorage.setItem('userId', res.data.userId);
-        router.push({ name: 'homepage' });
+        message.success('登录成功');
+        
+        goToHomePage();
       } else {
-        console.error('登录失败')
+        throw new Error('登录失败')
       }
     })
     .catch((error) => {
-      console.error('登录请求失败:', error)
+      message.error('登录失败，请检查手机号和密码是否正确');
     })
 }
 
