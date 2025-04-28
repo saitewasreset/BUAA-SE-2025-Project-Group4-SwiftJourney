@@ -83,6 +83,7 @@
 //! - `infrastructure`: 基础设施实现
 //! - `models`: 数据库Data Object定义
 
+use crate::domain::service::DiffInfo;
 use async_trait::async_trait;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -258,6 +259,29 @@ pub enum DiffType {
     Removed,
     Modified,
     Unchanged,
+}
+
+impl<T> From<&DiffInfo<T>> for DiffType
+where
+    T: Aggregate + PartialEq + Eq,
+{
+    fn from(value: &DiffInfo<T>) -> Self {
+        let old = &value.old;
+        let new = &value.new;
+
+        match (old, new) {
+            (None, None) => DiffType::Unchanged,
+            (None, Some(_)) => DiffType::Added,
+            (Some(_), None) => DiffType::Removed,
+            (Some(old_value), Some(new_value)) => {
+                if old_value == new_value {
+                    DiffType::Unchanged
+                } else {
+                    DiffType::Modified
+                }
+            }
+        }
+    }
 }
 
 /// 定义变更检测的基本特征
