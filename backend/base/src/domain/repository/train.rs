@@ -1,8 +1,9 @@
 use crate::Verified;
-use crate::domain::model::train::{SeatType, Train, TrainId, TrainNumber, TrainType};
+use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType};
+use crate::domain::model::train_schedule::SeatId;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[async_trait]
 pub trait TrainRepository: Repository<Train> {
@@ -17,6 +18,11 @@ pub trait TrainRepository: Repository<Train> {
         &self,
         train_id: TrainId,
     ) -> Result<HashSet<SeatType>, RepositoryError>;
+
+    async fn get_seat_id_map(
+        &self,
+        train_id: TrainId,
+    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, RepositoryError>;
 
     async fn find_by_train_number(
         &self,
