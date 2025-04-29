@@ -419,6 +419,9 @@ const disableRegister = computed(() => {
     inputPhone.value === '' ||
     inputPassword.value === '' ||
     inputConfirmPassword.value === '' ||
+    inputNickName.value === '' ||
+    inputIdNumber.value === '' ||
+    inputName.value === '' ||
     inputPasswordError.value ||
     inputConfirmPasswordError.value ||
     inputPhoneError.value ||
@@ -428,7 +431,7 @@ const disableRegister = computed(() => {
 })
 </script>
 
-<style lang="css">
+<style lang="css" scoped>
 /* 整体背景颜色 */
 body {
   background-color: #f0f2f5;
