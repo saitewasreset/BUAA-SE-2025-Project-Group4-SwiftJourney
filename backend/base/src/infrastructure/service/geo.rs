@@ -4,12 +4,22 @@ use crate::domain::repository::city::CityRepository;
 use crate::domain::service::geo::{GeoService, GeoServiceError};
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct GeoServiceImpl<R>
 where
     R: CityRepository,
 {
-    city_repository: R,
+    city_repository: Arc<R>,
+}
+
+impl<R> GeoServiceImpl<R>
+where
+    R: CityRepository,
+{
+    pub fn new(city_repository: Arc<R>) -> Self {
+        GeoServiceImpl { city_repository }
+    }
 }
 
 #[async_trait]
