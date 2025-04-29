@@ -4,7 +4,7 @@ use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait StationRepository: Repository<Station> {
+pub trait StationRepository: Repository<Station> + 'static + Send + Sync {
     async fn load(&self) -> Result<Vec<Station>, RepositoryError>;
 
     async fn find_by_city(&self, city_id: CityId) -> Result<Vec<Station>, RepositoryError>;
