@@ -2,6 +2,7 @@ use crate::Verified;
 use crate::domain::model::train::{
     SeatType, SeatTypeId, SeatTypeName, Train, TrainId, TrainNumber, TrainType,
 };
+use crate::domain::model::train_schedule::SeatId;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
@@ -452,6 +453,62 @@ impl TrainRepository for TrainRepositoryImpl {
             Ok(r.into_iter().collect())
         } else {
             Ok(HashSet::default())
+        }
+    }
+
+    async fn get_seat_id_map(
+        &self,
+        train_id: TrainId,
+    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, RepositoryError> {
+        if let Some(train) = crate::models::train::Entity::find_by_id(train_id.to_db_value())
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to query train for train id: {}",
+                train_id.to_db_value()
+            ))?
+        {
+            let seat_type_mapping = crate::models::seat_type_mapping::Entity::find()
+                .filter(crate::models::seat_type_mapping::Column::TrainTypeId.eq(train.type_id))
+                .all(&self.db)
+                .await
+                .context(format!(
+                    "failed to query seat type mapping for train type id: {}",
+                    train.type_id
+                ))?;
+
+            let seat_type = crate::models::seat_type::Entity::find()
+                .all(&self.db)
+                .await
+                .context("failed to query seat type")?;
+
+            let seat_type_to_name = seat_type
+                .into_iter()
+                .map(|x| (x.id, x.type_name))
+                .collect::<HashMap<_, _>>();
+
+            let mut result: HashMap<SeatTypeName<Verified>, Vec<SeatId>> = HashMap::new();
+
+            for seat_type in seat_type_mapping {
+                let seat_type_name = SeatTypeName::from_unchecked(
+                    seat_type_to_name
+                        .get(&seat_type.seat_type_id)
+                        .ok_or(RepositoryError::InconsistentState(anyhow!(
+                            "no seat type for seat type id: {}",
+                            seat_type.seat_type_id
+                        )))
+                        .cloned()?,
+                );
+
+                result.entry(seat_type_name).or_default().push(
+                    SeatId::try_from(seat_type.seat_id)
+                        .map_err(|e| RepositoryError::ValidationError(e.into()))?,
+                );
+            }
+
+            Ok(result)
+        } else {
+            Ok(HashMap::default())
         }
     }
 
