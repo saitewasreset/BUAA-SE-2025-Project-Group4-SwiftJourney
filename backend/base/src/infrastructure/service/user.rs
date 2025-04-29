@@ -10,7 +10,6 @@ use crate::domain::repository::user::UserRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::password::PasswordService;
 use crate::domain::service::user::{UserService, UserServiceError};
-use async_trait::async_trait;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -51,7 +50,6 @@ where
     }
 }
 
-#[async_trait]
 impl<R, P> UserService for UserServiceImpl<R, P>
 where
     R: UserRepository + 'static + Send + Sync,
@@ -333,20 +331,17 @@ mod tests {
     use crate::infrastructure::service::password::{
         Argon2PasswordServiceImpl, MockPasswordServiceImpl,
     };
-    use async_trait::async_trait;
     use mockall::mock;
 
     mock! {
         UserRepo {}
 
-        #[async_trait]
         impl Repository<User> for UserRepo {
             async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
             async fn save(&self, user: &mut User) -> Result<UserId, RepositoryError>;
             async fn remove(&self, aggregate: User) -> Result<(), RepositoryError>;
         }
 
-        #[async_trait]
         impl UserRepository for UserRepo {
             async fn find_by_phone(&self,phone: Phone,) -> Result<Option<User>, RepositoryError>;
 

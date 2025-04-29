@@ -1,4 +1,3 @@
-pub mod train;
 pub mod user;
 
 use actix_web::body::BoxBody;

@@ -72,13 +72,27 @@
 use crate::domain::model::password::HashedPassword;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use email_address::EmailAddress;
-use id_macro::define_id_type;
 use shared::{PHONE_PREFIX_SET, PHONE_REGEX};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use thiserror::Error;
 
-define_id_type!(User);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UserId(u64);
+
+impl Identifier for UserId {}
+
+impl From<u64> for UserId {
+    fn from(value: u64) -> Self {
+        UserId(value)
+    }
+}
+
+impl From<UserId> for u64 {
+    fn from(value: UserId) -> Self {
+        value.0
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Gender {

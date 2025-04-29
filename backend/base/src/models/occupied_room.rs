@@ -21,7 +21,7 @@ pub enum Relation {
         from = "Column::HotelId",
         to = "super::hotel::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Hotel,
     #[sea_orm(
@@ -29,7 +29,7 @@ pub enum Relation {
         from = "Column::RoomTypeId",
         to = "super::hotel_room_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     HotelRoomType,
     #[sea_orm(
@@ -37,7 +37,7 @@ pub enum Relation {
         from = "Column::PersonInfoId",
         to = "super::person_info::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     PersonInfo,
 }
