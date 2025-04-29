@@ -544,7 +544,7 @@ pub enum RepositoryError {
 /// - `remove`: 移除指定的聚合根
 /// - `save`: 保存聚合根（根据ID是否存在自动判断插入或更新）
 #[async_trait]
-pub trait Repository<AG>
+pub trait Repository<AG>: 'static + Send + Sync
 where
     AG: Aggregate,
 {
@@ -617,7 +617,7 @@ where
 impl<AG, T> Repository<AG> for T
 where
     AG: Aggregate,
-    T: DbRepositorySupport<AG> + Send + Sync,
+    T: DbRepositorySupport<AG> + 'static + Send + Sync,
 {
     async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError> {
         let entity = self.on_select(id).await?;
@@ -681,7 +681,7 @@ where
 /// - `detach`: 从仓储仓储聚合根管理器中分离聚合根
 impl<AG, T> SnapshottingRepository<AG> for T
 where
-    T: DbRepositorySupport<AG> + Send + Sync,
+    T: DbRepositorySupport<AG> + 'static + Send + Sync,
     AG: Aggregate,
 {
     fn attach(&self, aggregate: AG) {
