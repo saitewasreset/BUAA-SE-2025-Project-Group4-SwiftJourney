@@ -6,11 +6,9 @@
 //! - 会话管理服务接口(`SessionManagerService`)
 //!
 //! 注意：具体实现应放在基础设施层(`infrastructure::service`)。
-
 use crate::domain::RepositoryError;
 use crate::domain::model::session::{Session, SessionId};
 use crate::domain::model::user::UserId;
-use async_trait::async_trait;
 
 /// 会话管理服务接口
 ///
@@ -28,8 +26,7 @@ use async_trait::async_trait;
 /// # Notes
 ///
 /// - 实现者应保证线程安全
-#[async_trait]
-pub trait SessionManagerService: 'static + Send + Sync {
+pub trait SessionManagerService {
     /// 创建新会话
     ///
     /// # 参数
@@ -42,7 +39,10 @@ pub trait SessionManagerService: 'static + Send + Sync {
     /// # 业务规则
     /// - 自动生成会话ID
     /// - 设置默认TTL(应在实现层配置)
-    async fn create_session(&self, user_id: UserId) -> Result<Session, RepositoryError>;
+    fn create_session(
+        &self,
+        user_id: UserId,
+    ) -> impl Future<Output = Result<Session, RepositoryError>> + Send;
 
     /// 删除会话
     ///
@@ -52,7 +52,10 @@ pub trait SessionManagerService: 'static + Send + Sync {
     /// # 返回
     /// - `Ok(())`: 删除成功
     /// - `Err(RepositoryError)`: 如果删除失败
-    async fn delete_session(&self, session: Session) -> Result<(), RepositoryError>;
+    fn delete_session(
+        &self,
+        session: Session,
+    ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 
     /// 查询会话详情
     ///
@@ -63,7 +66,10 @@ pub trait SessionManagerService: 'static + Send + Sync {
     /// - `Ok(Some(Session))`: 找到有效会话
     /// - `Ok(None)`: 会话不存在
     /// - `Err(RepositoryError)`: 查询过程中出错
-    async fn get_session(&self, session_id: SessionId) -> Result<Option<Session>, RepositoryError>;
+    fn get_session(
+        &self,
+        session_id: SessionId,
+    ) -> impl Future<Output = Result<Option<Session>, RepositoryError>> + Send;
 
     /// 通过会话ID获取用户ID
     ///
@@ -74,8 +80,8 @@ pub trait SessionManagerService: 'static + Send + Sync {
     /// - `Ok(Some(UserId))`: 会话有效且找到关联用户
     /// - `Ok(None)`: 会话不存在或已过期
     /// - `Err(RepositoryError)`: 查询过程中出错
-    async fn get_user_id_by_session(
+    fn get_user_id_by_session(
         &self,
         session_id: SessionId,
-    ) -> Result<Option<UserId>, RepositoryError>;
+    ) -> impl Future<Output = Result<Option<UserId>, RepositoryError>> + Send;
 }

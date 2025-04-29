@@ -9,21 +9,25 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub number: String,
-    pub type_id: i32,
+    pub type_id: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::dish::Entity")]
     Dish,
-    #[sea_orm(has_many = "super::train_schedule::Entity")]
-    TrainSchedule,
+    #[sea_orm(has_many = "super::occupied_seat::Entity")]
+    OccupiedSeat,
+    #[sea_orm(has_many = "super::train_order::Entity")]
+    TrainOrder,
+    #[sea_orm(has_many = "super::train_route::Entity")]
+    TrainRoute,
     #[sea_orm(
         belongs_to = "super::train_type::Entity",
         from = "Column::TypeId",
         to = "super::train_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     TrainType,
 }
@@ -34,9 +38,21 @@ impl Related<super::dish::Entity> for Entity {
     }
 }
 
-impl Related<super::train_schedule::Entity> for Entity {
+impl Related<super::occupied_seat::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TrainSchedule.def()
+        Relation::OccupiedSeat.def()
+    }
+}
+
+impl Related<super::train_order::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TrainOrder.def()
+    }
+}
+
+impl Related<super::train_route::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TrainRoute.def()
     }
 }
 

@@ -23,7 +23,7 @@ pub enum Relation {
         from = "Column::TakeawayShopId",
         to = "super::takeaway_shop::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     TakeawayShop,
 }

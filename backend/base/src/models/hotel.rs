@@ -25,7 +25,7 @@ pub enum Relation {
         from = "Column::CityId",
         to = "super::city::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     City,
     #[sea_orm(has_many = "super::hotel_order::Entity")]
@@ -41,7 +41,7 @@ pub enum Relation {
         from = "Column::StationId",
         to = "super::station::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Station,
 }

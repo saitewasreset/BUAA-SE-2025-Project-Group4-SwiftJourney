@@ -10,10 +10,10 @@
 //! - 自动会话淘汰机制
 //! - 配置驱动的会话管理策略
 
-use async_trait::async_trait;
+use std::{collections::VecDeque, sync::Arc};
+
 use chrono::Utc;
 use dashmap::DashMap;
-use std::{collections::VecDeque, sync::Arc};
 
 use crate::domain::{
     RepositoryError,
@@ -65,7 +65,6 @@ where
     }
 }
 
-#[async_trait]
 impl<R> SessionManagerService for SessionManagerServiceImpl<R>
 where
     R: SessionRepository + 'static + Send + Sync,
@@ -138,7 +137,6 @@ where
 mod tests {
     use super::*;
     use crate::domain::Repository;
-    use async_trait::async_trait;
     use chrono::{Duration, Utc};
     use mockall::predicate::*;
     use mockall::*;
@@ -146,7 +144,6 @@ mod tests {
 
     mock! {
         pub SessionRepository {}
-        #[async_trait]
         impl Repository<Session> for SessionRepository {
             async fn find(&self, id: SessionId) -> Result<Option<Session>, RepositoryError>;
             async fn remove(&self, aggregate: Session) -> Result<(), RepositoryError>;
