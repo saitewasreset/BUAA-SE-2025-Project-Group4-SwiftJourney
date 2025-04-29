@@ -36,9 +36,8 @@ where
             .collect())
     }
 
-    async fn get_city_by_name(&self, name: String) -> Result<Option<City>, GeoServiceError> {
-        let city_name = CityName::from(name.clone());
-        let cities = self.city_repository.find_by_name(city_name).await?;
+    async fn get_city_by_name(&self, name: &str) -> Result<Option<City>, GeoServiceError> {
+        let cities = self.city_repository.find_by_name(name).await?;
 
         if cities.is_empty() {
             Ok(None)
@@ -50,7 +49,7 @@ where
     async fn add_city(&self, city: City) -> Result<CityId, GeoServiceError> {
         if !self
             .city_repository
-            .find_by_name(city.name().clone())
+            .find_by_name(&city.name())
             .await?
             .is_empty()
         {

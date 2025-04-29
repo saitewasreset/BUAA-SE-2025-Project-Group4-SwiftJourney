@@ -1,4 +1,4 @@
-use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
+use crate::domain::model::city::{City, CityId, ProvinceName};
 use crate::domain::repository::city::CityRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
@@ -102,8 +102,8 @@ impl CityRepository for CityRepositoryImpl {
         self.query_cities(|f| f).await
     }
 
-    async fn find_by_name(&self, city_name: CityName) -> Result<Vec<City>, RepositoryError> {
-        self.query_cities(|f| f.filter(crate::models::city::Column::Name.eq(city_name.to_string())))
+    async fn find_by_name(&self, city_name: &str) -> Result<Vec<City>, RepositoryError> {
+        self.query_cities(|f| f.filter(crate::models::city::Column::Name.eq(city_name)))
             .await
     }
 
