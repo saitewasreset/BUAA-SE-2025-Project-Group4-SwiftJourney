@@ -36,10 +36,10 @@ const activeIndex = ref('personaldata');
 
 <style scoped>
 .tabs-container {
-    position: fixed;
+    position: absolute;
     top: 10%;
     left: 60px;
-    width: 100%; /* 根据需要调整宽度 */
+    width: 95%; /* 根据需要调整宽度 */
     height: 90%; /* 根据需要调整高度 */
 }
 </style>
