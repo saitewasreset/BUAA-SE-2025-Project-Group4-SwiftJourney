@@ -12,7 +12,7 @@ use sea_orm::{ActiveValue, DatabaseConnection, DbErr};
 use sea_orm::{ColumnTrait, ModelTrait};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 impl_db_id_from_u64!(TrainId, i32, "train");
@@ -388,7 +388,7 @@ impl TrainRepositoryImpl {
 impl TrainRepository for TrainRepositoryImpl {
     async fn get_verified_train_number(
         &self,
-    ) -> Result<Vec<TrainNumber<Verified>>, RepositoryError> {
+    ) -> Result<HashSet<TrainNumber<Verified>>, RepositoryError> {
         let train_models = crate::models::train::Entity::find()
             .all(&self.db)
             .await
@@ -400,7 +400,9 @@ impl TrainRepository for TrainRepositoryImpl {
             .collect())
     }
 
-    async fn get_verified_train_type(&self) -> Result<Vec<TrainType<Verified>>, RepositoryError> {
+    async fn get_verified_train_type(
+        &self,
+    ) -> Result<HashSet<TrainType<Verified>>, RepositoryError> {
         let train_type_models = crate::models::train_type::Entity::find()
             .all(&self.db)
             .await
@@ -415,7 +417,7 @@ impl TrainRepository for TrainRepositoryImpl {
     async fn get_verified_seat_type(
         &self,
         train_id: TrainId,
-    ) -> Result<Vec<SeatType>, RepositoryError> {
+    ) -> Result<HashSet<SeatType>, RepositoryError> {
         if let Some(train) = self.find(train_id).await? {
             let r = crate::models::seat_type::Entity::find()
                 .inner_join(crate::models::seat_type_in_train_type::Entity)
@@ -447,9 +449,9 @@ impl TrainRepository for TrainRepositoryImpl {
                     .map_err(RepositoryError::ValidationError)
                 })?;
 
-            Ok(r)
+            Ok(r.into_iter().collect())
         } else {
-            Ok(Vec::default())
+            Ok(HashSet::default())
         }
     }
 
