@@ -10,8 +10,8 @@ pub struct Model {
     pub train_order_id: i64,
     pub dish_id: i64,
     pub person_info_id: i64,
-    pub pay_transaction_id: Option<i64>,
-    pub refund_transaction_id: Option<i64>,
+    pub pay_transaction_id: i64,
+    pub refund_transaction_id: i64,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub amount: i32,
@@ -28,7 +28,7 @@ pub enum Relation {
         from = "Column::DishId",
         to = "super::dish::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Dish,
     #[sea_orm(
@@ -36,7 +36,7 @@ pub enum Relation {
         from = "Column::PersonInfoId",
         to = "super::person_info::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     PersonInfo,
     #[sea_orm(
@@ -44,7 +44,7 @@ pub enum Relation {
         from = "Column::TrainOrderId",
         to = "super::train_order::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     TrainOrder,
     #[sea_orm(
@@ -52,7 +52,7 @@ pub enum Relation {
         from = "Column::PayTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Transaction2,
     #[sea_orm(
@@ -60,7 +60,7 @@ pub enum Relation {
         from = "Column::RefundTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Transaction1,
 }

@@ -5,7 +5,6 @@
 use crate::domain::model::user::{IdentityCardId, Phone, User, UserId};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::{Identifiable, Repository, RepositoryError};
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{
     Arc, Mutex,
@@ -66,7 +65,6 @@ impl MockUserRepository {
     }
 }
 
-#[async_trait]
 impl UserRepository for MockUserRepository {
     async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
         let phone_index = self.phone_index.lock().unwrap();
@@ -111,7 +109,6 @@ impl UserRepository for MockUserRepository {
     }
 }
 
-#[async_trait]
 impl Repository<User> for MockUserRepository {
     async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError> {
         Ok(self.users.lock().unwrap().get(&id).cloned())

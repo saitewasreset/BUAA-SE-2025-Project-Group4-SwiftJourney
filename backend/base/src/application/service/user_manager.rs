@@ -143,7 +143,7 @@ impl From<UserServiceError> for Box<dyn ApplicationError> {
 /// 2. 所有方法返回`Result`，错误类型为`Box<dyn ApplicationError>`
 /// 3. 接收命令对象作为参数，遵循CQRS模式
 #[async_trait]
-pub trait UserManagerService: 'static + Send + Sync {
+pub trait UserManagerService {
     /// 注册新用户
     ///
     /// # Arguments

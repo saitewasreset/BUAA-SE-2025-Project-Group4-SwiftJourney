@@ -23,7 +23,7 @@ pub mod takeaway_order;
 pub mod takeaway_shop;
 pub mod train;
 pub mod train_order;
-pub mod train_schedule;
+pub mod train_route;
 pub mod train_type;
 pub mod transaction;
 pub mod user;

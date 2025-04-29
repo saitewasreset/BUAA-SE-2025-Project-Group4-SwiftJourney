@@ -9,7 +9,6 @@ use crate::domain::model::user::{
     User, UserId, UserInfo, Username,
 };
 use crate::domain::service::ServiceError;
-use async_trait::async_trait;
 use thiserror::Error;
 
 /// 用户服务操作可能产生的错误类型
@@ -59,8 +58,7 @@ impl From<PasswordError> for UserServiceError {
 ///
 /// 定义了对用户实体进行业务操作的核心契约。
 /// 所有方法都是异步的，返回实现了`Future` trait的结果。
-#[async_trait]
-pub trait UserService: 'static + Sync + Send {
+pub trait UserService {
     /// 注册新用户
     ///
     /// # Arguments
@@ -78,14 +76,14 @@ pub trait UserService: 'static + Sync + Send {
     /// * `UserExists` - 手机号或身份证号已存在
     /// * `InfrastructureError` - 基础设施错误（如数据库访问失败）
     /// * `InvalidPassword` - 密码错误
-    async fn register(
+    fn register(
         &self,
         username: Username,
         raw_password: RawPassword,
         name: RealName,
         phone: Phone,
         identity_card_id: IdentityCardId,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 删除用户
     ///
@@ -99,7 +97,7 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 指定手机号的用户不存在
     /// * `InfrastructureError` - 基础设施错误
-    async fn delete(&self, phone: Phone) -> Result<(), UserServiceError>;
+    fn delete(&self, phone: Phone) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 验证用户登录密码
     ///
@@ -110,11 +108,11 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施或密码服务错误
-    async fn verify_password(
+    fn verify_password(
         &self,
         user: &User,
         raw_password: String,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 设置用户登录密码
     ///
@@ -125,11 +123,11 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施或密码服务错误
-    async fn set_password(
+    fn set_password(
         &self,
         user_id: UserId,
         raw_password: String,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 设置或清除支付密码
     ///
@@ -144,11 +142,11 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施或密码服务错误
-    async fn set_payment_password(
+    fn set_payment_password(
         &self,
         user_id: UserId,
         payment_password: Option<PaymentPassword>,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 直接设置支付密码错误尝试次数
     ///
@@ -159,11 +157,11 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施错误
-    async fn set_wrong_payment_password_tried(
+    fn set_wrong_payment_password_tried(
         &self,
         user_id: UserId,
         password_attempts: PasswordAttempts,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 重置支付密码错误尝试次数为0
     ///
@@ -173,10 +171,10 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施错误
-    async fn clear_wrong_payment_password_tried(
+    fn clear_wrong_payment_password_tried(
         &self,
         user_id: UserId,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 递增支付密码错误尝试次数
     ///
@@ -189,10 +187,10 @@ pub trait UserService: 'static + Sync + Send {
     /// * `NoSuchUser` - 用户不存在
     /// * `PaymentPasswordMaxAttemptsExceed` - 尝试次数已达上限
     /// * `InfrastructureError` - 基础设施错误
-    async fn increment_wrong_payment_password_tried(
+    fn increment_wrong_payment_password_tried(
         &self,
         user_id: UserId,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 
     /// 更新用户详细信息
     ///
@@ -203,9 +201,9 @@ pub trait UserService: 'static + Sync + Send {
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施错误
-    async fn set_user_info(
+    fn set_user_info(
         &self,
         user_id: UserId,
         user_info: UserInfo,
-    ) -> Result<(), UserServiceError>;
+    ) -> impl Future<Output = Result<(), UserServiceError>> + Send;
 }

@@ -21,7 +21,7 @@ pub use super::takeaway_order::Entity as TakeawayOrder;
 pub use super::takeaway_shop::Entity as TakeawayShop;
 pub use super::train::Entity as Train;
 pub use super::train_order::Entity as TrainOrder;
-pub use super::train_schedule::Entity as TrainSchedule;
+pub use super::train_route::Entity as TrainRoute;
 pub use super::train_type::Entity as TrainType;
 pub use super::transaction::Entity as Transaction;
 pub use super::user::Entity as User;

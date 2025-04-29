@@ -84,7 +84,7 @@ impl From<User> for UserProfileDTO {
 /// - `UserProfileError::InternalServerError`: 当服务器内部错误时
 
 #[async_trait]
-pub trait UserProfileService: 'static + Send + Sync {
+pub trait UserProfileService {
     async fn get_profile(
         &self,
         query: UserProfileQuery,

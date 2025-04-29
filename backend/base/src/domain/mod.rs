@@ -83,8 +83,6 @@
 //! - `infrastructure`: 基础设施实现
 //! - `models`: 数据库Data Object定义
 
-use crate::domain::service::DiffInfo;
-use async_trait::async_trait;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -259,53 +257,6 @@ pub enum DiffType {
     Removed,
     Modified,
     Unchanged,
-}
-
-impl DiffType {
-    pub fn from_with_compare_fn<T>(
-        old: Option<&T>,
-        new: Option<&T>,
-        compare_fn: fn(&T, &T) -> bool,
-    ) -> Self
-    where
-        T: Entity + PartialEq + Eq,
-    {
-        match (old, new) {
-            (None, None) => DiffType::Unchanged,
-            (None, Some(_)) => DiffType::Added,
-            (Some(_), None) => DiffType::Removed,
-            (Some(old_value), Some(new_value)) => {
-                if compare_fn(old_value, new_value) {
-                    DiffType::Unchanged
-                } else {
-                    DiffType::Modified
-                }
-            }
-        }
-    }
-}
-
-impl<T> From<&DiffInfo<T>> for DiffType
-where
-    T: Aggregate + PartialEq + Eq,
-{
-    fn from(value: &DiffInfo<T>) -> Self {
-        let old = &value.old;
-        let new = &value.new;
-
-        match (old, new) {
-            (None, None) => DiffType::Unchanged,
-            (None, Some(_)) => DiffType::Added,
-            (Some(_), None) => DiffType::Removed,
-            (Some(old_value), Some(new_value)) => {
-                if old_value == new_value {
-                    DiffType::Unchanged
-                } else {
-                    DiffType::Modified
-                }
-            }
-        }
-    }
 }
 
 /// 定义变更检测的基本特征
@@ -527,9 +478,6 @@ pub enum RepositoryError {
 
     #[error("invalid data object from db")]
     ValidationError(#[from] anyhow::Error),
-
-    #[error("inconsistent database state")]
-    InconsistentState(anyhow::Error),
 }
 
 /// 仓储接口，定义了对聚合根(AG)的持久化操作
@@ -543,23 +491,16 @@ pub enum RepositoryError {
 /// - `find`: 根据ID查找聚合根
 /// - `remove`: 移除指定的聚合根
 /// - `save`: 保存聚合根（根据ID是否存在自动判断插入或更新）
-#[async_trait]
 pub trait Repository<AG>
 where
     AG: Aggregate,
 {
-    async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError>;
-    async fn remove(&self, aggregate: AG) -> Result<(), RepositoryError>;
-    async fn save(&self, aggregate: &mut AG) -> Result<AG::ID, RepositoryError>;
-}
-
-pub trait DbId {
-    type DbType;
-
-    fn to_db_value(&self) -> Self::DbType;
-    fn from_db_value(value: Self::DbType) -> Result<Self, anyhow::Error>
-    where
-        Self: Sized;
+    fn find(&self, id: AG::ID) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
+    fn remove(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+    fn save(
+        &self,
+        aggregate: &mut AG,
+    ) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
 }
 
 pub trait SnapshottingRepository<AG>: Repository<AG>
@@ -585,8 +526,6 @@ where
 /// - `on_update`: 执行更新操作时的回调
 /// - `on_delete`: 执行删除操作时的回调
 ///
-
-#[async_trait]
 pub trait DbRepositorySupport<AG>
 where
     AG: Aggregate,
@@ -594,10 +533,19 @@ where
     type Manager: AggregateManager<AG>;
 
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>>;
-    async fn on_insert(&self, aggregate: AG) -> Result<AG::ID, RepositoryError>;
-    async fn on_select(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError>;
-    async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError>;
-    async fn on_delete(&self, aggregate: AG) -> Result<(), RepositoryError>;
+    fn on_insert(
+        &self,
+        aggregate: AG,
+    ) -> impl Future<Output = Result<AG::ID, RepositoryError>> + Send;
+    fn on_select(
+        &self,
+        id: AG::ID,
+    ) -> impl Future<Output = Result<Option<AG>, RepositoryError>> + Send;
+    fn on_update(
+        &self,
+        diff: MultiEntityDiff,
+    ) -> impl Future<Output = Result<(), RepositoryError>> + Send;
+    fn on_delete(&self, aggregate: AG) -> impl Future<Output = Result<(), RepositoryError>> + Send;
 }
 
 /// 为实现了`DbRepositorySupport`的类型自动提供`Repository`的默认实现
@@ -613,7 +561,6 @@ where
 ///
 /// # Errors
 /// - 当数据库操作失败时返回`RepositoryError`
-#[async_trait]
 impl<AG, T> Repository<AG> for T
 where
     AG: Aggregate,

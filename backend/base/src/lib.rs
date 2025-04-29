@@ -29,8 +29,3 @@ pub mod application;
 pub mod domain;
 pub mod infrastructure;
 pub mod models;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Unverified;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Verified;
