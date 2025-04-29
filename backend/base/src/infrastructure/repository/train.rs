@@ -456,6 +456,20 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError> {
+        let train_type_map = self
+            .cache_table::<crate::models::train_type::Entity, _, _, _>(|q| q, |m| m.id)
+            .await
+            .context("failed to query train type")?;
+        let seat_type_map = self
+            .cache_table_vec::<crate::models::seat_type::Entity, _, _, _>(|q| q, |m| m.id)
+            .await
+            .context("failed to query train route")?;
+
+        self.query_trains_cached(|q| q, &train_type_map, &seat_type_map)
+            .await
+    }
+
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,

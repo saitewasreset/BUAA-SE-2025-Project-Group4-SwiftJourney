@@ -19,6 +19,8 @@ pub trait TrainRepository: Repository<Train> {
         train_id: TrainId,
     ) -> Result<HashSet<SeatType>, RepositoryError>;
 
+    async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError>;
+
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
