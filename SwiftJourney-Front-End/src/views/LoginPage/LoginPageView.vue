@@ -48,6 +48,9 @@
 import { ref } from 'vue'
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue';
+import { userApi } from '@/api/UserApi/userApi'
+import { useUserStore } from '@/stores/user'
 
 const inputPhone = ref('')
 const inputPassword = ref('')
@@ -66,13 +69,28 @@ function goToRegisterPage() {
 
 // -------------------- 处理登录逻辑 --------------------
 
-function postLoginMsg() {
+async function postLoginMsg() {
   console.log('post login message: ' + inputPhone.value + ' ' + inputPassword.value)
-  // TODO
+  await userApi.userLogin({ phone: inputPhone.value, password: inputPassword.value })
+    .then((res) => {
+      if (res.status === 200) {
+        const nowUser = useUserStore();
+        localStorage.setItem('userId', res.data.userId);
+        message.success('登录成功');
+        
+        goToHomePage();
+      } else {
+        throw new Error('登录失败')
+      }
+    })
+    .catch((error) => {
+      message.error('登录失败，请检查手机号和密码是否正确');
+    })
 }
+
 </script>
 
-<style lang="css">
+<style lang="css" scoped>
 /* 整体背景颜色 */
 body {
   background-color: #f0f2f5;

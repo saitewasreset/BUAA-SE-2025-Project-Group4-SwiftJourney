@@ -48,7 +48,12 @@
   
 <script>
 import { ElMessage } from 'element-plus';
+import { useUserStore } from '@/stores/user';
+import { useDebugUserStore } from '@/stores/user';
 import validator from 'validator';
+
+const user = useUserStore();
+const debugUser = useDebugUserStore();
 
   export default {
     data() {
@@ -83,6 +88,9 @@ import validator from 'validator';
         setAgeButtonText: "设置",
         setEmailButtonText: "设置",
       };
+    },
+    created() {
+      this.initFormData();
     },
     computed: {
       desensitizeName() {
@@ -142,6 +150,15 @@ import validator from 'validator';
       },
     },
     methods: {
+      initFormData() {
+        this.formData.name = debugUser.name;
+        this.formData.username = debugUser.username;
+        this.formData.identityCardId = debugUser.identityCardId;
+        this.formData.phone = debugUser.phone;
+        this.formData.gender = debugUser.gender === 'male' ? '男' : '女';
+        this.formData.email = debugUser.email;
+        this.formData.age = debugUser.age;
+      },
       setUsername() {
         this.isSetUsername = !this.isSetUsername;
         this.setUsernameButtonText = this.isSetUsername ? "取消" : "设置";
