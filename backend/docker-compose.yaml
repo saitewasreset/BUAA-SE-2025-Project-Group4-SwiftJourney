@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: swiftjourney
+      POSTGRES_PASSWORD: swiftjourney
+      POSTGRES_DB: swiftjourney
+      TZ: Asia/Shanghai
+      LANG: zh_CN.utf-8
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=zh-CN --encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swiftjourney -d $$POSTGRES_DB"]
+      start_period: 1m
+      start_interval: 5s
+      interval: 10m
+      timeout: 30s
+      retries: 3
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      start_period: 1m
+      start_interval: 5s
+      interval: 10m
+      timeout: 30s
+      retries: 3
+
+  backend:
+    build: .
+    volumes:
+      - backend_data:/instance
+    environment:
+      DATABASE_URL: postgres://swiftjourney:swiftjourney@db/swiftjourney
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - 8080:8080
+
+volumes:
+  postgres_data:
+  backend_data:
+  redis_data:
