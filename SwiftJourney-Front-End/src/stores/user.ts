@@ -5,6 +5,7 @@ import { NormalConstants } from '@/constant/NormalConstant';
 export const useUserStore = defineStore('user', {
     state: () => ({
         personalId: '',
+        username: '',
         name: '',
         identityCardId: '',
         preferredSeatLocation: 'A' as 'A' | 'B' | 'C' | 'D' | 'F',
@@ -40,6 +41,7 @@ export const useUserStore = defineStore('user', {
 export const useDebugUserStore = defineStore('debugUser', {
     state: () => ({
         personalId: '123456789012345678',
+        username: 'J J',
         name: 'John Doe',
         identityCardId: '123456789012345678',
         preferredSeatLocation: 'A' as 'A' | 'B' | 'C' | 'D' | 'F',
