@@ -1,3 +1,4 @@
+pub mod geo;
 pub mod password;
 pub mod route;
 pub mod session;

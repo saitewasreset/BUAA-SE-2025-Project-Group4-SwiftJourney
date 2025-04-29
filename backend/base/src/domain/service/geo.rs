@@ -28,12 +28,12 @@ impl From<RepositoryError> for GeoServiceError {
 pub trait GeoService {
     async fn get_city_map(&self) -> Result<HashMap<ProvinceName, City>, GeoServiceError>;
 
-    async fn get_city_by_name(&self, name: String) -> Result<City, GeoServiceError>;
+    async fn get_city_by_name(&self, name: String) -> Result<Option<City>, GeoServiceError>;
 
     // 检查是否重名
     async fn add_city(&self, city: City) -> Result<CityId, GeoServiceError>;
 
-    async fn remove_city(&self, city_id: CityId) -> Result<(), GeoServiceError>;
+    async fn remove_city(&self, city: City) -> Result<(), GeoServiceError>;
 
     // 检查是否重名
     async fn modify_city(
