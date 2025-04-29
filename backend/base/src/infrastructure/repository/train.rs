@@ -15,6 +15,7 @@ use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::ops::Deref;
 
 impl_db_id_from_u64!(TrainId, i32, "train");
 impl_db_id_from_u64!(SeatTypeId, i32, "seat type");
@@ -529,14 +530,20 @@ impl TrainRepository for TrainRepositoryImpl {
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,
-    ) -> Result<Option<Train>, RepositoryError> {
+    ) -> Result<Train, RepositoryError> {
         let query_results = self
             .query_trains(|q| {
                 q.filter(crate::models::train::Column::Number.eq(train_number.to_string()))
             })
             .await?;
 
-        Ok(query_results.into_iter().next())
+        Ok(query_results
+            .into_iter()
+            .next()
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no train for verified train number: {}",
+                train_number.deref()
+            )))?)
     }
 
     async fn find_by_train_type(
