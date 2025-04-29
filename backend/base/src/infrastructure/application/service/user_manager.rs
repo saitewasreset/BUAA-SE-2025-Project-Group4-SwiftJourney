@@ -214,6 +214,7 @@ mod tests {
     // 模拟UserService
     mock! {
         UserService {}
+        #[async_trait]
         impl UserService for UserService {
             async fn register(
                 &self,
@@ -269,6 +270,7 @@ mod tests {
             async fn save(&self, entity: &mut User) -> Result<UserId, RepositoryError>;
             async fn remove(&self, aggregate: User) -> Result<(), RepositoryError>;
         }
+        #[async_trait]
         impl UserRepository for UserRepo {
             async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError>;
             async fn find_by_identity_card_id(
@@ -282,6 +284,7 @@ mod tests {
     // 模拟SessionManagerService
     mock! {
         SessionService {}
+        #[async_trait]
         impl SessionManagerService for SessionService {
             async fn create_session(&self, user_id: UserId) -> Result<Session, RepositoryError>;
             async fn delete_session(&self, session: Session) -> Result<(), RepositoryError>;
