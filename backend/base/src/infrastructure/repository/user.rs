@@ -306,6 +306,7 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
     }
 }
 
+#[async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
         let phone: String = phone.into();
