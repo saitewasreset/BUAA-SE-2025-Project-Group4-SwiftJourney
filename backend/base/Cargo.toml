@@ -1,0 +1,35 @@
+[package]
+name = "base"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+shared = { path = "../shared" }
+id_macro = { path = "../id_macro" }
+
+tokio = { version = "1", features = ["full"] }
+sea-orm = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+thiserror = "2.0"
+anyhow = "1.0"
+email_address = "0.2"
+argon2 = { version = "0.5", features = ["password-hash", "alloc"] }
+uuid = { version = "1.16", features = ["v4"] }
+regex = "1.11"
+phf = "0.11"
+dashmap = "6.1"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+
+async-trait = "0.1"
+dyn-fmt = "0.4"
+
+petgraph = "0.8"
+
+[dev-dependencies]
+
+claims = "0.8"
+mockall = "0.13"
