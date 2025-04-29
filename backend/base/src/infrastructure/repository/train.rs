@@ -388,38 +388,28 @@ impl TrainRepositoryImpl {
 
 #[async_trait]
 impl TrainRepository for TrainRepositoryImpl {
-    async fn get_verified_train_number(
-        &self,
-    ) -> Result<HashSet<TrainNumber<Verified>>, RepositoryError> {
+    async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_models = crate::models::train::Entity::find()
             .all(&self.db)
             .await
             .map_err(anyhow::Error::from)?;
 
-        Ok(train_models
-            .into_iter()
-            .map(|e| TrainNumber::from_unchecked(e.number))
-            .collect())
+        Ok(train_models.into_iter().map(|e| e.number).collect())
     }
 
-    async fn get_verified_train_type(
-        &self,
-    ) -> Result<HashSet<TrainType<Verified>>, RepositoryError> {
+    async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_type_models = crate::models::train_type::Entity::find()
             .all(&self.db)
             .await
             .map_err(anyhow::Error::from)?;
 
-        Ok(train_type_models
-            .into_iter()
-            .map(|e| TrainType::from_unchecked(e.type_name))
-            .collect())
+        Ok(train_type_models.into_iter().map(|e| e.type_name).collect())
     }
 
     async fn get_verified_seat_type(
         &self,
         train_id: TrainId,
-    ) -> Result<HashSet<SeatType>, RepositoryError> {
+    ) -> Result<HashSet<String>, RepositoryError> {
         if let Some(train) = self.find(train_id).await? {
             let r = crate::models::seat_type::Entity::find()
                 .inner_join(crate::models::seat_type_in_train_type::Entity)
@@ -430,25 +420,11 @@ impl TrainRepository for TrainRepositoryImpl {
                 .all(&self.db)
                 .await
                 .map_err(|e| RepositoryError::Db(e.into()))
-                .and_then(|seat_types| {
-                    transform_list(
-                        seat_types,
-                        |model| {
-                            let seat_type_id = SeatTypeId::from_db_value(model.id)?;
-                            let seat_type_name = SeatTypeName::from_unchecked(model.type_name);
-                            let capacity = model.capacity as u32;
-                            let price = model.price;
-
-                            Ok(SeatType::new(
-                                Some(seat_type_id),
-                                seat_type_name,
-                                capacity,
-                                price,
-                            ))
-                        },
-                        |model| model.id,
-                    )
-                    .map_err(RepositoryError::ValidationError)
+                .map(|seat_types| {
+                    seat_types
+                        .into_iter()
+                        .map(|e| e.type_name)
+                        .collect::<Vec<_>>()
                 })?;
 
             Ok(r.into_iter().collect())
