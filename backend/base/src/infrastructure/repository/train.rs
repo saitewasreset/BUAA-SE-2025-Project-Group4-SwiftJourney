@@ -412,6 +412,47 @@ impl TrainRepository for TrainRepositoryImpl {
             .collect())
     }
 
+    async fn get_verified_seat_type(
+        &self,
+        train_id: TrainId,
+    ) -> Result<Vec<SeatType>, RepositoryError> {
+        if let Some(train) = self.find(train_id).await? {
+            let r = crate::models::seat_type::Entity::find()
+                .inner_join(crate::models::seat_type_in_train_type::Entity)
+                .filter(
+                    crate::models::seat_type_in_train_type::Column::TrainTypeId
+                        .eq(train.train_type().to_string()),
+                )
+                .all(&self.db)
+                .await
+                .map_err(|e| RepositoryError::Db(e.into()))
+                .and_then(|seat_types| {
+                    transform_list(
+                        seat_types,
+                        |model| {
+                            let seat_type_id = SeatTypeId::from_db_value(model.id)?;
+                            let seat_type_name = SeatTypeName::from_unchecked(model.type_name);
+                            let capacity = model.capacity as u32;
+                            let price = model.price;
+
+                            Ok(SeatType::new(
+                                Some(seat_type_id),
+                                seat_type_name,
+                                capacity,
+                                price,
+                            ))
+                        },
+                        |model| model.id,
+                    )
+                    .map_err(RepositoryError::ValidationError)
+                })?;
+
+            Ok(r)
+        } else {
+            Ok(Vec::default())
+        }
+    }
+
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,
