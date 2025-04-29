@@ -30,14 +30,21 @@
  */
 use actix_web::{App, HttpServer, web};
 use api::MAX_BODY_LENGTH;
+use base::application::service::user_manager::UserManagerService;
+use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
+use base::domain::repository::user::UserRepository;
+use base::domain::service::session::SessionManagerService;
+use base::domain::service::user::UserService;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
+use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
+use env_logger::Env;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use std::sync::Arc;
@@ -46,6 +53,8 @@ use tracing::{instrument, warn};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
 
     let conn = Database::connect(&database_url)
@@ -56,25 +65,44 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
-    let session_manager_service =
-        web::Data::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
+    let session_manager_service_impl =
+        Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
             Arc::new(SessionRepositoryImpl::new(
                 SessionRepositoryConfig::default(),
             )),
             SessionConfig::default(),
         ));
 
-    let user_repository = web::Data::new(UserRepositoryImpl::new(conn.clone()));
-
-    let user_service = web::Data::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
-        Arc::clone(&user_repository),
+    let user_repository_impl = Arc::new(UserRepositoryImpl::new(conn.clone()));
+    let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
+        Arc::clone(&user_repository_impl),
     ));
 
-    let user_manager_service = web::Data::new(UserManagerServiceImpl::new(
-        Arc::clone(&user_service),
-        Arc::clone(&user_repository),
-        Arc::clone(&session_manager_service),
+    let user_manager_service_impl = Arc::new(UserManagerServiceImpl::new(
+        Arc::clone(&user_service_impl),
+        Arc::clone(&user_repository_impl),
+        Arc::clone(&session_manager_service_impl),
     ));
+
+    let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&user_repository_impl),
+    ));
+
+    let user_repository: web::Data<dyn UserRepository> =
+        web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
+
+    let user_service: web::Data<dyn UserService> =
+        web::Data::from(user_service_impl as Arc<dyn UserService>);
+
+    let session_manager_service: web::Data<dyn SessionManagerService> =
+        web::Data::from(session_manager_service_impl as Arc<dyn SessionManagerService>);
+
+    let user_manager_service: web::Data<dyn UserManagerService> =
+        web::Data::from(user_manager_service_impl as Arc<dyn UserManagerService>);
+
+    let user_profile_service: web::Data<dyn UserProfileService> =
+        web::Data::from(user_profile_service_impl as Arc<dyn UserProfileService>);
 
     // Step 2: Create instance of your application service,
     // and wrap it with `web::Data::new`
@@ -88,6 +116,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_repository.clone())
             .app_data(user_service.clone())
             .app_data(user_manager_service.clone())
+            .app_data(user_profile_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
