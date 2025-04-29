@@ -29,7 +29,7 @@ pub trait TrainRepository: Repository<Train> {
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,
-    ) -> Result<Option<Train>, RepositoryError>;
+    ) -> Result<Train, RepositoryError>;
 
     async fn find_by_train_type(
         &self,
