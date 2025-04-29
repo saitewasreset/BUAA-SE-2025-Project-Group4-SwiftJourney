@@ -1,9 +1,14 @@
 # Request For Comments 4: API 文档
 
-Version: 3 (2025-04-12 15:05:00)
+Version: 5 (2025-04-22 13:25:00)
 
 最近变更：
 
+- Version 5
+  - 订单列表：按交易组合订单，`OrderInfo::status`改为小写
+- Version 4
+  - 用户注册：新增了部分校验失败的错误代码
+  - 设置个人资料：新增了部分校验失败的错误代码
 - Version 3
   - 用户注册：要求填写姓名以及身份证号
   - 用户登录：移除判断是否是第一次登录功能，响应数据变为`null`
@@ -157,6 +162,9 @@ interface UserRegisterRequest {
 | 200   | `For Super Earth!`             | 注册成功                   |
 | 13001 | `Identity card id format`      | 身份证号格式错误           |
 | 15001 | `Phone {phone} already exists` | 该手机号对应的用户已经存在 |
+| 15003 | `Invalid username`             | 用户名格式错误             |
+| 15004 | `Invalid password`             | 密码格式错误               |
+| 15005 | `Invalid name`                 | 姓名格式错误               |
 
 响应**数据**：
 
@@ -294,10 +302,13 @@ interface UserUpdateInfo {
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                       | 含义                             |
-| ---- | -------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 15003 | `Invalid username`                                                   | 用户名格式错误                   |
+| 15006 | `Invalid age`                                                        | 年龄格式错误                     |
+| 15007 | `Invalid email`                                                      | 邮箱格式错误                     |
 
 响应**数据**：
 
@@ -850,19 +861,28 @@ type ResponseData = TransactionInfo;
 响应**数据**：
 
 ```typescript
-type ResponseData = OrderInfo[];
+type ResponseData = TransactionData[];
+
+interface TransactionData {
+  // 交易的 UUID
+  transactionId: string;
+  // 交易状态
+  status: "unpaid" | "paid";
+  // 交易创建日期时间
+  createTime: string;
+  // 支付日期时间
+  payTime?: string;
+  // 该交易对应的订单列表
+  orders: OrderInfo[];
+  // 该交易的金额（所有订单金额之和）
+  amount: number;
+}
 
 interface OrderInfo {
   // 订单的 UUID
   orderId: string;
-  // 订单对应的交易的 UUID
-  transactionId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
-  status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
-  // 订单创建日期时间
-  orderTime: string;
-  // 支付日期时间
-  payTime?: string;
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
   // 订单金额
   amount: number;
   // 订单类型
