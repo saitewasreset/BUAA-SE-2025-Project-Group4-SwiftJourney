@@ -53,7 +53,7 @@ pub trait StationService {
     async fn get_station_by_name(
         &self,
         station_name: String,
-    ) -> Result<Station, StationServiceError>;
+    ) -> Result<Option<Station>, StationServiceError>;
 
     async fn add_station(
         &self,
