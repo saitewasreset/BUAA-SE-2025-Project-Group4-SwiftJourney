@@ -183,15 +183,26 @@ interface TrainOrderRequest {
   seatType: string;
 }
 
+interface TransactionData {
+  // 交易的 UUID
+  transactionId: string;
+  // 交易状态
+  status: "unpaid" | "paid";
+  // 交易创建日期时间
+  createTime: string;
+  // 支付日期时间
+  payTime?: string;
+  // 该交易对应的订单列表
+  orders: OrderInfo[];
+  // 该交易的金额（所有订单金额之和）
+  amount: number;
+}
+
 interface OrderInfo {
   // 订单的 UUID
   orderId: string;
-  // 订单对应的交易的 UUID
-  transactionId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
-  status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
-  // 支付日期时间
-  payTime?: string;
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
   // 订单金额
   amount: number;
   // 订单类型
@@ -201,6 +212,7 @@ interface OrderInfo {
   // 人类可读的不能取消订单的原因（若适用）
   reason?: string;
 }
+
 
 interface SeatLocationInfo {
   // 车厢号，例如：“03 车 12A 二等座”中的“3”
