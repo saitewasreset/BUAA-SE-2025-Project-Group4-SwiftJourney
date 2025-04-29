@@ -25,7 +25,7 @@ impl From<RepositoryError> for GeoServiceError {
 }
 
 #[async_trait]
-pub trait GeoService {
+pub trait GeoService: 'static + Send + Sync {
     async fn get_city_map(&self) -> Result<HashMap<ProvinceName, City>, GeoServiceError>;
 
     async fn get_city_by_name(&self, name: String) -> Result<Option<City>, GeoServiceError>;
