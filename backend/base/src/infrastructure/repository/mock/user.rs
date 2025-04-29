@@ -66,6 +66,7 @@ impl MockUserRepository {
     }
 }
 
+#[async_trait]
 impl UserRepository for MockUserRepository {
     async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
         let phone_index = self.phone_index.lock().unwrap();

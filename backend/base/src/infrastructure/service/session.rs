@@ -10,10 +10,10 @@
 //! - 自动会话淘汰机制
 //! - 配置驱动的会话管理策略
 
-use std::{collections::VecDeque, sync::Arc};
-
+use async_trait::async_trait;
 use chrono::Utc;
 use dashmap::DashMap;
+use std::{collections::VecDeque, sync::Arc};
 
 use crate::domain::{
     RepositoryError,
@@ -65,6 +65,7 @@ where
     }
 }
 
+#[async_trait]
 impl<R> SessionManagerService for SessionManagerServiceImpl<R>
 where
     R: SessionRepository + 'static + Send + Sync,
