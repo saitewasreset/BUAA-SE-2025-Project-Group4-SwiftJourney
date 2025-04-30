@@ -564,6 +564,7 @@ dependencies = [
  "petgraph",
  "phf",
  "regex",
+ "rust_decimal",
  "sea-orm",
  "serde",
  "shared",

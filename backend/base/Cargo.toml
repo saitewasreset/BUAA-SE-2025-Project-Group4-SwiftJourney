@@ -28,6 +28,7 @@ async-trait = "0.1"
 dyn-fmt = "0.4"
 
 petgraph = "0.8"
+rust_decimal = "1.37"
 
 [dev-dependencies]
 
