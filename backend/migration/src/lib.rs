@@ -36,6 +36,9 @@ mod m20250426_031246_modify_station_change_city_id_type;
 mod m20250426_041251_modify_train_change_train_type_id_type;
 mod m20250426_060711_modify_seat_type_in_train_type_change_type;
 mod m20250430_062929_modify_city_add_unique_name;
+mod m20250430_063613_modify_station_add_unique_name_city;
+mod m20250430_064614_modify_train_add_unique_number;
+mod m20250430_065037_modify_train_type_add_unique_type_name;
 
 pub struct Migrator;
 
@@ -79,6 +82,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20250426_041251_modify_train_change_train_type_id_type::Migration),
             Box::new(m20250426_060711_modify_seat_type_in_train_type_change_type::Migration),
             Box::new(m20250430_062929_modify_city_add_unique_name::Migration),
+            Box::new(m20250430_063613_modify_station_add_unique_name_city::Migration),
+            Box::new(m20250430_064614_modify_train_add_unique_number::Migration),
+            Box::new(m20250430_065037_modify_train_type_add_unique_type_name::Migration),
         ]
     }
 }
