@@ -1,6 +1,8 @@
 pub mod train;
 pub mod user;
 
+pub mod general;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
@@ -10,8 +12,8 @@ use dyn_fmt::AsStrFormatExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use shared::{
-    API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_MESSAGE_TEMPLATE, API_SUCCESS_CODE,
-    API_SUCCESS_MESSAGE,
+    API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_CODE, API_FORBIDDEN_MESSAGE_TEMPLATE,
+    API_SUCCESS_CODE, API_SUCCESS_MESSAGE,
 };
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
@@ -58,6 +60,32 @@ impl ResponseError for ApplicationErrorBox {
             .content_type(ContentType::json())
             .body(body)
     }
+}
+
+#[derive(Debug)]
+pub struct ModeError;
+
+impl Display for ModeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ModeError")
+    }
+}
+
+impl std::error::Error for ModeError {}
+
+impl ApplicationError for ModeError {
+    fn error_code(&self) -> u32 {
+        API_FORBIDDEN_CODE
+    }
+
+    fn error_message(&self) -> String {
+        API_FORBIDDEN_MESSAGE_TEMPLATE.format(["debug mode is not enabled"])
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AppConfig {
+    pub debug: bool,
 }
 
 #[derive(Serialize)]

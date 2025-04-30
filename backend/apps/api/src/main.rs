@@ -29,7 +29,7 @@
  * Become a Helldiver!
  */
 use actix_web::{App, HttpServer, web};
-use api::MAX_BODY_LENGTH;
+use api::{AppConfig, MAX_BODY_LENGTH};
 use base::application::service::user_manager::UserManagerService;
 use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
@@ -47,6 +47,7 @@ use base::infrastructure::service::user::UserServiceImpl;
 use env_logger::Env;
 use migration::MigratorTrait;
 use sea_orm::Database;
+use std::env::VarError;
 use std::sync::Arc;
 use std::{env, fs};
 use tracing::{instrument, warn};
@@ -56,6 +57,12 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+
+    let debug_mode = match env::var("DEBUG") {
+        Ok(_) => true,
+        Err(VarError::NotPresent) => false,
+        Err(VarError::NotUnicode(_)) => true,
+    };
 
     let conn = Database::connect(&database_url)
         .await
@@ -104,6 +111,8 @@ async fn main() -> std::io::Result<()> {
     let user_profile_service: web::Data<dyn UserProfileService> =
         web::Data::from(user_profile_service_impl as Arc<dyn UserProfileService>);
 
+    let app_config = AppConfig { debug: debug_mode };
+
     // Step 2: Create instance of your application service,
     // and wrap it with `web::Data::new`
     // HINT: You can borrow web::Data<T> as &Arc<T>
@@ -121,9 +130,12 @@ async fn main() -> std::io::Result<()> {
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
+            .app_data(app_config.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .service(
-                web::scope("/api").service(web::scope("/user").configure(api::user::scoped_config)),
+                web::scope("/api")
+                    .service(web::scope("/user").configure(api::user::scoped_config))
+                    .service(web::scope("/general").configure(api::general::scoped_config)),
             )
         // Step 6: Register your endpoint using `.service()` function
         // Exercise 1.2.1D - 7: Your code here. (5 / 5)
