@@ -33,7 +33,7 @@ pub struct TrainTypeInfoItem {
     pub id: String,
     pub name: String,
     // 等级 -> 位置
-    pub seat: HashMap<String, HashMap<String, SeatInfo>>,
+    pub seat: HashMap<String, HashMap<char, Vec<SeatInfo>>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
