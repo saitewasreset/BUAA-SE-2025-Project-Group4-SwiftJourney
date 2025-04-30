@@ -25,6 +25,8 @@
  * Become a LEGEND.
  * Become a Helldiver!
  */
+pub mod data;
+
 use phf::{Set, phf_set};
 use regex::Regex;
 use std::sync::LazyLock;
