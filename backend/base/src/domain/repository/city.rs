@@ -1,6 +1,7 @@
 use crate::domain::model::city::{City, ProvinceName};
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
+use shared::data::CityData;
 
 #[async_trait]
 pub trait CityRepository: Repository<City> + 'static + Send + Sync {
@@ -12,4 +13,6 @@ pub trait CityRepository: Repository<City> + 'static + Send + Sync {
         &self,
         province_name: ProvinceName,
     ) -> Result<Vec<City>, RepositoryError>;
+
+    async fn save_raw(&self, city_data: CityData) -> Result<(), RepositoryError>;
 }
