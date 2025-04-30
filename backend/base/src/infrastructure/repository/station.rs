@@ -4,11 +4,13 @@ use crate::domain::model::station::{Station, StationId};
 use crate::domain::repository::station::StationRepository;
 use crate::domain::{Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 use sea_orm::{ColumnTrait, Select};
+use shared::data::StationData;
+use std::collections::HashMap;
 
 pub struct StationRepositoryImpl {
     db: DatabaseConnection,
@@ -125,6 +127,59 @@ impl StationRepository for StationRepositoryImpl {
             .transpose()
             .context(format!("Failed to validate station with id: {:?}", id))
             .map_err(RepositoryError::ValidationError)
+    }
+
+    async fn save_raw(&self, station_data: StationData) -> Result<(), RepositoryError> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .context("failed to start transaction")?;
+
+        let cities = crate::models::city::Entity::find()
+            .all(&txn)
+            .await
+            .context("failed to load cities")?;
+
+        let city_name_to_id = cities
+            .into_iter()
+            .map(|city| (city.name, city.id))
+            .collect::<HashMap<_, _>>();
+
+        for station in &station_data {
+            if !city_name_to_id.contains_key(&station.name) {
+                return Err(RepositoryError::InconsistentState(anyhow!(
+                    "City not found: {}",
+                    station.name
+                )));
+            }
+        }
+
+        let model_list = station_data
+            .into_iter()
+            .map(|station| {
+                let city_id = city_name_to_id[&station.name];
+                crate::models::station::ActiveModel {
+                    id: ActiveValue::NotSet,
+                    name: ActiveValue::Set(station.name),
+                    city_id: ActiveValue::Set(city_id),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        crate::models::station::Entity::insert_many(model_list)
+            .on_conflict(
+                OnConflict::column(crate::models::station::Column::Name)
+                    .update_column(crate::models::station::Column::CityId)
+                    .to_owned(),
+            )
+            .exec(&txn)
+            .await
+            .context("failed to save raw station data")?;
+
+        txn.commit().await.context("failed to commit transaction")?;
+
+        Ok(())
     }
 }
 

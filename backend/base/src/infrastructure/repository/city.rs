@@ -5,8 +5,9 @@ use crate::infrastructure::repository::transform_list;
 use anyhow::Context;
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 use sea_orm::{ColumnTrait, Select};
+use shared::data::CityData;
 
 pub struct CityRepositoryImpl {
     db: DatabaseConnection,
@@ -115,6 +116,37 @@ impl CityRepository for CityRepositoryImpl {
             f.filter(crate::models::city::Column::Province.eq(province_name.to_string()))
         })
         .await
+    }
+
+    async fn save_raw(&self, city_data: CityData) -> Result<(), RepositoryError> {
+        let model_list = city_data
+            .into_iter()
+            .map(|(city, province)| crate::models::city::ActiveModel {
+                id: ActiveValue::NotSet,
+                name: ActiveValue::Set(city),
+                province: ActiveValue::Set(province),
+            })
+            .collect::<Vec<_>>();
+
+        let txn = self
+            .db
+            .begin()
+            .await
+            .context("failed to start transaction")?;
+
+        crate::models::city::Entity::insert_many(model_list)
+            .on_conflict(
+                OnConflict::column(crate::models::city::Column::Name)
+                    .update_column(crate::models::city::Column::Province)
+                    .to_owned(),
+            )
+            .exec(&txn)
+            .await
+            .context("failed to save raw city data")?;
+
+        txn.commit().await.context("failed to commit transaction")?;
+
+        Ok(())
     }
 }
 
