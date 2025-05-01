@@ -215,7 +215,7 @@ impl StationRepository for StationRepositoryImpl {
         let model_list = station_data
             .into_iter()
             .map(|station| {
-                let city_id = city_name_to_id[&station.name];
+                let city_id = city_name_to_id[&station.city];
                 crate::models::station::ActiveModel {
                     id: ActiveValue::NotSet,
                     name: ActiveValue::Set(station.name),
