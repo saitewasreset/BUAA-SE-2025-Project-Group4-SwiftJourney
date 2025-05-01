@@ -20,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
+use tracing::{debug, error, instrument, trace};
 
 impl_db_id_from_u64!(TrainId, i32, "train");
 impl_db_id_from_u64!(SeatTypeId, i32, "seat type");
@@ -39,6 +40,7 @@ struct TrainActiveModelPack {
 pub struct TrainDataConverter;
 
 impl TrainDataConverter {
+    #[instrument(skip_all)]
     fn make_from_db(pack: TrainDoPack) -> anyhow::Result<Train> {
         let train_id = TrainId::from_db_value(pack.train.id)?;
 
@@ -64,7 +66,12 @@ impl TrainDataConverter {
                 ))
             },
             |model| model.id,
-        )?;
+        )
+        .map_err(|e| {
+            error!("failed to transform seat type list: {}", e);
+
+            e
+        })?;
 
         let seats: HashMap<_, _> = seat_type_list
             .into_iter()
@@ -80,6 +87,7 @@ impl TrainDataConverter {
         ))
     }
 
+    #[instrument]
     fn transform_to_do(train: &Train, train_type_id: i32) -> TrainActiveModelPack {
         let mut train_model = crate::models::train::ActiveModel {
             id: ActiveValue::NotSet,
@@ -131,6 +139,7 @@ pub struct TrainRepositoryImpl {
 }
 
 impl TrainRepositoryImpl {
+    #[instrument(skip(self))]
     async fn find_aggregate(
         &self,
         train: crate::models::train::Model,
@@ -142,11 +151,22 @@ impl TrainRepositoryImpl {
             .context(format!(
                 "failed to find related train type for train id: {}",
                 train.id
-            ))?
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to find related train type for train id: {}: {}",
+                    train.id, e
+                );
+                e
+            })?
             .ok_or(RepositoryError::InconsistentState(anyhow!(
                 "no train type for train id: {}",
                 train.id
-            )))?;
+            )))
+            .map_err(|e| {
+                error!("no train type for train id: {}: {}", train.id, e);
+                e
+            })?;
 
         let seat_type = train_type
             .find_related(crate::models::seat_type::Entity)
@@ -155,7 +175,14 @@ impl TrainRepositoryImpl {
             .context(format!(
                 "failed to find related seat type for train id: {}",
                 train.id
-            ))?;
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to find related seat type for train id: {}: {}",
+                    train.id, e
+                );
+                e
+            })?;
 
         let pack = TrainDoPack {
             train,
@@ -163,12 +190,16 @@ impl TrainRepositoryImpl {
             seat_type,
         };
 
-        TrainDataConverter::make_from_db(pack).map_err(RepositoryError::ValidationError)
+        TrainDataConverter::make_from_db(pack).map_err(|e| {
+            error!("failed to transform train data: {}", e);
+            RepositoryError::ValidationError(e)
+        })
     }
 }
 
 #[async_trait]
 impl Repository<Train> for TrainRepositoryImpl {
+    #[instrument(skip(self))]
     async fn find(&self, id: TrainId) -> Result<Option<Train>, RepositoryError> {
         let train = crate::models::train::Entity::find_by_id(id.to_db_value())
             .one(&self.db)
@@ -176,7 +207,11 @@ impl Repository<Train> for TrainRepositoryImpl {
             .context(format!(
                 "failed to find train with id: {}",
                 id.to_db_value()
-            ))?;
+            ))
+            .map_err(|e| {
+                error!("failed to find train with id: {}: {}", id.to_db_value(), e);
+                e
+            })?;
 
         if let Some(train) = train {
             Ok(Some(self.find_aggregate(train).await?))
@@ -185,6 +220,7 @@ impl Repository<Train> for TrainRepositoryImpl {
         }
     }
 
+    #[instrument(skip(self))]
     async fn remove(&self, aggregate: Train) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             crate::models::train::Entity::delete_by_id(id.to_db_value())
@@ -193,12 +229,21 @@ impl Repository<Train> for TrainRepositoryImpl {
                 .context(format!(
                     "failed to remove train with id: {}",
                     id.to_db_value()
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to remove train with id: {}: {}",
+                        id.to_db_value(),
+                        e
+                    );
+                    e
+                })?;
         }
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
         let train_type = aggregate.train_type();
 
@@ -210,20 +255,44 @@ impl Repository<Train> for TrainRepositoryImpl {
                 "failed to find related train type {} for train id: {:?}",
                 train_type,
                 aggregate.get_id()
-            ))?
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to find related train type {} for train id: {:?}: {}",
+                    train_type,
+                    aggregate.get_id(),
+                    e
+                );
+                e
+            })?
             .ok_or(RepositoryError::InconsistentState(anyhow!(
                 "no train type {} for train id: {:?}",
                 train_type,
                 aggregate.get_id()
-            )))?;
+            )))
+            .map_err(|e| {
+                error!(
+                    "no train type {} for train id: {:?}: {}",
+                    train_type,
+                    aggregate.get_id(),
+                    e
+                );
+                e
+            })?;
 
         let do_pack = TrainDataConverter::transform_to_do(aggregate, train_type_model.id);
+
+        trace!("Begin transaction");
 
         let txn = self
             .db
             .begin()
             .await
-            .context("cannot start database transaction")?;
+            .context("cannot start database transaction")
+            .map_err(|e| {
+                error!("cannot start database transaction: {}", e);
+                e
+            })?;
 
         crate::models::seat_type::Entity::insert_many(do_pack.seat_type)
             .on_conflict(
@@ -240,7 +309,15 @@ impl Repository<Train> for TrainRepositoryImpl {
             .context(format!(
                 "failed to save seat for train id: {:?}",
                 aggregate.get_id()
-            ))?;
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to save seat for train id: {:?}: {}",
+                    aggregate.get_id(),
+                    e
+                );
+                e
+            })?;
 
         crate::models::seat_type_in_train_type::Entity::insert_many(
             do_pack.seat_type_in_train_type,
@@ -251,7 +328,15 @@ impl Repository<Train> for TrainRepositoryImpl {
         .context(format!(
             "failed to save seat type in train type for train id: {:?}",
             aggregate.get_id()
-        ))?;
+        ))
+        .map_err(|e| {
+            error!(
+                "failed to save seat type in train type for train id: {:?}: {}",
+                aggregate.get_id(),
+                e
+            );
+            e
+        })?;
 
         let result = crate::models::train::Entity::insert(do_pack.train)
             .on_conflict(
@@ -267,13 +352,24 @@ impl Repository<Train> for TrainRepositoryImpl {
             .context(format!(
                 "failed to save train with id: {:?}",
                 aggregate.get_id()
-            ))?;
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to save train with id: {:?}: {}",
+                    aggregate.get_id(),
+                    e
+                );
+                e
+            })?;
 
         let train_id = TrainId::from_db_value(result.last_insert_id)?;
 
+        trace!("Commit transaction");
         txn.commit()
             .await
             .context("cannot commit database transaction")?;
+
+        debug!("Train saved with id: {:?}", train_id);
 
         Ok(train_id)
     }
@@ -284,6 +380,7 @@ impl TrainRepositoryImpl {
         TrainRepositoryImpl { db }
     }
 
+    #[instrument(skip_all)]
     async fn cache_table<E, K, F, B>(
         &self,
         builder: B,
@@ -297,7 +394,11 @@ impl TrainRepositoryImpl {
     {
         builder(E::find())
             .all(&self.db)
-            .await?
+            .await
+            .map_err(|e| {
+                error!("failed to query table: {}", e);
+                e
+            })?
             .into_iter()
             .map(|model| {
                 let key = key_func(&model);
@@ -306,6 +407,7 @@ impl TrainRepositoryImpl {
             .collect::<Result<HashMap<K, E::Model>, DbErr>>()
     }
 
+    #[instrument(skip_all)]
     async fn cache_table_vec<E, K, F, B>(
         &self,
         builder: B,
@@ -319,7 +421,10 @@ impl TrainRepositoryImpl {
     {
         let mut result: HashMap<K, Vec<E::Model>> = HashMap::new();
 
-        let models = builder(E::find()).all(&self.db).await?;
+        let models = builder(E::find()).all(&self.db).await.map_err(|e| {
+            error!("failed to query table: {}", e);
+            e
+        })?;
 
         for model in models {
             let key = key_func(&model);
@@ -330,6 +435,7 @@ impl TrainRepositoryImpl {
         Ok(result)
     }
 
+    #[instrument(skip_all)]
     async fn query_trains(
         &self,
         builder: impl FnOnce(
@@ -339,12 +445,19 @@ impl TrainRepositoryImpl {
         let train_model_list = builder(crate::models::train::Entity::find())
             .all(&self.db)
             .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
+            .map_err(|e| RepositoryError::Db(e.into()))
+            .map_err(|e| {
+                error!("failed to query train: {}", e);
+                e
+            })?;
 
         let mut train_list = Vec::with_capacity(train_model_list.len());
 
         for train_model in train_model_list {
-            let train = self.find_aggregate(train_model).await?;
+            let train = self.find_aggregate(train_model).await.map_err(|e| {
+                error!("failed to find aggregate train: {}", e);
+                e
+            })?;
 
             train_list.push(train);
         }
@@ -352,6 +465,7 @@ impl TrainRepositoryImpl {
         Ok(train_list)
     }
 
+    #[instrument(skip_all)]
     async fn query_trains_cached(
         &self,
         builder: impl FnOnce(
@@ -363,7 +477,11 @@ impl TrainRepositoryImpl {
         let train_model_list = builder(crate::models::train::Entity::find())
             .all(&self.db)
             .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
+            .map_err(|e| RepositoryError::Db(e.into()))
+            .map_err(|e| {
+                error!("failed to query train: {}", e);
+                e
+            })?;
 
         let mut train_list = Vec::with_capacity(train_model_list.len());
 
@@ -373,7 +491,11 @@ impl TrainRepositoryImpl {
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no train type for train id: {}",
                     train.id
-                )))?
+                )))
+                .map_err(|e| {
+                    error!("no train type for train id: {}: {}", train.id, e);
+                    e
+                })?
                 .clone();
 
             let seat_type = seat_type_map
@@ -381,7 +503,11 @@ impl TrainRepositoryImpl {
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no seat type for train id: {}",
                     train.id
-                )))?
+                )))
+                .map_err(|e| {
+                    error!("no seat type for train id: {}: {}", train.id, e);
+                    e
+                })?
                 .clone();
 
             let pack = TrainDoPack {
@@ -391,7 +517,12 @@ impl TrainRepositoryImpl {
             };
 
             train_list.push(
-                TrainDataConverter::make_from_db(pack).map_err(RepositoryError::ValidationError)?,
+                TrainDataConverter::make_from_db(pack)
+                    .map_err(RepositoryError::ValidationError)
+                    .map_err(|e| {
+                        error!("failed to transform train data: {}", e);
+                        e
+                    })?,
             );
         }
 
@@ -401,29 +532,43 @@ impl TrainRepositoryImpl {
 
 #[async_trait]
 impl TrainRepository for TrainRepositoryImpl {
+    #[instrument(skip(self))]
     async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_models = crate::models::train::Entity::find()
             .all(&self.db)
             .await
-            .map_err(anyhow::Error::from)?;
+            .map_err(anyhow::Error::from)
+            .map_err(|e| {
+                error!("failed to query train: {}", e);
+                e
+            })?;
 
         Ok(train_models.into_iter().map(|e| e.number).collect())
     }
 
+    #[instrument(skip(self))]
     async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_type_models = crate::models::train_type::Entity::find()
             .all(&self.db)
             .await
-            .map_err(anyhow::Error::from)?;
+            .map_err(anyhow::Error::from)
+            .map_err(|e| {
+                error!("failed to query train type: {}", e);
+                e
+            })?;
 
         Ok(train_type_models.into_iter().map(|e| e.type_name).collect())
     }
 
+    #[instrument(skip(self))]
     async fn get_verified_seat_type(
         &self,
         train_id: TrainId,
     ) -> Result<HashSet<String>, RepositoryError> {
-        if let Some(train) = self.find(train_id).await? {
+        if let Some(train) = self.find(train_id).await.map_err(|e| {
+            error!("failed to find train: {}", e);
+            e
+        })? {
             let r = crate::models::seat_type::Entity::find()
                 .inner_join(crate::models::seat_type_in_train_type::Entity)
                 .filter(
@@ -433,6 +578,10 @@ impl TrainRepository for TrainRepositoryImpl {
                 .all(&self.db)
                 .await
                 .map_err(|e| RepositoryError::Db(e.into()))
+                .map_err(|e| {
+                    error!("failed to query seat type: {}", e);
+                    e
+                })
                 .map(|seat_types| {
                     seat_types
                         .into_iter()
@@ -446,20 +595,30 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    #[instrument(skip(self))]
     async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError> {
         let train_type_map = self
             .cache_table::<crate::models::train_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
-            .context("failed to query train type")?;
+            .context("failed to query train type")
+            .map_err(|e| {
+                error!("failed to query train type: {}", e);
+                e
+            })?;
         let seat_type_map = self
             .cache_table_vec::<crate::models::seat_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
-            .context("failed to query train route")?;
+            .context("failed to query train route")
+            .map_err(|e| {
+                error!("failed to query train route: {}", e);
+                e
+            })?;
 
         self.query_trains_cached(|q| q, &train_type_map, &seat_type_map)
             .await
     }
 
+    #[instrument(skip(self))]
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
@@ -470,7 +629,15 @@ impl TrainRepository for TrainRepositoryImpl {
             .context(format!(
                 "failed to query train for train id: {}",
                 train_id.to_db_value()
-            ))?
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to query train for train id: {}: {}",
+                    train_id.to_db_value(),
+                    e
+                );
+                e
+            })?
         {
             let seat_type_mapping = crate::models::seat_type_mapping::Entity::find()
                 .filter(crate::models::seat_type_mapping::Column::TrainTypeId.eq(train.type_id))
@@ -479,7 +646,14 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to query seat type mapping for train type id: {}",
                     train.type_id
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to query seat type mapping for train type id: {}: {}",
+                        train.type_id, e
+                    );
+                    e
+                })?;
 
             let seat_type = crate::models::seat_type::Entity::find()
                 .all(&self.db)
@@ -501,12 +675,23 @@ impl TrainRepository for TrainRepositoryImpl {
                             "no seat type for seat type id: {}",
                             seat_type.seat_type_id
                         )))
-                        .cloned()?,
+                        .cloned()
+                        .map_err(|e| {
+                            error!(
+                                "no seat type for seat type id: {}: {}",
+                                seat_type.seat_type_id, e
+                            );
+                            e
+                        })?,
                 );
 
                 result.entry(seat_type_name).or_default().push(
                     SeatId::try_from(seat_type.seat_id)
-                        .map_err(|e| RepositoryError::ValidationError(e.into()))?,
+                        .map_err(|e| RepositoryError::ValidationError(e.into()))
+                        .map_err(|e| {
+                            error!("failed to convert seat id: {}: {}", seat_type.seat_id, e);
+                            e
+                        })?,
                 );
             }
 
@@ -516,6 +701,7 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    #[instrument(skip(self))]
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,
@@ -524,7 +710,11 @@ impl TrainRepository for TrainRepositoryImpl {
             .query_trains(|q| {
                 q.filter(crate::models::train::Column::Number.eq(train_number.to_string()))
             })
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("failed to query train by number: {}", e);
+                e
+            })?;
 
         Ok(query_results
             .into_iter()
@@ -535,6 +725,7 @@ impl TrainRepository for TrainRepositoryImpl {
             )))?)
     }
 
+    #[instrument(skip(self))]
     async fn find_by_train_type(
         &self,
         train_type: TrainType<Verified>,
@@ -542,11 +733,19 @@ impl TrainRepository for TrainRepositoryImpl {
         let train_type_map = self
             .cache_table::<crate::models::train_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
-            .context("failed to query train type")?;
+            .context("failed to query train type")
+            .map_err(|e| {
+                error!("failed to query train type: {}", e);
+                e
+            })?;
         let seat_type_map = self
             .cache_table_vec::<crate::models::seat_type::Entity, _, _, _>(|q| q, |m| m.id)
             .await
-            .context("failed to query train route")?;
+            .context("failed to query train route")
+            .map_err(|e| {
+                error!("failed to query train route: {}", e);
+                e
+            })?;
 
         let train_type_id = train_type_map
             .values()
@@ -566,6 +765,7 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    #[instrument(skip(self, route_repository))]
     async fn save_raw_train_number<T: RouteRepository>(
         &self,
         train_number_data: TrainNumberData,
@@ -575,7 +775,11 @@ impl TrainRepository for TrainRepositoryImpl {
             .db
             .begin()
             .await
-            .context("failed to start transaction")?;
+            .context("failed to start transaction")
+            .map_err(|e| {
+                error!("failed to start transaction: {}", e);
+                e
+            })?;
 
         let to_insert_train_number_set = train_number_data
             .iter()
@@ -585,7 +789,11 @@ impl TrainRepository for TrainRepositoryImpl {
         let trains = crate::models::train::Entity::find()
             .all(&txn)
             .await
-            .context("failed to load trains")?;
+            .context("failed to load trains")
+            .map_err(|e| {
+                error!("failed to load trains: {}", e);
+                e
+            })?;
 
         let to_delete_train_number = trains
             .iter()
@@ -601,7 +809,14 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to delete route with id: {}",
                     train_data.default_line_id
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to delete route with id: {}: {}",
+                        train_data.default_line_id, e
+                    );
+                    e
+                })?;
             crate::models::train::Entity::delete_many()
                 .filter(crate::models::train::Column::Number.eq(&train_number))
                 .exec(&txn)
@@ -609,13 +824,24 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to delete train with number: {}",
                     train_number
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to delete train with number: {}: {}",
+                        train_number, e
+                    );
+                    e
+                })?;
         }
 
         let train_types = crate::models::train_type::Entity::find()
             .all(&txn)
             .await
-            .context("failed to load train types")?;
+            .context("failed to load train types")
+            .map_err(|e| {
+                error!("failed to load train types: {}", e);
+                e
+            })?;
 
         let train_type_to_id = train_types
             .into_iter()
@@ -631,15 +857,30 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to save route for train number: {}",
                     &data.train_number
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to save route for train number: {}: {}",
+                        &data.train_number, e
+                    );
+                    e
+                })?;
 
-            let train_type_id = train_type_to_id.get(&data.train_type).copied().ok_or(
-                RepositoryError::InconsistentState(anyhow!(
+            let train_type_id = train_type_to_id
+                .get(&data.train_type)
+                .copied()
+                .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no train type {} (train number: {})",
                     &data.train_type,
                     &data.train_number
-                )),
-            )?;
+                )))
+                .map_err(|e| {
+                    error!(
+                        "no train type {} (train number: {}): {}",
+                        &data.train_type, &data.train_number, e
+                    );
+                    e
+                })?;
 
             let model = crate::models::train::ActiveModel {
                 id: ActiveValue::NotSet,
@@ -654,13 +895,19 @@ impl TrainRepository for TrainRepositoryImpl {
         crate::models::train::Entity::insert_many(model_list)
             .exec(&txn)
             .await
-            .context("failed to save train data")?;
+            .context("failed to save train data")
+            .map_err(|e| {
+                error!("failed to save train data: {}", e);
+                e
+            })?;
 
+        trace!("Commit transaction");
         txn.commit().await.context("failed to commit transaction")?;
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn save_raw_train_type(
         &self,
         train_type_data: TrainTypeData,
@@ -669,7 +916,11 @@ impl TrainRepository for TrainRepositoryImpl {
             .db
             .begin()
             .await
-            .context("failed to start transaction")?;
+            .context("failed to start transaction")
+            .map_err(|e| {
+                error!("failed to start transaction: {}", e);
+                e
+            })?;
 
         let train_type_list = train_type_data
             .iter()
@@ -687,7 +938,11 @@ impl TrainRepository for TrainRepositoryImpl {
             )
             .exec(&txn)
             .await
-            .context("failed to save raw train type data")?;
+            .context("failed to save raw train type data")
+            .map_err(|e| {
+                error!("failed to save raw train type data: {}", e);
+                e
+            })?;
 
         let to_insert_train_type_name_set = train_type_data
             .iter()
@@ -697,7 +952,11 @@ impl TrainRepository for TrainRepositoryImpl {
         let db_train_type_list = crate::models::train_type::Entity::find()
             .all(&txn)
             .await
-            .context("failed to load train type")?;
+            .context("failed to load train type")
+            .map_err(|e| {
+                error!("failed to load train type: {}", e);
+                e
+            })?;
 
         let train_type_name_to_id = db_train_type_list
             .iter()
@@ -713,7 +972,11 @@ impl TrainRepository for TrainRepositoryImpl {
         let seat_type_in_train_type_list = crate::models::seat_type_in_train_type::Entity::find()
             .all(&txn)
             .await
-            .context("failed to load seat type in train type")?;
+            .context("failed to load seat type in train type")
+            .map_err(|e| {
+                error!("failed to load seat type in train type: {}", e);
+                e
+            })?;
 
         let to_delete_seat_type_id = seat_type_in_train_type_list
             .iter()
@@ -730,7 +993,14 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to delete seat type mapping for seat type id: {}",
                     seat_type_id
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to delete seat type mapping for seat type id: {}: {}",
+                        seat_type_id, e
+                    );
+                    e
+                })?;
 
             crate::models::seat_type_in_train_type::Entity::delete_many()
                 .filter(crate::models::seat_type_in_train_type::Column::SeatTypeId.eq(seat_type_id))
@@ -739,7 +1009,14 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to delete seat type in train type for seat type id: {}",
                     seat_type_id
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to delete seat type in train type for seat type id: {}: {}",
+                        seat_type_id, e
+                    );
+                    e
+                })?;
 
             crate::models::seat_type::Entity::delete_many()
                 .filter(crate::models::seat_type::Column::Id.eq(seat_type_id))
@@ -748,7 +1025,14 @@ impl TrainRepository for TrainRepositoryImpl {
                 .context(format!(
                     "failed to delete seat type for seat type id: {}",
                     seat_type_id
-                ))?;
+                ))
+                .map_err(|e| {
+                    error!(
+                        "failed to delete seat type for seat type id: {}: {}",
+                        seat_type_id, e
+                    );
+                    e
+                })?;
         }
 
         let mut train_type_id_to_seat_type_name_to_id: HashMap<i32, HashMap<String, i32>> =
@@ -773,7 +1057,11 @@ impl TrainRepository for TrainRepositoryImpl {
                 let result = crate::models::seat_type::Entity::insert(model)
                     .exec(&txn)
                     .await
-                    .context("failed to insert seat type")?;
+                    .context("failed to insert seat type")
+                    .map_err(|e| {
+                        error!("failed to insert seat type: {}", e);
+                        e
+                    })?;
 
                 let seat_type_id = result.last_insert_id;
 
@@ -796,7 +1084,11 @@ impl TrainRepository for TrainRepositoryImpl {
         )
         .exec(&txn)
         .await
-        .context("failed to insert seat type in train type")?;
+        .context("failed to insert seat type in train type")
+        .map_err(|e| {
+            error!("failed to insert seat type in train type: {}", e);
+            e
+        })?;
 
         let mut seat_type_mapping_model_list = Vec::new();
 
@@ -828,9 +1120,21 @@ impl TrainRepository for TrainRepositoryImpl {
         crate::models::seat_type_mapping::Entity::insert_many(seat_type_mapping_model_list)
             .exec(&txn)
             .await
-            .context("failed to insert seat type mapping")?;
+            .context("failed to insert seat type mapping")
+            .map_err(|e| {
+                error!("failed to insert seat type mapping: {}", e);
+                e
+            })?;
 
-        txn.commit().await.context("failed to commit transaction")?;
+        trace!("Commit transaction");
+
+        txn.commit()
+            .await
+            .context("failed to commit transaction")
+            .map_err(|e| {
+                error!("failed to commit transaction: {}", e);
+                e
+            })?;
         Ok(())
     }
 }

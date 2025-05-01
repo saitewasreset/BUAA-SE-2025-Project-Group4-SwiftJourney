@@ -9,6 +9,7 @@ use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::{error, instrument, warn};
 
 pub struct TrainDataServiceImpl<C, S, T, R>
 where
@@ -47,10 +48,12 @@ where
         }
     }
 
+    #[instrument(skip_all)]
     pub fn check_debug_mode(&self) -> Result<(), Box<dyn ApplicationError>> {
         if self.debug {
             Ok(())
         } else {
+            warn!("Debug mode is not enabled");
             Err(Box::new(ModeError))
         }
     }
@@ -68,16 +71,18 @@ where
         self.debug
     }
 
+    #[instrument(skip_all)]
     async fn load_city(&self, command: LoadCityCommand) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
-        self.city_repository
-            .save_raw(command)
-            .await
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+        self.city_repository.save_raw(command).await.map_err(|e| {
+            error!("Error saving city: {:?}", e);
+            GeneralError::InternalServerError
+        })?;
 
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn load_station(
         &self,
         command: LoadStationCommand,
@@ -87,11 +92,15 @@ where
         self.station_repository
             .save_raw(command)
             .await
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+            .map_err(|e| {
+                error!("Error saving station: {:?}", e);
+                GeneralError::InternalServerError
+            })?;
 
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
@@ -101,11 +110,15 @@ where
         self.train_repository
             .save_raw_train_type(command)
             .await
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+            .map_err(|e| {
+                error!("Error saving train type: {:?}", e);
+                GeneralError::InternalServerError
+            })?;
 
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
@@ -115,7 +128,10 @@ where
         self.train_repository
             .save_raw_train_number(command, Arc::clone(&self.route_repository))
             .await
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+            .map_err(|e| {
+                error!("Error saving train number: {:?}", e);
+                GeneralError::InternalServerError
+            })?;
 
         Ok(())
     }
