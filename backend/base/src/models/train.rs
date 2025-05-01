@@ -10,7 +10,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub number: String,
     pub type_id: i32,
-    pub default_line_id: i32,
+    pub default_line_id: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
