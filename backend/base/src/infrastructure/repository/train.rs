@@ -765,7 +765,7 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
-    #[instrument(skip(self, route_repository))]
+    #[instrument(skip_all)]
     async fn save_raw_train_number<T: RouteRepository>(
         &self,
         train_number_data: TrainNumberData,
@@ -907,7 +907,7 @@ impl TrainRepository for TrainRepositoryImpl {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn save_raw_train_type(
         &self,
         train_type_data: TrainTypeData,
