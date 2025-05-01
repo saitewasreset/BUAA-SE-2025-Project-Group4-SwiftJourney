@@ -1,3 +1,4 @@
+use crate::domain::model::route::RouteId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use crate::{Unverified, Verified};
 use id_macro::define_id_type;
@@ -36,6 +37,7 @@ pub struct Train {
     number: TrainNumber<Verified>,
     train_type: TrainType<Verified>,
     seats: HashMap<String, SeatType>,
+    default_route_id: RouteId,
 }
 
 impl Identifiable for Train {
@@ -59,12 +61,14 @@ impl Train {
         number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seats: HashMap<String, SeatType>,
+        default_route_id: RouteId,
     ) -> Self {
         Train {
             id: train_id,
             number,
             train_type,
             seats,
+            default_route_id,
         }
     }
 
@@ -78,6 +82,10 @@ impl Train {
 
     pub fn seats(&self) -> &HashMap<String, SeatType> {
         &self.seats
+    }
+
+    pub fn default_route_id(&self) -> RouteId {
+        self.default_route_id
     }
 }
 
