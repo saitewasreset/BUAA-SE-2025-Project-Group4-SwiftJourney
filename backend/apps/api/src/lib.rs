@@ -3,6 +3,8 @@ pub mod user;
 
 pub mod general;
 
+pub mod data;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
