@@ -1,9 +1,12 @@
 use crate::Verified;
 use crate::domain::model::train::{SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use crate::domain::model::train_schedule::SeatId;
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
+use shared::data::{TrainNumberData, TrainTypeData};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[async_trait]
 pub trait TrainRepository: Repository<Train> {
@@ -31,4 +34,15 @@ pub trait TrainRepository: Repository<Train> {
         &self,
         train_type: TrainType<Verified>,
     ) -> Result<Vec<Train>, RepositoryError>;
+
+    async fn save_raw_train_number<T: RouteRepository>(
+        &self,
+        train_number_data: TrainNumberData,
+        route_repository: Arc<T>,
+    ) -> Result<(), RepositoryError>;
+
+    async fn save_raw_train_type(
+        &self,
+        train_type_data: TrainTypeData,
+    ) -> Result<(), RepositoryError>;
 }
