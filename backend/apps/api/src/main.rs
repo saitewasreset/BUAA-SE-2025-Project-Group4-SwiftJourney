@@ -50,17 +50,19 @@ use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
-use env_logger::Env;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use std::env::VarError;
 use std::sync::Arc;
 use std::{env, fs};
-use tracing::{instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
+use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init_from_env(Env::default().default_filter_or("info"));
+    // env_logger::init_from_env(Env::default().default_filter_or("info"));
+
+    tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
 
@@ -155,6 +157,7 @@ async fn main() -> std::io::Result<()> {
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
+            .wrap(TracingLogger::default())
             .service(
                 web::scope("/api")
                     .service(web::scope("/user").configure(api::user::scoped_config))

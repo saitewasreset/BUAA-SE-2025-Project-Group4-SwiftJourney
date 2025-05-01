@@ -11,6 +11,7 @@ use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, Transac
 use sea_orm::{ColumnTrait, Select};
 use shared::data::StationData;
 use std::collections::HashMap;
+use tracing::{debug, error, instrument, trace};
 
 pub struct StationRepositoryImpl {
     db: DatabaseConnection,
@@ -21,6 +22,7 @@ impl_db_id_from_u64!(StationId, i32, "station");
 pub struct StationDataConverter;
 
 impl StationDataConverter {
+    #[instrument]
     pub fn make_from_do(station_do: crate::models::station::Model) -> anyhow::Result<Station> {
         let station_id = StationId::from_db_value(station_do.id)?;
         let name = station_do.name;
@@ -29,6 +31,7 @@ impl StationDataConverter {
         Ok(Station::new(Some(station_id), name, city_id))
     }
 
+    #[instrument]
     pub fn transform_to_do(station: &Station) -> crate::models::station::ActiveModel {
         let mut model = crate::models::station::ActiveModel {
             id: ActiveValue::NotSet,
@@ -46,11 +49,16 @@ impl StationDataConverter {
 
 #[async_trait]
 impl Repository<Station> for StationRepositoryImpl {
+    #[instrument(skip(self))]
     async fn find(&self, id: StationId) -> Result<Option<Station>, RepositoryError> {
         let result = crate::models::station::Entity::find_by_id(u64::from(id) as i32)
             .one(&self.db)
             .await
-            .context(format!("Failed to find station with id: {}", u64::from(id)))?;
+            .context(format!("Failed to find station with id: {}", u64::from(id)))
+            .map_err(|e| {
+                error!("Failed to find station with id: {}: {:?}", u64::from(id), e);
+                RepositoryError::Db(e)
+            })?;
 
         result
             .map(StationDataConverter::make_from_do)
@@ -59,9 +67,17 @@ impl Repository<Station> for StationRepositoryImpl {
                 "Failed to validate station with id: {}",
                 u64::from(id)
             ))
-            .map_err(RepositoryError::ValidationError)
+            .map_err(|e| {
+                error!(
+                    "Failed to validate station with id: {}: {:?}",
+                    u64::from(id),
+                    e
+                );
+                RepositoryError::ValidationError(e)
+            })
     }
 
+    #[instrument(skip(self))]
     async fn remove(&self, aggregate: Station) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             let id = u64::from(id) as i32;
@@ -69,14 +85,19 @@ impl Repository<Station> for StationRepositoryImpl {
             crate::models::station::Entity::delete_by_id(id)
                 .exec(&self.db)
                 .await
-                .context(format!("Failed to remove station with id: {}", id))?;
+                .context(format!("Failed to remove station with id: {}", id))
+                .map_err(|e| {
+                    error!("Failed to remove station with id: {}: {:?}", id, e);
+                    RepositoryError::Db(e)
+                })?;
         }
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut Station) -> Result<StationId, RepositoryError> {
-        let station_do = StationDataConverter::transform_to_do(&aggregate);
+        let station_do = StationDataConverter::transform_to_do(aggregate);
         let result = crate::models::station::Entity::insert(station_do)
             .on_conflict(
                 OnConflict::column(crate::models::station::Column::Id)
@@ -91,9 +112,20 @@ impl Repository<Station> for StationRepositoryImpl {
             .context(format!(
                 "Failed to save station with id: {:?}",
                 aggregate.get_id()
-            ))?;
+            ))
+            .map_err(|e| {
+                error!(
+                    "Failed to save station with id: {:?}: {:?}",
+                    aggregate.get_id(),
+                    e
+                );
+                RepositoryError::Db(e)
+            })?;
 
         let id = result.last_insert_id as u64;
+
+        debug!("Station saved with id: {}", id);
+
         aggregate.set_id(id.into());
 
         Ok(id.into())
@@ -102,10 +134,12 @@ impl Repository<Station> for StationRepositoryImpl {
 
 #[async_trait]
 impl StationRepository for StationRepositoryImpl {
+    #[instrument(skip(self))]
     async fn load(&self) -> Result<Vec<Station>, RepositoryError> {
         self.query_stations(|q| q).await
     }
 
+    #[instrument(skip(self))]
     async fn find_by_city(&self, city_id: CityId) -> Result<Vec<Station>, RepositoryError> {
         self.query_stations(|q| {
             q.filter(crate::models::station::Column::CityId.eq(u64::from(city_id) as i32))
@@ -113,12 +147,17 @@ impl StationRepository for StationRepositoryImpl {
         .await
     }
 
+    #[instrument(skip(self))]
     async fn find_by_name(&self, station_name: &str) -> Result<Option<Station>, RepositoryError> {
         let model = crate::models::station::Entity::find()
             .filter(crate::models::station::Column::Name.eq(station_name))
             .one(&self.db)
             .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
+            .map_err(|e| RepositoryError::Db(e.into()))
+            .map_err(|e| {
+                error!("Failed to find station by name: {}: {:?}", station_name, e);
+                e
+            })?;
 
         let id = model.as_ref().map(|x| x.id);
 
@@ -127,19 +166,32 @@ impl StationRepository for StationRepositoryImpl {
             .transpose()
             .context(format!("Failed to validate station with id: {:?}", id))
             .map_err(RepositoryError::ValidationError)
+            .map_err(|e| {
+                error!("Failed to validate station with id: {:?}: {:?}", id, e);
+                e
+            })
     }
 
     async fn save_raw(&self, station_data: StationData) -> Result<(), RepositoryError> {
+        trace!("Begin transaction");
         let txn = self
             .db
             .begin()
             .await
-            .context("failed to start transaction")?;
+            .context("failed to start transaction")
+            .map_err(|e| {
+                error!("Failed to start transaction: {:?}", e);
+                RepositoryError::Db(e)
+            })?;
 
         let cities = crate::models::city::Entity::find()
             .all(&txn)
             .await
-            .context("failed to load cities")?;
+            .context("failed to load cities")
+            .map_err(|e| {
+                error!("Failed to load cities: {:?}", e);
+                RepositoryError::Db(e)
+            })?;
 
         let city_name_to_id = cities
             .into_iter()
@@ -147,7 +199,12 @@ impl StationRepository for StationRepositoryImpl {
             .collect::<HashMap<_, _>>();
 
         for station in &station_data {
-            if !city_name_to_id.contains_key(&station.name) {
+            if !city_name_to_id.contains_key(&station.city) {
+                error!(
+                    "City {} not found for station {}",
+                    station.city, station.name
+                );
+
                 return Err(RepositoryError::InconsistentState(anyhow!(
                     "City not found: {}",
                     station.name
@@ -175,8 +232,13 @@ impl StationRepository for StationRepositoryImpl {
             )
             .exec(&txn)
             .await
-            .context("failed to save raw station data")?;
+            .context("failed to save raw station data")
+            .map_err(|e| {
+                error!("Failed to save raw station data: {:?}", e);
+                RepositoryError::Db(e)
+            })?;
 
+        trace!("Commit transaction");
         txn.commit().await.context("failed to commit transaction")?;
 
         Ok(())
@@ -188,6 +250,7 @@ impl StationRepositoryImpl {
         StationRepositoryImpl { db }
     }
 
+    #[instrument(skip_all)]
     pub async fn query_stations(
         &self,
         builder: impl FnOnce(
@@ -198,9 +261,18 @@ impl StationRepositoryImpl {
         let stations = query
             .all(&self.db)
             .await
-            .map_err(|e| RepositoryError::Db(e.into()))?;
+            .map_err(|e| RepositoryError::Db(e.into()))
+            .map_err(|e| {
+                error!("Failed to query stations: {:?}", e);
+                e
+            })?;
+
         transform_list(stations, StationDataConverter::make_from_do, |x| x.id)
             .context("Failed to transform station list")
+            .map_err(|e| {
+                error!("Failed to transform station list: {:?}", e);
+                e
+            })
             .map_err(RepositoryError::ValidationError)
     }
 }
