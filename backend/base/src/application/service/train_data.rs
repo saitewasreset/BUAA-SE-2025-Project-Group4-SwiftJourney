@@ -3,7 +3,6 @@ use crate::application::commands::train_data::{
     LoadCityCommand, LoadStationCommand, LoadTrainNumberCommand, LoadTrainTypeCommand,
 };
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 #[async_trait]
 pub trait TrainDataService: 'static + Send + Sync {
