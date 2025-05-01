@@ -66,6 +66,7 @@ pub trait TrainTypeConfigurationService {
         train_number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
+        default_route_id: RouteId,
     ) -> Result<TrainId, TrainTypeConfigurationServiceError>;
 
     async fn modify_train_type(
@@ -74,6 +75,7 @@ pub trait TrainTypeConfigurationService {
         train_number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
+        default_route_id: RouteId,
     ) -> Result<(), TrainTypeConfigurationServiceError>;
 
     async fn remove_train_type(

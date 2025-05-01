@@ -1,4 +1,5 @@
 use crate::domain::Identifiable;
+use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use crate::domain::model::train_schedule::SeatId;
 use crate::domain::repository::train::TrainRepository;
@@ -121,13 +122,14 @@ where
         train_number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
+        default_route_id: RouteId,
     ) -> Result<TrainId, TrainTypeConfigurationServiceError> {
         let seat_map = seat_configuration
             .into_iter()
             .map(|x| (x.name().to_string(), x))
             .collect::<HashMap<_, _>>();
 
-        let mut train = Train::new(None, train_number, train_type, seat_map);
+        let mut train = Train::new(None, train_number, train_type, seat_map, default_route_id);
 
         self.train_repository.save(&mut train).await?;
 
@@ -140,6 +142,7 @@ where
         train_number: TrainNumber<Verified>,
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
+        default_route_id: RouteId,
     ) -> Result<(), TrainTypeConfigurationServiceError> {
         if self.train_repository.find(train_id).await?.is_some() {
             let seat_map = seat_configuration
@@ -147,7 +150,7 @@ where
                 .map(|x| (x.name().to_string(), x))
                 .collect::<HashMap<_, _>>();
 
-            let mut train = Train::new(None, train_number, train_type, seat_map);
+            let mut train = Train::new(None, train_number, train_type, seat_map, default_route_id);
 
             self.train_repository.save(&mut train).await?;
 
