@@ -226,9 +226,12 @@ impl StationRepository for StationRepositoryImpl {
 
         crate::models::station::Entity::insert_many(model_list)
             .on_conflict(
-                OnConflict::column(crate::models::station::Column::Name)
-                    .update_column(crate::models::station::Column::CityId)
-                    .to_owned(),
+                OnConflict::columns([
+                    crate::models::station::Column::Name,
+                    crate::models::station::Column::CityId,
+                ])
+                .update_column(crate::models::station::Column::CityId)
+                .to_owned(),
             )
             .exec(&txn)
             .await
