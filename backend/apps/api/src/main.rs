@@ -55,7 +55,7 @@ use sea_orm::Database;
 use std::env::VarError;
 use std::sync::Arc;
 use std::{env, fs};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{instrument, warn};
 use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
