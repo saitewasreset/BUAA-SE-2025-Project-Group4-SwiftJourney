@@ -1,3 +1,23 @@
+//! 车次仓储实现模块
+//!
+//! 该模块提供了车次车次仓储的具体实现，使用SeaORM作为底层数据库访问框架。
+//! 主要功能包括车次的增删改查、座位类型管理以及与车次类型、路线的关联操作。
+//!
+//! # 主要功能
+//! - 车次信息的持久化存储
+//! - 座位类型配置管理
+//! - 与车次类型、路线的关联维护
+//! - 车次数据的批量导入
+//!
+//! # 实现特点
+//! - 使用SeaORM进行数据库操作
+//! - 支持事务处理保证数据一致性
+//! - 提供数据转换器实现领域模型与数据库模型的映射
+//!
+//! # 性能考虑
+//! - 使用缓存优化查询性能
+//! - 批量操作减少数据库交互次数
+//! - 异步操作提高并发处理能力
 use crate::Verified;
 use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{
@@ -25,21 +45,37 @@ use tracing::{debug, error, instrument, trace};
 impl_db_id_from_u64!(TrainId, i32, "train");
 impl_db_id_from_u64!(SeatTypeId, i32, "seat type");
 
+/// 数据库模型打包结构
+///
+/// 用于将数据库查询结果打包，便于后续转换为领域模型
 struct TrainDoPack {
     pub train: crate::models::train::Model,
     pub train_type: crate::models::train_type::Model,
     pub seat_type: Vec<crate::models::seat_type::Model>,
 }
 
+/// 数据库活动模型打包结构
+///
+/// 用于将领域模型转换为数据库活动模型，便于数据库操作
 struct TrainActiveModelPack {
     pub train: crate::models::train::ActiveModel,
     pub seat_type: Vec<crate::models::seat_type::ActiveModel>,
     pub seat_type_in_train_type: Vec<crate::models::seat_type_in_train_type::ActiveModel>,
 }
 
+/// 车次数据转换器
+///
+/// 负责数据库模型与领域模型之间的转换
 pub struct TrainDataConverter;
 
 impl TrainDataConverter {
+    /// 从数据库模型转换为领域模型
+    ///
+    /// # Arguments
+    /// * `pack`: 数据库模型打包结构
+    ///
+    /// # Returns
+    /// 转换后的领域模型
     #[instrument(skip_all)]
     fn make_from_db(pack: TrainDoPack) -> anyhow::Result<Train> {
         let train_id = TrainId::from_db_value(pack.train.id)?;
@@ -87,6 +123,14 @@ impl TrainDataConverter {
         ))
     }
 
+    /// 从领域模型转换为数据库模型
+    ///
+    /// # Arguments
+    /// * `train`: 车次领域模型
+    /// * `train_type_id`: 车次类型ID
+    ///
+    /// # Returns
+    /// 转换后的数据库活动模型打包结构
     #[instrument]
     fn transform_to_do(train: &Train, train_type_id: i32) -> TrainActiveModelPack {
         let mut train_model = crate::models::train::ActiveModel {
@@ -134,11 +178,28 @@ impl TrainDataConverter {
     }
 }
 
+/// 车次仓储实现
+///
+/// 使用SeaORM作为底层ORM框架，提供路线数据的持久化能力。
+///
+/// # 特性
+/// - 线程安全的数据库连接管理
+/// - 自动事务处理
+/// - 详细的日志记录
 pub struct TrainRepositoryImpl {
     db: DatabaseConnection,
 }
 
 impl TrainRepositoryImpl {
+    /// 查找聚合
+    ///
+    /// 根据数据库模型查找完整的车次聚合
+    ///
+    /// # Arguments
+    /// * `train`: 数据库模型
+    ///
+    /// # Returns
+    /// 转换后的领域模型
     #[instrument(skip(self))]
     async fn find_aggregate(
         &self,
@@ -199,6 +260,13 @@ impl TrainRepositoryImpl {
 
 #[async_trait]
 impl Repository<Train> for TrainRepositoryImpl {
+    /// 根据ID查找车次
+    ///
+    /// # Arguments
+    /// * `id`: 车次ID
+    ///
+    /// # Returns
+    /// 找到的车次聚合根，如果不存在则返回None
     #[instrument(skip(self))]
     async fn find(&self, id: TrainId) -> Result<Option<Train>, RepositoryError> {
         let train = crate::models::train::Entity::find_by_id(id.to_db_value())
@@ -220,6 +288,13 @@ impl Repository<Train> for TrainRepositoryImpl {
         }
     }
 
+    /// 删除车次
+    ///
+    /// # Arguments
+    /// * `aggregate`: 要删除的车次聚合根
+    ///
+    /// # Returns
+    /// 操作结果
     #[instrument(skip(self))]
     async fn remove(&self, aggregate: Train) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
@@ -243,6 +318,13 @@ impl Repository<Train> for TrainRepositoryImpl {
         Ok(())
     }
 
+    /// 保存车次
+    ///
+    /// # Arguments
+    /// * `aggregate`: 要保存的车次聚合根
+    ///
+    /// # Returns
+    /// 保存后的车次ID
     #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
         let train_type = aggregate.train_type();
@@ -376,6 +458,10 @@ impl Repository<Train> for TrainRepositoryImpl {
 }
 
 impl TrainRepositoryImpl {
+    /// 创建新的车次仓储实例
+    ///
+    /// # Arguments
+    /// * `db`: 数据库连接
     pub fn new(db: DatabaseConnection) -> Self {
         TrainRepositoryImpl { db }
     }
@@ -532,6 +618,10 @@ impl TrainRepositoryImpl {
 
 #[async_trait]
 impl TrainRepository for TrainRepositoryImpl {
+    /// 获取已验证的车次编号集合
+    ///
+    /// # Returns
+    /// 所有已存在的车次编号集合
     #[instrument(skip(self))]
     async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_models = crate::models::train::Entity::find()
@@ -546,6 +636,10 @@ impl TrainRepository for TrainRepositoryImpl {
         Ok(train_models.into_iter().map(|e| e.number).collect())
     }
 
+    /// 获取已验证的车次类型集合
+    ///
+    /// # Returns
+    /// 所有已存在的车次类型集合
     #[instrument(skip(self))]
     async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError> {
         let train_type_models = crate::models::train_type::Entity::find()
@@ -560,6 +654,13 @@ impl TrainRepository for TrainRepositoryImpl {
         Ok(train_type_models.into_iter().map(|e| e.type_name).collect())
     }
 
+    /// 获取已验证的座位类型集合
+    ///
+    /// # Arguments
+    /// * `train_id`: 车次ID
+    ///
+    /// # Returns
+    /// 该车次所有已存在的座位类型集合
     #[instrument(skip(self))]
     async fn get_verified_seat_type(
         &self,
@@ -595,6 +696,10 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    /// 获取所有车次
+    ///
+    /// # Returns
+    /// 所有车次的列表
     #[instrument(skip(self))]
     async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError> {
         let train_type_map = self
@@ -618,6 +723,13 @@ impl TrainRepository for TrainRepositoryImpl {
             .await
     }
 
+    /// 获取座位ID映射
+    ///
+    /// # Arguments
+    /// * `train_id`: 车次ID
+    ///
+    /// # Returns
+    /// 座位类型到座位ID列表的映射
     #[instrument(skip(self))]
     async fn get_seat_id_map(
         &self,
@@ -701,6 +813,13 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    /// 根据车次编号查找车次
+    ///
+    /// # Arguments
+    /// * `train_number`: 已验证的车次编号
+    ///
+    /// # Returns
+    /// 找到的车次
     #[instrument(skip(self))]
     async fn find_by_train_number(
         &self,
@@ -725,6 +844,13 @@ impl TrainRepository for TrainRepositoryImpl {
             )))?)
     }
 
+    /// 根据车次类型查找车次
+    ///
+    /// # Arguments
+    /// * `train_type`: 已验证的车次类型
+    ///
+    /// # Returns
+    /// 找到的车次列表
     #[instrument(skip(self))]
     async fn find_by_train_type(
         &self,
@@ -765,6 +891,14 @@ impl TrainRepository for TrainRepositoryImpl {
         }
     }
 
+    /// 保存原始车次编号数据
+    ///
+    /// # Arguments
+    /// * `train_number_data`: 车次编号数据
+    /// * `route_repository`: 路线仓储
+    ///
+    /// # Returns
+    /// 操作结果
     #[instrument(skip_all)]
     async fn save_raw_train_number<T: RouteRepository>(
         &self,
@@ -907,6 +1041,13 @@ impl TrainRepository for TrainRepositoryImpl {
         Ok(())
     }
 
+    /// 保存原始车次类型数据
+    ///
+    /// # Arguments
+    /// * `train_type_data`: 车次类型数据
+    ///
+    /// # Returns
+    /// 操作结果
     #[instrument(skip_all)]
     async fn save_raw_train_type(
         &self,

@@ -1,4 +1,3 @@
-use crate::user::{user_info, user_manager};
 use actix_web::web;
 
 pub mod schedule;

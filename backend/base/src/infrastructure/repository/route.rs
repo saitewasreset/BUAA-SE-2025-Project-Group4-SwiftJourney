@@ -1,3 +1,17 @@
+//! 车次路线仓储实现模块
+//!
+//! 该模块提供了基于SeaORM的车次路线仓储实现，负责车次路线数据的持久化操作。
+//! 路线作为火车票订购系统的核心数据，包含车次的所有停靠站点信息。
+//!
+//! # 主要功能
+//! - 车次路线的CRUD操作
+//! - 批量导入路线数据
+//! - 按路线ID查询完整路线信息
+//!
+//! # 实现特点
+//! - 使用事务保证操作的原子性
+//! - 自动生成路线ID
+//! - 严格的数据一致性检查
 use crate::domain::model::route::{Route, RouteId, StopId};
 use crate::domain::model::station::StationId;
 use crate::domain::repository::route::RouteRepository;
@@ -15,9 +29,29 @@ use tracing::{error, instrument, trace};
 impl_db_id_from_u64!(RouteId, i64, "route");
 impl_db_id_from_u64!(StopId, i32, "stop");
 
+/// 车次路线数据转换器
+///
+/// 负责领域对象(`Route`)与数据库模型(`route::Model`)之间的双向转换。
+///
+/// # 转换逻辑
+/// - 一个Route对应数据库中的多条记录(每个停靠站一条)
+/// - 转换时自动处理ID类型转换
+/// - 严格检查数据一致性
 pub struct RouteDataConverter;
 
 impl RouteDataConverter {
+    /// 从数据库模型创建路线领域对象
+    ///
+    /// # Arguments
+    /// - `route_model_list`: 数据库查询结果(同一路线的所有停靠站记录)
+    ///
+    /// # Returns
+    /// 转换后的Route领域对象
+    ///
+    /// # Errors
+    /// - 当停靠站列表为空时返回错误
+    /// - 当路线ID不一致时返回错误
+    /// - 当ID转换失败时返回错误
     #[instrument(skip_all)]
     pub fn make_from_do(
         route_model_list: Vec<crate::models::route::Model>,
@@ -56,6 +90,13 @@ impl RouteDataConverter {
         Ok(route)
     }
 
+    /// 将路线领域对象转换为数据库模型列表
+    ///
+    /// # Arguments
+    /// - `route`: 要转换的Route领域对象
+    ///
+    /// # Returns
+    /// 可用于数据库操作的ActiveModel列表(每个停靠站一个)
     #[instrument]
     pub fn transform_to_do(route: Route) -> Vec<crate::models::route::ActiveModel> {
         let route_id = route.get_id();
@@ -96,15 +137,38 @@ impl RouteDataConverter {
     }
 }
 
+/// 车次路线仓储实现
+///
+/// 使用SeaORM作为底层ORM框架，提供路线数据的持久化能力。
+///
+/// # 特性
+/// - 线程安全的数据库连接管理
+/// - 自动事务处理
+/// - 详细的日志记录
 pub struct RouteRepositoryImpl {
+    /// 数据库连接池
     db: DatabaseConnection,
 }
 
 impl RouteRepositoryImpl {
+    /// 创建新的路线仓储实例
+    ///
+    /// # Arguments
+    /// - `db`: SeaORM数据库连接
     pub fn new(db: DatabaseConnection) -> Self {
         RouteRepositoryImpl { db }
     }
 
+    /// 获取新的路线ID
+    ///
+    /// # Arguments
+    /// - `txn`: 数据库事务
+    ///
+    /// # Returns
+    /// 新的路线ID(当前最大ID+1)
+    ///
+    /// # Errors
+    /// - 数据库查询错误
     #[instrument(skip_all)]
     pub async fn get_new_line_id(&self, txn: &DatabaseTransaction) -> Result<i64, RepositoryError> {
         let last_line = crate::models::route::Entity::find()
@@ -123,6 +187,18 @@ impl RouteRepositoryImpl {
 
 #[async_trait]
 impl Repository<Route> for RouteRepositoryImpl {
+    /// 根据ID查找路线
+    ///
+    /// # Arguments
+    /// - `id`: 路线ID
+    ///
+    /// # Returns
+    /// - `Some(Route)`: 找到的路线对象(包含所有停靠站)
+    /// - `None`: 路线不存在
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find(&self, id: RouteId) -> Result<Option<Route>, RepositoryError> {
         let model = crate::models::route::Entity::find()
@@ -159,6 +235,16 @@ impl Repository<Route> for RouteRepositoryImpl {
         }
     }
 
+    /// 删除路线记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要删除的路线对象
+    ///
+    /// # Notes
+    /// - 使用事务保证删除所有相关停靠站记录
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn remove(&self, aggregate: Route) -> Result<(), RepositoryError> {
         if let Some(route_id) = aggregate.get_id() {
@@ -198,6 +284,21 @@ impl Repository<Route> for RouteRepositoryImpl {
         Ok(())
     }
 
+    /// 保存路线记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要保存的路线对象(可变引用)
+    ///
+    /// # Returns
+    /// 保存后的路线ID
+    ///
+    /// # Notes
+    /// - 使用事务保证原子性
+    /// - 自动生成新的路线ID(如果是新增)
+    /// - 保存后会重新加载完整路线数据
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
         trace!("Begin Transaction");
@@ -240,6 +341,14 @@ impl Repository<Route> for RouteRepositoryImpl {
 
 #[async_trait]
 impl RouteRepository for RouteRepositoryImpl {
+    /// 加载所有路线
+    ///
+    /// # Returns
+    /// 所有路线列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip_all)]
     async fn load(&self) -> Result<Vec<Route>, RepositoryError> {
         let route_models = crate::models::route::Entity::find()
@@ -276,6 +385,22 @@ impl RouteRepository for RouteRepositoryImpl {
         Ok(result)
     }
 
+    /// 批量导入原始路线数据
+    ///
+    /// # Arguments
+    /// - `raw_routes`: 原始路线数据(车站名称和时间信息)
+    ///
+    /// # Returns
+    /// 新创建的路线ID
+    ///
+    /// # Notes
+    /// - 使用事务保证原子性
+    /// - 自动将车站名称转换为ID
+    /// - 自动生成新的路线ID
+    ///
+    /// # Errors
+    /// - 数据库操作错误
+    /// - 车站不存在错误
     #[instrument(skip_all)]
     async fn save_raw(
         &self,

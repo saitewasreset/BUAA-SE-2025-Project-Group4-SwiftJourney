@@ -1,3 +1,22 @@
+//! 城市仓储实现模块
+//!
+//! 提供基于SeaORM的城市仓储实现，负责城市数据的持久化操作。
+//!
+//! 主要功能：
+//! - 城市实体的CRUD操作
+//! - 按名称或省份查询城市
+//! - 批量导入城市数据
+//!
+//! # 实现细节
+//! - 使用`CityRepositoryImpl`作为主要实现结构体
+//! - 通过`CityDataConverter`处理领域模型与数据库模型的转换
+//! - 基于SeaORM实现数据库操作
+//!
+//! # 数据转换
+//! - 领域对象(`City`)与数据库模型(`city::Model`)之间的双向转换
+//! - 自动处理ID类型转换
+//! - 字段验证和错误处理
+
 use crate::domain::model::city::{City, CityId, ProvinceName};
 use crate::domain::repository::city::CityRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
@@ -10,15 +29,46 @@ use sea_orm::{ColumnTrait, Select};
 use shared::data::CityData;
 use tracing::{debug, error, instrument, trace};
 
+/// 城市仓储实现
+///
+/// 使用SeaORM作为底层ORM框架，提供城市数据的持久化能力。
+///
+/// # 特性
+/// - 线程安全的数据库连接管理
+/// - 自动事务处理
+/// - 详细的日志记录
+///
 pub struct CityRepositoryImpl {
+    /// 数据库连接池
     db: DatabaseConnection,
 }
 
+/// 城市数据转换器
+///
+/// 负责领域对象(`City`)与数据库模型(`city::Model`)之间的转换。
+///
+/// # 方法
+/// - `make_from_do`: 从数据库模型创建领域对象
+/// - `transform_to_do`: 将领域对象转换为数据库模型
+///
+/// # Errors
+/// - 当ID转换失败时返回错误
+/// - 当字段验证失败时返回错误
 pub struct CityDataConverter;
 
 impl_db_id_from_u64!(CityId, i32, "city");
 
 impl CityDataConverter {
+    /// 从数据库模型创建城市领域对象
+    ///
+    /// # Arguments
+    /// - `city_do`: 数据库查询结果模型
+    ///
+    /// # Returns
+    /// 转换后的城市领域对象
+    ///
+    /// # Errors
+    /// - 当ID转换失败时返回错误
     #[instrument]
     pub fn make_from_do(city_do: crate::models::city::Model) -> anyhow::Result<City> {
         let city_id = CityId::from_db_value(city_do.id)?;
@@ -28,6 +78,13 @@ impl CityDataConverter {
         Ok(City::new(Some(city_id), name, province))
     }
 
+    /// 将城市领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// - `city`: 要转换的城市领域对象
+    ///
+    /// # Returns
+    /// 可用于数据库操作的ActiveModel
     #[instrument]
     pub fn transform_to_do(city: City) -> crate::models::city::ActiveModel {
         let mut model = crate::models::city::ActiveModel {
@@ -46,6 +103,18 @@ impl CityDataConverter {
 
 #[async_trait]
 impl Repository<City> for CityRepositoryImpl {
+    /// 根据ID查找城市
+    ///
+    /// # Arguments
+    /// - `id`: 城市ID
+    ///
+    /// # Returns
+    /// - `Some(City)`: 找到的城市对象
+    /// - `None`: 城市不存在
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find(&self, id: CityId) -> Result<Option<City>, RepositoryError> {
         let result = crate::models::city::Entity::find_by_id(id.to_db_value())
@@ -67,6 +136,13 @@ impl Repository<City> for CityRepositoryImpl {
             .map_err(RepositoryError::ValidationError)
     }
 
+    /// 删除城市记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要删除的城市对象
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn remove(&self, aggregate: City) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
@@ -85,6 +161,20 @@ impl Repository<City> for CityRepositoryImpl {
         Ok(())
     }
 
+    /// 保存城市记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要保存的城市对象（可变引用）
+    ///
+    /// # Returns
+    /// 保存后的城市ID
+    ///
+    /// # Notes
+    /// - 如果城市ID已存在，则执行更新操作
+    /// - 如果城市ID不存在，则执行插入操作并设置新ID
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut City) -> Result<CityId, RepositoryError> {
         let city_do = CityDataConverter::transform_to_do(aggregate.clone());
@@ -122,17 +212,47 @@ impl Repository<City> for CityRepositoryImpl {
 
 #[async_trait]
 impl CityRepository for CityRepositoryImpl {
+    /// 加载所有城市记录
+    ///
+    /// # Returns
+    /// 城市列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip_all)]
     async fn load(&self) -> Result<Vec<City>, RepositoryError> {
         self.query_cities(|f| f).await
     }
 
+    /// 按城市名称查询
+    ///
+    /// # Arguments
+    /// - `city_name`: 城市名称
+    ///
+    /// # Returns
+    /// 匹配的城市列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find_by_name(&self, city_name: &str) -> Result<Vec<City>, RepositoryError> {
         self.query_cities(|f| f.filter(crate::models::city::Column::Name.eq(city_name)))
             .await
     }
 
+    /// 按省份名称查询
+    ///
+    /// # Arguments
+    /// - `province_name`: 省份名称
+    ///
+    /// # Returns
+    /// 匹配的城市列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find_by_province(
         &self,
@@ -144,6 +264,17 @@ impl CityRepository for CityRepositoryImpl {
         .await
     }
 
+    /// 批量导入原始城市数据
+    ///
+    /// # Arguments
+    /// - `city_data`: 城市数据列表（城市名称和省份名称对）
+    ///
+    /// # Notes
+    /// - 使用事务保证原子性
+    /// - 冲突时更新省份名称
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip_all)]
     async fn save_raw(&self, city_data: CityData) -> Result<(), RepositoryError> {
         let model_list = city_data
@@ -194,10 +325,25 @@ impl CityRepository for CityRepositoryImpl {
 }
 
 impl CityRepositoryImpl {
+    /// 创建新的城市仓储实例
+    ///
+    /// # Arguments
+    /// - `db`: SeaORM数据库连接
     pub fn new(db: DatabaseConnection) -> Self {
         CityRepositoryImpl { db }
     }
 
+    /// 通用城市查询方法
+    ///
+    /// # Arguments
+    /// - `builder`: 查询构建器闭包
+    ///
+    /// # Returns
+    /// 查询结果的城市列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip_all)]
     pub async fn query_cities(
         &self,

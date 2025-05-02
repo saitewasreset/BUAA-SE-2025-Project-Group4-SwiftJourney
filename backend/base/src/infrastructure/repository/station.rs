@@ -1,3 +1,17 @@
+//! 车站仓储实现模块
+//!
+//! 提供基于SeaORM的车站仓储实现，负责车站数据的持久化操作。
+//! 车站作为火车票系统的核心数据，包含名称和所属城市信息。
+//!
+//! # 主要功能
+//! - 车站实体的CRUD操作
+//! - 按城市或名称查询车站
+//! - 批量导入车站数据
+//!
+//! # 实现特点
+//! - 使用SeaORM实现数据库操作
+//! - 事务支持保证数据一致性
+//! - 详细的错误处理和日志记录
 use crate::domain::DbId;
 use crate::domain::model::city::CityId;
 use crate::domain::model::station::{Station, StationId};
@@ -13,15 +27,41 @@ use shared::data::StationData;
 use std::collections::HashMap;
 use tracing::{debug, error, instrument, trace};
 
+/// 车站仓储实现
+///
+/// 使用SeaORM作为底层ORM框架，提供车站数据的持久化能力。
+///
+/// # 特性
+/// - 线程安全的数据库连接管理
+/// - 自动ID生成
+/// - 详细的日志记录
 pub struct StationRepositoryImpl {
+    /// 数据库连接池
     db: DatabaseConnection,
 }
 
 impl_db_id_from_u64!(StationId, i32, "station");
 
+/// 车站数据转换器
+///
+/// 负责领域对象(`Station`)与数据库模型(`station::Model`)之间的转换。
+///
+/// # 转换逻辑
+/// - 处理ID类型转换
+/// - 字段验证和错误处理
 pub struct StationDataConverter;
 
 impl StationDataConverter {
+    /// 从数据库模型创建车站领域对象
+    ///
+    /// # Arguments
+    /// - `station_do`: 数据库查询结果模型
+    ///
+    /// # Returns
+    /// 转换后的Station领域对象
+    ///
+    /// # Errors
+    /// - 当ID转换失败时返回错误
     #[instrument]
     pub fn make_from_do(station_do: crate::models::station::Model) -> anyhow::Result<Station> {
         let station_id = StationId::from_db_value(station_do.id)?;
@@ -31,6 +71,13 @@ impl StationDataConverter {
         Ok(Station::new(Some(station_id), name, city_id))
     }
 
+    /// 将车站领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// - `station`: 要转换的车站领域对象
+    ///
+    /// # Returns
+    /// 可用于数据库操作的ActiveModel
     #[instrument]
     pub fn transform_to_do(station: &Station) -> crate::models::station::ActiveModel {
         let mut model = crate::models::station::ActiveModel {
@@ -49,6 +96,18 @@ impl StationDataConverter {
 
 #[async_trait]
 impl Repository<Station> for StationRepositoryImpl {
+    /// 根据ID查找车站
+    ///
+    /// # Arguments
+    /// - `id`: 车站ID
+    ///
+    /// # Returns
+    /// - `Some(Station)`: 找到的车站对象
+    /// - `None`: 车站不存在
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find(&self, id: StationId) -> Result<Option<Station>, RepositoryError> {
         let result = crate::models::station::Entity::find_by_id(u64::from(id) as i32)
@@ -77,6 +136,13 @@ impl Repository<Station> for StationRepositoryImpl {
             })
     }
 
+    /// 删除车站记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要删除的车站对象
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn remove(&self, aggregate: Station) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
@@ -95,6 +161,20 @@ impl Repository<Station> for StationRepositoryImpl {
         Ok(())
     }
 
+    /// 保存车站记录
+    ///
+    /// # Arguments
+    /// - `aggregate`: 要保存的车站对象(可变引用)
+    ///
+    /// # Returns
+    /// 保存后的车站ID
+    ///
+    /// # Notes
+    /// - 如果车站ID已存在，则执行更新操作
+    /// - 如果车站ID不存在，则执行插入操作并设置新ID
+    ///
+    /// # Errors
+    /// - 数据库操作错误
     #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut Station) -> Result<StationId, RepositoryError> {
         let station_do = StationDataConverter::transform_to_do(aggregate);
@@ -134,11 +214,30 @@ impl Repository<Station> for StationRepositoryImpl {
 
 #[async_trait]
 impl StationRepository for StationRepositoryImpl {
+    /// 加载所有车站记录
+    ///
+    /// # Returns
+    /// 车站列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn load(&self) -> Result<Vec<Station>, RepositoryError> {
         self.query_stations(|q| q).await
     }
 
+    /// 按城市ID查询车站
+    ///
+    /// # Arguments
+    /// - `city_id`: 城市ID
+    ///
+    /// # Returns
+    /// 该城市下的车站列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find_by_city(&self, city_id: CityId) -> Result<Vec<Station>, RepositoryError> {
         self.query_stations(|q| {
@@ -147,6 +246,18 @@ impl StationRepository for StationRepositoryImpl {
         .await
     }
 
+    /// 按车站名称查询
+    ///
+    /// # Arguments
+    /// - `station_name`: 车站名称
+    ///
+    /// # Returns
+    /// - `Some(Station)`: 找到的车站对象
+    /// - `None`: 车站不存在
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip(self))]
     async fn find_by_name(&self, station_name: &str) -> Result<Option<Station>, RepositoryError> {
         let model = crate::models::station::Entity::find()
@@ -172,6 +283,18 @@ impl StationRepository for StationRepositoryImpl {
             })
     }
 
+    /// 批量导入原始车站数据
+    ///
+    /// # Arguments
+    /// - `station_data`: 车站数据列表(包含车站名称和所属城市名称)
+    ///
+    /// # Notes
+    /// - 使用事务保证原子性
+    /// - 自动将城市名称转换为ID
+    ///
+    /// # Errors
+    /// - 数据库操作错误
+    /// - 城市不存在错误
     async fn save_raw(&self, station_data: StationData) -> Result<(), RepositoryError> {
         trace!("Begin transaction");
         let txn = self
@@ -249,10 +372,25 @@ impl StationRepository for StationRepositoryImpl {
 }
 
 impl StationRepositoryImpl {
+    /// 创建新的车站仓储实例
+    ///
+    /// # Arguments
+    /// - `db`: SeaORM数据库连接
     pub fn new(db: DatabaseConnection) -> Self {
         StationRepositoryImpl { db }
     }
 
+    /// 通用车站查询方法
+    ///
+    /// # Arguments
+    /// - `builder`: 查询构建器闭包
+    ///
+    /// # Returns
+    /// 查询结果的车站列表
+    ///
+    /// # Errors
+    /// - 数据库查询错误
+    /// - 数据转换错误
     #[instrument(skip_all)]
     pub async fn query_stations(
         &self,

@@ -1,3 +1,24 @@
+//! 列车班次仓储实现模块
+//!
+//! 提供基于SeaORM的列车班次(聚合根)仓储实现，负责：
+//! - 列车班次数据的持久化存储
+//! - 座位占用状态管理
+//! - 复杂查询支持（按日期/车次查询）
+//!
+//! # 实现特性
+//! - 使用SeaORM进行数据库访问
+//! - 支持事务性操作
+//! - 自动变更检测与跟踪
+//! - 联表查询优化（班次+占用座位+座位类型+座位映射）
+//!
+//! # 数据模型转换
+//! 本模块实现了领域模型与数据库模型的互相转换：
+//! - `TrainScheduleDataConverter`: 处理班次聚合根的转换
+//! - `OccupiedSeatConverter`: 处理占用座位实体的转换
+//!
+//! # 并发安全
+//! - 使用`Arc<Mutex<AggregateManager>>`保证变更检测的线程安全
+//! - 所有数据库操作在事务中执行
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::route::RouteId;
 use crate::domain::model::station::StationId;
@@ -25,18 +46,48 @@ use std::sync::{Arc, Mutex};
 impl_db_id_from_u64!(TrainScheduleId, i32, "train schedule");
 impl_db_id_from_u64!(SeatId, i64, "seat id");
 
+/// 列车班次数据转换器
+///
+/// 负责领域模型 `TrainSchedule` 与数据库模型之间的双向转换。
+///
+/// # 转换逻辑
+/// - 班次主体信息 ↔ `train_schedule` 表
+/// - 座位占用信息 ↔ `occupied_seat` + `seat_type` + `seat_type_mapping` 表
 pub struct TrainScheduleDataConverter;
+
+/// 占用座位数据转换器
+///
+/// 负责领域模型 `OccupiedSeat` 与数据库模型 `occupied_seat` 之间的双向转换。
 pub struct OccupiedSeatConverter;
 
+/// 数据库模型打包结构
 struct TrainScheduleDoPack {
+    /// 班次主表数据
     train_schedule: crate::models::train_schedule::Model,
+    /// 已占用座位列表
     occupied_seat: Vec<crate::models::occupied_seat::Model>,
+    /// 座位类型字典(seat_type_id → 模型)
     seat_type: HashMap<i32, crate::models::seat_type::Model>,
-    // seat_type_id -> seat_id -> seat_type_mapping
+    /// 座位位置映射字典(seat_type_id → seat_id → 映射模型)
     seat_type_mapping: HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
 }
 
 impl TrainScheduleDataConverter {
+    /// 从数据库模型创建领域模型
+    ///
+    /// # Arguments
+    /// * `pack`: 从数据库查询出的打包数据
+    ///
+    /// # Process
+    /// 1. 转换基础班次信息
+    /// 2. 构建座位可用性映射
+    /// 3. 组装为聚合根
+    ///
+    /// # Errors
+    /// 在以下情况返回错误：
+    /// - 数据不一致（如缺失关联记录）
+    /// - 无效的ID格式
+    /// - 字段验证失败
     fn make_from_do(pack: TrainScheduleDoPack) -> anyhow::Result<TrainSchedule> {
         let mut seat_availability_map: SeatAvailabilityMap = HashMap::new();
         let train_schedule_id = TrainScheduleId::from_db_value(pack.train_schedule.id)?;
@@ -117,6 +168,13 @@ impl TrainScheduleDataConverter {
         ))
     }
 
+    /// 转换领域模型到ActiveModel模型（班次主表）
+    ///
+    /// # Arguments
+    /// * `train_schedule`: 要转换的班次聚合根
+    ///
+    /// # Note
+    /// 不包含关联的座位占用数据转换
     pub fn transform_to_train_schedule_do(
         train_schedule: &TrainSchedule,
     ) -> crate::models::train_schedule::ActiveModel {
@@ -134,6 +192,14 @@ impl TrainScheduleDataConverter {
         train_schedule_active_model
     }
 
+    /// 转换领域模型到ActiveModel模型列表（占用座位表）
+    ///
+    /// # Arguments
+    /// * `train_schedule`: 要转换的班次聚合根
+    /// * `train_schedule_id`: 关联的班次数据库ID
+    ///
+    /// # Returns
+    /// 返回可以批量插入的ActiveRecord列表
     pub fn transform_to_occupied_seat_do(
         train_schedule: TrainSchedule,
         train_schedule_id: i32,
@@ -171,6 +237,16 @@ impl TrainScheduleDataConverter {
 }
 
 impl OccupiedSeatConverter {
+    /// 从数据库模型创建占用座位实体
+    ///
+    /// # Arguments
+    /// * `occupied_seat`: 占用座位主表记录
+    /// * `seat_type`: 关联的座位类型记录
+    /// * `seat_type_mapping`: 座位位置映射记录
+    ///
+    /// # Validation
+    /// - 检查座位位置字符不为空
+    /// - 验证所有ID格式有效
     pub fn make_from_do(
         occupied_seat: crate::models::occupied_seat::Model,
         seat_type: crate::models::seat_type::Model,
@@ -215,6 +291,10 @@ impl OccupiedSeatConverter {
         ))
     }
 
+    /// 转换占用座位实体到ActiveModel模型
+    ///
+    /// # Arguments
+    /// * `occupied_seat`: 要转换的占用座位实体
     pub fn transform_to_do(
         occupied_seat: &OccupiedSeat,
     ) -> crate::models::occupied_seat::ActiveModel {
@@ -247,12 +327,33 @@ impl OccupiedSeatConverter {
     }
 }
 
+/// 列车班次仓储实现
+///
+/// # 架构说明
+/// 实现两种仓储接口：
+/// - `TrainScheduleRepository`: 领域特定仓储接口
+/// - `DbRepositorySupport`: 基础设施层仓储支持接口
+///
+/// # 并发设计
+/// - 使用`Arc<Mutex<...>>`封装聚合管理器
+/// - 所有数据库操作在事务中执行
 pub struct TrainScheduleRepositoryImpl {
+    /// 数据库连接池
     db: DatabaseConnection,
+    /// 聚合根变更管理器
     aggregate_manager: Arc<Mutex<AggregateManagerImpl<TrainSchedule>>>,
 }
 
 impl TrainScheduleRepositoryImpl {
+    /// 创建新的仓储实例
+    ///
+    /// # Arguments
+    /// * `db`: 数据库连接池
+    ///
+    /// # Initialization
+    /// 初始化时会配置自定义的变更检测函数，用于：
+    /// - 跟踪座位占用状态变化
+    /// - 识别班次基础信息修改
     pub fn new(db: DatabaseConnection) -> Self {
         let detect_changes_fn = |diff: DiffInfo<TrainSchedule>| {
             let mut result = MultiEntityDiff::new();
@@ -328,6 +429,19 @@ impl TrainScheduleRepositoryImpl {
         }
     }
 
+    /// 执行联表查询并转换为领域模型
+    ///
+    /// # Arguments
+    /// * `builder`: 构造查询条件的闭包
+    ///
+    /// # Query Strategy
+    /// 1. 查询班次主表+列车信息
+    /// 2. 批量查询所有关联座位类型
+    /// 3. 批量查询所有座位位置映射
+    /// 4. 按班次查询占用座位记录
+    ///
+    /// # Performance
+    /// 使用批量查询减少数据库往返次数
     async fn query_train_schedules_eagerly(
         &self,
         builder: impl FnOnce(
@@ -404,10 +518,23 @@ impl TrainScheduleRepositoryImpl {
 #[async_trait]
 impl DbRepositorySupport<TrainSchedule> for TrainScheduleRepositoryImpl {
     type Manager = AggregateManagerImpl<TrainSchedule>;
+    /// 获取聚合管理器引用
+    ///
+    /// # Note
+    /// 返回的Arc<Mutex<..>>保证线程安全访问
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>> {
         Arc::clone(&self.aggregate_manager)
     }
 
+    /// 插入新班次
+    ///
+    /// # Transaction
+    /// 在单个事务中完成：
+    /// 1. 插入班次主表记录
+    /// 2. 批量插入占用座位记录
+    ///
+    /// # Conflict
+    /// 采用ON CONFLICT UPDATE策略处理冲突
     async fn on_insert(
         &self,
         aggregate: TrainSchedule,
@@ -470,6 +597,10 @@ impl DbRepositorySupport<TrainSchedule> for TrainScheduleRepositoryImpl {
         Ok(train_schedule_id)
     }
 
+    /// 查询班次
+    ///
+    /// # Eager Loading
+    /// 通过`query_train_schedules_eagerly`实现急切加载所有关联数据
     async fn on_select(
         &self,
         id: TrainScheduleId,
@@ -542,6 +673,13 @@ impl DbRepositorySupport<TrainSchedule> for TrainScheduleRepositoryImpl {
         }
     }
 
+    /// 处理变更集
+    ///
+    /// # Dispatch Logic
+    /// 根据变更类型分发操作：
+    /// - Added: 插入记录
+    /// - Modified: 更新记录
+    /// - Removed: 删除记录
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
         for changes in diff.get_changes::<OccupiedSeat>() {
             match changes.diff_type {
@@ -629,6 +767,10 @@ impl DbRepositorySupport<TrainSchedule> for TrainScheduleRepositoryImpl {
         Ok(())
     }
 
+    /// 删除班次
+    ///
+    /// # Cascade
+    /// 依赖数据库外键的ON DELETE CASCADE自动清理关联座位记录
     async fn on_delete(&self, aggregate: TrainSchedule) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             crate::models::train_schedule::Entity::delete_by_id(id.to_db_value())
@@ -646,6 +788,11 @@ impl DbRepositorySupport<TrainSchedule> for TrainScheduleRepositoryImpl {
 
 #[async_trait]
 impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
+    /// 按日期查询班次
+    ///
+    /// # Query
+    /// - 精确匹配出发日期
+    /// - 返回完整聚合对象(包含所有关联数据)
     async fn find_by_date(&self, date: NaiveDate) -> Result<Vec<TrainSchedule>, RepositoryError> {
         self.query_train_schedules_eagerly(|q| {
             q.filter(crate::models::train_schedule::Column::DepartureDate.eq(date))
@@ -653,6 +800,11 @@ impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
         .await
     }
 
+    /// 按列车ID查询班次
+    ///
+    /// # Query
+    /// - 精确匹配列车模板ID
+    /// - 返回该列车的所有运行班次
     async fn find_by_train_id(
         &self,
         train_id: TrainId,
