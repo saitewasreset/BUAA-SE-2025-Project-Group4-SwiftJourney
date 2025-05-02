@@ -926,7 +926,7 @@ impl TrainRepository for TrainRepositoryImpl {
             .iter()
             .map(|item| crate::models::train_type::ActiveModel {
                 id: ActiveValue::NotSet,
-                type_name: ActiveValue::Set(item.name.to_string()),
+                type_name: ActiveValue::Set(item.id.to_string()),
             })
             .collect::<Vec<_>>();
 
@@ -946,7 +946,7 @@ impl TrainRepository for TrainRepositoryImpl {
 
         let to_insert_train_type_name_set = train_type_data
             .iter()
-            .map(|item| item.name.to_string())
+            .map(|item| item.id.to_string())
             .collect::<HashSet<_>>();
 
         let db_train_type_list = crate::models::train_type::Entity::find()
@@ -1041,7 +1041,7 @@ impl TrainRepository for TrainRepositoryImpl {
         let mut seat_type_in_train_type_model_list = Vec::new();
 
         for train_type_info in &train_type_data {
-            let train_type_id = train_type_name_to_id[&train_type_info.name];
+            let train_type_id = train_type_name_to_id[&train_type_info.id];
             for (seat_type, m) in &train_type_info.seat {
                 let capacity = m.values().map(|v| v.len()).sum::<usize>() as i32;
 
@@ -1093,7 +1093,7 @@ impl TrainRepository for TrainRepositoryImpl {
         let mut seat_type_mapping_model_list = Vec::new();
 
         for train_type_info in train_type_data {
-            let train_type_id = train_type_name_to_id[&train_type_info.name];
+            let train_type_id = train_type_name_to_id[&train_type_info.id];
             for (seat_type, m) in train_type_info.seat {
                 let mut current_seat_id = 0;
                 let seat_type_id =
