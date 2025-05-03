@@ -5,9 +5,11 @@ use sea_orm_migration::{prelude::*, schema::*};
 pub struct Migration;
 
 #[derive(DeriveIden)]
-pub enum TrainRoute {
+pub enum TrainSchedule {
     Table,
+    Id,
     TrainId,
+    DepartureDate,
     LineId,
 }
 
@@ -17,18 +19,14 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(TrainRoute::Table)
-                    .if_not_exists()
-                    .col(big_integer(TrainRoute::TrainId).not_null())
-                    .col(big_integer(TrainRoute::LineId).not_null())
-                    .primary_key(
-                        Index::create()
-                            .col(TrainRoute::TrainId)
-                            .col(TrainRoute::LineId),
-                    )
+                    .table(TrainSchedule::Table)
+                    .col(pk_auto(TrainSchedule::Id))
+                    .col(integer(TrainSchedule::TrainId))
+                    .col(date(TrainSchedule::DepartureDate))
+                    .col(big_integer(TrainSchedule::LineId))
                     .foreign_key(
                         ForeignKey::create()
-                            .from(TrainRoute::Table, TrainRoute::TrainId)
+                            .from(TrainSchedule::Table, TrainSchedule::TrainId)
                             .to(Train::Table, Train::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -39,7 +37,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(TrainRoute::Table).to_owned())
+            .drop_table(Table::drop().table(TrainSchedule::Table).to_owned())
             .await
     }
 }

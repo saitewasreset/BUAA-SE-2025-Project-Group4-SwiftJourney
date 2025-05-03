@@ -12,8 +12,8 @@ pub struct Model {
     pub end_date: Date,
     pub hotel_room_type_id: i64,
     pub person_info_id: i64,
-    pub pay_transaction_id: i64,
-    pub refund_transaction_id: i64,
+    pub pay_transaction_id: Option<i64>,
+    pub refund_transaction_id: Option<i64>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub create_time: DateTimeWithTimeZone,
@@ -29,7 +29,7 @@ pub enum Relation {
         from = "Column::HotelId",
         to = "super::hotel::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Hotel,
     #[sea_orm(
@@ -37,7 +37,7 @@ pub enum Relation {
         from = "Column::HotelRoomTypeId",
         to = "super::hotel_room_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     HotelRoomType,
     #[sea_orm(
@@ -45,7 +45,7 @@ pub enum Relation {
         from = "Column::PersonInfoId",
         to = "super::person_info::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     PersonInfo,
     #[sea_orm(
@@ -53,7 +53,7 @@ pub enum Relation {
         from = "Column::PayTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction2,
     #[sea_orm(
@@ -61,7 +61,7 @@ pub enum Relation {
         from = "Column::RefundTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction1,
 }

@@ -7,15 +7,14 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub train_id: i64,
-    pub departure_date: Date,
-    pub seat_type_id: i64,
+    pub train_schedule_id: i32,
+    pub seat_type_id: i32,
     pub seat_id: i32,
-    pub begin_station_id: i64,
-    pub end_station_id: i64,
-    pub person_info_id: i64,
-    pub pay_transaction_id: i64,
-    pub refund_transaction_id: i64,
+    pub begin_station_id: i32,
+    pub end_station_id: i32,
+    pub person_info_id: i32,
+    pub pay_transaction_id: Option<i64>,
+    pub refund_transaction_id: Option<i64>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub create_time: DateTimeWithTimeZone,
@@ -33,7 +32,7 @@ pub enum Relation {
         from = "Column::PersonInfoId",
         to = "super::person_info::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     PersonInfo,
     #[sea_orm(
@@ -41,7 +40,7 @@ pub enum Relation {
         from = "Column::SeatTypeId",
         to = "super::seat_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     SeatType,
     #[sea_orm(
@@ -49,7 +48,7 @@ pub enum Relation {
         from = "Column::BeginStationId",
         to = "super::station::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Station2,
     #[sea_orm(
@@ -57,25 +56,25 @@ pub enum Relation {
         from = "Column::EndStationId",
         to = "super::station::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Station1,
     #[sea_orm(has_many = "super::takeaway_order::Entity")]
     TakeawayOrder,
     #[sea_orm(
-        belongs_to = "super::train::Entity",
-        from = "Column::TrainId",
-        to = "super::train::Column::Id",
+        belongs_to = "super::train_schedule::Entity",
+        from = "Column::TrainScheduleId",
+        to = "super::train_schedule::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
-    Train,
+    TrainSchedule,
     #[sea_orm(
         belongs_to = "super::transaction::Entity",
         from = "Column::PayTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction2,
     #[sea_orm(
@@ -83,7 +82,7 @@ pub enum Relation {
         from = "Column::RefundTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Transaction1,
 }
@@ -112,9 +111,9 @@ impl Related<super::takeaway_order::Entity> for Entity {
     }
 }
 
-impl Related<super::train::Entity> for Entity {
+impl Related<super::train_schedule::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Train.def()
+        Relation::TrainSchedule.def()
     }
 }
 

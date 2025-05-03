@@ -6,9 +6,9 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "seat_type_mapping")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub train_type_id: i64,
+    pub train_type_id: i32,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub seat_type_id: i64,
+    pub seat_type_id: i32,
     #[sea_orm(primary_key, auto_increment = false)]
     pub seat_id: i64,
     pub carriage: i32,
@@ -23,7 +23,7 @@ pub enum Relation {
         from = "Column::SeatTypeId",
         to = "super::seat_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     SeatType,
     #[sea_orm(
@@ -31,7 +31,7 @@ pub enum Relation {
         from = "Column::TrainTypeId",
         to = "super::train_type::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     TrainType,
 }

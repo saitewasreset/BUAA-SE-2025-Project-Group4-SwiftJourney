@@ -87,8 +87,13 @@
 //! - 差异检测函数应避免复杂计算
 //! - 大规模聚合根集合应考虑分片管理
 
+pub mod geo;
 pub mod password;
+pub mod route;
 pub mod session;
+pub mod station;
+pub mod train_schedule;
+pub mod train_type;
 pub mod user;
 
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};

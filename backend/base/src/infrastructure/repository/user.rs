@@ -17,6 +17,7 @@ use crate::domain::{
     RepositoryError, TypedDiff,
 };
 use anyhow::Context;
+use async_trait::async_trait;
 use email_address::EmailAddress;
 use sea_orm::ColumnTrait;
 use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
@@ -162,21 +163,10 @@ impl UserRepositoryImpl {
         let detect_changes_fn = |diff: DiffInfo<User>| {
             let mut result = MultiEntityDiff::new();
 
+            let diff_type = DiffType::from(&diff);
+
             let old = diff.old;
             let new = diff.new;
-
-            let diff_type = match (&old, &new) {
-                (None, None) => DiffType::Unchanged,
-                (None, Some(_)) => DiffType::Added,
-                (Some(_), None) => DiffType::Removed,
-                (Some(old_value), Some(new_value)) => {
-                    if old_value == new_value {
-                        DiffType::Unchanged
-                    } else {
-                        DiffType::Modified
-                    }
-                }
-            };
 
             result.add_change(TypedDiff::new(diff_type, old, new));
 
@@ -192,6 +182,7 @@ impl UserRepositoryImpl {
     }
 }
 
+#[async_trait]
 impl DbRepositorySupport<User> for UserRepositoryImpl {
     type Manager = AggregateManagerImpl<User>;
 
@@ -315,6 +306,7 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
     }
 }
 
+#[async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
         let phone: String = phone.into();
