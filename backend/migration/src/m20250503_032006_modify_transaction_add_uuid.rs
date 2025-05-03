@@ -42,7 +42,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Transaction::Table).to_owned())
+            .alter_table(
+                Table::alter()
+                    .table(Transaction::Table)
+                    .drop_column(Transaction::Uuid)
+                    .to_owned(),
+            )
             .await?;
 
         Ok(())
