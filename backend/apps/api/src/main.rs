@@ -30,6 +30,7 @@
  */
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH};
+use base::application::service::geo::GeoApplicationService;
 use base::application::service::train_data::TrainDataService;
 use base::application::service::user_manager::UserManagerService;
 use base::application::service::user_profile::UserProfileService;
@@ -38,6 +39,7 @@ use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::user::UserService;
+use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
@@ -47,8 +49,10 @@ use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
+use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
+use base::infrastructure::service::station::StationServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
@@ -117,6 +121,18 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&route_repository_impl),
     ));
 
+    let geo_service_impl = Arc::new(GeoServiceImpl::new(Arc::clone(&city_repository_impl)));
+
+    let station_service_impl = Arc::new(StationServiceImpl::new(
+        Arc::clone(&station_repository_impl),
+        Arc::clone(&geo_service_impl),
+    ));
+
+    let geo_application_service_impl = Arc::new(GeoApplicationServiceImpl::new(
+        Arc::clone(&geo_service_impl),
+        Arc::clone(&station_service_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -135,7 +151,12 @@ async fn main() -> std::io::Result<()> {
     let train_data_service: web::Data<dyn TrainDataService> =
         web::Data::from(train_data_service_impl as Arc<dyn TrainDataService>);
 
+    let geo_application_service: web::Data<dyn GeoApplicationService> =
+        web::Data::from(geo_application_service_impl as Arc<dyn GeoApplicationService>);
+
     let app_config = AppConfig { debug: debug_mode };
+
+    let app_config_data = web::Data::new(app_config);
 
     // Step 2: Create instance of your application service,
     // and wrap it with `web::Data::new`
@@ -151,11 +172,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_manager_service.clone())
             .app_data(user_profile_service.clone())
             .app_data(train_data_service.clone())
+            .app_data(geo_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
-            .app_data(app_config.clone())
+            .app_data(app_config_data.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
             .service(
