@@ -51,7 +51,7 @@ where
     /// 获取所有城市到省份的映射实现
     ///
     /// # Returns
-    /// * `Ok(HashMap<ProvinceName, City>)` - 省份名称到城市实体的映射
+    /// * `Ok(HashMap<ProvinceName, Vec<City>>)` - 省份名称到城市实体的映射
     /// * `Err(GeoServiceError)` - 获取失败及原因
     ///
     /// # Notes
@@ -59,13 +59,17 @@ where
     ///
     /// # Errors
     /// * `InfrastructureError` - 仓储访问错误
-    async fn get_city_map(&self) -> Result<HashMap<ProvinceName, City>, GeoServiceError> {
+    async fn get_city_map(&self) -> Result<HashMap<ProvinceName, Vec<City>>, GeoServiceError> {
         let cities = self.city_repository.load().await?;
 
-        Ok(cities
-            .into_iter()
-            .map(|city| (city.province().clone(), city))
-            .collect())
+        let mut result: HashMap<ProvinceName, Vec<City>> = HashMap::new();
+
+        for city in cities {
+            let province = city.province().clone();
+            result.entry(province).or_default().push(city);
+        }
+
+        Ok(result)
     }
 
     /// 根据城市名称查找城市实现
