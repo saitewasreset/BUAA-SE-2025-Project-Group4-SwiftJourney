@@ -42,6 +42,7 @@ mod m20250430_065037_modify_train_type_add_unique_type_name;
 mod m20250501_024033_modify_route_change_station_id_type;
 mod m20250501_034231_modify_train_add_default_line_id;
 mod m20250503_032006_modify_transaction_add_uuid;
+mod m20250503_052335_create_balance_view;
 
 pub struct Migrator;
 
@@ -91,6 +92,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250501_024033_modify_route_change_station_id_type::Migration),
             Box::new(m20250501_034231_modify_train_add_default_line_id::Migration),
             Box::new(m20250503_032006_modify_transaction_add_uuid::Migration),
+            Box::new(m20250503_052335_create_balance_view::Migration),
         ]
     }
 }
