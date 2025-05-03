@@ -1,5 +1,9 @@
-use crate::domain::model::transaction::TransactionId;
+use crate::domain::model::transaction::{TransactionAmountAbs, TransactionId};
+use dyn_clone::{DynClone, clone_trait_object};
 use sea_orm::prelude::TimeDateTimeWithTimeZone;
+use std::fmt::Debug;
+use std::hash::Hash;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OrderStatus {
@@ -22,15 +26,42 @@ pub enum OrderStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OrderId(u64);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OrderTimeInfo {
     create_time: TimeDateTimeWithTimeZone,
     active_time: TimeDateTimeWithTimeZone,
     complete_time: TimeDateTimeWithTimeZone,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PaymentInfo {
     pay_transaction_id: TransactionId,
     refund_transaction_id: Option<TransactionId>,
 }
 
+pub trait Order: DynClone + Debug + Send + Sync + 'static {
+    fn order_id(&self) -> OrderId;
+
+    fn uuid(&self) -> Uuid;
+
+    fn already_refund(&self) -> bool;
+
+    fn order_status(&self) -> OrderStatus;
+    fn order_time_info(&self) -> OrderTimeInfo;
+
+    fn order_amount(&self) -> TransactionAmountAbs;
+
+    fn payment_info(&self) -> PaymentInfo;
+
+    fn on_status_change(&mut self, old_status: OrderStatus, new_status: OrderStatus);
+}
+
+clone_trait_object!(Order);
+
 pub struct TrainOrder {}
+
+pub struct HotelOrder {}
+
+pub struct DishOrder {}
+
+pub struct TakeawayOrder {}
