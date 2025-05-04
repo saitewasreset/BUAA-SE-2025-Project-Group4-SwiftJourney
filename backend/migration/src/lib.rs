@@ -11,6 +11,7 @@ mod m20250411_010701_create_route;
 mod m20250411_010715_create_user;
 mod m20250411_010719_create_person_info;
 mod m20250411_010725_create_transaction;
+mod m20250411_010730_create_seat_availability;
 mod m20250411_010735_create_occupied_seat;
 mod m20250411_010744_create_hotel;
 mod m20250411_010751_create_hotel_room_type;
@@ -93,6 +94,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250501_034231_modify_train_add_default_line_id::Migration),
             Box::new(m20250503_032006_modify_transaction_add_uuid::Migration),
             Box::new(m20250503_052335_create_balance_view::Migration),
+            Box::new(m20250411_010730_create_seat_availability::Migration),
         ]
     }
 }
