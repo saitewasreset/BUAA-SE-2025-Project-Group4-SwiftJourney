@@ -14,6 +14,7 @@ pub mod occupied_room;
 pub mod occupied_seat;
 pub mod person_info;
 pub mod route;
+pub mod seat_availability;
 pub mod seat_type;
 pub mod seat_type_in_train_type;
 pub mod seat_type_mapping;
