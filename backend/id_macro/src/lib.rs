@@ -31,6 +31,12 @@ pub fn define_id_type(input: TokenStream) -> TokenStream {
             NegativeValue,
         }
 
+        impl std::fmt::Display for #id_struct {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
         impl TryFrom<i32> for #id_struct {
             type Error = #error_enum;
 
