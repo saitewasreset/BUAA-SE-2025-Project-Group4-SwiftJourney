@@ -12,6 +12,7 @@ pub enum TakeawayDish {
     DishType,
     Price,
     TakeawayShopId,
+    Images,
 }
 
 #[async_trait::async_trait]
@@ -31,6 +32,7 @@ impl MigrationTrait for Migration {
                             .check(Expr::col(TakeawayDish::Price).gte(0)),
                     )
                     .col(big_integer(TakeawayDish::TakeawayShopId).not_null())
+                    .col(json(TakeawayDish::Images).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayDish::Table, TakeawayDish::TakeawayShopId)
