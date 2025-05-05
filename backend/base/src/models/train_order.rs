@@ -7,6 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub uuid: Uuid,
     pub train_schedule_id: i32,
     pub seat_type_id: i32,
     pub seat_id: i32,
