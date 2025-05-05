@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 5 (2025-04-22 13:25:00)
+Version: 6 (2025-05-03 10:37:00)
 
 最近变更：
 
+- Version 6
+  - 新增：城市信息
 - Version 5
   - 订单列表：按交易组合订单，`OrderInfo::status`改为小写
 - Version 4
@@ -109,6 +111,29 @@ type ResponseData = "debug" | "release";
 `GET /api/general/city_stations`
 
 返回从城市到该城市车站列表的映射。
+
+需要 Cookie：
+
+- 无
+
+响应代码表：
+
+| 代码 | 可能的响应消息     | 含义                             |
+| ---- | ------------------ | -------------------------------- |
+| 200  | `For Super Earth!` | 请求已被成功执行，可访问响应数据 |
+
+响应**数据**：
+
+```typescript
+// 城市 -> 车站 []
+type ResponseData = Map<string, string[]>;
+```
+
+### 城市信息
+
+`GET /api/general/city`
+
+返回从省到该城省车城市列表的映射。
 
 需要 Cookie：
 

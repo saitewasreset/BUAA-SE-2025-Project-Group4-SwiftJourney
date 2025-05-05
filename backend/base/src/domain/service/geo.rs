@@ -40,12 +40,12 @@ pub trait GeoService: 'static + Send + Sync {
     /// 获取所有城市到省份的映射
     ///
     /// # Returns
-    /// * `Ok(HashMap<ProvinceName, City>)` - 省份名称到城市实体的映射
+    /// * `Ok(HashMap<ProvinceName, Vec<City>>)` - 省份名称到城市实体的映射
     /// * `Err(GeoServiceError)` - 获取失败及原因
     ///
     /// # Errors
     /// * `InfrastructureError` - 基础设施错误（如数据库访问失败）
-    async fn get_city_map(&self) -> Result<HashMap<ProvinceName, City>, GeoServiceError>;
+    async fn get_city_map(&self) -> Result<HashMap<ProvinceName, Vec<City>>, GeoServiceError>;
 
     /// 根据城市名称查找城市
     ///
