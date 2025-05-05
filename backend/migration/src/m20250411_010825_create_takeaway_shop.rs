@@ -10,6 +10,7 @@ pub enum TakeawayShop {
     Id,
     Name,
     StationId,
+    Images,
 }
 
 #[async_trait::async_trait]
@@ -23,6 +24,7 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(TakeawayShop::Id))
                     .col(string(TakeawayShop::Name).not_null())
                     .col(big_integer(TakeawayShop::StationId).not_null())
+                    .col(json(TakeawayShop::Images).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayShop::Table, TakeawayShop::StationId)
