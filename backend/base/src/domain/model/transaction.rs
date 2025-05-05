@@ -107,17 +107,12 @@ pub enum RefundError {
     AlreadyRefunded(Vec<Uuid>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TransactionAmountAbs(Decimal);
 
-impl TryFrom<Decimal> for TransactionAmountAbs {
-    type Error = TransactionAmountError;
-
-    fn try_from(value: Decimal) -> Result<Self, Self::Error> {
-        if value.is_sign_negative() {
-            Err(TransactionAmountError::NegativeValue(value))
-        } else {
-            Ok(TransactionAmountAbs(value))
-        }
+impl From<Decimal> for TransactionAmountAbs {
+    fn from(value: Decimal) -> Self {
+        Self(value.abs())
     }
 }
 
@@ -150,7 +145,7 @@ impl Transaction {
     pub fn new(user_id: UserId, orders: Vec<Box<dyn Order>>) -> Transaction {
         let total_amount = orders
             .iter()
-            .map(|order| Decimal::from(order.order_amount()))
+            .map(|order| order.unit_price() * order.amount())
             .sum::<Decimal>();
 
         Transaction {
@@ -165,6 +160,28 @@ impl Transaction {
         }
     }
 
+    pub fn new_full(
+        transaction_id: Option<TransactionId>,
+        uuid: Uuid,
+        create_time: DateTimeWithTimeZone,
+        finish_time: Option<DateTimeWithTimeZone>,
+        amount: Decimal,
+        status: TransactionStatus,
+        user_id: UserId,
+        orders: Vec<Box<dyn Order>>,
+    ) -> Transaction {
+        Transaction {
+            transaction_id,
+            uuid,
+            create_time,
+            finish_time,
+            amount,
+            status,
+            user_id,
+            orders,
+        }
+    }
+
     // 注意：不会检查用户是否有足够的余额
     pub fn pay(&mut self) -> Result<(), TransactionError> {
         if self.status == TransactionStatus::Paid {
@@ -173,10 +190,6 @@ impl Transaction {
 
         self.status = TransactionStatus::Paid;
         self.finish_time = Some(Self::now());
-
-        for order in &mut self.orders {
-            order.on_status_change(OrderStatus::Unpaid, OrderStatus::Paid);
-        }
 
         Ok(())
     }
@@ -234,14 +247,8 @@ impl Transaction {
 
         let refund_amount_abs = to_refund_orders
             .iter()
-            .map(|order| Decimal::from(order.order_amount()))
+            .map(|order| order.unit_price() * order.amount())
             .sum::<Decimal>();
-
-        for order in &mut self.orders {
-            if transaction_order_uuid_set.contains(&order.uuid()) {
-                order.on_status_change(order.order_status(), OrderStatus::Cancelled);
-            }
-        }
 
         Ok(Transaction {
             transaction_id: None,
@@ -277,5 +284,13 @@ impl Transaction {
 
     pub fn orders(&self) -> &[Box<dyn Order>] {
         &self.orders
+    }
+
+    pub fn status(&self) -> TransactionStatus {
+        self.status
+    }
+
+    pub fn into_orders(self) -> Vec<Box<dyn Order>> {
+        self.orders
     }
 }
