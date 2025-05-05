@@ -1,4 +1,5 @@
 pub mod city;
+pub mod hotel;
 pub mod order;
 pub mod password;
 pub mod personal_info;
