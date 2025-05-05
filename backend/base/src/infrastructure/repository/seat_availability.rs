@@ -111,7 +111,7 @@ impl OccupiedSeatDataConverter {
 }
 
 impl SeatAvailabilityDataConverter {
-    pub fn make_from_do(
+    fn make_from_do(
         seat_availability_do_pack: SeatAvailabilityDoPack,
     ) -> Result<SeatAvailability, anyhow::Error> {
         let seat_availability_id = seat_availability_do_pack.seat_availability.id;
@@ -177,7 +177,7 @@ impl SeatAvailabilityDataConverter {
         ))
     }
 
-    pub fn transform_to_do_availability_only(
+    fn transform_to_do_availability_only(
         seat_availability: &SeatAvailability,
     ) -> crate::models::seat_availability::ActiveModel {
         let mut seat_availability_active_model = crate::models::seat_availability::ActiveModel {
@@ -214,14 +214,14 @@ impl SeatAvailabilityDataConverter {
         seat_availability_active_model
     }
 
-    pub fn transform_to_do(seat_availability: SeatAvailability) -> SeatAvailabilityActiveModelPack {
+    fn transform_to_do(seat_availability: SeatAvailability) -> SeatAvailabilityActiveModelPack {
         let seat_availability_active_model =
             SeatAvailabilityDataConverter::transform_to_do_availability_only(&seat_availability);
 
         let occupied_seat_active_model_list = seat_availability
             .into_occupied_seat()
             .into_values()
-            .map(|item| OccupiedSeatDataConverter::transform_to_do(item))
+            .map(OccupiedSeatDataConverter::transform_to_do)
             .collect::<Vec<_>>();
 
         SeatAvailabilityActiveModelPack {
@@ -402,7 +402,7 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
             None => None,
         };
 
-        result.transpose().map_err(|e| RepositoryError::Db(e))
+        result.transpose().map_err(RepositoryError::Db)
     }
 
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
