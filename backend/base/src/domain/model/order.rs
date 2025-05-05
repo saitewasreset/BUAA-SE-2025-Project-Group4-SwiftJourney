@@ -1,6 +1,10 @@
+use crate::domain::model::personal_info::PersonalInfo;
+use crate::domain::model::train::SeatTypeId;
+use crate::domain::model::train_schedule::{Seat, StationRange, TrainScheduleId};
 use crate::domain::model::transaction::{TransactionAmountAbs, TransactionId};
 use dyn_clone::{DynClone, clone_trait_object};
 use sea_orm::prelude::TimeDateTimeWithTimeZone;
+use std::any::Any;
 use std::fmt::Debug;
 use std::hash::Hash;
 use uuid::Uuid;
@@ -39,7 +43,7 @@ pub struct PaymentInfo {
     refund_transaction_id: Option<TransactionId>,
 }
 
-pub trait Order: DynClone + Debug + Send + Sync + 'static {
+pub trait Order: DynClone + Debug + Send + Sync + 'static + Any {
     fn order_id(&self) -> OrderId;
 
     fn uuid(&self) -> Uuid;
@@ -58,7 +62,12 @@ pub trait Order: DynClone + Debug + Send + Sync + 'static {
 
 clone_trait_object!(Order);
 
-pub struct TrainOrder {}
+pub struct TrainOrder {
+    train_schedule_id: TrainScheduleId,
+    seat: Seat,
+    station_range: StationRange,
+    personal_info: PersonalInfo,
+}
 
 pub struct HotelOrder {}
 
