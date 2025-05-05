@@ -19,7 +19,6 @@ use super::{
     train::{SeatType, TrainId},
 };
 use crate::domain::model::route::RouteId;
-use crate::domain::model::train::SeatTypeId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use crate::{Unverified, Verified};
 use chrono::NaiveDate;
@@ -72,7 +71,8 @@ impl From<(StationId, StationId)> for StationRange<Unverified> {
 /// 座位可用性映射类型
 ///
 /// 键为车站区间，值为该区间各座位类型的可用性信息
-pub type SeatAvailabilityMap = HashMap<StationRange<Verified>, HashMap<SeatType, SeatAvailability>>;
+pub type SeatAvailabilityMap =
+    HashMap<StationRange<Verified>, HashMap<SeatType, SeatAvailabilityId>>;
 
 /// 列车班次聚合根
 ///
@@ -99,7 +99,7 @@ pub struct TrainSchedule {
     train_id: TrainId,
     date: NaiveDate,
     route_id: RouteId,
-    seat_availability: SeatAvailabilityMap,
+    seat_availability_map: SeatAvailabilityMap,
 }
 
 impl Identifiable for TrainSchedule {
@@ -112,7 +112,6 @@ impl Identifiable for TrainSchedule {
     /// 设置班次ID并同步更新所有占用座位记录的train_schedule_id
     fn set_id(&mut self, id: Self::ID) {
         self.id = Some(id);
-        self.update_occupied_seat_train_schedule_id();
     }
 }
 
@@ -120,48 +119,6 @@ impl Entity for TrainSchedule {}
 impl Aggregate for TrainSchedule {}
 
 impl TrainSchedule {
-    fn seat_availability(
-        &self,
-        seat_type: &SeatType,
-        station_range: &StationRange<Verified>,
-    ) -> &SeatAvailability {
-        self.seat_availability
-            .get(station_range)
-            .expect("seat_availability should contain verified station range")
-            .get(seat_type)
-            .expect("seat_availability should contain verified seat type")
-    }
-
-    fn seat_availability_mut(
-        &mut self,
-        seat_type: &SeatType,
-        station_range: &StationRange<Verified>,
-    ) -> &mut SeatAvailability {
-        self.seat_availability
-            .get_mut(station_range)
-            .expect("seat_availability should contain verified station range")
-            .get_mut(seat_type)
-            .expect("seat_availability should contain verified seat type")
-    }
-
-    fn update_occupied_seat_train_schedule_id(&mut self) {
-        self.seat_availability
-            .values_mut()
-            .flat_map(|v| v.values_mut())
-            .flat_map(|x| x.occupied_seat.values_mut())
-            .for_each(|occupied_seat| {
-                occupied_seat.train_schedule_id = self.id;
-
-                if let Some(id) = occupied_seat.train_schedule_id {
-                    occupied_seat.id = Some(OccupiedSeatId::new(
-                        id,
-                        occupied_seat.seat_type_id,
-                        occupied_seat.seat.id,
-                    ));
-                }
-            });
-    }
-
     /// 创建新班次实例
     ///
     /// # Arguments
@@ -175,14 +132,13 @@ impl TrainSchedule {
         train_id: TrainId,
         date: NaiveDate,
         route_id: RouteId,
-        seat_availability: SeatAvailabilityMap,
     ) -> Self {
         Self {
             id,
             route_id,
             train_id,
             date,
-            seat_availability,
+            seat_availability_map: HashMap::new(),
         }
     }
 
@@ -201,118 +157,61 @@ impl TrainSchedule {
         self.date
     }
 
-    /// 获取座位占用条目的迭代器
-    pub fn occupied_entry_iter(&self) -> impl Iterator<Item = &OccupiedSeat> {
-        self.seat_availability
-            .values()
-            .flat_map(|x| x.values())
-            .flat_map(|x| x.occupied_seat.values())
-    }
-
-    /// 获取座位占用条目的数量
-    pub fn occupied_entry_len(&self) -> usize {
-        self.occupied_entry_iter().count()
-    }
-
-    /// 获取指定区间和座位类型的可用座位数
-    ///
-    /// # Note
-    /// 此函数只统计精确占用StationRange的座位数，更小和更大范围内占用的都**不会**被统计
-    pub fn available_seats_count(
-        &self,
-        seat_type: &SeatType,
-        station_range: &StationRange<Verified>,
-    ) -> Option<u32> {
-        Some(
-            self.seat_availability(seat_type, station_range)
-                .available_seats_count(),
-        )
-    }
-
-    pub fn seat_type(&self) -> Vec<SeatType> {
-        self.seat_availability
-            .values()
-            .next()
-            .expect("SeatAvailabilityMap should have at least one element")
-            .keys()
-            .cloned()
-            .collect()
-    }
-
-    pub fn get_seat_status_by_id(
-        &self,
-        station_range: &StationRange<Verified>,
-        seat_id: SeatId,
-    ) -> SeatStatus {
-        match self
-            .seat_availability
-            .get(station_range)
-            .expect("seat_availability should contain verified station range")
-            .values()
-            .flat_map(|x| x.occupied_seat.keys())
-            .any(|e| *e == seat_id)
-        {
-            true => SeatStatus::Occupied,
-            false => SeatStatus::Available,
-        }
-    }
-
-    /// 添加座位占用记录
-    ///
-    /// # Note
-    /// - 若座位已被占用，将替换原有记录
-    /// - 此函数只精确占用StationRange，更小和更大范围都**不会**被自动标记占用
-    pub fn add_occupied_seat(
+    pub fn add_seat_availability(
         &mut self,
-        station_range: &StationRange<Verified>,
-        seat: Seat,
-        passenger_id: PersonalInfoId,
+        station_range: StationRange<Verified>,
+        seat_type: SeatType,
+        seat_availability_id: SeatAvailabilityId,
     ) {
-        let seat_type = &seat.seat_type;
-
-        let train_schedule_id = self.id;
-
-        self.seat_availability_mut(seat_type, station_range)
-            .add_occupied_seat(train_schedule_id, seat, passenger_id)
-    }
-
-    /// 移除座位占用记录
-    ///
-    /// # Note
-    /// 若对应ID的座位未被占有，则不执行任何操作
-    pub fn remove_occupied_seat(&mut self, station_range: &StationRange<Verified>, seat: Seat) {
-        let seat_type = &seat.seat_type;
-
-        self.seat_availability_mut(seat_type, station_range)
-            .remove_occupied_seat(seat);
-    }
-
-    pub fn into_seat_availability(self) -> Vec<SeatAvailability> {
-        self.seat_availability
-            .into_values()
-            .flat_map(|x| x.into_values())
-            .collect()
+        self.seat_availability_map
+            .entry(station_range)
+            .or_default()
+            .insert(seat_type, seat_availability_id);
     }
 }
+
+define_id_type!(SeatAvailability);
 
 /// 座位可用性信息
 ///
 /// 记录特定区间内某类座位的占用情况
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeatAvailability {
+    id: Option<SeatAvailabilityId>,
+    train_schedule_id: TrainScheduleId,
     seat_type: SeatType,
-    from_station: StationId,
-    to_station: StationId,
+    station_range: StationRange<Verified>,
     occupied_seat: HashMap<SeatId, OccupiedSeat>,
 }
 
+impl Identifiable for SeatAvailability {
+    type ID = SeatAvailabilityId;
+
+    fn get_id(&self) -> Option<Self::ID> {
+        self.id
+    }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id)
+    }
+}
+
+impl Entity for SeatAvailability {}
+impl Aggregate for SeatAvailability {}
+
 impl SeatAvailability {
     /// 创建新的座位可用性记录
-    pub fn new(seat_type: SeatType, station_range: StationRange<Verified>) -> Self {
+    pub fn new(
+        id: Option<SeatAvailabilityId>,
+        train_schedule_id: TrainScheduleId,
+        seat_type: SeatType,
+        station_range: StationRange<Verified>,
+    ) -> Self {
         Self {
+            id,
+            train_schedule_id,
             seat_type,
-            from_station: station_range.get_from_station_id(),
-            to_station: station_range.get_to_station_id(),
+            station_range,
             occupied_seat: HashMap::new(),
         }
     }
@@ -326,18 +225,11 @@ impl SeatAvailability {
     ///
     /// # Note
     /// - 若座位已被占用，将替换原有记录
-    pub fn add_occupied_seat(
-        &mut self,
-        train_schedule_id: Option<TrainScheduleId>,
-        seat: Seat,
-        passenger_id: PersonalInfoId,
-    ) {
+    pub fn add_occupied_seat(&mut self, seat: Seat, passenger_id: PersonalInfoId) {
         self.occupied_seat.insert(
             seat.id,
             OccupiedSeat::new(
-                train_schedule_id,
-                self.seat_type.get_id().expect("seat_type_id should be set"),
-                StationRange::from_unchecked(self.from_station, self.to_station),
+                self.id.expect("seat_availability.id should be set"),
                 seat,
                 passenger_id,
             ),
@@ -352,6 +244,10 @@ impl SeatAvailability {
         self.occupied_seat.remove(&seat.id);
     }
 
+    pub fn train_schedule_id(&self) -> TrainScheduleId {
+        self.train_schedule_id
+    }
+
     /// 获取该信息对应的座位类型
     pub fn seat_type(&self) -> &SeatType {
         &self.seat_type
@@ -359,7 +255,11 @@ impl SeatAvailability {
 
     /// 获取该信息对应的车站区间
     pub fn station_range(&self) -> StationRange<Verified> {
-        StationRange::from_unchecked(self.from_station, self.to_station)
+        self.station_range
+    }
+
+    pub fn occupied_seat(&self) -> &HashMap<SeatId, OccupiedSeat> {
+        &self.occupied_seat
     }
 
     pub fn into_occupied_seat(self) -> HashMap<SeatId, OccupiedSeat> {
@@ -370,8 +270,7 @@ impl SeatAvailability {
 /// 已占用座位ID复合标识符
 ///
 /// 由三个部分组成：
-/// - 班次ID：标识所属的列车班次
-/// - 座位类型ID：标识座位类型
+/// - 座位可用性实体ID：标识所属的列车班次、位置、座位类型、车站区间
 /// - 座位ID：标识具体座位
 ///
 /// # 复合键设计
@@ -381,8 +280,7 @@ impl SeatAvailability {
 /// - 精确查找特定座位状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OccupiedSeatId {
-    train_schedule_id: TrainScheduleId,
-    seat_type_id: SeatTypeId,
+    seat_availability_id: SeatAvailabilityId,
     seat_id: SeatId,
 }
 
@@ -390,29 +288,17 @@ impl OccupiedSeatId {
     /// 创建新的占用座位ID
     ///
     /// # Arguments
-    /// * `train_schedule_id`: 关联的班次ID
-    /// * `seat_type_id`: 座位类型ID
+    /// * `seat_availability_id`: 关联的座位可用性实体ID
     /// * `seat_id`: 具体座位ID
-    pub fn new(
-        train_schedule_id: TrainScheduleId,
-        seat_type_id: SeatTypeId,
-        seat_id: SeatId,
-    ) -> Self {
+    pub fn new(seat_availability_id: SeatAvailabilityId, seat_id: SeatId) -> Self {
         Self {
-            train_schedule_id,
-            seat_type_id,
+            seat_availability_id,
             seat_id,
         }
     }
 
-    /// 获取关联班次ID
-    pub fn train_schedule_id(&self) -> TrainScheduleId {
-        self.train_schedule_id
-    }
-
-    /// 获取座位类型ID
-    pub fn seat_type_id(&self) -> SeatTypeId {
-        self.seat_type_id
+    pub fn seat_availability_id(&self) -> SeatAvailabilityId {
+        self.seat_availability_id
     }
 
     /// 获取具体座位ID
@@ -431,10 +317,7 @@ impl Identifier for OccupiedSeatId {}
 /// - 座位详细信息
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OccupiedSeat {
-    id: Option<OccupiedSeatId>,
-    train_schedule_id: Option<TrainScheduleId>,
-    seat_type_id: SeatTypeId,
-    station_range: StationRange<Verified>,
+    id: OccupiedSeatId,
     seat: Seat,
     passenger_id: PersonalInfoId,
 }
@@ -443,11 +326,11 @@ impl Identifiable for OccupiedSeat {
     type ID = OccupiedSeatId;
 
     fn get_id(&self) -> Option<Self::ID> {
-        self.id
+        Some(self.id)
     }
 
     fn set_id(&mut self, id: Self::ID) {
-        self.id = Some(id)
+        self.id = id
     }
 }
 
@@ -467,20 +350,14 @@ impl OccupiedSeat {
     /// 当`train_schedule_id`为None时，ID将无法生成
     /// 在班次插入数据库时，其ID生成，并自动更新关联占用记录的ID
     pub fn new(
-        train_schedule_id: Option<TrainScheduleId>,
-        seat_type_id: SeatTypeId,
-        station_range: StationRange<Verified>,
+        seat_availability_id: SeatAvailabilityId,
         seat: Seat,
         passenger_id: PersonalInfoId,
     ) -> Self {
-        let id = train_schedule_id
-            .map(|train_schedule_id| OccupiedSeatId::new(train_schedule_id, seat_type_id, seat.id));
+        let id = OccupiedSeatId::new(seat_availability_id, seat.id);
 
         Self {
             id,
-            train_schedule_id,
-            seat_type_id,
-            station_range,
             seat,
             passenger_id,
         }
@@ -494,14 +371,6 @@ impl OccupiedSeat {
     /// 获取乘客信息ID
     pub fn passenger_id(&self) -> PersonalInfoId {
         self.passenger_id
-    }
-
-    /// 获取占用区间
-    ///
-    /// # Returns
-    /// 返回已验证的车站区间（出发站→到达站）
-    pub fn station_range(&self) -> StationRange<Verified> {
-        self.station_range
     }
 }
 
@@ -538,12 +407,17 @@ impl Identifiable for Seat {
 
 impl Seat {
     /// 创建新座位实例
-    pub fn new(id: SeatId, seat_type: SeatType, info: SeatLocationInfo) -> Self {
+    pub fn new(
+        id: SeatId,
+        seat_type: SeatType,
+        info: SeatLocationInfo,
+        status: SeatStatus,
+    ) -> Self {
         Self {
             id,
             seat_type,
             info,
-            status: SeatStatus::Available,
+            status,
         }
     }
 
