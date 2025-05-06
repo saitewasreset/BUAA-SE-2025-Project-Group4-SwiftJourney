@@ -1,3 +1,28 @@
+//! 交易仓储实现模块
+//!
+//! 本模块提供了交易(Transaction)和订单(Order)的数据库仓储实现，负责处理交易数据的持久化操作。
+//!
+//! ## 主要功能
+//! - 交易记录的CRUD操作
+//! - 关联订单(火车票、酒店、餐饮、外卖)的批量处理
+//! - 用户余额查询
+//! - 数据转换(领域模型 ↔ 数据库模型)
+//!
+//! ## 模块结构
+//! - `TransactionRepositoryImpl`: 交易仓储主实现
+//! - `OrderDataConverter`: 订单数据转换器
+//! - `TransactionDataConverter`: 交易数据转换器
+//! - 各种数据包结构体: 用于批量处理相关数据
+//!
+//! ## 数据库表关系
+//! - 交易表(transaction)为主表
+//! - 订单表(train_order/hotel_order/dish_order/takeaway_order)为从表
+//! - 通过外键关联(pay_transaction_id/refund_transaction_id)
+//!
+//! ## 注意事项
+//! - 所有操作都在数据库事务中执行以保证数据一致性
+//! - 使用聚合管理器跟踪变更
+//! - 支持四种订单类型的混合处理
 use crate::domain::model::dish::DishId;
 use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomId};
 use crate::domain::model::order::{
@@ -33,8 +58,15 @@ use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
 
+/// 订单数据转换器
+///
+/// 提供订单模型在领域对象和数据库对象之间的转换功能
+/// 支持四种订单类型: 火车票、酒店、火车餐、外卖
 pub struct OrderDataConverter;
 
+/// 火车票订单数据包
+///
+/// 包含火车票订单模型及其关联的座位类型和座位映射数据
 pub struct TrainOrderDoPack {
     train_order: crate::models::train_order::Model,
     /// 座位类型字典(seat_type_id → 模型)
@@ -44,6 +76,16 @@ pub struct TrainOrderDoPack {
 }
 
 impl OrderDataConverter {
+    /// 从数据库模型创建火车票订单领域对象
+    ///
+    /// # Arguments
+    /// * `train_order_do_pack` - 包含火车票订单及相关数据的包
+    ///
+    /// # Returns
+    /// 返回转换后的`TrainOrder`结果
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do_train(
         train_order_do_pack: TrainOrderDoPack,
     ) -> Result<TrainOrder, anyhow::Error> {
@@ -144,6 +186,13 @@ impl OrderDataConverter {
         ))
     }
 
+    /// 将火车票订单领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// * `train_order` - 要转换的火车票订单
+    ///
+    /// # Returns
+    /// 返回转换后的数据库活动模型
     pub fn transform_to_do_train(
         train_order: TrainOrder,
     ) -> crate::models::train_order::ActiveModel {
@@ -206,6 +255,16 @@ impl OrderDataConverter {
         model
     }
 
+    /// 从数据库模型创建酒店订单领域对象
+    ///
+    /// # Arguments
+    /// * `hotel_order_do` - 包含酒店订单及相关数据的包
+    ///
+    /// # Returns
+    /// 返回转换后的`HotelOrder`结果
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do_hotel(
         hotel_order_do: crate::models::hotel_order::Model,
     ) -> Result<HotelOrder, anyhow::Error> {
@@ -258,6 +317,13 @@ impl OrderDataConverter {
         ))
     }
 
+    /// 将酒店订单领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// * `hotel_order` - 要转换的酒店订单
+    ///
+    /// # Returns
+    /// 返回转换后的数据库活动模型
     pub fn transform_to_do_hotel(
         hotel_order: HotelOrder,
     ) -> crate::models::hotel_order::ActiveModel {
@@ -296,6 +362,16 @@ impl OrderDataConverter {
         model
     }
 
+    /// 从数据库模型创建火车餐订单领域对象
+    ///
+    /// # Arguments
+    /// * `dish_order_do` - 包含火车餐订单及相关数据的包
+    ///
+    /// # Returns
+    /// 返回转换后的`DishOrder`结果
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do_dish(
         dish_order_do: crate::models::dish_order::Model,
     ) -> Result<DishOrder, anyhow::Error> {
@@ -346,6 +422,13 @@ impl OrderDataConverter {
         ))
     }
 
+    /// 将火车餐订单领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// * `dish_order` - 要转换的火车餐订单
+    ///
+    /// # Returns
+    /// 返回转换后的数据库活动模型
     pub fn transform_to_do_dish(dish_order: DishOrder) -> crate::models::dish_order::ActiveModel {
         let mut model = crate::models::dish_order::ActiveModel {
             id: ActiveValue::NotSet,
@@ -381,6 +464,16 @@ impl OrderDataConverter {
         model
     }
 
+    /// 从数据库模型创建外卖订单领域对象
+    ///
+    /// # Arguments
+    /// * `takeaway_order_do` - 包含外卖订单及相关数据的包
+    ///
+    /// # Returns
+    /// 返回转换后的`TakeawayOrder`结果
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do_takeaway(
         takeaway_order_do: crate::models::takeaway_order::Model,
     ) -> Result<TakeawayOrder, anyhow::Error> {
@@ -433,6 +526,13 @@ impl OrderDataConverter {
         ))
     }
 
+    /// 将外卖订单领域对象转换为数据库模型
+    ///
+    /// # Arguments
+    /// * `takeaway_order` - 要转换的外卖订单
+    ///
+    /// # Returns
+    /// 返回转换后的数据库活动模型
     pub fn transform_to_do_takeaway(
         takeaway_order: TakeawayOrder,
     ) -> crate::models::takeaway_order::ActiveModel {
@@ -473,8 +573,14 @@ impl OrderDataConverter {
     }
 }
 
+/// 交易数据转换器
+///
+/// 提供交易模型在领域对象和数据库对象之间的转换功能
 pub struct TransactionDataConverter;
 
+/// 订单数据包
+///
+/// 包含四种类型的订单列表，用于批量处理
 pub struct OrderPack {
     pub train_orders: Vec<TrainOrder>,
     pub hotel_orders: Vec<HotelOrder>,
@@ -610,12 +716,16 @@ impl OrderPack {
 }
 
 impl_db_id_from_u64!(TransactionId, i32, "transaction id");
-
+/// 交易数据包
+///
+/// 包含交易模型及其关联的订单数据包
 pub struct TransactionDoPack {
     pub transaction: crate::models::transaction::Model,
     pub orders: OrderPack,
 }
-
+/// 订单数据库活动模型包
+///
+/// 包含四种类型订单的数据库活动模型列表
 pub struct OrderActiveModelPack {
     pub train_orders: Vec<crate::models::train_order::ActiveModel>,
     pub hotel_orders: Vec<crate::models::hotel_order::ActiveModel>,
@@ -806,12 +916,25 @@ impl OrderDoPack {
     }
 }
 
+/// 交易数据库活动模型包
+///
+/// 包含交易及其订单的数据库活动模型
 pub struct TransactionActiveModelPack {
     pub transaction: crate::models::transaction::ActiveModel,
     pub orders: OrderActiveModelPack,
 }
 
 impl TransactionDataConverter {
+    /// 从数据库模型创建交易领域对象
+    ///
+    /// # Arguments
+    /// * `transaction_do_pack` - 包含交易及相关订单数据的包
+    ///
+    /// # Returns
+    /// 返回转换后的`Transaction`结果
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do(
         transaction_do_pack: TransactionDoPack,
     ) -> Result<Transaction, anyhow::Error> {
@@ -835,6 +958,13 @@ impl TransactionDataConverter {
         ))
     }
 
+    /// 将交易领域对象转换为数据库模型(仅交易部分)
+    ///
+    /// # Arguments
+    /// * `transaction` - 要转换的交易对象
+    ///
+    /// # Returns
+    /// 返回交易部分的数据库活动模型
     pub fn transform_to_do_transaction_only(
         transaction: &Transaction,
     ) -> crate::models::transaction::ActiveModel {
@@ -857,6 +987,13 @@ impl TransactionDataConverter {
         transaction_model
     }
 
+    /// 将完整交易领域对象转换为数据库模型包
+    ///
+    /// # Arguments
+    /// * `transaction` - 要转换的完整交易对象
+    ///
+    /// # Returns
+    /// 返回包含交易和订单的数据库活动模型包
     pub fn transform_to_do(transaction: Transaction) -> TransactionActiveModelPack {
         let transaction_model =
             TransactionDataConverter::transform_to_do_transaction_only(&transaction);
@@ -870,6 +1007,10 @@ impl TransactionDataConverter {
     }
 }
 
+/// 交易仓储实现
+///
+/// 实现`TransactionRepository`和`DbRepositorySupport` trait
+/// 使用SeaORM进行数据库操作，支持事务和聚合管理
 pub struct TransactionRepositoryImpl {
     db: DatabaseConnection,
     aggregate_manager: Arc<Mutex<AggregateManagerImpl<Transaction>>>,
@@ -921,6 +1062,13 @@ fn is_order_equal(a: &dyn Order, b: &dyn Order) -> bool {
 }
 
 impl TransactionRepositoryImpl {
+    /// 创建新的交易仓储实例
+    ///
+    /// # Arguments
+    /// * `db` - 数据库连接
+    ///
+    /// # Returns
+    /// 返回新创建的仓储实例
     pub fn new(db: DatabaseConnection) -> Self {
         let detect_change_fn = |diff: DiffInfo<Transaction>| {
             let mut result = MultiEntityDiff::new();

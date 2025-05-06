@@ -1,3 +1,25 @@
+//! 座位可用性仓储实现模块
+//!
+//! 本模块提供座位可用性(`SeatAvailability`)及其相关实体(如`OccupiedSeat`)的数据库持久化实现。
+//! 主要功能包括：
+//! - 座位可用性记录的CRUD操作
+//! - 已占用座位记录的CRUD操作
+//! - 座位类型和位置映射的关联查询
+//! - 聚合根变更检测与同步
+//!
+//! 模块使用SeaORM作为ORM框架，通过事务保证数据一致性。
+//!
+//! # 主要结构体
+//! - [`SeatAvailabilityRepositoryImpl`][]: 座位可用性资源库实现
+//! - [`SeatAvailabilityDataConverter`][]: 座位可用性数据转换器
+//! - [`OccupiedSeatDataConverter`][]: 已占用座位数据转换器
+//!
+//! # 数据模型
+//! 模块涉及以下数据库表：
+//! - `seat_availability`: 座位可用性主表
+//! - `occupied_seat`: 已占用座位表
+//! - `seat_type`: 座位类型表
+//! - `seat_type_mapping`: 座位类型映射表
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::{SeatType, SeatTypeId, SeatTypeName};
@@ -18,10 +40,19 @@ use std::sync::{Arc, Mutex};
 
 impl_db_id_from_u64!(SeatAvailabilityId, i32, "seat availability");
 
+/// 座位可用性数据转换器
+///
+/// 负责`SeatAvailability`领域对象与数据库模型之间的转换
 pub struct SeatAvailabilityDataConverter;
 
+/// 已占用座位数据转换器
+///
+/// 负责`OccupiedSeat`领域对象与数据库模型之间的转换
 pub struct OccupiedSeatDataConverter;
 
+/// 座位可用性数据库模型包
+///
+/// 包含从数据库查询出的相关模型数据，用于构建领域对象
 struct SeatAvailabilityDoPack {
     seat_availability: crate::models::seat_availability::Model,
     /// 已占用座位列表
@@ -32,12 +63,28 @@ struct SeatAvailabilityDoPack {
     seat_type_mapping: HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
 }
 
+/// 座位可用性活动模型包
+///
+/// 包含准备写入数据库的活动模型数据
 struct SeatAvailabilityActiveModelPack {
     seat_availability: crate::models::seat_availability::ActiveModel,
     occupied_seat: Vec<crate::models::occupied_seat::ActiveModel>,
 }
 
 impl OccupiedSeatDataConverter {
+    /// 从数据库模型创建领域对象
+    ///
+    /// # Arguments
+    /// * `occupied_seat_do` - 数据库中的已占用座位记录
+    /// * `seat_availability` - 关联的座位可用性记录
+    /// * `seat_type` - 座位类型字典
+    /// * `seat_type_mapping` - 座位位置映射字典
+    ///
+    /// # Returns
+    /// 返回转换后的`OccupiedSeat`领域对象
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     pub fn make_from_do(
         occupied_seat_do: crate::models::occupied_seat::Model,
         seat_availability: &crate::models::seat_availability::Model,
@@ -93,6 +140,13 @@ impl OccupiedSeatDataConverter {
         ))
     }
 
+    /// 将领域对象转换为数据库活动模型
+    ///
+    /// # Arguments
+    /// * `occupied_seat` - 要转换的已占用座位领域对象
+    ///
+    /// # Returns
+    /// 返回可用于数据库操作的ActiveModel
     pub fn transform_to_do(
         occupied_seat: OccupiedSeat,
     ) -> crate::models::occupied_seat::ActiveModel {
@@ -111,6 +165,16 @@ impl OccupiedSeatDataConverter {
 }
 
 impl SeatAvailabilityDataConverter {
+    /// 从数据库模型包创建座位可用性领域对象
+    ///
+    /// # Arguments
+    /// * `seat_availability_do_pack` - 包含所有相关数据的模型包
+    ///
+    /// # Returns
+    /// 返回转换后的`SeatAvailability`领域对象
+    ///
+    /// # Errors
+    /// 当数据不一致或转换失败时返回错误
     fn make_from_do(
         seat_availability_do_pack: SeatAvailabilityDoPack,
     ) -> Result<SeatAvailability, anyhow::Error> {
@@ -177,6 +241,13 @@ impl SeatAvailabilityDataConverter {
         ))
     }
 
+    /// 将座位可用性领域对象转换为仅包含可用性数据的数据库活动模型
+    ///
+    /// # Arguments
+    /// * `seat_availability` - 要转换的座位可用性领域对象
+    ///
+    /// # Returns
+    /// 返回仅包含座位可用性数据的ActiveModel
     fn transform_to_do_availability_only(
         seat_availability: &SeatAvailability,
     ) -> crate::models::seat_availability::ActiveModel {
@@ -214,6 +285,15 @@ impl SeatAvailabilityDataConverter {
         seat_availability_active_model
     }
 
+    /// 将座位可用性领域对象完整转换为数据库活动模型包
+    ///
+    /// 包含座位可用性主记录和所有关联的已占用座位记录
+    ///
+    /// # Arguments
+    /// * `seat_availability` - 要转换的座位可用性领域对象
+    ///
+    /// # Returns
+    /// 返回包含所有相关数据的ActiveModel包
     fn transform_to_do(seat_availability: SeatAvailability) -> SeatAvailabilityActiveModelPack {
         let seat_availability_active_model =
             SeatAvailabilityDataConverter::transform_to_do_availability_only(&seat_availability);
@@ -231,6 +311,12 @@ impl SeatAvailabilityDataConverter {
     }
 }
 
+/// 座位可用性仓储实现
+///
+/// 提供座位可用性聚合根的持久化操作，包括：
+/// - 创建、查询、更新、删除座位可用性记录
+/// - 管理已占用座位记录的变更
+/// - 通过事务保证数据一致性
 pub struct SeatAvailabilityRepositoryImpl {
     db: DatabaseConnection,
     aggregate_manager: Arc<Mutex<AggregateManagerImpl<SeatAvailability>>>,
