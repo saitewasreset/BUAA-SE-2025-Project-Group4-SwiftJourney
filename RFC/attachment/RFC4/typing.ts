@@ -203,7 +203,9 @@ interface OrderInfo {
   orderId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
   status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
-  // 订单金额
+  // 订单单价
+  unitPrice: number;
+  // 订单数量
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish" | "takeaway";
@@ -212,7 +214,6 @@ interface OrderInfo {
   // 人类可读的不能取消订单的原因（若适用）
   reason?: string;
 }
-
 
 interface SeatLocationInfo {
   // 车厢号，例如：“03 车 12A 二等座”中的“3”
@@ -241,7 +242,7 @@ interface HotelOrderInfo extends OrderInfo {
   hotelName: string;
   // 酒店 UUID
   hotelId: string;
-  // 旅客姓名
+  // 订房人姓名
   name: string;
   // 人类可读的房间类型，例如：“大床房”
   roomType: string;
@@ -379,8 +380,10 @@ interface HotelOrderRequest {
   // 离开日期
   endDate?: string;
 
-  // 旅客 UUID（见`PersonalInfo`）
+  // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
+  // 预订数量
+  amount: number;
 }
 
 interface HotelCommentQuota {
