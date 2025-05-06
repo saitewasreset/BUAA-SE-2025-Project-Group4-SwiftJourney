@@ -64,6 +64,18 @@ impl From<OrderStatus> for &'static str {
     }
 }
 
+impl From<&OrderStatus> for &'static str {
+    fn from(value: &OrderStatus) -> Self {
+        (*value).into()
+    }
+}
+
+impl std::fmt::Display for OrderStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", <&OrderStatus as Into<&'static str>>::into(self))
+    }
+}
+
 define_id_type!(Order);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
