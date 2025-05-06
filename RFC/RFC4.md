@@ -1,9 +1,14 @@
 # Request For Comments 4: API 文档
 
-Version: 6 (2025-05-03 10:37:00)
+Version: 7 (2025-05-06 15:05:00)
 
 最近变更：
 
+- Version 7
+  - 订单信息：拆分总价为单价和数量
+  - 酒店订单：修改“旅客姓名”为“订房人姓名”
+  - 外卖订单：新增用餐时间
+  - 酒店预订：新增预订数量
 - Version 6
   - 新增：城市信息
 - Version 5
@@ -908,7 +913,9 @@ interface OrderInfo {
   orderId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
   status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
-  // 订单金额
+  // 订单单价
+  unitPrice: number;
+  // 订单数量
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish" | "takeaway";
@@ -945,7 +952,7 @@ interface HotelOrderInfo extends OrderInfo {
   hotelName: string;
   // 酒店 UUID
   hotelId: string;
-  // 旅客姓名
+  // 订房人姓名
   name: string;
   // 人类可读的房间类型，例如：“大床房”
   roomType: string;
@@ -1232,8 +1239,10 @@ interface HotelOrderRequest {
   // 离开日期
   endDate?: string;
 
-  // 旅客 UUID（见`PersonalInfo`）
+  // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
+  // 预订数量
+  amount: number;
 }
 ```
 
@@ -1521,6 +1530,8 @@ interface DishOrder {
 interface TakeawayOrder {
   // 车站名称
   station: string;
+  // 用餐时间（到达station的时间）
+  arrivalTime: string;
   // 店铺名称
   shopName: string;
   // 餐品名称
