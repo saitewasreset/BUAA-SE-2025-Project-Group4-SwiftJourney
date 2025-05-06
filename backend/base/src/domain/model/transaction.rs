@@ -1,3 +1,21 @@
+//! # 交易实体模块
+//!
+//! 该模块定义了火车票订购系统中的交易相关实体数据结构及其相关操作。主要包含以下内容：
+//!
+//! - `TransactionStatus`: 枚举类型，表示交易的状态。
+//! - `TransactionStatusError`: 枚举类型，表示交易状态错误。
+//! - `TransactionAmountError`: 枚举类型，表示交易金额错误。
+//! - `TransactionError`: 枚举类型，表示交易错误。
+//! - `RefundError`: 枚举类型，表示退款错误。
+//! - `TransactionAmountAbs`: 结构体，表示交易金额的绝对值。
+//! - `Transaction`: 结构体，表示交易实体。
+//!
+//! ## 关于交易和订单的约定
+//!
+//! - 一笔订单明确对应一个服务，例如：一张火车票、一个房间预订、一份火车餐。
+//! - 交易对应一笔支付，一个交易可包含多个订单，例如：添加多个乘车人后点击“预订”，产生多个订单，但只有一个交易；交易有“未支付”、“已支付”两种状态。
+//! - 只能取消“订单”，而不能直接取消“交易”。若需“取消”交易，需通过退款交易实现。
+//! - 取消订单、失败订单的退款通过新的退款交易返还，原始支付交易不变。
 use crate::domain::model::order::{Order, OrderStatus};
 use crate::domain::model::user::UserId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
@@ -9,12 +27,18 @@ use std::fmt::{Display, Formatter};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// 枚举类型，表示交易的状态。
+///
+/// 主要包含以下状态：
+/// - `Unpaid`: 交易尚未支付。
+/// - `Paid`: 交易已支付。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TransactionStatus {
     Unpaid,
     Paid,
 }
 
+/// 枚举类型，表示交易状态错误。
 #[derive(Error, Debug)]
 pub enum TransactionStatusError {
     #[error("Invalid transaction status: {0}")]
@@ -31,6 +55,10 @@ impl Display for TransactionStatus {
 }
 
 impl From<TransactionStatus> for &'static str {
+    /// 将 `TransactionStatus` 枚举类型转换为字符串。
+    ///
+    /// Returns:
+    /// - 对应的字符串。
     fn from(status: TransactionStatus) -> Self {
         match status {
             TransactionStatus::Unpaid => "Unpaid",
@@ -42,6 +70,14 @@ impl From<TransactionStatus> for &'static str {
 impl TryFrom<&str> for TransactionStatus {
     type Error = &'static str;
 
+    /// 将字符串尝试转换为 `TransactionStatus` 枚举类型。
+    ///
+    /// Arguments:
+    /// - `value`: 要转换的字符串。
+    ///
+    /// Returns:
+    /// - 成功时返回 `TransactionStatus` 枚举类型。
+    /// - 失败时返回错误字符串。
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "Unpaid" => Ok(TransactionStatus::Unpaid),
@@ -53,6 +89,17 @@ impl TryFrom<&str> for TransactionStatus {
 
 define_id_type!(Transaction);
 
+/// 结构体，表示交易实体。
+///
+/// 包含以下字段：
+/// - `transaction_id`: 交易的唯一标识符，可以为空。
+/// - `uuid`: 交易的 UUID。
+/// - `create_time`: 交易创建时间。
+/// - `finish_time`: 交易完成时间，可能为空。
+/// - `amount`: 交易金额。
+/// - `status`: 交易状态。
+/// - `user_id`: 用户的唯一标识符。
+/// - `orders`: 交易包含的订单列表。
 #[derive(Debug, Clone)]
 pub struct Transaction {
     transaction_id: Option<TransactionId>,
@@ -81,12 +128,13 @@ impl Entity for Transaction {}
 
 impl Aggregate for Transaction {}
 
+/// 枚举类型，表示交易金额错误。
 #[derive(Error, Debug)]
 pub enum TransactionAmountError {
     #[error("Invalid negative transaction amount: {0}")]
     NegativeValue(Decimal),
 }
-
+/// 枚举类型，表示交易错误。
 #[derive(Error, Debug)]
 pub enum TransactionError {
     #[error("Transaction already paid: {0}")]
@@ -95,6 +143,7 @@ pub enum TransactionError {
     RefundError(#[from] RefundError),
 }
 
+/// 枚举类型，表示退款错误。
 #[derive(Error, Debug)]
 pub enum RefundError {
     #[error("transaction not paid: {0}")]
@@ -107,16 +156,31 @@ pub enum RefundError {
     AlreadyRefunded(Vec<Uuid>),
 }
 
+/// 结构体，表示交易金额的绝对值。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TransactionAmountAbs(Decimal);
 
 impl From<Decimal> for TransactionAmountAbs {
+    /// 将 `Decimal` 类型转换为 `TransactionAmountAbs`。
+    ///
+    /// Arguments:
+    /// - `value`: 要转换的 `Decimal` 值。
+    ///
+    /// Returns:
+    /// - `TransactionAmountAbs` 实例。
     fn from(value: Decimal) -> Self {
         Self(value.abs())
     }
 }
 
 impl From<TransactionAmountAbs> for Decimal {
+    /// 将 `TransactionAmountAbs` 转换为 `Decimal`。
+    ///
+    /// Arguments:
+    /// - `value`: 要转换的 `TransactionAmountAbs` 实例。
+    ///
+    /// Returns:
+    /// - `Decimal` 值。
     fn from(value: TransactionAmountAbs) -> Self {
         value.0
     }
@@ -129,12 +193,24 @@ impl Display for TransactionAmountAbs {
 }
 
 impl Transaction {
+    /// 获取当前系统时间并返回带有时区的时间。
+    ///
+    /// Returns:
+    /// - 当前系统时间，带有时区。
     fn now() -> DateTimeWithTimeZone {
         let local_now = Local::now();
         let offset = *local_now.offset(); // 获取系统当前时区偏移
         local_now.with_timezone(&offset)
     }
 
+    /// 创建一个新的充值交易实例。
+    ///
+    /// Arguments:
+    /// - `user_id`: 用户的唯一标识符。
+    /// - `recharge_amount`: 充值金额的绝对值。
+    ///
+    /// Returns:
+    /// - 新创建的充值交易实例。
     pub fn new_recharge(user_id: UserId, recharge_amount: TransactionAmountAbs) -> Transaction {
         Transaction {
             transaction_id: None,
@@ -148,6 +224,14 @@ impl Transaction {
         }
     }
 
+    /// 创建一个新的交易实例。
+    ///
+    /// Arguments:
+    /// - `user_id`: 用户的唯一标识符。
+    /// - `orders`: 交易包含的订单列表。
+    ///
+    /// Returns:
+    /// - 新创建的交易实例。
     pub fn new(user_id: UserId, orders: Vec<Box<dyn Order>>) -> Transaction {
         let total_amount = orders
             .iter()
@@ -166,6 +250,20 @@ impl Transaction {
         }
     }
 
+    /// 创建一个新的完整交易实例。
+    ///
+    /// Arguments:
+    /// - `transaction_id`: 交易的唯一标识符，可以为空。
+    /// - `uuid`: 交易的 UUID。
+    /// - `create_time`: 交易创建时间。
+    /// - `finish_time`: 交易完成时间，可能为空。
+    /// - `amount`: 交易金额。
+    /// - `status`: 交易状态。
+    /// - `user_id`: 用户的唯一标识符。
+    /// - `orders`: 交易包含的订单列表。
+    ///
+    /// Returns:
+    /// - 新创建的完整交易实例。
     pub fn new_full(
         transaction_id: Option<TransactionId>,
         uuid: Uuid,
@@ -188,7 +286,14 @@ impl Transaction {
         }
     }
 
-    // 注意：不会检查用户是否有足够的余额
+    /// 标记交易为已支付。
+    ///
+    /// Returns:
+    /// - 成功时返回 `Ok(())`。
+    /// - 失败时返回 `TransactionError`。
+    ///
+    /// Notes:
+    /// 不会检查用户是否有足够的余额
     pub fn pay(&mut self) -> Result<(), TransactionError> {
         if self.status == TransactionStatus::Paid {
             return Err(TransactionError::AlreadyPaid(self.uuid));
@@ -200,6 +305,11 @@ impl Transaction {
         Ok(())
     }
 
+    /// 创建一个新的退款交易实例。
+    ///
+    /// Returns:
+    /// - 成功时返回新的退款交易实例。
+    /// - 失败时返回 `RefundError`。
     pub fn refund_transaction(&mut self) -> Result<Transaction, RefundError> {
         if self.amount.is_sign_negative() {
             return Err(RefundError::RechargeTransaction(self.uuid));
@@ -210,7 +320,17 @@ impl Transaction {
         self.refund_transaction_partial(&to_refund_order_list)
     }
 
-    // 调用者需要保证传入的订单是当前交易的订单
+    /// 创建一个新的部分退款交易实例。
+    ///
+    /// Arguments:
+    /// - `to_refund_orders`: 要退款的订单列表。
+    ///
+    /// Returns:
+    /// - 成功时返回新的部分退款交易实例。
+    /// - 失败时返回 `RefundError`。
+    ///
+    /// Notes:
+    /// 调用者需要保证传入的订单是当前交易的订单
     pub fn refund_transaction_partial(
         &mut self,
         to_refund_orders: &[Box<dyn Order>],
@@ -268,34 +388,66 @@ impl Transaction {
         })
     }
 
+    /// 获取交易的 UUID。
+    ///
+    /// Returns:
+    /// - 交易的 UUID。
     pub fn uuid(&self) -> Uuid {
         self.uuid
     }
 
+    /// 获取交易创建时间。
+    ///
+    /// Returns:
+    /// - 交易创建时间。
     pub fn create_time(&self) -> DateTimeWithTimeZone {
         self.create_time
     }
 
+    /// 获取交易完成时间。
+    ///
+    /// Returns:
+    /// - 交易完成时间，可能为空。
     pub fn finish_time(&self) -> Option<DateTimeWithTimeZone> {
         self.finish_time
     }
 
+    /// 获取交易金额。
+    ///
+    /// Returns:
+    /// - 交易金额。
     pub fn raw_amount(&self) -> Decimal {
         self.amount
     }
 
+    /// 获取用户的唯一标识符。
+    ///
+    /// Returns:
+    /// - 用户的唯一标识符。
     pub fn user_id(&self) -> UserId {
         self.user_id
     }
 
+    /// 获取交易包含的订单列表。
+    ///
+    /// Returns:
+    /// - 交易包含的订单列表的不可变引用。
     pub fn orders(&self) -> &[Box<dyn Order>] {
         &self.orders
     }
 
+    /// 获取交易状态。
+    ///
+    /// Returns:
+    /// - 交易状态。
     pub fn status(&self) -> TransactionStatus {
         self.status
     }
 
+    /// 获取交易包含的订单列表并转移所有权。
+    ///
+    /// Returns:
+    /// - 交易包含的订单列表。
     pub fn into_orders(self) -> Vec<Box<dyn Order>> {
         self.orders
     }
