@@ -13,6 +13,7 @@ use crate::domain::model::train_schedule::{
 };
 use crate::domain::model::transaction::{Transaction, TransactionId, TransactionStatus};
 use crate::domain::model::user::UserId;
+use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{DbId, DiffType, Identifiable, TypedDiff};
 use crate::domain::{DbRepositorySupport, MultiEntityDiff, RepositoryError};
@@ -20,14 +21,15 @@ use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{One, ToPrimitive};
-use sea_orm::ColumnTrait;
 use sea_orm::{
-    ActiveValue, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait, QueryFilter, Select,
-    TransactionTrait,
+    ActiveValue, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait,
+    QueryFilter, Select, Statement, TransactionTrait,
 };
+use sea_orm::{ColumnTrait, FromQueryResult};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
 
@@ -1177,5 +1179,44 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl TransactionRepository for TransactionRepositoryImpl {
+    async fn find_by_uuid(&self, uuid: Uuid) -> Result<Option<Transaction>, RepositoryError> {
+        let r = self
+            .query_transaction(|q| q.filter(crate::models::transaction::Column::Uuid.eq(uuid)))
+            .await?;
+
+        Ok(r.into_iter().next())
+    }
+
+    async fn find_by_user_id(&self, user_id: UserId) -> Result<Vec<Transaction>, RepositoryError> {
+        let r = self
+            .query_transaction(|q| {
+                q.filter(crate::models::transaction::Column::UserId.eq(user_id.to_db_value()))
+            })
+            .await?;
+
+        Ok(r)
+    }
+
+    async fn get_user_balance(&self, user_id: UserId) -> Result<Option<Decimal>, RepositoryError> {
+        #[derive(Debug, FromQueryResult)]
+        struct Balance {
+            balance: Decimal,
+        }
+
+        let r = Balance::find_by_statement(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            r#"SELECT "balance"."balance" FROM "balance" WHERE "balance"."user_id" = $1"#,
+            [user_id.to_db_value().into()],
+        ))
+        .one(&self.db)
+        .await
+        .context(format!("Failed to query balance for user: {}", user_id))?;
+
+        Ok(r.map(|item| item.balance))
     }
 }
