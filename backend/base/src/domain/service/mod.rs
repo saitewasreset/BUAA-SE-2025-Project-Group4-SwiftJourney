@@ -94,8 +94,9 @@ pub mod route;
 pub mod session;
 pub mod station;
 pub mod train_schedule;
-mod train_seat;
+pub mod train_seat;
 pub mod train_type;
+pub mod transaction;
 pub mod user;
 
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};

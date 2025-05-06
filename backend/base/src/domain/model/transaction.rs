@@ -122,6 +122,12 @@ impl From<TransactionAmountAbs> for Decimal {
     }
 }
 
+impl Display for TransactionAmountAbs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Transaction {
     fn now() -> DateTimeWithTimeZone {
         let local_now = Local::now();
