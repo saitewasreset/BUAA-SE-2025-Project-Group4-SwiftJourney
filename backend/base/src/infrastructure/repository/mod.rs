@@ -11,6 +11,12 @@ pub mod route;
 pub mod station;
 pub mod train;
 pub mod train_schedule;
+pub mod transaction;
+
+pub mod dish;
+pub mod hotel;
+pub mod seat_availability;
+pub mod takeaway;
 
 #[instrument(level = "trace", skip_all)]
 pub fn transform_list<T, U, I>(

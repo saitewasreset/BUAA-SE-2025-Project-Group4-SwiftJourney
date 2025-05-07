@@ -5,6 +5,7 @@
 //! - 领域模型与数据库模型之间的转换
 //! - 变更追踪与聚合管理
 
+use crate::domain::DbId;
 use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, RealName, User, UserId, UserInfo,
@@ -23,6 +24,8 @@ use sea_orm::ColumnTrait;
 use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+
+impl_db_id_from_u64!(UserId, i32, "user id");
 
 /// 用户仓储实现结构体
 ///

@@ -34,3 +34,5 @@ pub mod models;
 pub struct Unverified;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Verified;
+
+pub const HOTEL_MAX_BOOKING_DAYS: u32 = 7;
