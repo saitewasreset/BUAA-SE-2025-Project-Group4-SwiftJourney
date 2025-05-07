@@ -95,6 +95,44 @@ where
 
         Ok(user)
     }
+
+    async fn verify_user_password(
+        &self,
+        user: &User,
+        user_password: String,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        self.user_service
+            .verify_password(&user, user_password)
+            .await
+            .map_err(|e| match e {
+                UserServiceError::InvalidPassword => {
+                    Box::new(TransactionApplicationServiceError::WrongUserPassword)
+                        as Box<dyn ApplicationError>
+                }
+                _ => Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>,
+            })?;
+
+        Ok(())
+    }
+
+    async fn verify_payment_password(
+        &self,
+        user: &User,
+        payment_password: String,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        self.user_service
+            .verify_payment_password(&user, payment_password)
+            .await
+            .map_err(|e| match e {
+                UserServiceError::InvalidPassword => {
+                    Box::new(TransactionApplicationServiceError::WrongUserPassword)
+                        as Box<dyn ApplicationError>
+                }
+                _ => Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>,
+            })?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -161,16 +199,8 @@ where
     ) -> Result<(), Box<dyn ApplicationError>> {
         let user = self.get_user_by_session_id(&command.session_id).await?;
 
-        self.user_service
-            .verify_password(&user, command.user_password)
-            .await
-            .map_err(|e| match e {
-                UserServiceError::InvalidPassword => {
-                    Box::new(TransactionApplicationServiceError::WrongUserPassword)
-                        as Box<dyn ApplicationError>
-                }
-                _ => Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>,
-            })?;
+        self.verify_user_password(&user, command.user_password)
+            .await?;
 
         let payment_password = PaymentPassword::try_from(command.payment_password.as_str())
             .map_err(|_for_super_earth| {
@@ -209,6 +239,19 @@ where
         &self,
         command: PayTransactionCommand,
     ) -> Result<(), Box<dyn ApplicationError>> {
+        let user = self.get_user_by_session_id(&command.session_id).await?;
+
+        if let Some(user_password) = command.user_password {
+            self.verify_user_password(&user, user_password).await?;
+        } else if let Some(payment_password) = command.payment_password {
+            self.verify_payment_password(&user, payment_password)
+                .await?;
+        } else {
+            return Err(Box::new(GeneralError::BadRequest(
+                "Neither user password nor payment password was set".to_string(),
+            )));
+        }
+
         self.transaction_service
             .pay_transaction(command.transaction_id)
             .await?;
