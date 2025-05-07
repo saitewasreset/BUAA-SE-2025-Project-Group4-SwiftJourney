@@ -1,9 +1,9 @@
 use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::{Bytes, Data};
 use actix_web::{HttpRequest, get, post, web};
-use base::application::commands::transaction::{BalanceQuery, RechargeCommand};
+use base::application::commands::transaction::{BalanceQuery, RechargeCommand, TransactionQuery};
 use base::application::service::transaction::{
-    BalanceInfoDTO, RechargeDTO, TransactionApplicationService,
+    BalanceInfoDTO, RechargeDTO, TransactionApplicationService, TransactionInfoDTO,
 };
 
 #[post("/recharge")]
@@ -40,6 +40,24 @@ pub async fn query_balance(
     ApiResponse::ok(balance_info_dto)
 }
 
+#[get("/")]
+pub async fn query_transactions(
+    requests: HttpRequest,
+    transaction_service: Data<dyn TransactionApplicationService>,
+) -> Result<ApiResponse<Vec<TransactionInfoDTO>>, ApplicationErrorBox> {
+    let session_id = get_session_id(&requests)?;
+
+    let transaction_query = TransactionQuery { session_id };
+
+    let transaction_info_list = transaction_service
+        .query_transactions(transaction_query)
+        .await?;
+
+    ApiResponse::ok(transaction_info_list)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(recharge).service(query_balance);
+    cfg.service(recharge)
+        .service(query_balance)
+        .service(query_transactions);
 }
