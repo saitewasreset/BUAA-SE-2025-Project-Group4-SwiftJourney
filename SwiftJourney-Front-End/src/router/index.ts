@@ -29,9 +29,10 @@ const router = createRouter({
       component: () => import('../views/RegisterPage/RegisterPageView.vue'),
     },
     {
-      path: '/personalhomepage',
+      path: '/personalhomepage/:activeIndex',
       name: 'personalhomepage',
       component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
+      props: true
     },
   ],
 })
