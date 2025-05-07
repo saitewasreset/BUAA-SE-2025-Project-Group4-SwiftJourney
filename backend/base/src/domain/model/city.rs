@@ -32,7 +32,7 @@
 //! # use std::ops::Deref;
 //! # let city = City::new(
 //! #    Some(CityId::from(1u64)),
-//! #    CityName::from("北京".to_string()),
+//! #    CityName::from("北京市".to_string()),
 //! #    ProvinceName::from("北京市".to_string())
 //! # );
 //! assert_eq!(city.name().deref(), "北京市");

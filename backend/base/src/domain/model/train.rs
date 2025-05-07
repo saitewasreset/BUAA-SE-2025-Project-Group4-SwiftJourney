@@ -18,7 +18,7 @@
 //!
 //! 创建车次实例：
 //! ```
-//! # use base::domain::model::train::{Train, TrainNumber, TrainType, SeatType, TrainId, SeatTypeId};
+//! # use base::domain::model::train::{Train, TrainNumber, TrainType, SeatType, TrainId, SeatTypeId, SeatTypeName};
 //! # use base::domain::model::route::{RouteId};
 //! # use std::collections::HashMap;
 //! # use sea_orm::prelude::Decimal;
@@ -26,13 +26,13 @@
 //! let seats = HashMap::from([
 //!     ("商务座".to_string(), SeatType::new(
 //!         Some(SeatTypeId::from(1u64)),
-//!         "商务座".into(),
+//!         SeatTypeName::from_unchecked("商务座".into()),
 //!         30,
 //!         Decimal::new(5000, 2) // 50.00 SC/站
 //!     )),
 //!     ("二等座".to_string(), SeatType::new(
 //!         Some(SeatTypeId::from(2u64)),
-//!         "二等座".into(),
+//!         SeatTypeName::from_unchecked("二等座".into()),
 //!         200,
 //!         Decimal::new(3000, 2) // 30.00 SC/站
 //!     ))
@@ -49,7 +49,7 @@
 //!
 //! 获取车次信息：
 //! ```
-//! # use base::domain::model::train::{Train, TrainNumber, TrainType, SeatType, TrainId, SeatTypeId};
+//! # use base::domain::model::train::{Train, TrainNumber, TrainType, SeatType, TrainId, SeatTypeId, SeatTypeName};
 //! # use base::domain::model::route::{RouteId};
 //! # use std::collections::HashMap;
 //! # use sea_orm::prelude::Decimal;
@@ -57,13 +57,13 @@
 //! # let seats = HashMap::from([
 //! #    ("商务座".to_string(), SeatType::new(
 //! #        Some(SeatTypeId::from(1u64)),
-//! #        "商务座".into(),
+//! #        SeatTypeName::from_unchecked("商务座".into()),
 //! #        30,
 //! #        Decimal::new(5000, 2) // 50.00 SC/站
 //! #    )),
 //! #    ("二等座".to_string(), SeatType::new(
 //! #        Some(SeatTypeId::from(2u64)),
-//! #        "二等座".into(),
+//! #        SeatTypeName::from_unchecked("二等座".into()),
 //! #        200,
 //! #        Decimal::new(3000, 2) // 30.00 SC/站
 //! #     ))
@@ -77,7 +77,7 @@
 //! #     RouteId::from(101u64) // 默认路线ID
 //! # );
 //! assert_eq!(train.number(), "G1234");
-//! assert_eq!(train.train_type(), "高铁");
+//! assert_eq!(train.train_type(), "G");
 //! ```
 use crate::domain::model::route::RouteId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};

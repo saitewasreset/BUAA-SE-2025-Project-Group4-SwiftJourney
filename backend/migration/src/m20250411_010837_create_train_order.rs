@@ -12,6 +12,7 @@ pub struct Migration;
 pub enum TrainOrder {
     Table,
     Id,
+    Uuid,
     TrainScheduleId,
     SeatTypeId,
     SeatId,
@@ -36,6 +37,7 @@ impl MigrationTrait for Migration {
                     .table(TrainOrder::Table)
                     .if_not_exists()
                     .col(pk_auto(TrainOrder::Id))
+                    .col(uuid(TrainOrder::Uuid).not_null())
                     .col(integer(TrainOrder::TrainScheduleId).not_null())
                     .col(integer(TrainOrder::SeatTypeId).not_null())
                     .col(integer(TrainOrder::SeatId).not_null())

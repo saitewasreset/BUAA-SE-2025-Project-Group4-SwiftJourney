@@ -9,6 +9,7 @@ pub struct Model {
     pub id: i32,
     pub name: String,
     pub station_id: i64,
+    pub images: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
