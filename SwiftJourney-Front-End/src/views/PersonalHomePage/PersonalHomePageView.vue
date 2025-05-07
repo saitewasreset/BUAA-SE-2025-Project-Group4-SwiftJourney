@@ -22,7 +22,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import AccountSecurity from '@/components/PersonalHomeElMenu/AccountSecurity.vue';
 import PersonalData from '@/components/PersonalHomeElMenu/PersonalData.vue';
@@ -31,6 +32,19 @@ import Recharge from '@/components/PersonalHomeElMenu/Recharge.vue';
 import TransactionRecord from '@/components/PersonalHomeElMenu/TransactionRecord.vue';
 
 const activeIndex = ref('personaldata');
+const route = useRoute();
+const router = useRouter();
+
+activeIndex.value = computed({
+  get() {
+    return route.params.activeIndex;
+  },
+  set(newIndex) {
+    if (newIndex !== route.params.activeIndex) {
+      router.push({ name: route.name, params: { activeIndex: newIndex } });
+    }
+  },
+});
 
 </script>
 
