@@ -1,9 +1,13 @@
 # Request For Comments 4: API 文档
 
-Version: 7 (2025-05-06 15:05:00)
+Version: 8 (2025-05-07 21:05:00)
 
 最近变更：
 
+- Version 8
+  - 交易查询：现在可获得所有交易的列表
+  - 设置支付密码：应当提供`string`类型的支付密码；新增支付密码格式错误的返回代码
+  - 支付交易：新增部分错误代码、应当提供`string`类型的支付密码
 - Version 7
   - 订单信息：拆分总价为单价和数量
   - 酒店订单：修改“旅客姓名”为“订房人姓名”
@@ -501,7 +505,7 @@ interface BalanceInfo {
 
 ### 交易信息查询（US1.1.3）
 
-`GET /api/transaction/{transaction_id}`
+`GET /api/transaction`
 
 需要 Cookie：
 
@@ -518,7 +522,7 @@ interface BalanceInfo {
 响应**数据**：
 
 ```typescript
-type ResponseData = TransactionInfo;
+type ResponseData = TransactionInfo[];
 
 interface TransactionInfo {
   transactionId: string;
@@ -547,16 +551,18 @@ type Request = PaymentPasswordInfo;
 interface PaymentPasswordInfo {
   // 修改支付密码时，需要传入用户密码进行验证
   userPassword: string;
-  paymentPassword: number;
+  paymentPassword: string;
 }
 ```
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                       | 含义                             |
-| ---- | -------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 11002 | `Wrong user password`                                                | 用户密码错误                     |
+| 11007 | `Invalid payment password format`                                    | 支付密码格式错误                 |
 
 响应**数据**：
 
@@ -583,7 +589,7 @@ type Request = PaymentConfirmation;
 
 interface PaymentConfirmation {
   userPassword?: string;
-  paymentPassword?: number;
+  paymentPassword?: string;
 }
 ```
 
@@ -597,14 +603,16 @@ interface PaymentConfirmation {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                             | 含义                                          |
-| ----- | -------------------------------------------------------------------------- | --------------------------------------------- |
-| 200   | `For Super Earth!`                                                         | 请求已被成功执行，可访问响应数据              |
-| 400   | `No password provided`                                                     | 请求中`userPassword`和`paymentPassword`都为空 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`       | 会话无效                                      |
-| 11001 | `Wrong payment password`                                                   | 支付密码错误                                  |
-| 11002 | `Wrong user password`                                                      | 用户密码错误                                  |
-| 11003 | `Too many failed payment password attempts. Please use your user password` | 支付密码输入错误次数过多                      |
+| 代码  | 可能的响应消息                                                                     | 含义                                          |
+| ----- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
+| 200   | `For Super Earth!`                                                                 | 请求已被成功执行，可访问响应数据              |
+| 400   | `No password provided`                                                             | 请求中`userPassword`和`paymentPassword`都为空 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`               | 会话无效                                      |
+| 11001 | `Wrong payment password`                                                           | 支付密码错误                                  |
+| 11002 | `Wrong user password`                                                              | 用户密码错误                                  |
+| 11003 | `Too many failed payment password attempts. Please use your user password`         | 支付密码输入错误次数过多                      |
+| 11004 | `Insufficient funds`                                                               | 余额不足                                      |
+| 11006 | `Invalid transaction status {status} for op {op} for transaction {transaction_id}` | 交易状态错误，例如，支付已经支付过的交易      |
 
 响应**数据**：
 
