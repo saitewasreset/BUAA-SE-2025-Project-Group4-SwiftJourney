@@ -230,6 +230,13 @@ mod tests {
                 user: &User,
                 raw_password: String,
             ) -> Result<(), UserServiceError>;
+
+            async fn verify_payment_password(
+                &self,
+                user: &User,
+                raw_payment_password: String,
+            ) -> Result<(), UserServiceError>;
+
             async fn set_password(
                 &self,
                 user_id: UserId,
