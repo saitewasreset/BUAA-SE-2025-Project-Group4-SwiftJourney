@@ -12,6 +12,7 @@ pub use super::occupied_room::Entity as OccupiedRoom;
 pub use super::occupied_seat::Entity as OccupiedSeat;
 pub use super::person_info::Entity as PersonInfo;
 pub use super::route::Entity as Route;
+pub use super::seat_availability::Entity as SeatAvailability;
 pub use super::seat_type::Entity as SeatType;
 pub use super::seat_type_in_train_type::Entity as SeatTypeInTrainType;
 pub use super::seat_type_mapping::Entity as SeatTypeMapping;
