@@ -43,17 +43,17 @@
                             </div>
 
                             <div class="UserButtonLine">
-                                <el-button link plain>个人资料</el-button>
-                                <el-button link plain>余额重置</el-button>
+                                <el-button link plain @click="goToPersonalDataPage">个人资料</el-button>
+                                <el-button link plain @click="goToRechargePage">余额重置</el-button>
                             </div>
 
                             <div class="UserButtonLine">
-                                <el-button link plain>预填信息</el-button>
-                                <el-button link plain>账户安全</el-button>
+                                <el-button link plain @click="goToPrefilledIforPage">预填信息</el-button>
+                                <el-button link plain @click="goToAccountSecurityPage">账户安全</el-button>
                             </div>
 
                             <div class="UserButtonLine">
-                                <el-button link plain>交易记录</el-button>
+                                <el-button link plain @click="goToTransactionRecordPage">交易记录</el-button>
                             </div>
                         </div>
                     </div>
@@ -90,6 +90,26 @@
 
     function goToRegisterPage() {
         router.push({ name: 'register' });
+    }
+
+    function goToAccountSecurityPage() {
+        router.push({name: 'personalhomepage', params: { activeIndex: 'accountsecurity' }});
+    }
+
+    function goToPersonalDataPage() {
+        router.push({name: 'personalhomepage', params: { activeIndex: 'personaldata' }});
+    }
+
+    function goToPrefilledIforPage() {
+        router.push({name: 'personalhomepage', params: { activeIndex: 'prefilledinformation' }});
+    }
+
+    function goToRechargePage() {
+        router.push({name: 'personalhomepage', params: { activeIndex: 'recharge' }});
+    }
+
+    function goToTransactionRecordPage() {
+        router.push({ name: 'personalhomepage', params: { activeIndex: 'transactionrecord' }});
     }
 </script>
 
