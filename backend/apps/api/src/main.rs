@@ -32,6 +32,9 @@ use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH};
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::train_data::TrainDataService;
+use base::application::service::transaction::{
+    TransactionApplicationService, TransactionApplicationServiceError,
+};
 use base::application::service::user_manager::UserManagerService;
 use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
@@ -41,6 +44,7 @@ use base::domain::service::session::SessionManagerService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
+use base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::repository::city::CityRepositoryImpl;
@@ -48,11 +52,14 @@ use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
+use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
+use base::infrastructure::service::transaction::TransactionServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
@@ -84,6 +91,8 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
+    let app_config = AppConfig { debug: debug_mode };
+
     let session_manager_service_impl =
         Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
             Arc::new(SessionRepositoryImpl::new(
@@ -97,6 +106,7 @@ async fn main() -> std::io::Result<()> {
     let station_repository_impl = Arc::new(StationRepositoryImpl::new(conn.clone()));
     let train_repository_impl = Arc::new(TrainRepositoryImpl::new(conn.clone()));
     let route_repository_impl = Arc::new(RouteRepositoryImpl::new(conn.clone()));
+    let transaction_repository_impl = Arc::new(TransactionRepositoryImpl::new(conn.clone()));
 
     let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
         Arc::clone(&user_repository_impl),
@@ -107,6 +117,8 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&user_repository_impl),
         Arc::clone(&session_manager_service_impl),
     ));
+
+    let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new());
 
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
@@ -126,6 +138,21 @@ async fn main() -> std::io::Result<()> {
     let station_service_impl = Arc::new(StationServiceImpl::new(
         Arc::clone(&station_repository_impl),
         Arc::clone(&geo_service_impl),
+    ));
+
+    let transaction_service_impl = Arc::new(TransactionServiceImpl::new(
+        Arc::clone(&user_repository_impl),
+        Arc::clone(&transaction_repository_impl),
+        Arc::clone(&order_status_manager_service_impl),
+    ));
+
+    let transaction_application_service_impl = Arc::new(TransactionApplicationServiceImpl::new(
+        app_config.debug,
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&transaction_repository_impl),
+        Arc::clone(&user_service_impl),
+        Arc::clone(&user_repository_impl),
     ));
 
     let geo_application_service_impl = Arc::new(GeoApplicationServiceImpl::new(
@@ -154,7 +181,10 @@ async fn main() -> std::io::Result<()> {
     let geo_application_service: web::Data<dyn GeoApplicationService> =
         web::Data::from(geo_application_service_impl as Arc<dyn GeoApplicationService>);
 
-    let app_config = AppConfig { debug: debug_mode };
+    let transaction_application_service: web::Data<dyn TransactionApplicationService> =
+        web::Data::from(
+            transaction_application_service_impl as Arc<dyn TransactionApplicationService>,
+        );
 
     let app_config_data = web::Data::new(app_config);
 
@@ -173,6 +203,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_profile_service.clone())
             .app_data(train_data_service.clone())
             .app_data(geo_application_service.clone())
+            .app_data(transaction_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
@@ -184,7 +215,8 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api")
                     .service(web::scope("/user").configure(api::user::scoped_config))
                     .service(web::scope("/general").configure(api::general::scoped_config))
-                    .service(web::scope("/data").configure(api::data::scoped_config)),
+                    .service(web::scope("/data").configure(api::data::scoped_config))
+                    .service(web::scope("/payment").configure(api::payment::scoped_config)),
             )
         // Step 6: Register your endpoint using `.service()` function
         // Exercise 1.2.1D - 7: Your code here. (5 / 5)
