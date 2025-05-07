@@ -71,7 +71,7 @@ impl From<RepositoryError> for TransactionServiceError {
 /// - `pay_transaction`: 支付交易。
 /// - `refund_transaction`: 退款交易。
 #[async_trait]
-pub trait TransactionService {
+pub trait TransactionService: 'static + Send + Sync {
     /// 为用户充值。
     ///
     /// Arguments:
