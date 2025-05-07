@@ -46,6 +46,23 @@ where
     U: UserService,
     UR: UserRepository,
 {
+    pub fn new(
+        debug_mode: bool,
+        session_manager: Arc<S>,
+        transaction_service: Arc<T>,
+        transaction_repository: Arc<R>,
+        user_service: Arc<U>,
+        user_repository: Arc<UR>,
+    ) -> Self {
+        Self {
+            debug_mode,
+            session_manager,
+            transaction_service,
+            transaction_repository,
+            user_service,
+            user_repository,
+        }
+    }
     async fn get_user_id_by_session_id(
         &self,
         session_id: &str,
