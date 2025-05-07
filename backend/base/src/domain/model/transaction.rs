@@ -160,6 +160,26 @@ pub enum RefundError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TransactionAmountAbs(Decimal);
 
+#[derive(Error, Debug)]
+pub enum TransactionAmountAbsError {
+    #[error("negative value")]
+    NegativeValue,
+    #[error("invalid value")]
+    InvalidValue,
+}
+
+impl TransactionAmountAbs {
+    pub fn from_f64_checked(value: f64) -> Result<TransactionAmountAbs, TransactionAmountAbsError> {
+        if value < 0.0 {
+            return Err(TransactionAmountAbsError::NegativeValue);
+        }
+
+        let dec = Decimal::try_from(value).map_err(|e| TransactionAmountAbsError::InvalidValue)?;
+
+        Ok(TransactionAmountAbs(dec))
+    }
+}
+
 impl From<Decimal> for TransactionAmountAbs {
     /// 将 `Decimal` 类型转换为 `TransactionAmountAbs`。
     ///
