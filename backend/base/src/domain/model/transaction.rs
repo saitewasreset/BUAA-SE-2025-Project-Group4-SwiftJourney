@@ -224,6 +224,27 @@ impl Transaction {
         }
     }
 
+    /// 创建一个新的调试交易实例。
+    ///
+    /// Arguments:
+    /// - `user_id`: 用户的唯一标识符。
+    /// - `recharge_amount`: 充值金额的绝对值。
+    ///
+    /// Returns:
+    /// - 新创建的调试交易实例。
+    pub fn new_debug(user_id: UserId, amount: TransactionAmountAbs) -> Transaction {
+        Transaction {
+            transaction_id: None,
+            uuid: Uuid::new_v4(),
+            create_time: Self::now(),
+            finish_time: Some(Self::now()),
+            amount: Decimal::from(amount),
+            status: TransactionStatus::Unpaid,
+            user_id,
+            orders: vec![],
+        }
+    }
+
     /// 创建一个新的交易实例。
     ///
     /// Arguments:
