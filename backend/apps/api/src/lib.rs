@@ -5,6 +5,8 @@ pub mod general;
 
 pub mod data;
 
+pub mod payment;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
