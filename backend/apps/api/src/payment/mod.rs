@@ -2,12 +2,15 @@ use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body
 use actix_web::web::{Bytes, Data};
 use actix_web::{HttpRequest, get, post, web};
 use base::application::commands::transaction::{
-    BalanceQuery, RechargeCommand, SetPaymentPasswordCommand, TransactionQuery,
+    BalanceQuery, PayTransactionCommand, RechargeCommand, SetPaymentPasswordCommand,
+    TransactionQuery,
 };
 use base::application::service::transaction::{
-    BalanceInfoDTO, PaymentPasswordInfoDTO, RechargeDTO, TransactionApplicationService,
-    TransactionInfoDTO,
+    BalanceInfoDTO, PaymentConfirmationDTO, PaymentPasswordInfoDTO, RechargeDTO,
+    TransactionApplicationService, TransactionInfoDTO,
 };
+use sea_orm::prelude::Uuid;
+use serde::Deserialize;
 
 #[post("/recharge")]
 pub async fn recharge(
@@ -80,9 +83,38 @@ pub async fn set_payment_password(
     ApiResponse::ok(())
 }
 
+#[derive(Deserialize)]
+struct PayTransactionInfo {
+    transaction_id: Uuid,
+}
+
+#[post("/pay/{transaction_id}")]
+async fn pay_transaction(
+    info: web::Path<PayTransactionInfo>,
+    requests: HttpRequest,
+    body: Bytes,
+    transaction_service: Data<dyn TransactionApplicationService>,
+) -> Result<ApiResponse<()>, ApplicationErrorBox> {
+    let session_id = get_session_id(&requests)?;
+
+    let payment_confirmation_dto: PaymentConfirmationDTO = parse_request_body(body)?;
+
+    let command = PayTransactionCommand {
+        session_id,
+        transaction_id: info.transaction_id,
+        user_password: payment_confirmation_dto.user_password,
+        payment_password: payment_confirmation_dto.payment_password,
+    };
+
+    transaction_service.pay_transaction(command).await?;
+
+    ApiResponse::ok(())
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(recharge)
         .service(query_balance)
         .service(query_transactions)
-        .service(set_payment_password);
+        .service(set_payment_password)
+        .service(pay_transaction);
 }
