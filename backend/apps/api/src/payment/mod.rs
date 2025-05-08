@@ -2,12 +2,12 @@ use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body
 use actix_web::web::{Bytes, Data};
 use actix_web::{HttpRequest, get, post, web};
 use base::application::commands::transaction::{
-    BalanceQuery, PayTransactionCommand, RechargeCommand, SetPaymentPasswordCommand,
-    TransactionQuery,
+    BalanceQuery, GenerateDebugTransactionCommand, PayTransactionCommand, RechargeCommand,
+    SetPaymentPasswordCommand, TransactionQuery,
 };
 use base::application::service::transaction::{
     BalanceInfoDTO, PaymentConfirmationDTO, PaymentPasswordInfoDTO, RechargeDTO,
-    TransactionApplicationService, TransactionInfoDTO,
+    TransactionApplicationService, TransactionGenerateDTO, TransactionInfoDTO,
 };
 use sea_orm::prelude::Uuid;
 use serde::Deserialize;
@@ -111,10 +111,33 @@ async fn pay_transaction(
     ApiResponse::ok(())
 }
 
+#[post("/generate")]
+async fn generate_transaction(
+    requests: HttpRequest,
+    body: Bytes,
+    transaction_service: Data<dyn TransactionApplicationService>,
+) -> Result<ApiResponse<TransactionInfoDTO>, ApplicationErrorBox> {
+    let session_id = get_session_id(&requests)?;
+
+    let transaction_generate_dto: TransactionGenerateDTO = parse_request_body(body)?;
+
+    let command = GenerateDebugTransactionCommand {
+        session_id,
+        amount: transaction_generate_dto.amount,
+    };
+
+    let transaction_info_dto = transaction_service
+        .generate_debug_transaction(command)
+        .await?;
+
+    ApiResponse::ok(transaction_info_dto)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(recharge)
         .service(query_balance)
         .service(query_transactions)
         .service(set_payment_password)
-        .service(pay_transaction);
+        .service(pay_transaction)
+        .service(generate_transaction);
 }
