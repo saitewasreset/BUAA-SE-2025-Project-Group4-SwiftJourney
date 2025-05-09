@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 8 (2025-05-07 21:05:00)
+Version: 9 (2025-05-09 11:45:00)
 
 最近变更：
 
+- Version 9
+  - 修复`depature`拼写错误
 - Version 8
   - 交易查询：现在可获得所有交易的列表
   - 设置支付密码：应当提供`string`类型的支付密码；新增支付密码格式错误的返回代码
@@ -677,9 +679,9 @@ type ResponseData = TransactionInfo;
 type Request = TrainScheduleQuery;
 
 interface TrainScheduleQuery {
-  depatureStation?: string;
+  departureStation?: string;
   arrivalStation?: string;
-  depatureCity?: string;
+  departureCity?: string;
   arrivalCity?: string;
   // deparuteDate：YYYY-MM-DD
   deparuteDate: string;
@@ -690,18 +692,18 @@ interface TrainScheduleQuery {
 
 查询一致性要求：
 
-- `depatureStation`和`depatureCity`有且仅有一个存在
+- `departureStation`和`departureCity`有且仅有一个存在
 - `arrivalStation`和`arrivalCity`有且仅有一个存在
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                               | 含义                                             |
-| ----- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
-| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`depatureStation`或`depatureStation`不存在 |
-| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`depatureCity`或`arrivalCity`不存在        |
-| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                         |
+| 代码  | 可能的响应消息                                                               | 含义                                               |
+| ----- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
+| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`departureStation`或`departureStation`不存在 |
+| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在         |
+| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                           |
 
 响应**数据**：
 
@@ -714,7 +716,7 @@ interface StoppingStationInfo {
   // 到达该站点的日期时间，若为始发站，不包含该属性
   arrivalTime?: string;
   // 离开该站点的日期时间，若为终到站，不包含该属性
-  depatureTime?: string;
+  departureTime?: string;
 }
 
 interface SeatTypeInfo {
@@ -727,15 +729,15 @@ interface SeatTypeInfo {
 }
 
 interface TrainScheduleInfo {
-  depatureStation: string;
+  departureStation: string;
   // 离开“起始站”的日期时间
-  depatureTime: string;
+  departureTime: string;
   arrivalStation: string;
   // 到达“到达站”的日期时间
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -769,9 +771,9 @@ interface TrainScheduleInfo {
 type Request = TrainScheduleQuery;
 
 interface TrainScheduleQuery {
-  depatureStation?: string;
+  departureStation?: string;
   arrivalStation?: string;
-  depatureCity?: string;
+  departureCity?: string;
   arrivalCity?: string;
   // deparuteDate：YYYY-MM-DD
   deparuteDate: string;
@@ -782,18 +784,18 @@ interface TrainScheduleQuery {
 
 查询一致性要求：
 
-- `depatureStation`和`depatureCity`有且仅有一个存在
+- `departureStation`和`departureCity`有且仅有一个存在
 - `arrivalStation`和`arrivalCity`有且仅有一个存在
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                               | 含义                                             |
-| ----- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
-| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`depatureStation`或`depatureStation`不存在 |
-| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`depatureCity`或`arrivalCity`不存在        |
-| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                         |
+| 代码  | 可能的响应消息                                                               | 含义                                               |
+| ----- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
+| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`departureStation`或`departureStation`不存在 |
+| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在         |
+| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                           |
 
 响应**数据**：
 
@@ -844,10 +846,10 @@ interface TrainOrderRequest {
   // 车次号，例如：“G53”
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
 
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
 
@@ -860,13 +862,13 @@ interface TrainOrderRequest {
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                                                         | 含义                                                 |
-| ---- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| 200  | `For Super Earth!`                                                                                     | 请求已被成功执行，可访问响应数据                     |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                                   | 会话无效                                             |
-| 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {origin_depature_time}` | 车次号不存在，或车次号与离开“始发站”的时间的组合非法 |
-| 404  | `Sorry, but this was meant to be a private game: invalid station: {station_name}`                      | 起始站/到达站不存在                                  |
-| 404  | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}`                    | 乘车人 Id 不存在，或未与当前用户绑定                 |
+| 代码 | 可能的响应消息                                                                                          | 含义                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 200  | `For Super Earth!`                                                                                      | 请求已被成功执行，可访问响应数据                     |
+| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                                    | 会话无效                                             |
+| 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {origin_departure_time}` | 车次号不存在，或车次号与离开“始发站”的时间的组合非法 |
+| 404  | `Sorry, but this was meant to be a private game: invalid station: {station_name}`                       | 起始站/到达站不存在                                  |
+| 404  | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}`                     | 乘车人 Id 不存在，或未与当前用户绑定                 |
 
 响应**数据**：
 
@@ -948,7 +950,7 @@ interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 乘车人姓名
   name: string;
   // 人类可读的座位号
@@ -974,7 +976,7 @@ interface DishOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 用餐“时间”
   dishTime: "lunch" | "dinner";
   // 用餐人姓名
@@ -987,7 +989,7 @@ interface TakeawayOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 车站
   station: string;
   // 店铺名称
@@ -1371,7 +1373,7 @@ interface DishQuery {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
 }
 ```
 
@@ -1421,7 +1423,7 @@ interface TrainDishInfo {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
 
@@ -1456,7 +1458,7 @@ type Request = DishStationQuery;
 
 interface DishStationQuery {
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
   // 查询日期
@@ -1481,15 +1483,15 @@ interface FullTrainDishInfo {
   // 车次
   trainNumber: string;
 
-  depatureStation: string;
+  departureStation: string;
   // 离开“起始站”的日期时间
-  depatureTime: string;
+  departureTime: string;
   arrivalStation: string;
   // 到达“到达站”的日期时间
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -1554,7 +1556,7 @@ interface TrainDishOrderRequest {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  origindepartureTime: string;
 
   // 要预订的火车餐列表
   dishes: DishOrder[];
@@ -1668,9 +1670,9 @@ interface TripNotify extends Notify {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
 }
