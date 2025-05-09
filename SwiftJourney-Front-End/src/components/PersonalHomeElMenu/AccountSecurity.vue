@@ -53,6 +53,7 @@
   
 <script>
 import { ElMessage } from 'element-plus';
+import { paymentApi } from '@/api/PaymentApi/paymentApi'
 
 export default{
     data() {
@@ -138,21 +139,35 @@ export default{
                 this.digits[i] = "";
                 this.confirmDigits[i] = "";
             }
-        }, isSetPayPasswordSave() {
+        }, 
+        async isSetPayPasswordSave() {
             if(!this.checkPayPassword()){
                 return;
             }
             this.payPasswordFormData.newPayPassword = this.digits.join('');
-            //------------TODO--------------//
-            //将原密码和新密码同时发给后端，若原密码正确，更新，若原密码错误，不更新
-            this.isSetPayPassword = false;
-            this.payPasswordFormData.password = "";
-            this.payPasswordFormData.newPayPassword = "";
-            for(let i = 0; i < 6; i++){
-                this.digits[i] = "";
-                this.confirmDigits[i] = "";
-            }
-            this.setedPayPassword = "已设置";
+
+            await paymentApi.setPaymentPassword({userPassword: this.payPasswordFormData.password, paymentPassword: this.payPasswordFormData.newPayPassword})
+            .then((res) => {
+                if(res.status == 403) {
+                    ElMessage.error('账户密码错误');
+                    return;
+                } else if (res.status == 200) {
+                    ElMessage.success('支付密码设置成功');
+                    this.isSetPayPassword = false;
+                    this.payPasswordFormData.password = "";
+                    this.payPasswordFormData.newPayPassword = "";
+                    for(let i = 0; i < 6; i++){
+                        this.digits[i] = "";
+                        this.confirmDigits[i] = "";
+                    }
+                    this.setedPayPassword = "已设置";
+                } else {
+                    ElMessage.error(res.status + res.data)
+                }
+            })
+            .catch((error) => {
+                ElMessage.error(error);
+            })
         },
         checkPayPassword() {
             for(let i = 0; i < 6; i++){
