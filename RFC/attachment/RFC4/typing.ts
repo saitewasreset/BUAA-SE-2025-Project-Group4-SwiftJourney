@@ -229,8 +229,14 @@ interface SeatLocationInfo {
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
-  // 离开起始站日期时间
+  // 始发站
+  departureStation: string;
+  // 终到站
+  terminalStation: string;
+  // 离开始发站日期时间
   departureTime: string;
+  // 到达终到站的日期时间
+  terminalTime: string;
   // 乘车人姓名
   name: string;
   // 人类可读的座位号
@@ -272,6 +278,8 @@ interface TakeawayOrderInfo extends OrderInfo {
   departureTime: string;
   // 车站
   station: string;
+  // 用餐时间（到达车站的时间）
+  dishTime: string;
   // 店铺名称
   shopName: string;
   // 用餐人姓名
