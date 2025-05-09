@@ -5,5 +5,8 @@ import { postBlobRequest } from "../axios";
 export const userApi = {
     userLogin: (params: Object) => {
         return postRequest('/api/user/login', params);
+    },
+    setUserInfo: (params: Object) => {
+        return postRequest('/api/user/user_info', params);
     }
 };
