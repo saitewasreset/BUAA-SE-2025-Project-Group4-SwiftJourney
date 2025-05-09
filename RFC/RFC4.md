@@ -1,9 +1,18 @@
 # Request For Comments 4: API 文档
 
-Version: 7 (2025-05-06 15:05:00)
+Version: 10 (2025-05-09 17:32:00)
 
 最近变更：
 
+- Version 10
+  - `TrainOrderInfo`新增始发站、终到站相关信息
+  - `TakeawayOrderInfo`新增用餐时间
+- Version 9
+  - 修复`depature`拼写错误
+- Version 8
+  - 交易查询：现在可获得所有交易的列表
+  - 设置支付密码：应当提供`string`类型的支付密码；新增支付密码格式错误的返回代码
+  - 支付交易：新增部分错误代码、应当提供`string`类型的支付密码
 - Version 7
   - 订单信息：拆分总价为单价和数量
   - 酒店订单：修改“旅客姓名”为“订房人姓名”
@@ -939,8 +948,14 @@ interface SeatLocationInfo {
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
-  // 离开起始站日期时间
-  depatureTime: string;
+  // 始发站
+  departureStation: string;
+  // 终到站
+  terminalStation: string;
+  // 离开始发站日期时间
+  departureTime: string;
+  // 到达终到站的日期时间
+  terminalTime: string;
   // 乘车人姓名
   name: string;
   // 人类可读的座位号
@@ -982,6 +997,8 @@ interface TakeawayOrderInfo extends OrderInfo {
   depatureTime: string;
   // 车站
   station: string;
+  // 用餐时间（到达车站的时间）
+  dishTime: string;
   // 店铺名称
   shopName: string;
   // 用餐人姓名
