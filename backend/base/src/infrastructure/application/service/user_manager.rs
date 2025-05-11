@@ -9,18 +9,19 @@
 //!   - 用户仓储(`UserRepository`)
 //!   - 会话管理服务(`SessionManagerService`)
 use crate::application::commands::user_manager::{
-    UserLoginCommand, UserLogoutCommand, UserRegisterCommand,
+    UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
 use crate::application::service::user_manager::{UserManagerError, UserManagerService};
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::Identifiable;
 use crate::domain::model::session::SessionId;
 use crate::domain::model::user::{IdentityCardId, Phone, RawPassword, RealName, Username};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::user::UserService;
+use crate::domain::{DbId, Identifiable};
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::error;
 
 /// 用户管理服务实现
 ///
@@ -187,6 +188,43 @@ where
                 .delete_session(session)
                 .await
                 .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+
+            Ok(())
+        } else {
+            Err(GeneralError::InvalidSessionId.into())
+        }
+    }
+
+    async fn update_password(
+        &self,
+        command: UserUpdatePasswordCommand,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(command.session_id.as_str())
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
+        if let Some(user_id) = self
+            .session_manager
+            .get_user_id_by_session(session_id)
+            .await
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+        {
+            let user = self
+                .user_repository
+                .find(user_id)
+                .await
+                .map_err(|e| {
+                    error!("failed load user {} from db: {}", user_id.to_db_value(), e);
+
+                    GeneralError::InternalServerError
+                })?
+                .ok_or(GeneralError::InvalidSessionId)?;
+
+            self.user_service
+                .verify_password(&user, command.origin_password)
+                .await?;
+
+            self.user_service
+                .set_password(user_id, command.new_password)
+                .await?;
 
             Ok(())
         } else {
