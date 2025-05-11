@@ -15,6 +15,7 @@ pub mod transaction;
 
 pub mod dish;
 pub mod hotel;
+pub mod order;
 pub mod seat_availability;
 pub mod takeaway;
 
