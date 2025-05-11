@@ -88,12 +88,12 @@ interface TransactionInfo {
 interface PaymentPasswordInfo {
   // 修改支付密码时，需要传入用户密码进行验证
   userPassword: string;
-  paymentPassword: number;
+  paymentPassword: string;
 }
 
 interface PaymentConfirmation {
   userPassword?: string;
-  paymentPassword?: number;
+  paymentPassword?: string;
 }
 
 interface TrainScheduleQuery {
