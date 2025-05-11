@@ -9,6 +9,7 @@ pub struct Model {
     pub id: i32,
     pub train_id: i32,
     pub departure_date: Date,
+    pub origin_departure_time: i32,
     pub line_id: i64,
 }
 
