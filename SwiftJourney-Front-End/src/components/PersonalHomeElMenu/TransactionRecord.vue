@@ -30,35 +30,35 @@
                         <div style="min-width: 185px">付款时间: {{ transactionDetail.payTime == null ? '待付款' : transactionDetail.payTime }}</div>
                     </div>
                     <div v-if="isShowTransactionDetail(transactionDetail.id)">
-                        <el-table :data="transactionDetail.orderDetail" stripe style="width: 100%">
+                        <el-table :data="transactionDetail.orderInfo" stripe style="width: 100%">
                             <el-table-column fixed type="expand">
                                 <template #default="props">
                                     <div v-if="props.row.type == '火车订票'" class="train-order-detail-container">
                                         <el-card class="InfoCard" shadow="always">
                                             <div class="TravelInfo">
                                                 <div class="TravelDate">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).date }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "date") }}</p>
                                                 </div>
                                             </div>
                                             <div class="TicketInfo">
                                                 <div class="Info-BigName">
-                                                    <span style="font-weight: bolder;">{{ orderMap.get(props.row.id).depatureStation }}</span>
+                                                    <span style="font-weight: bolder;">{{ getOrderMap(props.row.id, "depatureStation") }}</span>
                                                     <span style="font-size: 14px;"> 站 </span>
                                                 </div>
                                                 <div class="Arrow">
-                                                    <span class="Arrow-span">{{ orderMap.get(props.row.id).trainNumber }}</span>
+                                                    <span class="Arrow-span">{{ getOrderMap(props.row.id, "trainNumber") }}</span>
                                                     <img class="Arrow-img" src="@/assets/TicketArrow.svg" />
-                                                    <span class="Arrow-span">{{ orderMap.get(props.row.id).depatureTime }} 开</span>
+                                                    <span class="Arrow-span">{{ getOrderMap(props.row.id, "depatureTime") }} 开</span>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <span style="font-weight: bolder;">{{ orderMap.get(props.row.id).reachStation }}</span>
+                                                    <span style="font-weight: bolder;">{{ getOrderMap(props.row.id, "reachStation") }}</span>
                                                     <span style="font-size: 14px;"> 站 </span>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).seatInfo }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "seatInfo") }}</p>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).name }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "name") }}</p>
                                                 </div>
                                             </div>
                                         </el-card>
@@ -67,22 +67,22 @@
                                         <el-card class="InfoCard" shadow="always">
                                             <div class="RoomInfo">
                                                 <div class="RoomNumber">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).number }} 间</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "number") }} 间</p>
                                                 </div>
                                             </div>
                                             <div class="HotelInfo">
                                                 <div class="Info-BigName">
-                                                    <span style="font-weight: bolder;">{{ orderMap.get(props.row.id).hotelName }}</span>
+                                                    <span style="font-weight: bolder;">{{ getOrderMap(props.row.id, "hotelName") }}</span>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).roomType }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "roomType") }}</p>
                                                 </div>
                                                 <div class="Info-SmaleName">
-                                                    <p style="margin-bottom: 0;">入住日期: {{ orderMap.get(props.row.id).beginDate }}</p>
-                                                    <p style="margin-bottom: 0;">离店日期: {{ orderMap.get(props.row.id).endDate }}</p>
+                                                    <p style="margin-bottom: 0;">入住日期: {{ getOrderMap(props.row.id, "beginDate") }}</p>
+                                                    <p style="margin-bottom: 0;">离店日期: {{ getOrderMap(props.row.id, "endDate") }}</p>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).name }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "name") }}</p>
                                                 </div>
                                             </div>
                                         </el-card>
@@ -91,25 +91,25 @@
                                         <el-card class="InfoCard" shadow="always">
                                             <div class="TravelInfo">
                                                 <div class="TravelDate">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).date }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "date") }}</p>
                                                 </div>
                                             </div>
                                             <div class="FoodInfo">
                                                 <div class="Info-BigName">
-                                                    <span style="font-weight: bolder;">{{ orderMap.get(props.row.id).shopName }}</span>
+                                                    <span style="font-weight: bolder;">{{ getOrderMap(props.row.id, "shopName") }}</span>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).foodName }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "foodName") }}</p>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).trainNumber }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "trainNumber") }}</p>
                                                 </div>
                                                 <div class="Info-SmaleName">
-                                                    <p style="margin-bottom: 0;">预计时间: {{ orderMap.get(props.row.id).time }}</p>
-                                                    <p v-if="orderMap.get(props.row.id).station != ''" style="margin-bottom: 0;">{{ orderMap.get(props.row.id).station }}站</p>
+                                                    <p style="margin-bottom: 0;">预计时间: {{ getOrderMap(props.row.id, "time") }}</p>
+                                                    <p v-if="getOrderMap(props.row.id, 'station') != ''" style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "station") }}站</p>
                                                 </div>
                                                 <div class="Info-BigName">
-                                                    <p style="margin-bottom: 0;">{{ orderMap.get(props.row.id).name }}</p>
+                                                    <p style="margin-bottom: 0;">{{ getOrderMap(props.row.id, "name") }}</p>
                                                 </div>
                                             </div>
                                         </el-card>
@@ -133,13 +133,30 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
-import { useTransactionStore } from '@/stores/transaction'
+import { orderApi } from "@/api/orderApi/orderApi";
+import type { ResponseData, TransactionData, OrderInfo, SeatLocationInfo, TrainOrderInfo, HotelOrderInfo, DishOrderInfo, TakeawayOrderInfo,
+    OrderInform, TransactionDetail, OrderDetail, TrainOrderDetail, HotelOrderDetail, FoodOrderDetail } from '@/interface/interface';
 dayjs.locale('zh-cn');
 
-const transaction = useTransactionStore();
+const statusChangeTab = {
+    unpaid: "未支付",
+    paid: "已支付",
+    ongoing: "进行中",
+    active: "",
+    completed: "已完成",
+    failed: "失败",
+    canceled: "已取消",
+}
+
+const typeChangeTab = {
+    train: "火车订票",
+    hotel: "酒店预订",
+    dish: "火车餐预订",
+    takeaway: "火车餐预订",
+}
 
 export default {
     data(){
@@ -152,33 +169,34 @@ export default {
             selectedDate: "",
             selectedStartDate: "",
             selectedEndDate: "",
-            isShowTransactionDetailMap: new Map(), //是否展示交易详情
-            transactionDetailList: transaction.transactionDetailList, 
-            orderMap: transaction.orderMap,
+            isShowTransactionDetailMap: new Map<string, Boolean>(), //是否展示交易详情
+            transactionMap: new Map<string, TransactionDetail>(),
+            transactionList: [] as string[],
+            orderMap: new Map<string, OrderDetail>(),
+            transactionDetailList: [] as TransactionDetail [],
         }
     },
     created: function() {
-        this.create();
+        //测试数据
+        //this.debugInit();
+        
+        //访问后端
+        this.init();
+        for(let tr of this.transactionDetailList) {
+            this.isShowTransactionDetailMap.set(tr.id, false);
+        }
     },
     methods: {
-        create() {
-            //生成debug数据
-            this.createDataForTest();
-
-
-
-            transaction.initTransactionDetailList();
-        },
-        isShowTransactionDetail (transactionId) {
+        isShowTransactionDetail (transactionId: string) {
             return this.isShowTransactionDetailMap.get(transactionId);
         },
-        showTransactionDetail(transactionId) {
+        showTransactionDetail(transactionId: string) {
             this.isShowTransactionDetailMap.set(transactionId, !this.isShowTransactionDetailMap.get(transactionId));
         },
-        selected(transactionDetail) {
+        selected(transactionDetail: TransactionDetail) {
             let selectedPay =  ((transactionDetail.status == '已支付') && this.isPayed) || ((transactionDetail.status == '未支付') && this.unPayed);
             let selectedType = false;
-            for(let order of transactionDetail.orderDetail) {
+            for(let order of transactionDetail.orderInfo) {
                 if(((order.type == '火车订票') && this.selectedTrain) || ((order.type == '酒店预订') && this.selectedHotel) || ((order.type == '火车餐预订') && this.selectedFood)){
                     selectedType = true;
                     break;
@@ -187,7 +205,7 @@ export default {
             let selectedTime = ((transactionDetail.time >= this.selectedStartDate) && (transactionDetail.time <= this.selectedEndDate)) || this.selectedDate == '';
             return selectedPay && selectedType  && selectedTime;
         },
-        handleDateChange(dateRange) {
+        handleDateChange(dateRange: any) {
             if(dateRange){
                 const [startDate, endDate] = this.selectedDate;
                 this.selectedStartDate = dayjs(startDate).format('YYYY-MM-DD HH:mm');
@@ -196,126 +214,303 @@ export default {
                 this.selectedDate = '';
             }
         },
+
+        getOrderMap(id: string, name: string): any {
+            let order = this.orderMap.get(id);
+            if(order && name in order){
+                return (order as any)[name];
+            }
+        },
+
+        //-----------init相关----------------//
+        setTransactionMap(transactionDetail: TransactionDetail): void {
+            this.transactionMap.set(transactionDetail.id, transactionDetail);
+        },
+
+        setOrderMap(orderDetail: OrderDetail): void {
+            this.orderMap.set(orderDetail.id, orderDetail);
+        },
+
+        initTransactionDetailList(): void {
+            this.transactionMap.forEach((value, key) => {
+                this.transactionList.push(key);
+            });
+            this.transactionListSort();
+            this.transactionWithMaps();
+        },
+
+        transactionListSort(): string[] {
+            return this.transactionList.sort((a, b) => {
+                const transactionA = this.transactionMap.get(a);
+                const transactionB = this.transactionMap.get(b);
+
+                if (!transactionA || !transactionB) {
+                    // 如果某个交易不存在，则将其视为较后
+                    if (!transactionA) return 1;
+                    if (!transactionB) return -1;
+                }
+
+                const time1 = transactionA.time;
+                const time2 = transactionB.time;
+                if(time1 < time2) return 1;
+                if(time1 > time2) return -1;
+                return 0;
+            });
+        },
+
+        transactionWithMaps(): void {
+            for(let id of this.transactionList) {
+                const transactionDetail = this.transactionMap.get(id);
+                if (transactionDetail) { // 检查是否为 undefined
+                    this.transactionDetailList.push(transactionDetail);
+                }
+            }
+        },
+
+        async init() {
+            await orderApi.orderList()
+            .then((res) => {
+                if(res.status == 200){
+                    const resData: ResponseData = res.data;
+                    this.dataHandle(resData);
+                } else {
+                    throw new Error(res.statusText);
+                }
+            })
+            .catch((error) => {
+                console.error(error);
+            })
+        },
+
+        dataHandle(resData: ResponseData): void{
+            for(const transactionData of resData){
+                let transactionDetail: TransactionDetail = {
+                    id: transactionData.transactionId,
+                    status: statusChangeTab[transactionData.status],
+                    time: transactionData.createTime,
+                    payTime: transactionData.payTime,
+                    money: String(transactionData.amount),
+                    orderInfo: [] as OrderInform [],
+                };
+                for(const orderInfo of transactionData.orders){
+                    let orderInform: OrderInform = {
+                        id: orderInfo.orderId,
+                        status: statusChangeTab[orderInfo.status],
+                        type: "",
+                        money: String(orderInfo.unitPrice),
+                        canCanceled: orderInfo.canCancel,
+                    };
+                    switch(orderInfo.orderType){
+                        case "train":
+                            const trainOrderInfo = orderInfo as TrainOrderInfo;
+                            let trainOrderDetail: TrainOrderDetail = {
+                                id: trainOrderInfo.orderId,
+                                name: trainOrderInfo.name,
+                                depatureStation: trainOrderInfo.departureStation,
+                                reachStation: trainOrderInfo.terminalStation,
+                                trainNumber: trainOrderInfo.trainNumber,
+                                date: trainOrderInfo.departureTime.substring(0, 10),
+                                depatureTime: trainOrderInfo.departureTime.substring(11),
+                                seatInfo: this.getSeat(trainOrderInfo.seat)
+                            };
+                            this.setOrderMap(trainOrderDetail);
+                            break;
+                        case "dish":
+                            const dishOrderInfo = orderInfo as DishOrderInfo;
+                            let dishOrederDetail: FoodOrderDetail = {
+                                id: dishOrderInfo.orderId,
+                                shopName: "餐车",
+                                foodName: dishOrderInfo.dishName,
+                                trainNumber: dishOrderInfo.trainNumber,
+                                station: '',
+                                date: dishOrderInfo.depatureTime.substring(0, 10),
+                                time: dishOrderInfo.dishTime == "dinner" ? "晚餐" : "午餐",
+                                name: dishOrderInfo.name,
+                            }
+                            this.setOrderMap(dishOrederDetail);
+                            break;
+                        case "hotel":
+                            const hotelOrderInfo = orderInfo as HotelOrderInfo;
+                            let hotelOrderDetail: HotelOrderDetail = {
+                                id: hotelOrderInfo.orderId,
+                                hotelName: hotelOrderInfo.hotelName,
+                                roomType: hotelOrderInfo.roomType,
+                                beginDate: hotelOrderInfo.beginDate,
+                                endDate: hotelOrderInfo.endDate,
+                                name: hotelOrderInfo.name,
+                                number: hotelOrderInfo.amount,
+                            }
+                            this.setOrderMap(hotelOrderDetail);
+                            break;
+                        case "takeaway":
+                            const takeawayOrderInfo = orderInfo as TakeawayOrderInfo;
+                            let takeawayOrederDetail: FoodOrderDetail = {
+                                id: takeawayOrderInfo.orderId,
+                                shopName: takeawayOrderInfo.shopName,
+                                foodName: takeawayOrderInfo.takeawayName,
+                                trainNumber: takeawayOrderInfo.trainNumber,
+                                station: takeawayOrderInfo.station,
+                                date: takeawayOrderInfo.depatureTime.substring(0,10),
+                                time: takeawayOrderInfo.dishTime,
+                                name: takeawayOrderInfo.name,
+                            }
+                            this.setOrderMap(takeawayOrederDetail);
+                            break;
+                        }
+                    orderInform.type = typeChangeTab[orderInfo.orderType];
+                    transactionDetail.orderInfo.push(orderInform);
+                }
+                this.setTransactionMap(transactionDetail);
+            }
+            this.initTransactionDetailList();
+        },
+
+        getSeat(seat: SeatLocationInfo): string {
+            return (seat.carriage < 10 ? `0${seat.carriage}` : `${seat.carriage}`) + "车" + seat.row + seat.location + " " + seat.type;
+        },
+
         //测试数据
-        createDataForTest() {
-            transaction.setTransactionMap({
-                id: "3x124gh234", 
-                status: "已支付",
-                time: "2025-04-09 10:20",
-                payTime: "2025-04-09 10:21", 
-                money: "SC 500", 
-                orderDetail: [{ 
-                    id: "0x0001", //订单编号
-                    status: "已完成", //订单状态
-                    money: "SC 400", //订单金额
-                    type: "火车订票", 
-                },
-                {
-                    id: "0x0002",
-                    status: "未完成",
-                    money: "SC 80",
-                    type: "火车订票", 
-                },
-                {
-                    id: "0x0003",
-                    status: "进行中",
-                    money: "SC 20",
-                    type: "火车订票", 
-                }], 
-            });
-            transaction.setOrderMap({
-                id: "0x0001",
-                depatureStation: "北京南",
-                reachStation: "南京南",
-                trainNumber: "G1",
-                date: "2025-04-20",
-                depatureTime: "07:20",
-                name: "张三",
-                seatInfo: "03车12A 二等座", 
-            });
-            transaction.setOrderMap({
-                id: "0x0002",
-                depatureStation: "南京南",
-                reachStation: "上海虹桥",
-                trainNumber: "G287",
-                date: "2025-04-20",
-                depatureTime: "11:35",
-                name: "张三",
-                seatInfo: "05车01E 二等座",
-            });
-            transaction.setOrderMap({
-                id: "0x0003",
-                depatureStation: "上海虹桥",
-                reachStation: "上海",
-                trainNumber: "D1088",
-                date: "2025-04-20",
-                depatureTime: "14:08",
-                name: "张三",
-                seatInfo: "05车10A 二等座",
-            });
-            transaction.setTransactionMap({
-                id: "68954cdf75", 
-                status: "未支付",
-                time: "2025-04-20 20:06", 
-                money: "SC 300", 
-                orderDetail: [{ 
-                    id: "0x0089", //订单编号
-                    status: "未支付", //订单状态
-                    money: "SC 300", //订单金额
-                    type: "酒店预订", 
-                }], 
-            });
-            transaction.setOrderMap({
-                id: "0x0089",
-                hotelName: "日升大酒店",
-                roomType: "大床房",
-                beginDate: "2025-04-20",
-                endDate: "2025-04-21",
-                name: "张三",
-                number: "1",
-            });
-            transaction.setTransactionMap({
-                id: "05we7df58w", 
-                status: "已支付",
-                time: "2025-04-15 07:48",
-                payTime: "2025-04-15 09:22", 
-                money: "SC 80", 
-                orderDetail: [{ 
-                    id: "0x8888", //订单编号
-                    status: "已完成", //订单状态
-                    money: "SC 30", //订单金额
-                    type: "火车餐预订", 
-                },
-                {
-                    id: "0x8756",
-                    status: "已完成",
-                    money: "SC 50",
-                    type: "火车餐预订", 
-                }], 
-            });
-            transaction.setOrderMap({
-                id: "0x8888",
-                shopName: "餐车",
-                foodName: "牛肉饭",
-                trainNumber: "G1",
-                station: "",
-                date: "YYYY-MM-DD",
-                time: "HH:mm",
-                name: "张三",
-            });
-            transaction.setOrderMap({
-                id: "0x8756",
-                shopName: "KFC",
-                foodName: "套餐A",
-                trainNumber: "G1",
-                station: "天津南",
-                date: "YYYY-MM-DD",
-                time: "HH:mm",
-                name: "张三",
-            });
-            this.isShowTransactionDetailMap.set('3x124gh234', false);
-            this.isShowTransactionDetailMap.set('68954cdf75', false);
-            this.isShowTransactionDetailMap.set('05we7df58w', false);
+        debugInit(): void {
+            const res: ResponseData = this.DebugList();
+            this.dataHandle(res);
+        },
+        DebugList(): ResponseData {
+            const debugData = [] as ResponseData;
+            const trainTransactionData: TransactionData = {
+                transactionId: "3x124gh234",
+                status: "paid",
+                createTime: "2025-04-09 10:20",
+                payTime: "2025-04-09 10:21",
+                amount: 500,
+                orders: [
+                    {
+                        orderId: "0x0001",
+                        status: "completed",
+                        unitPrice: 400,
+                        amount: 1,
+                        orderType: "train",
+                        canCancel: false,
+                        trainNumber: "G1",
+                        departureStation: "北京南",
+                        terminalStation: "南京南",
+                        departureTime: "2025-04-20 07:20",
+                        terminalTime: '',
+                        name: "张三",
+                        seat: {
+                            carriage: 3,
+                            row: 12,
+                            location: "A",
+                            type: "二等座",
+                        },
+                    } as TrainOrderInfo,
+                    {
+                        orderId: "0x0002",
+                        status: "ongoing",
+                        unitPrice: 80,
+                        amount: 1,
+                        orderType: "train",
+                        canCancel: false,
+                        trainNumber: "G287",
+                        departureStation: "南京南",
+                        terminalStation: "上海虹桥",
+                        departureTime: "2025-04-20 11:35",
+                        terminalTime: '',
+                        name: "张三",
+                        seat: {
+                            carriage: 5,
+                            row: 1,
+                            location: "E",
+                            type: "二等座",
+                        },
+                    } as TrainOrderInfo,
+                    {
+                        orderId: "0x0003",
+                        status: "ongoing",
+                        unitPrice: 20,
+                        amount: 1,
+                        orderType: "train",
+                        canCancel: false,
+                        trainNumber: "D1088",
+                        departureStation: "上海虹桥",
+                        terminalStation: "上海",
+                        departureTime: "2025-04-20 14:08",
+                        terminalTime: '',
+                        name: "张三",
+                        seat: {
+                            carriage: 12,
+                            row: 3,
+                            location: "B",
+                            type: "二等座",
+                        },
+                    } as TrainOrderInfo,
+                ]
+            };
+            debugData.push(trainTransactionData);
+
+            const hotelTransactionData: TransactionData = {
+                transactionId: "68954cdf75",
+                status: "unpaid",
+                createTime: "2025-04-20 20:06",
+                amount: 300,
+                orders: [
+                    {
+                        orderId: "0x0089",
+                        status: "unpaid",
+                        unitPrice: 300,
+                        amount: 1,
+                        orderType: "hotel",
+                        canCancel: false,
+                        hotelName: "日升大酒店",
+                        roomType: "大床房",
+                        hotelId: '',
+                        beginDate: "2025-04-20",
+                        endDate: "2025-04-21",
+                        name: "张三"
+                    } as HotelOrderInfo
+                ]
+            }
+            debugData.push(hotelTransactionData);
+
+            const foodTransactionData: TransactionData = {
+                transactionId: "05we7df58w",
+                status: "paid",
+                createTime: "2025-04-15 07:48",
+                payTime: "2025-04-15 09:22",
+                amount: 80,
+                orders: [
+                    {
+                        orderId: "0x8888",
+                        status: "completed",
+                        unitPrice: 50,
+                        amount: 1,
+                        orderType: "dish",
+                        canCancel: false,
+                        trainNumber: "G1",
+                        depatureTime: "2025-04-20 07:20",
+                        dishName: "牛肉饭",
+                        dishTime: "lunch",
+                        name: "张三"
+                    } as DishOrderInfo,
+                    {
+                        orderId: "0x8756",
+                        status: "completed",
+                        unitPrice: 30,
+                        amount: 1,
+                        orderType: "takeaway",
+                        canCancel: false,
+                        trainNumber: "G1",
+                        station: "天津南",
+                        depatureTime: "2025-04-20 07:20",
+                        dishTime: "2025-04-20 08:40",
+                        shopName: "KFC",
+                        takeawayName: "套餐B",
+                        name: "张三"
+                    } as TakeawayOrderInfo,
+                ]
+            }
+            debugData.push(foodTransactionData);
+
+            return debugData;
         }
     }
 }
