@@ -1,11 +1,9 @@
 use crate::domain::RepositoryError;
-use crate::domain::model::order::{DishOrder, HotelOrder, OrderId, TakeawayOrder, TrainOrder};
+use crate::domain::model::order::OrderId;
 use crate::domain::model::train_schedule::TrainScheduleId;
-use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use sea_orm::prelude::DateTimeWithTimeZone;
-use sea_orm::{DatabaseBackend, FromQueryResult, Statement};
+use sea_orm::FromQueryResult;
 use uuid::Uuid;
 /*
 c
@@ -81,8 +79,8 @@ SELECT train.number, route.departure_time, person_info.name, dish.name, dish.tim
 pub struct DishOrderRelatedData {
     /// 车次号
     pub train_number: String,
-    /// 车次离开始发站相对当日00:00:00的秒数
-    pub departure_time: i32,
+    /// 离开起始站日期时间
+    pub departure_time: String,
     /// 点餐人姓名
     pub name: String,
     /// 餐品名称
@@ -126,7 +124,8 @@ SELECT route.order, route.arrival_time, route.departure_time, station.name FROM 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
 pub struct TakeawayOrderRelatedData {
     pub train_number: String,
-    pub departure_time: i32,
+    /// 离开起始站日期时间
+    pub departure_time: String,
     pub station: String,
     pub shop_name: String,
     pub name: String,
@@ -144,7 +143,7 @@ pub trait OrderRepository: 'static + Send + Sync {
     async fn get_route_info_takeaway_order(
         &self,
         order_id: OrderId,
-        train_schedule_id: TrainScheduleId,
+        train_order_id: OrderId,
     ) -> Result<(NaiveDate, Vec<RouteInfo>), RepositoryError>;
     async fn get_train_order_related_data(
         &self,
@@ -161,12 +160,13 @@ pub trait OrderRepository: 'static + Send + Sync {
     async fn get_dish_order_related_data(
         &self,
         order_id: OrderId,
+        tz_offset_hour: i32,
     ) -> Result<DishOrderRelatedData, RepositoryError>;
 
     async fn get_takeaway_order_related_data(
         &self,
         order_id: OrderId,
-        train_schedule_id: TrainScheduleId,
+        train_order_id: OrderId,
         tz_offset_hour: i32,
     ) -> Result<TakeawayOrderRelatedData, RepositoryError>;
 }

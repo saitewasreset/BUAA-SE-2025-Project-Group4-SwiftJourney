@@ -88,6 +88,7 @@
 //! - 大规模聚合根集合应考虑分片管理
 
 pub mod geo;
+pub mod order;
 pub mod order_status;
 pub mod password;
 pub mod route;

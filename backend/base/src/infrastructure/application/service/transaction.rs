@@ -1,6 +1,6 @@
 use crate::application::commands::transaction::{
     BalanceQuery, GenerateDebugTransactionCommand, PayTransactionCommand, RechargeCommand,
-    SetPaymentPasswordCommand, TransactionQuery,
+    SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
 };
 use crate::application::service::transaction::{
     BalanceInfoDTO, TransactionApplicationService, TransactionApplicationServiceError,
@@ -13,6 +13,7 @@ use crate::domain::model::transaction::{Transaction, TransactionAmountAbs};
 use crate::domain::model::user::{PaymentPassword, User, UserId};
 use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::repository::user::UserRepository;
+use crate::domain::service::order::order_dto::TransactionDataDto;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::transaction::TransactionService;
 use crate::domain::service::user::{UserService, UserServiceError};
@@ -285,5 +286,40 @@ where
             })?;
 
         Ok(tx.into())
+    }
+
+    async fn query_transaction_details(
+        &self,
+        query: TransactionDetailQuery,
+    ) -> Result<Vec<TransactionDataDto>, Box<dyn ApplicationError>> {
+        let user_id = self.get_user_id_by_session_id(&query.session_id).await?;
+
+        let transaction_list = self
+            .transaction_repository
+            .find_by_user_id(user_id)
+            .await
+            .map_err(|e| {
+                error!("failed to query transaction for user_id {}: {}", user_id, e);
+
+                GeneralError::InternalServerError
+            })?;
+
+        let mut result = Vec::with_capacity(transaction_list.len());
+
+        for transaction in transaction_list {
+            let txid = transaction.get_id();
+            result.push(
+                self.transaction_service
+                    .convert_transaction_to_dto(transaction)
+                    .await
+                    .map_err(|e| {
+                        error!("failed to convert transaction {:?} to dto {}", txid, e);
+
+                        GeneralError::InternalServerError
+                    })?,
+            )
+        }
+
+        Ok(result)
     }
 }
