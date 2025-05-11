@@ -98,6 +98,7 @@ pub struct TrainSchedule {
     id: Option<TrainScheduleId>,
     train_id: TrainId,
     date: NaiveDate,
+    origin_departure_time: i32,
     route_id: RouteId,
     seat_availability_map: SeatAvailabilityMap,
 }
@@ -131,6 +132,7 @@ impl TrainSchedule {
         id: Option<TrainScheduleId>,
         train_id: TrainId,
         date: NaiveDate,
+        origin_departure_time: i32,
         route_id: RouteId,
     ) -> Self {
         Self {
@@ -138,6 +140,7 @@ impl TrainSchedule {
             route_id,
             train_id,
             date,
+            origin_departure_time,
             seat_availability_map: HashMap::new(),
         }
     }
@@ -155,6 +158,10 @@ impl TrainSchedule {
     /// 获取运行日期
     pub fn date(&self) -> NaiveDate {
         self.date
+    }
+
+    pub fn origin_departure_time(&self) -> i32 {
+        self.origin_departure_time
     }
 
     pub fn add_seat_availability(
