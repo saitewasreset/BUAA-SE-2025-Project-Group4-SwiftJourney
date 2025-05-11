@@ -160,6 +160,26 @@ pub enum RefundError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TransactionAmountAbs(Decimal);
 
+#[derive(Error, Debug)]
+pub enum TransactionAmountAbsError {
+    #[error("negative value")]
+    NegativeValue,
+    #[error("invalid value")]
+    InvalidValue,
+}
+
+impl TransactionAmountAbs {
+    pub fn from_f64_checked(value: f64) -> Result<TransactionAmountAbs, TransactionAmountAbsError> {
+        if value < 0.0 {
+            return Err(TransactionAmountAbsError::NegativeValue);
+        }
+
+        let dec = Decimal::try_from(value).map_err(|e| TransactionAmountAbsError::InvalidValue)?;
+
+        Ok(TransactionAmountAbs(dec))
+    }
+}
+
 impl From<Decimal> for TransactionAmountAbs {
     /// 将 `Decimal` 类型转换为 `TransactionAmountAbs`。
     ///
@@ -219,6 +239,27 @@ impl Transaction {
             finish_time: Some(Self::now()),
             amount: -Decimal::from(recharge_amount),
             status: TransactionStatus::Paid,
+            user_id,
+            orders: vec![],
+        }
+    }
+
+    /// 创建一个新的调试交易实例。
+    ///
+    /// Arguments:
+    /// - `user_id`: 用户的唯一标识符。
+    /// - `recharge_amount`: 充值金额的绝对值。
+    ///
+    /// Returns:
+    /// - 新创建的调试交易实例。
+    pub fn new_debug(user_id: UserId, amount: TransactionAmountAbs) -> Transaction {
+        Transaction {
+            transaction_id: None,
+            uuid: Uuid::new_v4(),
+            create_time: Self::now(),
+            finish_time: Some(Self::now()),
+            amount: Decimal::from(amount),
+            status: TransactionStatus::Unpaid,
             user_id,
             orders: vec![],
         }
