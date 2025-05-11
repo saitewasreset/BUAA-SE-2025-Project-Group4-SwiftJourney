@@ -4,9 +4,11 @@ use actix_web::cookie::time::Duration;
 use actix_web::web::{Bytes, Data};
 use actix_web::{HttpRequest, HttpResponse, post};
 use base::application::commands::user_manager::{
-    UserLoginCommand, UserLogoutCommand, UserRegisterCommand,
+    UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
-use base::application::service::user_manager::{UserLoginDTO, UserManagerService, UserRegisterDTO};
+use base::application::service::user_manager::{
+    UserLoginDTO, UserManagerService, UserRegisterDTO, UserUpdatePasswordDTO,
+};
 use shared::{API_SUCCESS_CODE, API_SUCCESS_MESSAGE};
 
 #[post("/register")]
@@ -73,4 +75,25 @@ async fn logout(
     let command = UserLogoutCommand { session_id };
 
     ApiResponse::ok(user_manager_service.logout(command).await?)
+}
+
+#[post("/update_password")]
+async fn update_password(
+    request: HttpRequest,
+    body: Bytes,
+    user_manager_service: Data<dyn UserManagerService>,
+) -> Result<ApiResponse<()>, ApplicationErrorBox> {
+    let session_id = get_session_id(&request)?;
+
+    let dto: UserUpdatePasswordDTO = parse_request_body(body)?;
+
+    let command = UserUpdatePasswordCommand {
+        session_id,
+        origin_password: dto.origin_password,
+        new_password: dto.new_password,
+    };
+
+    user_manager_service.update_password(command).await?;
+
+    ApiResponse::ok(())
 }

@@ -120,3 +120,10 @@ impl From<UserLoginDTO> for UserLoginCommand {
 pub struct UserLogoutCommand {
     pub session_id: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct UserUpdatePasswordCommand {
+    pub session_id: String,
+    pub origin_password: String,
+    pub new_password: String,
+}
