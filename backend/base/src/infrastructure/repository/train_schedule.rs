@@ -62,6 +62,7 @@ impl TrainScheduleDataConverter {
             Some(TrainScheduleId::from_db_value(train_schedule_do.id)?),
             TrainId::from_db_value(train_schedule_do.train_id)?,
             train_schedule_do.departure_date,
+            train_schedule_do.origin_departure_time,
             RouteId::from_db_value(train_schedule_do.line_id)?,
         );
 
@@ -104,6 +105,7 @@ impl TrainScheduleDataConverter {
             train_id: ActiveValue::Set(train_schedule.train_id().to_db_value()),
             line_id: ActiveValue::Set(train_schedule.route_id().to_db_value()),
             departure_date: ActiveValue::Set(train_schedule.date()),
+            origin_departure_time: ActiveValue::Set(train_schedule.origin_departure_time()),
         };
 
         if let Some(id) = train_schedule.get_id() {
