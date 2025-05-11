@@ -21,12 +21,32 @@ struct TrainOrderQueryResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
+struct DishOrderQueryResult {
+    /// 车次号
+    pub train_number: String,
+    /// 离开起始站的时间相对当日00:00:00的秒数
+    pub departure_time: i32,
+    /// 点餐人姓名
+    pub name: String,
+    /// 餐品名称
+    pub dish_name: String,
+    /// 用餐时间
+    pub dish_time: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
 struct TakeawayOrderQueryResult {
     pub train_number: String,
     pub station_id: i32,
     pub shop_name: String,
     pub name: String,
     pub takeaway_name: String,
+}
+
+#[derive(Debug, FromQueryResult)]
+struct DepartureTimeQueryResult {
+    pub departure_date: NaiveDate,
+    pub origin_departure_time: i32,
 }
 
 pub struct OrderRepositoryImpl {
@@ -101,7 +121,7 @@ INNER JOIN "train_schedule"
     async fn get_route_info_takeaway_order(
         &self,
         order_id: OrderId,
-        train_schedule_id: TrainScheduleId,
+        train_order_id: OrderId,
     ) -> Result<(NaiveDate, Vec<RouteInfo>), RepositoryError> {
         // 此时是相对发车时间
         let mut result = RouteInfo::find_by_statement(Statement::from_sql_and_values(
@@ -128,14 +148,24 @@ FROM "takeaway_order"
         .await
         .context("Failed to select route info")?;
 
+        let train_order =
+            crate::models::train_order::Entity::find_by_id(train_order_id.to_db_value())
+                .one(&self.db)
+                .await
+                .context("failed to query train order")?
+                .ok_or(RepositoryError::InconsistentState(anyhow!(
+                    "no train order for id: {}",
+                    train_order_id.to_db_value()
+                )))?;
+
         let train_schedule =
-            crate::models::train_schedule::Entity::find_by_id(train_schedule_id.to_db_value())
+            crate::models::train_schedule::Entity::find_by_id(train_order.train_schedule_id)
                 .one(&self.db)
                 .await
                 .context("failed to query train schedule")?
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no train schedule for id: {}",
-                    train_schedule_id.to_db_value()
+                    train_order.train_schedule_id
                 )))?;
 
         for data in &mut result {
@@ -258,8 +288,9 @@ FROM "hotel_order"
     async fn get_dish_order_related_data(
         &self,
         order_id: OrderId,
+        tz_offset_hour: i32,
     ) -> Result<DishOrderRelatedData, RepositoryError> {
-        let result = DishOrderRelatedData::find_by_statement(Statement::from_sql_and_values(
+        let query_result = DishOrderQueryResult::find_by_statement(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
             r#"SELECT
 "train"."number" AS "train_number",
@@ -291,13 +322,55 @@ FROM "dish_order"
             order_id.to_db_value()
         )))?;
 
+        let departure_time_info =
+            DepartureTimeQueryResult::find_by_statement(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT
+     "train_schedule"."departure_date" AS "departure_date",
+    "train_schedule"."origin_departure_time" AS "origin_departure_time"
+FROM "dish_order"
+    INNER JOIN "train_order"
+        ON "dish_order"."train_order_id" = "train_order"."id"
+    INNER JOIN "train_schedule"
+        ON "train_order"."train_schedule_id" = "train_schedule"."id"
+WHERE "dish_order"."id" = $1"#,
+                [order_id.to_db_value().into()],
+            ))
+            .one(&self.db)
+            .await
+            .context("failed to query related train schedule data")?
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no related train schedule for dish order id: {}",
+                order_id.to_db_value()
+            )))?;
+
+        let departure_time = departure_time_info
+            .departure_date
+            .and_time(
+                NaiveTime::from_num_seconds_from_midnight_opt(
+                    departure_time_info.origin_departure_time as u32,
+                    0,
+                )
+                .unwrap(),
+            )
+            .and_local_timezone(FixedOffset::east_opt(tz_offset_hour * 3600).unwrap())
+            .unwrap();
+
+        let result = DishOrderRelatedData {
+            train_number: query_result.train_number,
+            departure_time: departure_time.to_rfc3339(),
+            name: query_result.name,
+            dish_name: query_result.dish_name,
+            dish_time: query_result.dish_time,
+        };
+
         Ok(result)
     }
 
     async fn get_takeaway_order_related_data(
         &self,
         order_id: OrderId,
-        train_schedule_id: TrainScheduleId,
+        train_order_id: OrderId,
         tz_offset_hour: i32,
     ) -> Result<TakeawayOrderRelatedData, RepositoryError> {
         let query_result =
@@ -338,30 +411,62 @@ FROM "takeaway_order"
             )))?;
 
         let (departure_date, route_info_list) = self
-            .get_route_info_takeaway_order(order_id, train_schedule_id)
+            .get_route_info_takeaway_order(order_id, train_order_id)
             .await?;
 
         if route_info_list.len() < 2 {
             panic!(
-                "Invalid line for train schedule id: {}, less than 2 stations",
-                train_schedule_id.to_db_value()
+                "Invalid line for train order id: {}, less than 2 stations",
+                train_order_id.to_db_value()
             );
         }
 
-        let departure_time = route_info_list[0].departure_time;
+        let departure_time_info =
+            DepartureTimeQueryResult::find_by_statement(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT
+     "train_schedule"."departure_date" AS "departure_date",
+    "train_schedule"."origin_departure_time" AS "origin_departure_time"
+FROM "takeaway_order"
+    INNER JOIN "train_order"
+        ON "takeaway_order"."train_order_id" = "train_order"."id"
+    INNER JOIN "train_schedule"
+        ON "train_order"."train_schedule_id" = "train_schedule"."id"
+WHERE "takeaway_order"."id" = $1"#,
+                [order_id.to_db_value().into()],
+            ))
+            .one(&self.db)
+            .await
+            .context("failed to query related train schedule data")?
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no related train schedule for takeaway order id: {}",
+                order_id.to_db_value()
+            )))?;
+
+        let departure_time = departure_time_info
+            .departure_date
+            .and_time(
+                NaiveTime::from_num_seconds_from_midnight_opt(
+                    departure_time_info.origin_departure_time as u32,
+                    0,
+                )
+                .unwrap(),
+            )
+            .and_local_timezone(FixedOffset::east_opt(tz_offset_hour * 3600).unwrap())
+            .unwrap();
 
         let dish_route_info = route_info_list
             .iter()
             .find(|x| x.station_id == query_result.station_id)
             .ok_or(RepositoryError::InconsistentState(anyhow!(
-                "takeaway station id: {} not found in route info, train schedule id: {}",
+                "takeaway station id: {} not found in route info, train order id: {}",
                 query_result.station_id,
-                train_schedule_id.to_db_value()
+                train_order_id.to_db_value()
             )))?;
 
         let result = TakeawayOrderRelatedData {
             train_number: query_result.train_number,
-            departure_time,
+            departure_time: departure_time.to_rfc3339(),
             station: dish_route_info.station_name.clone(),
             shop_name: query_result.shop_name,
             takeaway_name: query_result.takeaway_name,

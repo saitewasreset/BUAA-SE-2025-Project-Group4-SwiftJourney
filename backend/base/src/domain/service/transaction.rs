@@ -6,9 +6,12 @@
 //! - `TransactionService`: 异步 trait，定义了交易领域的操作。
 use crate::domain::RepositoryError;
 use crate::domain::model::order::{Order, OrderStatus};
-use crate::domain::model::transaction::{RefundError, TransactionAmountAbs, TransactionStatus};
+use crate::domain::model::transaction::{
+    RefundError, Transaction, TransactionAmountAbs, TransactionStatus,
+};
 use crate::domain::model::user::UserId;
 use crate::domain::service::ServiceError;
+use crate::domain::service::order::order_dto::TransactionDataDto;
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use thiserror::Error;
@@ -136,4 +139,9 @@ pub trait TransactionService: 'static + Send + Sync {
         transaction_id: Uuid,
         to_refund_orders: &[Box<dyn Order>],
     ) -> Result<Uuid, TransactionServiceError>;
+
+    async fn convert_transaction_to_dto(
+        &self,
+        transaction: Transaction,
+    ) -> Result<TransactionDataDto, TransactionServiceError>;
 }

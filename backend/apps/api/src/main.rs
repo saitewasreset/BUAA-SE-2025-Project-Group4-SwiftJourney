@@ -32,9 +32,7 @@ use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH};
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::train_data::TrainDataService;
-use base::application::service::transaction::{
-    TransactionApplicationService, TransactionApplicationServiceError,
-};
+use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
 use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
@@ -48,6 +46,7 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::repository::city::CityRepositoryImpl;
+use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
@@ -55,6 +54,7 @@ use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
@@ -76,6 +76,15 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+
+    let tz_offset_hour = match tz_offset_hour_str {
+        Some(hour_str) => hour_str
+            .parse::<i32>()
+            .expect("cannot parse tz offset hour"),
+        // UTC+8: China Standard Time
+        None => 8,
+    };
 
     let debug_mode = match env::var("DEBUG") {
         Ok(_) => true,
@@ -107,6 +116,7 @@ async fn main() -> std::io::Result<()> {
     let train_repository_impl = Arc::new(TrainRepositoryImpl::new(conn.clone()));
     let route_repository_impl = Arc::new(RouteRepositoryImpl::new(conn.clone()));
     let transaction_repository_impl = Arc::new(TransactionRepositoryImpl::new(conn.clone()));
+    let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
 
     let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
         Arc::clone(&user_repository_impl),
@@ -140,9 +150,15 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&geo_service_impl),
     ));
 
+    let order_service_impl = Arc::new(OrderServiceImpl::new(
+        Arc::clone(&order_repository_impl),
+        tz_offset_hour,
+    ));
+
     let transaction_service_impl = Arc::new(TransactionServiceImpl::new(
         Arc::clone(&user_repository_impl),
         Arc::clone(&transaction_repository_impl),
+        Arc::clone(&order_service_impl),
         Arc::clone(&order_status_manager_service_impl),
     ));
 
@@ -216,7 +232,8 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/user").configure(api::user::scoped_config))
                     .service(web::scope("/general").configure(api::general::scoped_config))
                     .service(web::scope("/data").configure(api::data::scoped_config))
-                    .service(web::scope("/payment").configure(api::payment::scoped_config)),
+                    .service(web::scope("/payment").configure(api::payment::scoped_config))
+                    .service(web::scope("/order").configure(api::order::scoped_config)),
             )
         // Step 6: Register your endpoint using `.service()` function
         // Exercise 1.2.1D - 7: Your code here. (5 / 5)

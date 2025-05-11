@@ -485,6 +485,10 @@ impl Transaction {
         self.status
     }
 
+    pub fn amount(&self) -> Decimal {
+        self.amount
+    }
+
     /// 获取交易包含的订单列表并转移所有权。
     ///
     /// Returns:

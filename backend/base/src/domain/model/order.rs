@@ -377,15 +377,6 @@ pub struct TrainOrder {
     station_range: StationRange<Verified>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TrainOrderDetail {
-    pub base: BaseOrder,
-    pub train_number: TrainNumber<Verified>,
-    pub departure_time: DateTimeWithTimeZone,
-    pub name: String,
-    pub seat: String,
-}
-
 impl TrainOrder {
     /// 创建一个新的 `TrainOrder` 实例。
     ///
@@ -502,17 +493,6 @@ pub struct HotelOrder {
     hotel_id: HotelId,
     room_id: HotelRoomId,
     booking_date_range: HotelDateRange,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HotelOrderDetail {
-    pub base: BaseOrder,
-    pub hotel_name: String,
-    pub hotel_id: Uuid,
-    pub name: String,
-    pub room_type: String,
-    pub begin_date: String,
-    pub end_date: String,
 }
 
 impl HotelOrder {
@@ -632,14 +612,6 @@ pub struct DishOrder {
     dish_id: DishId,
     unit_price: Decimal,
     amount: Decimal,
-}
-
-pub struct DishOrderDetail {
-    pub base: BaseOrder,
-    pub train_number: TrainNumber<Verified>,
-    pub dish_time: DishTime,
-    pub name: String,
-    pub dish_name: String,
 }
 
 impl DishOrder {
@@ -770,16 +742,6 @@ pub struct TakeawayOrder {
     takeaway_dish_id: TakeawayDishId,
     unit_price: Decimal,
     amount: Decimal,
-}
-
-pub struct TakeawayOrderDetail {
-    pub train_number: String,
-    pub departure_time: DateTimeWithTimeZone,
-    pub station: String,
-    pub station_time: DateTimeWithTimeZone,
-    pub shop_name: String,
-    pub name: String,
-    pub takeaway_name: String,
 }
 
 impl TakeawayOrder {
