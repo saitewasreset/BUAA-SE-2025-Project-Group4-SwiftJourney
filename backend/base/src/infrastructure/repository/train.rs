@@ -120,6 +120,7 @@ impl TrainDataConverter {
             train_type,
             seats,
             default_route_id,
+            pack.train.default_origin_departure_time,
         ))
     }
 
@@ -138,6 +139,7 @@ impl TrainDataConverter {
             number: ActiveValue::Set(train.number().to_string()),
             type_id: ActiveValue::Set(train_type_id),
             default_line_id: ActiveValue::Set(train.default_route_id().to_db_value()),
+            default_origin_departure_time: ActiveValue::Set(train.default_origin_departure_time()),
         };
 
         if let Some(id) = train.get_id() {
@@ -1021,6 +1023,7 @@ impl TrainRepository for TrainRepositoryImpl {
                 number: ActiveValue::Set(data.train_number),
                 type_id: ActiveValue::Set(train_type_id),
                 default_line_id: ActiveValue::Set(route_id.to_db_value()),
+                default_origin_departure_time: ActiveValue::Set(data.origin_departure_time as i32),
             };
 
             model_list.push(model);
