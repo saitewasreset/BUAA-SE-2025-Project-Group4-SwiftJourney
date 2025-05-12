@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 10 (2025-05-09 17:32:00)
+Version: 11 (2025-05-11 17:32:00)
 
 最近变更：
 
+- Version 11
+  - 新增修改密码 API
 - Version 10
   - `TrainOrderInfo`新增始发站、终到站相关信息
   - `TakeawayOrderInfo`新增用餐时间
@@ -429,6 +431,45 @@ interface UpdatePersonalInfo {
 | 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                                       |
 | 13001 | `Identity card id format`                                            | 身份证号格式错误                               |
 | 13002 | `Invalid identity card id`                                           | 该身份证号对应的个人信息不存在，或没有权限设置 |
+
+响应**数据**：
+
+```typescript
+type ResponseData = null;
+```
+
+设置 Cookie：
+
+- 无
+
+### 修改密码
+
+`POST /api/user/update_password`
+
+需要 Cookie：
+
+- session_id
+
+请求：
+
+```typescript
+type Request = UpdatePassword;
+
+interface UpdatePassword {
+  // 原密码
+  originPassword: string;
+  // 新密码
+  newPassword: string;
+}
+```
+
+响应代码表：
+
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 15002 | `Invalid phone number or password`                                   | 用户名或密码错误                 |
 
 响应**数据**：
 

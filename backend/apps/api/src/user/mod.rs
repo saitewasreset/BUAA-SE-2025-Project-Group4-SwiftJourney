@@ -9,4 +9,5 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(user_manager::register);
     cfg.service(user_manager::login);
     cfg.service(user_manager::logout);
+    cfg.service(user_manager::update_password);
 }
