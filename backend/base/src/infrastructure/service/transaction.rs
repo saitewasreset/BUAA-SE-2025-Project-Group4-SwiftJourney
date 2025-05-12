@@ -3,48 +3,57 @@ use crate::domain::model::transaction::{Transaction, TransactionAmountAbs, Trans
 use crate::domain::model::user::UserId;
 use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::repository::user::UserRepository;
+use crate::domain::service::order::OrderService;
+use crate::domain::service::order::order_dto::TransactionDataDto;
 use crate::domain::service::order_status::OrderStatusManagerService;
 use crate::domain::service::transaction::{TransactionService, TransactionServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub struct TransactionServiceImpl<U, R, OS>
+pub struct TransactionServiceImpl<U, R, O, OS>
 where
     U: UserRepository,
     R: TransactionRepository,
+    O: OrderService,
     OS: OrderStatusManagerService,
 {
     user_repository: Arc<U>,
     transaction_repository: Arc<R>,
+    order_service: Arc<O>,
     order_status_manager_service: Arc<OS>,
 }
 
-impl<U, R, OS> TransactionServiceImpl<U, R, OS>
+impl<U, R, O, OS> TransactionServiceImpl<U, R, O, OS>
 where
     U: UserRepository,
     R: TransactionRepository,
+    O: OrderService,
     OS: OrderStatusManagerService,
 {
     pub fn new(
         user_repository: Arc<U>,
         transaction_repository: Arc<R>,
+        order_service: Arc<O>,
         order_status_manager_service: Arc<OS>,
     ) -> Self {
         Self {
             user_repository,
             transaction_repository,
+            order_service,
             order_status_manager_service,
         }
     }
 }
 
 #[async_trait]
-impl<U, R, OS> TransactionService for TransactionServiceImpl<U, R, OS>
+impl<U, R, O, OS> TransactionService for TransactionServiceImpl<U, R, O, OS>
 where
     U: UserRepository,
     R: TransactionRepository,
+    O: OrderService,
     OS: OrderStatusManagerService,
 {
     async fn recharge(
@@ -168,5 +177,31 @@ where
         }
 
         Ok(refund_tx.uuid())
+    }
+
+    async fn convert_transaction_to_dto(
+        &self,
+        transaction: Transaction,
+    ) -> Result<TransactionDataDto, TransactionServiceError> {
+        let mut dto = TransactionDataDto {
+            transaction_id: transaction.uuid().to_string(),
+            status: transaction.status().to_string(),
+            create_time: transaction.create_time().to_rfc3339(),
+            pay_time: transaction.finish_time().map(|dt| dt.to_rfc3339()),
+            amount: transaction.amount().to_f64().unwrap_or(0.0),
+            orders: Vec::new(),
+        };
+
+        let origin_orders = transaction.into_orders();
+
+        let mut orders = Vec::with_capacity(origin_orders.len());
+
+        for order in origin_orders {
+            orders.push(self.order_service.convert_order_to_dto(order).await?)
+        }
+
+        dto.orders = orders;
+
+        Ok(dto)
     }
 }

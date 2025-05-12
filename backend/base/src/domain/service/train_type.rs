@@ -146,6 +146,7 @@ pub trait TrainTypeConfigurationService {
     /// * `train_type` - 已验证的列车类型
     /// * `seat_configuration` - 座位配置列表
     /// * `default_route_id` - 默认路线ID
+    /// * `default_origin_departure_time` - 默认发车时间
     ///
     /// # Returns
     /// * `Ok(TrainId)` - 新添加的列车车次ID
@@ -160,6 +161,7 @@ pub trait TrainTypeConfigurationService {
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
         default_route_id: RouteId,
+        default_origin_departure_time: i32,
     ) -> Result<TrainId, TrainTypeConfigurationServiceError>;
 
     /// 修改现有的列车类型
@@ -170,6 +172,7 @@ pub trait TrainTypeConfigurationService {
     /// * `train_type` - 已验证的列车类型
     /// * `seat_configuration` - 座位配置列表
     /// * `default_route_id` - 默认路线ID
+    /// * `default_origin_departure_time` - 默认发车时间
     ///
     /// # Returns
     /// * `Ok(())` - 修改成功
@@ -185,6 +188,7 @@ pub trait TrainTypeConfigurationService {
         train_type: TrainType<Verified>,
         seat_configuration: Vec<SeatType>,
         default_route_id: RouteId,
+        default_origin_departure_time: i32,
     ) -> Result<(), TrainTypeConfigurationServiceError>;
 
     /// 删除指定的列车类型

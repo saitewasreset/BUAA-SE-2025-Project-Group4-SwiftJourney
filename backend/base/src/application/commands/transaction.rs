@@ -17,6 +17,11 @@ pub struct TransactionQuery {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TransactionDetailQuery {
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetPaymentPasswordCommand {
     pub session_id: String,
     pub user_password: String,

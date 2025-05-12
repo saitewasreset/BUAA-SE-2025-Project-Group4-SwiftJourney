@@ -12,10 +12,11 @@
 //! - `DishOrder`: 结构体，表示火车餐订单。
 //! - `TakeawayOrder`: 结构体，表示外卖订单。
 use crate::Verified;
-use crate::domain::model::dish::DishId;
+use crate::domain::model::dish::{DishId, DishTime};
 use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomId};
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::takeaway::TakeawayDishId;
+use crate::domain::model::train::TrainNumber;
 use crate::domain::model::train_schedule::{Seat, StationRange, TrainScheduleId};
 use crate::domain::model::transaction::TransactionId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
