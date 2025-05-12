@@ -8,6 +8,7 @@ pub struct Migration;
 pub enum PersonInfo {
     Table,
     Id,
+    Uuid,
     Name,
     IdentityCard,
     PreferredSeatLocation,
@@ -23,6 +24,7 @@ impl MigrationTrait for Migration {
                     .table(PersonInfo::Table)
                     .if_not_exists()
                     .col(pk_auto(PersonInfo::Id))
+                    .col(uuid(PersonInfo::Uuid))
                     .col(string(PersonInfo::Name).not_null())
                     .col(string(PersonInfo::IdentityCard).not_null())
                     .col(char(PersonInfo::PreferredSeatLocation))
