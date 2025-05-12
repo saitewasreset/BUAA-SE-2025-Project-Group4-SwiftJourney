@@ -50,6 +50,7 @@
 import { ElMessage } from 'element-plus';
 import { useUserStore } from '@/stores/user';
 import { useDebugUserStore } from '@/stores/user';
+import { userApi } from '@/api/UserApi/userApi'
 import validator from 'validator';
 
 const user = useUserStore();
@@ -193,12 +194,12 @@ const debugUser = useDebugUserStore();
           this.setEmail();
         }
       },
-      save() {
+      async save() {
         if(!this.checkAll()){
           return;
         }
 
-        if(!this.postData()){
+        if(this.postData() != true){
           return;
         }
 
@@ -241,16 +242,16 @@ const debugUser = useDebugUserStore();
         }
         return true;
       },
-      postData(){
+      async postData(){
         this.formPostData.age = this.formData.age;
         this.formPostData.email = this.formData.email;
-        this.formPostData.gender = this.formData.gender;
+        this.formPostData.gender = this.formData.gender == '男' ? 'male' : 'female';
         this.formPostData.username = this.formData.username;
         if(this.formTepData.username != "") {
           this.formPostData.username = this.formTepData.username;
         }
         if(this.formTepData.gender != "") {
-          this.formPostData.gender = this.formTepData.gender;
+          this.formPostData.gender = this.formTepData.gender == '男' ? 'male' : 'female';
         }
         if(this.formTepData.age != "") {
           this.formPostData.age = this.formTepData.age;
@@ -259,10 +260,26 @@ const debugUser = useDebugUserStore();
           this.formPostData.email = this.formTepData.email;
         }
 
-        //-----------TODO------------//
-        //添加将fromPostData发送的逻辑//
+        await userApi.setUserInfo(this.formPostData)
+          .then((res) =>{
+            if(res.status == 200) {
+              ElMessage.success('设置成功');
+              return true;
+            } else if (res.status == 403) {
+              ElMessage.error('会话无效');
+            } else if (res.status == 15003) {
+              ElMessage.error('用户名格式错误');
+            } else if (res.status == 15006) {
+              ElMessage.error('年龄格式错误');
+            } else if (res.status == 15007) {
+              ElMessage.error('邮箱格式错误');
+            }
+          })
+          .catch((error) => {
+            ElMessage.error(error);
+          })
 
-        return true;
+          return false;
       },
     },
   };
