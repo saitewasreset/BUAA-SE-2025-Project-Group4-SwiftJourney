@@ -8,6 +8,7 @@ pub struct Migration;
 pub enum TakeawayShop {
     Table,
     Id,
+    Uuid,
     Name,
     StationId,
     Images,
@@ -22,6 +23,7 @@ impl MigrationTrait for Migration {
                     .table(TakeawayShop::Table)
                     .if_not_exists()
                     .col(pk_auto(TakeawayShop::Id))
+                    .col(uuid(TakeawayShop::Uuid))
                     .col(string(TakeawayShop::Name).not_null())
                     .col(big_integer(TakeawayShop::StationId).not_null())
                     .col(json(TakeawayShop::Images).not_null())

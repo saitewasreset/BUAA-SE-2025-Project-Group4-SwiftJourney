@@ -1,9 +1,10 @@
 use crate::application::commands::transaction::{
     BalanceQuery, GenerateDebugTransactionCommand, PayTransactionCommand, RechargeCommand,
-    SetPaymentPasswordCommand, TransactionQuery,
+    SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::transaction::Transaction;
+use crate::domain::service::order::order_dto::TransactionDataDto;
 use crate::domain::service::transaction::TransactionServiceError;
 use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
@@ -154,4 +155,9 @@ pub trait TransactionApplicationService: 'static + Send + Sync {
         &self,
         command: GenerateDebugTransactionCommand,
     ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>>;
+
+    async fn query_transaction_details(
+        &self,
+        query: TransactionDetailQuery,
+    ) -> Result<Vec<TransactionDataDto>, Box<dyn ApplicationError>>;
 }

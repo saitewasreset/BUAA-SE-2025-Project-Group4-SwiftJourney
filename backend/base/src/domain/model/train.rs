@@ -43,7 +43,8 @@
 //!     TrainNumber::from_unchecked("G1234".to_string()),
 //!     TrainType::from_unchecked("G".to_string()),
 //!     seats,
-//!     RouteId::from(101u64) // 默认路线ID
+//!     RouteId::from(101u64), // 默认路线ID
+//!     233
 //! );
 //! ```
 //!
@@ -74,7 +75,8 @@
 //! #    TrainNumber::from_unchecked("G1234".to_string()),
 //! #    TrainType::from_unchecked("G".to_string()),
 //! #    seats,
-//! #     RouteId::from(101u64) // 默认路线ID
+//! #     RouteId::from(101u64), // 默认路线ID
+//! #     233
 //! # );
 //! assert_eq!(train.number(), "G1234");
 //! assert_eq!(train.train_type(), "G");
@@ -149,6 +151,7 @@ pub struct Train {
     train_type: TrainType<Verified>,
     seats: HashMap<String, SeatType>,
     default_route_id: RouteId,
+    default_origin_departure_time: i32,
 }
 
 impl Identifiable for Train {
@@ -181,6 +184,7 @@ impl Train {
         train_type: TrainType<Verified>,
         seats: HashMap<String, SeatType>,
         default_route_id: RouteId,
+        default_origin_departure_time: i32,
     ) -> Self {
         Train {
             id: train_id,
@@ -188,6 +192,7 @@ impl Train {
             train_type,
             seats,
             default_route_id,
+            default_origin_departure_time,
         }
     }
 
@@ -212,6 +217,10 @@ impl Train {
     /// 获取默认路线ID
     pub fn default_route_id(&self) -> RouteId {
         self.default_route_id
+    }
+
+    pub fn default_origin_departure_time(&self) -> i32 {
+        self.default_origin_departure_time
     }
 }
 
