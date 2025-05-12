@@ -69,6 +69,13 @@ interface UpdatePersonalInfo {
   default?: boolean;
 }
 
+interface UpdatePassword {
+  // 原密码
+  originPassword: string;
+  // 新密码
+  newPassword: string;
+}
+
 interface RechargeInfo {
   amount: number;
   // 由于无需访问外部支付系统，故`externalPaymentId`设置为`null`即可。
