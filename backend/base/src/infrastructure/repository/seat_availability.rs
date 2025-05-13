@@ -27,14 +27,15 @@ use crate::domain::model::train_schedule::{
     OccupiedSeat, Seat, SeatAvailability, SeatAvailabilityId, SeatId, SeatLocationInfo, SeatStatus,
     StationRange, TrainScheduleId,
 };
+use crate::domain::repository::seat_availability::SeatAvailabilityRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
     DbId, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use sea_orm::ColumnTrait;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{ColumnTrait, DbErr};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -608,5 +609,27 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl SeatAvailabilityRepository for SeatAvailabilityRepositoryImpl {
+    async fn get_train_schedule_seat_availability_list(
+        &self,
+        train_schedule_id: TrainScheduleId,
+    ) -> Result<Vec<crate::models::seat_availability::Model>, RepositoryError> {
+        let r = crate::models::seat_availability::Entity::find()
+            .filter(
+                crate::models::seat_availability::Column::TrainScheduleId
+                    .eq(train_schedule_id.to_db_value()),
+            )
+            .all(&self.db)
+            .await
+            .context(format!(
+                "failed to get seat availability list for train schedule id: {}",
+                train_schedule_id
+            ))?;
+
+        Ok(r)
     }
 }
