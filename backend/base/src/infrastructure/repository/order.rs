@@ -1,4 +1,6 @@
-use crate::domain::model::order::{DishOrder, HotelOrder, OrderId, TakeawayOrder, TrainOrder};
+use crate::domain::model::order::{
+    DishOrder, HotelOrder, Order, OrderId, TakeawayOrder, TrainOrder,
+};
 use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::repository::order::{
     DishOrderRelatedData, HotelOrderRelatedData, OrderRepository, RouteInfo,
@@ -14,6 +16,7 @@ use sea_orm::{
     DatabaseBackend, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
     Statement,
 };
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -223,6 +226,67 @@ FROM "train_order"
             Ok(None)
         }
     }
+
+    async fn update(&self, order: Box<dyn Order>) -> Result<(), RepositoryError> {
+        match order.as_ref().type_id() {
+            id if id == TypeId::of::<TrainOrder>() => {
+                let train_order = (order as Box<dyn Any>).downcast::<TrainOrder>().unwrap();
+
+                let order_uuid = train_order.uuid();
+
+                let train_order_do = OrderDataConverter::transform_to_do_train(*train_order);
+
+                crate::models::train_order::Entity::update(train_order_do)
+                    .exec(&self.db)
+                    .await
+                    .context(format!("failed to update train order uuid: {}", order_uuid))?;
+            }
+            id if id == TypeId::of::<HotelOrder>() => {
+                let hotel_order = (order as Box<dyn Any>).downcast::<HotelOrder>().unwrap();
+
+                let order_uuid = hotel_order.uuid();
+
+                let hotel_order_do = OrderDataConverter::transform_to_do_hotel(*hotel_order);
+
+                crate::models::hotel_order::Entity::update(hotel_order_do)
+                    .exec(&self.db)
+                    .await
+                    .context(format!("failed to update hotel order uuid: {}", order_uuid))?;
+            }
+            id if id == TypeId::of::<DishOrder>() => {
+                let dish_order = (order as Box<dyn Any>).downcast::<DishOrder>().unwrap();
+
+                let order_uuid = dish_order.uuid();
+
+                let dish_order_do = OrderDataConverter::transform_to_do_dish(*dish_order);
+
+                crate::models::dish_order::Entity::update(dish_order_do)
+                    .exec(&self.db)
+                    .await
+                    .context(format!("failed to update dish order uuid: {}", order_uuid))?;
+            }
+            id if id == TypeId::of::<TakeawayOrder>() => {
+                let takeaway_order = (order as Box<dyn Any>).downcast::<TakeawayOrder>().unwrap();
+
+                let order_uuid = takeaway_order.uuid();
+
+                let takeaway_order_do =
+                    OrderDataConverter::transform_to_do_takeaway(*takeaway_order);
+
+                crate::models::takeaway_order::Entity::update(takeaway_order_do)
+                    .exec(&self.db)
+                    .await
+                    .context(format!(
+                        "failed to update takeaway order uuid: {}",
+                        order_uuid
+                    ))?;
+            }
+            _ => panic!("Unknown order type"),
+        }
+
+        Ok(())
+    }
+
     /// 保证按order升序排列
     async fn get_route_info_train_order(
         &self,
