@@ -23,7 +23,7 @@ impl OrderStatusManagerService for OrderStatusManagerServiceImpl {
         todo!()
     }
 
-    async fn notify_status_change(&self, order_uuid: Uuid, new_status: OrderStatus) {
+    async fn notify_status_change(&self, order: &dyn Order, new_status: OrderStatus) {
         todo!()
     }
 }

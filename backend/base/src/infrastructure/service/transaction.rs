@@ -146,7 +146,7 @@ where
 
         for order in tx.orders() {
             self.order_status_manager_service
-                .notify_status_change(order.uuid(), OrderStatus::Paid)
+                .notify_status_change(order.as_ref(), OrderStatus::Paid)
                 .await;
         }
 
@@ -172,7 +172,7 @@ where
 
         for order in to_refund_orders {
             self.order_status_manager_service
-                .notify_status_change(order.uuid(), OrderStatus::Cancelled)
+                .notify_status_change(order.as_ref(), OrderStatus::Cancelled)
                 .await;
         }
 
