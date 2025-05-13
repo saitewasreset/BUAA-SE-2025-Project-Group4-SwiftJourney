@@ -275,7 +275,7 @@ impl SeatAvailabilityDataConverter {
                     .get_to_station_id()
                     .to_db_value(),
             ),
-            available_seats: ActiveValue::Set(seat_availability.available_seats_count() as i32),
+            occupied_seats: ActiveValue::Set(seat_availability.occupied_seats_count() as i32),
         };
 
         if let Some(id) = seat_availability.get_id() {
