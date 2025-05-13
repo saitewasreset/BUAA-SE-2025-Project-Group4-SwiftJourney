@@ -176,6 +176,11 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_service_impl),
     ));
 
+    let personal_info_service_impl = Arc::new(PersonalInfoServiceImpl::new(
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&personal_info_repository_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -202,6 +207,9 @@ async fn main() -> std::io::Result<()> {
             transaction_application_service_impl as Arc<dyn TransactionApplicationService>,
         );
 
+    let personal_info_service: web::Data<dyn PersonalInfoService> =
+        web::Data::from(personal_info_service_impl as Arc<dyn PersonalInfoService>);
+
     let app_config_data = web::Data::new(app_config);
 
     // Step 2: Create instance of your application service,
@@ -219,6 +227,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_profile_service.clone())
             .app_data(train_data_service.clone())
             .app_data(geo_application_service.clone())
+            .app_data(personal_info_service.clone())
             .app_data(transaction_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
