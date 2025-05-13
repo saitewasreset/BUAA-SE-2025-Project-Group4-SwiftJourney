@@ -110,6 +110,7 @@ pub struct Transaction {
     status: TransactionStatus,
     user_id: UserId,
     orders: Vec<Box<dyn Order>>,
+    atomic: bool,
 }
 
 impl Identifiable for Transaction {
@@ -241,6 +242,7 @@ impl Transaction {
             status: TransactionStatus::Paid,
             user_id,
             orders: vec![],
+            atomic: false,
         }
     }
 
@@ -248,7 +250,7 @@ impl Transaction {
     ///
     /// Arguments:
     /// - `user_id`: 用户的唯一标识符。
-    /// - `recharge_amount`: 充值金额的绝对值。
+    /// - `amount`: 交易金额的绝对值。
     ///
     /// Returns:
     /// - 新创建的调试交易实例。
@@ -262,6 +264,7 @@ impl Transaction {
             status: TransactionStatus::Unpaid,
             user_id,
             orders: vec![],
+            atomic: false,
         }
     }
 
@@ -273,7 +276,7 @@ impl Transaction {
     ///
     /// Returns:
     /// - 新创建的交易实例。
-    pub fn new(user_id: UserId, orders: Vec<Box<dyn Order>>) -> Transaction {
+    pub fn new(user_id: UserId, orders: Vec<Box<dyn Order>>, atomic: bool) -> Transaction {
         let total_amount = orders
             .iter()
             .map(|order| order.unit_price() * order.amount())
@@ -288,6 +291,7 @@ impl Transaction {
             status: TransactionStatus::Unpaid,
             user_id,
             orders,
+            atomic,
         }
     }
 
@@ -314,6 +318,7 @@ impl Transaction {
         status: TransactionStatus,
         user_id: UserId,
         orders: Vec<Box<dyn Order>>,
+        atomic: bool,
     ) -> Transaction {
         Transaction {
             transaction_id,
@@ -324,6 +329,7 @@ impl Transaction {
             status,
             user_id,
             orders,
+            atomic,
         }
     }
 
@@ -426,6 +432,7 @@ impl Transaction {
             status: TransactionStatus::Paid,
             user_id: self.user_id,
             orders: self.orders.clone(),
+            atomic: false,
         })
     }
 
@@ -495,5 +502,9 @@ impl Transaction {
     /// - 交易包含的订单列表。
     pub fn into_orders(self) -> Vec<Box<dyn Order>> {
         self.orders
+    }
+
+    pub fn atomic(&self) -> bool {
+        self.atomic
     }
 }
