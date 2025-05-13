@@ -11,7 +11,7 @@ pub struct Model {
     pub name: String,
     pub identity_card: String,
     pub preferred_seat_location: String,
-    pub user_id: i64,
+    pub user_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
