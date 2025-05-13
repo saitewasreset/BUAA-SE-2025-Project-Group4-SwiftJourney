@@ -121,8 +121,8 @@
                             <el-table-column prop="status" label="订单状态" width="200" />
                             <el-table-column prop="money" label="订单金额" width="200"/>
                             <el-table-column fixed="right" label="操作" min-width="150">
-                                <template #default>
-                                    <el-button text type="danger" size="16px">取消订单</el-button>
+                                <template #default="props">
+                                    <el-button v-if="props.row.status != '失败' && props.row.status != '已取消'" text type="danger" size="16px" @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
                                 </template>
                             </el-table-column>
                         </el-table>
@@ -139,6 +139,10 @@ import 'dayjs/locale/zh-cn';
 import { orderApi } from "@/api/orderApi/orderApi";
 import type { ResponseData, TransactionData, OrderInfo, SeatLocationInfo, TrainOrderInfo, HotelOrderInfo, DishOrderInfo, TakeawayOrderInfo,
     OrderInform, TransactionDetail, OrderDetail, TrainOrderDetail, HotelOrderDetail, FoodOrderDetail } from '@/interface/interface';
+import { id } from 'element-plus/es/locales.mjs';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Warning } from '@element-plus/icons-vue';
+import type { IndexInfo } from 'typescript';
 dayjs.locale('zh-cn');
 
 const statusChangeTab = {
@@ -178,10 +182,10 @@ export default {
     },
     created: function() {
         //测试数据
-        //this.debugInit();
+        this.debugInit();
         
         //访问后端
-        this.init();
+        //this.init();
         for(let tr of this.transactionDetailList) {
             this.isShowTransactionDetailMap.set(tr.id, false);
         }
@@ -219,6 +223,68 @@ export default {
             let order = this.orderMap.get(id);
             if(order && name in order){
                 return (order as any)[name];
+            }
+        },
+
+
+        cancelOrder(id: string, canCancel: boolean, reason: string) {
+            if(canCancel){
+                ElMessageBox.confirm(
+                    '确认取消该订单？',
+                    '警告！',
+                    {
+                        confirmButtonText: '确认',
+                        cancelButtonText: '取消',
+                        type: 'warning',
+                    }
+                ).then(() => {
+                    //api取消订单
+                    //this.apiOrderCancel(id);
+                    //debug取消订单
+                    this.cancelOrderSuccess();
+                })
+            } else {
+                ElMessage.error('不可取消该订单 ' + reason);
+            }
+        },
+
+        async apiOrderCancel(id: string) {
+            await orderApi.orderCancel(id)
+            .then((res) => {
+                if(res.status == 200) {
+                    this.cancelOrderSuccess();
+                } else if(res.status == 403) {
+                    ElMessage.error('会话无效');
+                } else if(res.status == 404) {
+                    ElMessage.error('订单号不存在，或没有权限访问该订单');
+                } else if(res.status == 14001) {
+                    ElMessage.error('订单已被取消');
+                } else if(res.status == 14002) {
+                    ElMessage.error('订单不满足取消条件');
+                }
+            }).catch((error) => {
+                ElMessage.error(error);
+            })
+        },
+
+        cancelOrderSuccess(){
+            ElMessage.success('成功取消该订单');
+            this.refresh();
+        },
+
+        refresh() {
+            this.transactionMap.clear();
+            this.transactionList.length = 0;
+            this.orderMap.clear();
+            this.transactionDetailList.length = 0;
+            //debug
+            this.debugInit();
+            //api
+            //this.init();
+            for(let tr of this.transactionDetailList) {
+                if(!this.isShowTransactionDetailMap.has(tr.id)) {
+                    this.isShowTransactionDetailMap.set(tr.id, false);
+                }
             }
         },
 
@@ -289,7 +355,7 @@ export default {
                     status: statusChangeTab[transactionData.status],
                     time: transactionData.createTime,
                     payTime: transactionData.payTime,
-                    money: String(transactionData.amount),
+                    money: 'SC ' + String(transactionData.amount),
                     orderInfo: [] as OrderInform [],
                 };
                 for(const orderInfo of transactionData.orders){
@@ -297,8 +363,9 @@ export default {
                         id: orderInfo.orderId,
                         status: statusChangeTab[orderInfo.status],
                         type: "",
-                        money: String(orderInfo.unitPrice),
+                        money: 'SC ' + String(orderInfo.unitPrice),
                         canCanceled: orderInfo.canCancel,
+                        reason: orderInfo.reason,
                     };
                     switch(orderInfo.orderType){
                         case "train":
@@ -390,6 +457,7 @@ export default {
                         amount: 1,
                         orderType: "train",
                         canCancel: false,
+                        reason: "该订单已完成",
                         trainNumber: "G1",
                         departureStation: "北京南",
                         terminalStation: "南京南",
@@ -410,6 +478,7 @@ export default {
                         amount: 1,
                         orderType: "train",
                         canCancel: false,
+                        reason: "该订单正在进行",
                         trainNumber: "G287",
                         departureStation: "南京南",
                         terminalStation: "上海虹桥",
@@ -425,11 +494,11 @@ export default {
                     } as TrainOrderInfo,
                     {
                         orderId: "0x0003",
-                        status: "ongoing",
+                        status: "paid",
                         unitPrice: 20,
                         amount: 1,
                         orderType: "train",
-                        canCancel: false,
+                        canCancel: true,
                         trainNumber: "D1088",
                         departureStation: "上海虹桥",
                         terminalStation: "上海",
@@ -459,7 +528,7 @@ export default {
                         unitPrice: 300,
                         amount: 1,
                         orderType: "hotel",
-                        canCancel: false,
+                        canCancel: true,
                         hotelName: "日升大酒店",
                         roomType: "大床房",
                         hotelId: '',
@@ -485,6 +554,7 @@ export default {
                         amount: 1,
                         orderType: "dish",
                         canCancel: false,
+                        reason: "该订单已完成",
                         trainNumber: "G1",
                         depatureTime: "2025-04-20 07:20",
                         dishName: "牛肉饭",
@@ -498,6 +568,7 @@ export default {
                         amount: 1,
                         orderType: "takeaway",
                         canCancel: false,
+                        reason: "该订单已完成",
                         trainNumber: "G1",
                         station: "天津南",
                         depatureTime: "2025-04-20 07:20",
