@@ -83,6 +83,7 @@ where
         &self,
         user_id: UserId,
         orders: Vec<Box<dyn Order>>,
+        atomic: bool,
     ) -> Result<Uuid, TransactionServiceError> {
         for order in &orders {
             if order.order_status() != OrderStatus::Unpaid {
@@ -99,7 +100,7 @@ where
             return Err(TransactionServiceError::InvalidUser(user_id));
         }
 
-        let mut tx = Transaction::new(user_id, orders.clone());
+        let mut tx = Transaction::new(user_id, orders.clone(), atomic);
 
         self.transaction_repository.save(&mut tx).await?;
 
