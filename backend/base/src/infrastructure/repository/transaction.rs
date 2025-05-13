@@ -68,11 +68,11 @@ pub struct OrderDataConverter;
 ///
 /// 包含火车票订单模型及其关联的座位类型和座位映射数据
 pub struct TrainOrderDoPack {
-    train_order: crate::models::train_order::Model,
+    pub train_order: crate::models::train_order::Model,
     /// 座位类型字典(seat_type_id → 模型)
-    seat_type: HashMap<i32, crate::models::seat_type::Model>,
+    pub seat_type: HashMap<i32, crate::models::seat_type::Model>,
     /// 座位位置映射字典(seat_type_id → seat_id → 映射模型)
-    seat_type_mapping: HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
+    pub seat_type_mapping: HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
 }
 
 impl OrderDataConverter {
@@ -955,6 +955,7 @@ impl TransactionDataConverter {
             transaction_status,
             UserId::try_from(transaction_do_pack.transaction.user_id)?,
             orders,
+            transaction_do_pack.transaction.atomic,
         ))
     }
 
@@ -978,6 +979,7 @@ impl TransactionDataConverter {
                 <TransactionStatus as Into<&str>>::into(transaction.status()).to_string(),
             ),
             user_id: ActiveValue::Set(transaction.user_id().to_db_value() as i64),
+            atomic: ActiveValue::Set(transaction.atomic()),
         };
 
         if let Some(id) = transaction.get_id() {
