@@ -8,5 +8,8 @@ export const userApi = {
     },
     setUserInfo: (params: Object) => {
         return postRequest('/api/user/user_info', params);
+    },
+    updatePassword: (params: Object) => {
+        return postRequest('/api/user/update_password', params);
     }
 };
