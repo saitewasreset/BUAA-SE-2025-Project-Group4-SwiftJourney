@@ -1,14 +1,21 @@
-use crate::domain::model::order::OrderId;
+use crate::domain::model::order::{DishOrder, HotelOrder, OrderId, TakeawayOrder, TrainOrder};
 use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::repository::order::{
     DishOrderRelatedData, HotelOrderRelatedData, OrderRepository, RouteInfo,
     TakeawayOrderRelatedData, TrainOrderRelatedData,
 };
 use crate::domain::{DbId, RepositoryError};
+use crate::infrastructure::repository::transaction::{OrderDataConverter, TrainOrderDoPack};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDate, NaiveTime};
-use sea_orm::{DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, Statement};
+use sea_orm::ColumnTrait;
+use sea_orm::{
+    DatabaseBackend, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
+    Statement,
+};
+use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
 struct TrainOrderQueryResult {
@@ -70,6 +77,152 @@ SELECT route.order, route.arrival_time, route.departure_time, station.id, statio
 
 #[async_trait]
 impl OrderRepository for OrderRepositoryImpl {
+    async fn find_train_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<TrainOrder>, RepositoryError> {
+        let train_order = crate::models::train_order::Entity::find()
+            .filter(crate::models::train_order::Column::Uuid.eq(order_uuid))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to find train order for order uuid: {}",
+                order_uuid
+            ))?;
+
+        if let Some(train_order) = train_order {
+            let seat_type_models = crate::models::seat_type::Entity::find()
+                .all(&self.db)
+                .await
+                .context("failed to find seat type from db")?;
+
+            let seat_type_mapping_models = crate::models::seat_type_mapping::Entity::find()
+                .from_raw_sql(Statement::from_sql_and_values(
+                    DbBackend::Postgres,
+                    r#"SELECT
+    "seat_type_mapping"."train_type_id",
+    "seat_type_mapping"."seat_type_id",
+    "seat_type_mapping"."seat_id",
+    "seat_type_mapping"."carriage",
+    "seat_type_mapping"."row",
+    "seat_type_mapping"."location"
+FROM "train_order"
+    INNER JOIN "train_schedule"
+        ON "train_order"."train_schedule_id" = "train_schedule"."id"
+    INNER JOIN "train"
+        ON "train_schedule"."train_id" = "train"."id"
+    INNER JOIN "seat_type_mapping"
+        ON "seat_type_mapping"."train_type_id" = "train"."type_id"
+    WHERE "train_order"."uuid" = $1"#,
+                    [order_uuid.into()],
+                ))
+                .all(&self.db)
+                .await
+                .context(format!(
+                    "failed to find seat type mappings from db for order uuid: {}",
+                    order_uuid
+                ))?;
+
+            let seat_type_map = seat_type_models
+                .into_iter()
+                .map(|x| (x.id, x))
+                .collect::<HashMap<_, _>>();
+
+            let mut seat_type_mapping_map: HashMap<
+                i32,
+                HashMap<i64, crate::models::seat_type_mapping::Model>,
+            > = HashMap::new();
+
+            for model in seat_type_mapping_models {
+                seat_type_mapping_map
+                    .entry(model.seat_type_id)
+                    .or_default()
+                    .insert(model.seat_id, model);
+            }
+
+            let train_order_do_pack = TrainOrderDoPack {
+                train_order,
+                seat_type: seat_type_map,
+                seat_type_mapping: seat_type_mapping_map,
+            };
+
+            let result = OrderDataConverter::make_from_do_train(train_order_do_pack)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn find_hotel_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<HotelOrder>, RepositoryError> {
+        let hotel_order_do = crate::models::hotel_order::Entity::find()
+            .filter(crate::models::hotel_order::Column::Uuid.eq(order_uuid))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to find hotel order for order uuid: {}",
+                order_uuid
+            ))?;
+
+        if let Some(hotel_order_do) = hotel_order_do {
+            let result = OrderDataConverter::make_from_do_hotel(hotel_order_do)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn find_dish_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<DishOrder>, RepositoryError> {
+        let dish_order_do = crate::models::dish_order::Entity::find()
+            .filter(crate::models::dish_order::Column::Uuid.eq(order_uuid))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to find dish order for order uuid: {}",
+                order_uuid
+            ))?;
+
+        if let Some(dish_order_do) = dish_order_do {
+            let result = OrderDataConverter::make_from_do_dish(dish_order_do)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn find_takeaway_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<TakeawayOrder>, RepositoryError> {
+        let takeaway_order_do = crate::models::takeaway_order::Entity::find()
+            .filter(crate::models::takeaway_order::Column::Uuid.eq(order_uuid))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "failed to find takeaway order for order uuid: {}",
+                order_uuid
+            ))?;
+
+        if let Some(takeaway_order_do) = takeaway_order_do {
+            let result = OrderDataConverter::make_from_do_takeaway(takeaway_order_do)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
+    }
     /// 保证按order升序排列
     async fn get_route_info_train_order(
         &self,
