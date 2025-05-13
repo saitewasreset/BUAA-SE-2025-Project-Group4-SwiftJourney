@@ -54,6 +54,7 @@
 <script>
 import { ElMessage } from 'element-plus';
 import { paymentApi } from '@/api/PaymentApi/paymentApi'
+import { userApi } from '@/api/UserApi/userApi'
 
 export default{
     data() {
@@ -91,8 +92,25 @@ export default{
             if(!this.checkPassword()){
                 return;
             }
-            //-----------TODO------------------//
-            //将原密码和新密码同时发给后端，若原密码正确，更新，若原密码错误，不更新
+            this.updatePassword();
+        },
+        async updatePassword() {
+            await userApi.updatePassword({originPassword: this.passwordFormData.originPassword, newPassword: this.passwordFormData.newPassword})
+            .then((res) => {
+                if(res.status == 200) {
+                    this.successUpdatePassword();
+                } else if (res.status == 403) {
+                    ElMessage.error('会话无效');
+                } else if (res.status == 15002) {
+                    ElMessage.error('密码错误');
+                } else {
+                    throw new Error(res.statusText);
+                }
+            }) .catch ((error) => {
+                ElMessage.error(error);
+            })
+        },
+        successUpdatePassword() {
             this.isSetPassword = false;
             this.passwordFormData.originPassword = "";
             this.passwordFormData.newPassword = "";
