@@ -1,5 +1,5 @@
 use crate::domain::RepositoryError;
-use crate::domain::model::order::OrderId;
+use crate::domain::model::order::{DishOrder, HotelOrder, OrderId, TakeawayOrder, TrainOrder};
 use crate::domain::model::train_schedule::TrainScheduleId;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -135,6 +135,25 @@ pub struct TakeawayOrderRelatedData {
 
 #[async_trait]
 pub trait OrderRepository: 'static + Send + Sync {
+    async fn find_train_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<TrainOrder>, RepositoryError>;
+    async fn find_hotel_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<HotelOrder>, RepositoryError>;
+
+    async fn find_dish_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<DishOrder>, RepositoryError>;
+
+    async fn find_takeaway_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<TakeawayOrder>, RepositoryError>;
+
     async fn get_route_info_train_order(
         &self,
         order_id: OrderId,
