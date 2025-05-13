@@ -24,11 +24,13 @@ pub enum TrainBookingServiceError {
 
 #[async_trait]
 pub trait TrainBookingService: 'static + Send + Sync {
-    async fn booking_ticket(&self, order: TrainOrder) -> Result<(), TrainBookingServiceError>;
-    async fn cancel_ticket(&self, order: TrainOrder) -> Result<(), TrainBookingServiceError>;
+    async fn booking_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError>;
+    async fn cancel_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError>;
 
+    // 返回要退款的订单
     async fn booking_group(
         &self,
-        transaction_id: TransactionId,
-    ) -> Result<Option<Transaction>, TrainBookingServiceError>;
+        order_uuid_list: Vec<Uuid>,
+        atomic: bool,
+    ) -> Result<Vec<TrainOrder>, TrainBookingServiceError>;
 }

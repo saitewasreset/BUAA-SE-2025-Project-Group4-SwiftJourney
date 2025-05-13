@@ -104,13 +104,6 @@ where
 
         self.transaction_repository.save(&mut tx).await?;
 
-        for order in &orders {
-            self.order_status_manager_service
-                .attach(order.as_ref())
-                .await
-                .expect("Order with status: Unpaid should be attached");
-        }
-
         Ok(tx.uuid())
     }
 
@@ -145,11 +138,15 @@ where
 
         self.transaction_repository.save(&mut tx).await?;
 
-        for order in tx.orders() {
-            self.order_status_manager_service
-                .notify_status_change(order.as_ref(), OrderStatus::Paid)
-                .await;
-        }
+        let orders = tx
+            .orders()
+            .iter()
+            .map(|order| order.as_ref())
+            .collect::<Vec<_>>();
+
+        self.order_status_manager_service
+            .notify_status_change(transaction_id, tx.atomic(), &orders, OrderStatus::Paid)
+            .await;
 
         Ok(())
     }
@@ -171,11 +168,15 @@ where
 
         self.transaction_repository.save(&mut tx).await?;
 
-        for order in to_refund_orders {
-            self.order_status_manager_service
-                .notify_status_change(order.as_ref(), OrderStatus::Cancelled)
-                .await;
-        }
+        let orders = tx
+            .orders()
+            .iter()
+            .map(|order| order.as_ref())
+            .collect::<Vec<_>>();
+
+        self.order_status_manager_service
+            .notify_status_change(transaction_id, tx.atomic(), &orders, OrderStatus::Cancelled)
+            .await;
 
         Ok(refund_tx.uuid())
     }

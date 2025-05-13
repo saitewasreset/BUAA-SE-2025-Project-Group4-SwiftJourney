@@ -1,7 +1,6 @@
+use crate::domain::service::order_status::OrderStatusMessagePack;
 use crate::infrastructure::RABBITMQ_ORDER_STATUS_EXCHANGE_NAME;
-use crate::infrastructure::messaging::consumer::order_status::{
-    OrderStatusMessage, RabbitMQOrderStatusConsumer,
-};
+use crate::infrastructure::messaging::consumer::order_status::RabbitMQOrderStatusConsumer;
 use lapin::options::{
     BasicConsumeOptions, BasicNackOptions, ExchangeDeclareOptions, QueueDeclareOptions,
 };
@@ -51,29 +50,31 @@ async fn consume_task(channel: lapin::Channel, consumer: Box<dyn RabbitMQOrderSt
 
     while let Some(delivery) = c.next().await {
         match delivery {
-            Ok(delivery) => match serde_json::from_slice::<OrderStatusMessage>(&delivery.data) {
-                Ok(order_status) => {
-                    if let Err(e) = consumer.consume(order_status).await {
-                        error!("Failed to consume message: {}", e);
+            Ok(delivery) => {
+                match serde_json::from_slice::<OrderStatusMessagePack>(&delivery.data) {
+                    Ok(order_status) => {
+                        if let Err(e) = consumer.consume(order_status).await {
+                            error!("Failed to consume message: {}", e);
+
+                            if let Err(e) = delivery.nack(BasicNackOptions::default()).await {
+                                error!("Failed to nack message: {}", e);
+                            }
+                        } else if let Err(e) = delivery
+                            .ack(lapin::options::BasicAckOptions::default())
+                            .await
+                        {
+                            error!("Failed to ack message: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to deserialize message: {}", e);
 
                         if let Err(e) = delivery.nack(BasicNackOptions::default()).await {
                             error!("Failed to nack message: {}", e);
                         }
-                    } else if let Err(e) = delivery
-                        .ack(lapin::options::BasicAckOptions::default())
-                        .await
-                    {
-                        error!("Failed to ack message: {}", e);
                     }
                 }
-                Err(e) => {
-                    error!("Failed to deserialize message: {}", e);
-
-                    if let Err(e) = delivery.nack(BasicNackOptions::default()).await {
-                        error!("Failed to nack message: {}", e);
-                    }
-                }
-            },
+            }
             Err(e) => {
                 error!("failed to receive delivery: {}", e);
             }

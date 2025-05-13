@@ -57,6 +57,7 @@ use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use base::infrastructure::service::order_status_consumer_service::OrderStatusConsumerService;
+use base::infrastructure::service::order_status_producer_service::OrderStatusProducerService;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
@@ -130,7 +131,15 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
     ));
 
-    let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new());
+    let order_status_producer_service = Arc::new(
+        OrderStatusProducerService::new(&rabbitmq_url)
+            .await
+            .expect("Failed to start order status producer service"),
+    );
+
+    let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new(
+        Arc::clone(&order_status_producer_service),
+    ));
 
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
