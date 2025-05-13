@@ -175,6 +175,19 @@ impl TrainSchedule {
             .or_default()
             .insert(seat_type, seat_availability_id);
     }
+
+    pub fn get_seat_availability_id(
+        &self,
+        station_range: StationRange<Verified>,
+        seat_type: SeatType,
+    ) -> SeatAvailabilityId {
+        *self
+            .seat_availability_map
+            .get(&station_range)
+            .expect("verified station range should exist")
+            .get(&seat_type)
+            .expect("seat type should exist")
+    }
 }
 
 define_id_type!(SeatAvailability);
@@ -223,9 +236,14 @@ impl SeatAvailability {
         }
     }
 
-    /// 获取可用座位数
-    pub fn available_seats_count(&self) -> u32 {
-        self.seat_type.capacity() - self.occupied_seat.len() as u32
+    /// 获取总计座位数
+    pub fn total_seats_count(&self) -> u32 {
+        self.seat_type.capacity()
+    }
+
+    /// 获取占用座位数
+    pub fn occupied_seats_count(&self) -> u32 {
+        self.occupied_seat.len() as u32
     }
 
     /// 添加座位占用记录
