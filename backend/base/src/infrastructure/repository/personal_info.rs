@@ -16,7 +16,9 @@ use crate::domain::{
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+};
 
 impl_db_id_from_u64!(PersonalInfoId, i32, "personal info");
 
@@ -155,7 +157,7 @@ impl DbRepositorySupport<PersonalInfo> for PersonalInfoRepositoryImpl {
     /// # Returns
     /// 返回查询到的个人信息领域模型（如果存在）
     async fn on_select(&self, id: PersonalInfoId) -> Result<Option<PersonalInfo>, RepositoryError> {
-        let id: i32 = u64::from(id) as i32;
+        let id = id.to_db_value();
 
         let personal_info_do = crate::models::person_info::Entity::find_by_id(id)
             .one(&self.db)
@@ -202,7 +204,7 @@ impl DbRepositorySupport<PersonalInfo> for PersonalInfoRepositoryImpl {
                 }
                 DiffType::Removed => {
                     if let Some(id) = changes.old_value.unwrap().get_id() {
-                        let id = u64::from(id) as i32;
+                        let id = id.to_db_value();
                         crate::models::person_info::Entity::delete_by_id(id)
                             .exec(&self.db)
                             .await
@@ -225,7 +227,7 @@ impl DbRepositorySupport<PersonalInfo> for PersonalInfoRepositoryImpl {
     /// 当数据库操作失败时返回错误
     async fn on_delete(&self, aggregate: PersonalInfo) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
-            let id = u64::from(id) as i32;
+            let id = id.to_db_value();
 
             crate::models::person_info::Entity::delete_by_id(id)
                 .exec(&self.db)
