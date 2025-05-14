@@ -1,5 +1,5 @@
 use crate::domain::service::object_storage::{
-    ObjectCategory, ObjectStorageService, ObjectStorageServiceError,
+    ObjectCategory, ObjectInfo, ObjectStorageService, ObjectStorageServiceError,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -79,6 +79,7 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
     async fn put_object(
         &self,
         object_category: ObjectCategory,
+        content_type: &str,
         object: Vec<u8>,
     ) -> Result<Uuid, ObjectStorageServiceError> {
         let object_uuid = Uuid::new_v4();
@@ -87,6 +88,7 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
             .put_object()
             .bucket(object_category.to_bucket_name())
             .key(object_uuid.to_string())
+            .content_type(content_type)
             .body(object.into())
             .send()
             .await
@@ -104,7 +106,7 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
         &self,
         object_category: ObjectCategory,
         object_id: Uuid,
-    ) -> Result<Vec<u8>, ObjectStorageServiceError> {
+    ) -> Result<ObjectInfo, ObjectStorageServiceError> {
         match self
             .client
             .get_object()
@@ -114,6 +116,10 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
             .await
         {
             Ok(output) => {
+                let content_type = output
+                    .content_type
+                    .unwrap_or("application/octet-stream".to_string());
+
                 let body = output.body.collect().await.map_err(|e| {
                     ObjectStorageServiceError::StorageServiceError(anyhow!(
                         "failed to collect object body: {} for object uuid: {}, category: {}",
@@ -122,7 +128,10 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
                         object_category
                     ))
                 })?;
-                Ok(body.into_bytes().to_vec())
+
+                let data = body.into_bytes().to_vec();
+
+                Ok(ObjectInfo { content_type, data })
             }
             Err(sdk_err) => match sdk_err {
                 SdkError::ServiceError(service_err) => match service_err.err() {
@@ -135,6 +144,35 @@ impl ObjectStorageService for S3ObjectStorageServiceImpl {
                         x
                     ))),
                 },
+                x => Err(ObjectStorageServiceError::StorageServiceError(anyhow!(
+                    "sdk error: {}",
+                    x
+                ))),
+            },
+        }
+    }
+
+    async fn delete_object(
+        &self,
+        object_category: ObjectCategory,
+        object_id: Uuid,
+    ) -> Result<(), ObjectStorageServiceError> {
+        match self
+            .client
+            .delete_object()
+            .bucket(object_category.to_bucket_name())
+            .key(object_id.to_string())
+            .send()
+            .await
+        {
+            Ok(_for_super_earth) => Ok(()),
+            Err(sdk_err) => match sdk_err {
+                SdkError::ServiceError(service_err) => {
+                    Err(ObjectStorageServiceError::StorageServiceError(anyhow!(
+                        "service error: {}",
+                        service_err.err()
+                    )))
+                }
                 x => Err(ObjectStorageServiceError::StorageServiceError(anyhow!(
                     "sdk error: {}",
                     x
