@@ -48,6 +48,7 @@ impl PersonalInfoDataConverter {
                 personal_info.preferred_seat_location().to_string(),
             ),
             user_id: ActiveValue::Set(personal_info.user_id().to_db_value()),
+            is_default: ActiveValue::Set(personal_info.is_default()),
         };
 
         if let Some(id) = personal_info.get_id() {
@@ -77,7 +78,7 @@ impl PersonalInfoDataConverter {
         .map_err(|e| anyhow!("Failed to parse preferred seat location: {}", e))?;
         let user_id = (user_do.user_id as u64).into();
 
-        let personal_info = PersonalInfo::new(
+        let mut personal_info = PersonalInfo::new(
             Some(id),
             uuid,
             name,
@@ -85,6 +86,7 @@ impl PersonalInfoDataConverter {
             preferred_seat_location,
             user_id,
         );
+        personal_info.set_default(user_do.is_default);
 
         Ok(personal_info)
     }
@@ -242,24 +244,23 @@ impl DbRepositorySupport<PersonalInfo> for PersonalInfoRepositoryImpl {
 
 #[async_trait]
 impl PersonalInfoRepository for PersonalInfoRepositoryImpl {
-    /// 根据用户ID查询个人信息
+    /// 根据用户ID查询多个个人信息
     ///
     /// # Arguments
     /// * `user_id` - 用户ID
     ///
     /// # Returns
-    /// * `Ok(Some(PersonalInfo))` - 查询成功且找到个人信息
-    /// * `Ok(None)` - 查询成功但未找到个人信息
+    /// * `Ok(Vec<PersonalInfo>)` - 查询成功返回个人信息列表（可能为空）
     /// * `Err(RepositoryError)` - 查询失败
     async fn find_by_user_id(
         &self,
         user_id: crate::domain::model::user::UserId,
-    ) -> Result<Option<PersonalInfo>, RepositoryError> {
+    ) -> Result<Vec<PersonalInfo>, RepositoryError> {
         let user_id_value = user_id.to_db_value();
 
-        let personal_info_do = crate::models::person_info::Entity::find()
+        let personal_info_items = crate::models::person_info::Entity::find()
             .filter(crate::models::person_info::Column::UserId.eq(user_id_value))
-            .one(&self.db)
+            .all(&self.db)
             .await
             .context(format!(
                 "Failed to find personal info with user id: {}",
@@ -267,12 +268,55 @@ impl PersonalInfoRepository for PersonalInfoRepositoryImpl {
             ))
             .map_err(RepositoryError::Db)?;
 
+        let mut result = Vec::new();
+        for item in personal_info_items {
+            match PersonalInfoDataConverter::make_from_do(item) {
+                Ok(info) => result.push(info),
+                Err(err) => {
+                    // 记录错误但继续处理其他记录
+                    tracing::warn!("Failed to convert personal info: {}", err);
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// 根据用户ID和身份证号查询个人信息
+    ///
+    /// # Arguments
+    /// * `user_id` - 用户ID
+    /// * `identity_card_id` - 身份证号
+    ///
+    /// # Returns
+    /// * `Ok(Some(PersonalInfo))` - 查询成功且找到个人信息
+    /// * `Ok(None)` - 查询成功但未找到个人信息
+    /// * `Err(RepositoryError)` - 查询失败
+    async fn find_by_user_id_and_identity_card(
+        &self,
+        user_id: crate::domain::model::user::UserId,
+        identity_card_id: crate::domain::model::user::IdentityCardId,
+    ) -> Result<Option<PersonalInfo>, RepositoryError> {
+        let user_id_value = user_id.to_db_value();
+        let identity_card_value = identity_card_id.to_string();
+
+        let personal_info_do = crate::models::person_info::Entity::find()
+            .filter(crate::models::person_info::Column::UserId.eq(user_id_value))
+            .filter(crate::models::person_info::Column::IdentityCard.eq(&identity_card_value))
+            .one(&self.db)
+            .await
+            .context(format!(
+                "Failed to find personal info with user id: {} and identity card: {}",
+                user_id_value, identity_card_value
+            ))
+            .map_err(RepositoryError::Db)?;
+
         personal_info_do
             .map(PersonalInfoDataConverter::make_from_do)
             .transpose()
             .context(format!(
-                "Failed to validate personal info with user id: {}",
-                user_id_value
+                "Failed to validate personal info with user id: {} and identity card: {}",
+                user_id_value, identity_card_value
             ))
             .map_err(RepositoryError::ValidationError)
     }

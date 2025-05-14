@@ -29,19 +29,23 @@ pub struct PersonalInfoQuery {
 
 /// 设置个人信息命令
 ///
-/// 包含更新个人信息所需的所有字段，通过[`crate::application::service::personal_info::PersonalInfoService`]执行。
+/// 包含更新或删除个人信息所需的所有字段。
+/// - 若要更新/新增信息，需设置name、identityCardId、preferredSeatLocation和default字段
+/// - 若要删除信息，只设置identityCardId字段
 ///
 /// # Fields
 /// - `session_id`: 用户会话标识，用于验证操作权限
-/// - `name`: 用户真实姓名
-/// - `identity_card_id`: 用户身份证号
-/// - `preferred_seat_location`: 优先座位位置
+/// - `name`: 用户真实姓名（仅更新/创建时需要）
+/// - `identity_card_id`: 身份证号（必填）
+/// - `preferred_seat_location`: 优先座位位置（可选）
+/// - `default`: 是否为默认个人信息（仅更新/创建时需要）
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetPersonalInfoCommand {
     pub session_id: String,
-    pub name: String,
+    pub name: Option<String>,
     pub identity_card_id: String,
-    pub preferred_seat_location: String,
+    pub preferred_seat_location: Option<String>,
+    pub default: Option<bool>,
 }
 
 impl SetPersonalInfoCommand {
@@ -61,6 +65,21 @@ impl SetPersonalInfoCommand {
             name: dto.name,
             identity_card_id: dto.identity_card_id,
             preferred_seat_location: dto.preferred_seat_location,
+            default: dto.default,
         }
+    }
+
+    /// 判断是否为删除操作
+    ///
+    /// 如果只提供了身份证号，没有其他参数，则视为删除操作
+    pub fn is_delete_operation(&self) -> bool {
+        self.name.is_none() && self.preferred_seat_location.is_none() && self.default.is_none()
+    }
+
+    /// 判断是否为更新/创建操作
+    ///
+    /// 如果提供了姓名、身份证号和默认设置，则视为更新/创建操作
+    pub fn is_update_operation(&self) -> bool {
+        self.name.is_some() && self.default.is_some()
     }
 }
