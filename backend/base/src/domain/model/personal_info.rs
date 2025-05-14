@@ -57,6 +57,7 @@ pub struct PersonalInfo {
     identity_card_id: IdentityCardId,
     preferred_seat_location: PreferredSeatLocation,
     user_id: UserId,
+    is_default: bool,
 }
 
 impl PersonalInfo {
@@ -75,6 +76,7 @@ impl PersonalInfo {
             identity_card_id,
             preferred_seat_location,
             user_id,
+            is_default: false,
         }
     }
 
@@ -120,6 +122,14 @@ impl PersonalInfo {
 
     pub fn set_user_id(&mut self, user_id: UserId) {
         self.user_id = user_id;
+    }
+
+    pub fn is_default(&self) -> bool {
+        self.is_default
+    }
+
+    pub fn set_default(&mut self, is_default: bool) {
+        self.is_default = is_default;
     }
 }
 

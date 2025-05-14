@@ -12,6 +12,7 @@ pub struct Model {
     pub identity_card: String,
     pub preferred_seat_location: String,
     pub user_id: i32,
+    pub is_default: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
