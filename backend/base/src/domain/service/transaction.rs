@@ -113,6 +113,7 @@ pub trait TransactionService: 'static + Send + Sync {
         &self,
         user_id: UserId,
         orders: Vec<Box<dyn Order>>,
+        atomic: bool,
     ) -> Result<Uuid, TransactionServiceError>;
 
     /// 支付交易。

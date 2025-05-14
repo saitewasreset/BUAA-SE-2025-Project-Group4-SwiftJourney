@@ -27,14 +27,20 @@ use crate::domain::model::train_schedule::{
     OccupiedSeat, Seat, SeatAvailability, SeatAvailabilityId, SeatId, SeatLocationInfo, SeatStatus,
     StationRange, TrainScheduleId,
 };
+use crate::domain::repository::seat_availability::{
+    OccupiedSeatInfoMap, SeatAvailabilityRepository,
+};
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
     DbId, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use sea_orm::ColumnTrait;
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{
+    ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
+    Statement, TransactionTrait,
+};
+use sea_orm::{ColumnTrait, DbErr};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -275,7 +281,7 @@ impl SeatAvailabilityDataConverter {
                     .get_to_station_id()
                     .to_db_value(),
             ),
-            available_seats: ActiveValue::Set(seat_availability.available_seats_count() as i32),
+            occupied_seats: ActiveValue::Set(seat_availability.occupied_seats_count() as i32),
         };
 
         if let Some(id) = seat_availability.get_id() {
@@ -608,5 +614,73 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl SeatAvailabilityRepository for SeatAvailabilityRepositoryImpl {
+    async fn get_train_schedule_seat_availability_list(
+        &self,
+        train_schedule_id: TrainScheduleId,
+    ) -> Result<Vec<crate::models::seat_availability::Model>, RepositoryError> {
+        let r = crate::models::seat_availability::Entity::find()
+            .filter(
+                crate::models::seat_availability::Column::TrainScheduleId
+                    .eq(train_schedule_id.to_db_value()),
+            )
+            .all(&self.db)
+            .await
+            .context(format!(
+                "failed to get seat availability list for train schedule id: {}",
+                train_schedule_id
+            ))?;
+
+        Ok(r)
+    }
+
+    async fn get_train_schedule_occupied_seat(
+        &self,
+        train_schedule_id: TrainScheduleId,
+    ) -> Result<OccupiedSeatInfoMap, RepositoryError> {
+        #[derive(FromQueryResult)]
+        struct OccupiedSeatInfo {
+            seat_type_id: i32,
+            begin_station_id: i32,
+            end_station_id: i32,
+            seat_id: i64,
+        }
+
+        let seat_info_list = OccupiedSeatInfo::find_by_statement(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            r#"SELECT
+    "seat_availability"."seat_type_id" AS "seat_type_id",
+    "seat_availability"."begin_station_id" AS "begin_station_id",
+    "seat_availability"."end_station_id" AS "end_station_id",
+    "occupied_seat"."seat_id" AS "seat_id"
+FROM "seat_availability"
+INNER JOIN "occupied_seat"
+    ON "occupied_seat"."seat_availability_id" = "seat_availability"."id"
+WHERE "seat_availability"."train_schedule_id" = $1;"#,
+            [train_schedule_id.to_db_value().into()],
+        ))
+        .all(&self.db)
+        .await
+        .context(format!(
+            "failed to get occupied seat info for train schedule id: {}",
+            train_schedule_id
+        ))?;
+
+        let mut result: OccupiedSeatInfoMap = HashMap::new();
+
+        for seat_info in seat_info_list {
+            let entry = result
+                .entry(seat_info.seat_type_id)
+                .or_default()
+                .entry((seat_info.begin_station_id, seat_info.end_station_id))
+                .or_default();
+            entry.push(seat_info.seat_id);
+        }
+
+        Ok(result)
     }
 }
