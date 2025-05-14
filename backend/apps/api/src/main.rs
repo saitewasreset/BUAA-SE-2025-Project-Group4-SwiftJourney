@@ -39,6 +39,7 @@ use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
+use base::domain::service::object_storage::ObjectStorageService;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
@@ -57,6 +58,7 @@ use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
@@ -69,7 +71,7 @@ use sea_orm::Database;
 use std::env::VarError;
 use std::sync::Arc;
 use std::{env, fs};
-use tracing::{instrument, warn};
+use tracing::{error, instrument, warn};
 use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
@@ -80,6 +82,11 @@ async fn main() -> std::io::Result<()> {
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+    let mini_io_endpoint = read_file_env("MINIO_ENDPOINT").expect("cannot get minio endpoint");
+    let mini_io_access_key =
+        read_file_env("MINIO_ACCESS_KEY").expect("cannot get minio access key");
+    let mini_io_secret_key =
+        read_file_env("MINIO_SECRET_KEY").expect("cannot get minio secret key");
 
     let tz_offset_hour = match tz_offset_hour_str {
         Some(hour_str) => hour_str
@@ -121,6 +128,16 @@ async fn main() -> std::io::Result<()> {
     let transaction_repository_impl = Arc::new(TransactionRepositoryImpl::new(conn.clone()));
     let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
+
+    let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
+        &mini_io_endpoint,
+        &mini_io_access_key,
+        &mini_io_secret_key,
+    ));
+
+    if let Err(e) = s3_object_storage_service_impl.init_buckets().await {
+        error!("failed to initialize storage buckets: {}", e);
+    }
 
     let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
         Arc::clone(&user_repository_impl),
