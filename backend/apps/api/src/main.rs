@@ -28,8 +28,9 @@
  * Become a LEGEND.
  * Become a Helldiver!
  */
+use actix_web::web::resource;
 use actix_web::{App, HttpServer, web};
-use api::{AppConfig, MAX_BODY_LENGTH};
+use api::{AppConfig, MAX_BODY_LENGTH, resource};
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
@@ -231,6 +232,9 @@ async fn main() -> std::io::Result<()> {
     let personal_info_service: web::Data<dyn PersonalInfoService> =
         web::Data::from(personal_info_service_impl as Arc<dyn PersonalInfoService>);
 
+    let object_storage_service: web::Data<dyn ObjectStorageService> =
+        web::Data::from(s3_object_storage_service_impl as Arc<dyn ObjectStorageService>);
+
     let app_config_data = web::Data::new(app_config);
 
     // Step 2: Create instance of your application service,
@@ -250,6 +254,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(geo_application_service.clone())
             .app_data(personal_info_service.clone())
             .app_data(transaction_application_service.clone())
+            .app_data(object_storage_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
@@ -257,6 +262,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(app_config_data.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
+            .service(web::scope("/resource").configure(resource::scoped_config))
             .service(
                 web::scope("/api")
                     .service(web::scope("/user").configure(api::user::scoped_config))
