@@ -4,7 +4,7 @@
 //! 接口设计遵循仓储模式，分离领域逻辑和数据访问细节。
 
 use crate::domain::model::personal_info::PersonalInfo;
-use crate::domain::model::user::UserId;
+use crate::domain::model::user::{UserId, IdentityCardId};
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
 
@@ -15,6 +15,7 @@ use async_trait::async_trait;
 ///
 /// # 方法
 /// - `find_by_user_id`: 根据用户ID查询个人信息
+/// - `find_by_user_id_and_identity_card`: 根据用户ID和身份证号查询个人信息
 #[async_trait]
 pub trait PersonalInfoRepository: Repository<PersonalInfo> {
     /// 根据用户ID查询个人信息
@@ -23,11 +24,23 @@ pub trait PersonalInfoRepository: Repository<PersonalInfo> {
     /// * `user_id` - 用户ID
     ///
     /// # Returns
+    /// * `Ok(Vec<PersonalInfo>)` - 查询成功返回个人信息列表（可能为空）
+    /// * `Err(RepositoryError)` - 查询失败
+    async fn find_by_user_id(&self, user_id: UserId) -> Result<Vec<PersonalInfo>, RepositoryError>;
+
+    /// 根据用户ID和身份证号查询个人信息
+    ///
+    /// # Arguments
+    /// * `user_id` - 用户ID
+    /// * `identity_card_id` - 身份证号
+    ///
+    /// # Returns
     /// * `Ok(Some(PersonalInfo))` - 查询成功且找到个人信息
     /// * `Ok(None)` - 查询成功但未找到个人信息
     /// * `Err(RepositoryError)` - 查询失败
-    async fn find_by_user_id(
+    async fn find_by_user_id_and_identity_card(
         &self,
         user_id: UserId,
+        identity_card_id: IdentityCardId,
     ) -> Result<Option<PersonalInfo>, RepositoryError>;
 }
