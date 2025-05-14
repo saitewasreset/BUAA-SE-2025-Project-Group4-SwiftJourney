@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub user_id: i64,
     pub hotel_id: i64,
-    pub time: DateTime,
+    pub time: DateTimeWithTimeZone,
     #[sea_orm(column_type = "Decimal(Some((2, 1)))")]
     pub rating: Decimal,
     pub text: String,
