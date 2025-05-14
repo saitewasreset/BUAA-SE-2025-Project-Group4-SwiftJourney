@@ -90,11 +90,11 @@
 pub mod geo;
 pub mod order;
 pub mod order_status;
-pub mod order_status_consumer;
 pub mod password;
 pub mod route;
 pub mod session;
 pub mod station;
+pub mod train_booking;
 pub mod train_schedule;
 pub mod train_seat;
 pub mod train_type;

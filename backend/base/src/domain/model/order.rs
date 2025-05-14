@@ -26,7 +26,7 @@ use rust_decimal::Decimal;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use uuid::Uuid;
 
@@ -239,6 +239,33 @@ pub enum OrderType {
     Hotel,
     Dish,
     Takeaway,
+}
+
+impl OrderType {
+    pub fn message_queue_name(&self) -> &'static str {
+        match self {
+            OrderType::Train => "order.train",
+            OrderType::Hotel => "order.hotel",
+            OrderType::Dish => "order.dish",
+            OrderType::Takeaway => "order.takeaway",
+        }
+    }
+}
+impl From<&OrderType> for &'static str {
+    fn from(value: &OrderType) -> Self {
+        match value {
+            OrderType::Train => "train",
+            OrderType::Hotel => "hotel",
+            OrderType::Dish => "dish",
+            OrderType::Takeaway => "takeaway",
+        }
+    }
+}
+
+impl Display for OrderType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", <&OrderType as Into<&'static str>>::into(self))
+    }
 }
 
 /// 特性，定义了订单的基本操作。
