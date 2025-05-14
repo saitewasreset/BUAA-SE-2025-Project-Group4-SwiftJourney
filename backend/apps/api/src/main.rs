@@ -56,6 +56,7 @@ use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
+use base::infrastructure::service::order_status_consumer_service::OrderStatusConsumerService;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
@@ -76,6 +77,7 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
 
     let tz_offset_hour = match tz_offset_hour_str {
@@ -203,6 +205,12 @@ async fn main() -> std::io::Result<()> {
         );
 
     let app_config_data = web::Data::new(app_config);
+
+    let order_status_consumer = vec![];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
 
     // Step 2: Create instance of your application service,
     // and wrap it with `web::Data::new`

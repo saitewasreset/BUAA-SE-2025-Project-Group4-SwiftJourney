@@ -17,5 +17,5 @@ pub trait OrderStatusManagerService: 'static + Send + Sync {
     async fn attach(&self, order: &dyn Order) -> Result<(), OrderStatusManagerServiceError>;
     async fn detach(&self, order: &dyn Order) -> Result<(), OrderStatusManagerServiceError>;
 
-    async fn notify_status_change(&self, order_uuid: Uuid, new_status: OrderStatus);
+    async fn notify_status_change(&self, order: &dyn Order, new_status: OrderStatus);
 }

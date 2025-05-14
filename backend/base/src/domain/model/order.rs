@@ -24,6 +24,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use id_macro::define_id_type;
 use rust_decimal::Decimal;
 use sea_orm::prelude::DateTimeWithTimeZone;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -39,7 +40,7 @@ use uuid::Uuid;
 /// - `Completed`: 订单已完成。
 /// - `Failed`: 订单处理失败。
 /// - `Cancelled`: 订单已被用户取消。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OrderStatus {
     /// 订单已经生成，还未支付
     Unpaid,
@@ -232,6 +233,14 @@ impl PaymentInfo {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum OrderType {
+    Train,
+    Hotel,
+    Dish,
+    Takeaway,
+}
+
 /// 特性，定义了订单的基本操作。
 ///
 /// 包含以下方法：
@@ -268,6 +277,9 @@ pub trait Order: DynClone + Debug + Send + Sync + 'static + Any {
     /// Returns:
     /// - 订单的状态。
     fn order_status(&self) -> OrderStatus;
+
+    fn order_type(&self) -> OrderType;
+
     /// 获取订单的时间信息。
     ///
     /// Returns:
@@ -444,6 +456,10 @@ impl Order for TrainOrder {
         self.base.order_status
     }
 
+    fn order_type(&self) -> OrderType {
+        OrderType::Train
+    }
+
     fn order_time_info(&self) -> OrderTimeInfo {
         self.base.order_time_info
     }
@@ -577,6 +593,10 @@ impl Order for HotelOrder {
         self.base.order_status
     }
 
+    fn order_type(&self) -> OrderType {
+        OrderType::Hotel
+    }
+
     fn order_time_info(&self) -> OrderTimeInfo {
         self.base.order_time_info
     }
@@ -707,6 +727,10 @@ impl Order for DishOrder {
         self.base.order_status
     }
 
+    fn order_type(&self) -> OrderType {
+        OrderType::Dish
+    }
+
     fn order_time_info(&self) -> OrderTimeInfo {
         self.base.order_time_info
     }
@@ -820,6 +844,10 @@ impl Order for TakeawayOrder {
 
     fn order_status(&self) -> OrderStatus {
         self.base.order_status
+    }
+
+    fn order_type(&self) -> OrderType {
+        OrderType::Takeaway
     }
 
     fn order_time_info(&self) -> OrderTimeInfo {
