@@ -44,6 +44,12 @@ impl ObjectCategory {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ObjectInfo {
+    pub content_type: String,
+    pub data: Vec<u8>,
+}
+
 #[async_trait]
 pub trait ObjectStorageService: 'static + Send + Sync {
     async fn init_buckets(&self) -> Result<(), ObjectStorageServiceError>;
@@ -51,6 +57,7 @@ pub trait ObjectStorageService: 'static + Send + Sync {
     async fn put_object(
         &self,
         object_category: ObjectCategory,
+        content_type: &str,
         object: Vec<u8>,
     ) -> Result<Uuid, ObjectStorageServiceError>;
 
@@ -58,5 +65,11 @@ pub trait ObjectStorageService: 'static + Send + Sync {
         &self,
         object_category: ObjectCategory,
         object_id: Uuid,
-    ) -> Result<Vec<u8>, ObjectStorageServiceError>;
+    ) -> Result<ObjectInfo, ObjectStorageServiceError>;
+
+    async fn delete_object(
+        &self,
+        object_category: ObjectCategory,
+        object_id: Uuid,
+    ) -> Result<(), ObjectStorageServiceError>;
 }
