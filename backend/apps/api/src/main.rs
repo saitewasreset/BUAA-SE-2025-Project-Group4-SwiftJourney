@@ -1,6 +1,8 @@
 // Step 1: Read the sentences below.
 // Thinking 1.2.1D - 6: 你认为下面的句子来自哪个游戏？其用意是什么？
+// 用意是夹带私货，宣传“管理式民主”
 // Thinking 1.2.1D - 7: 什么是“管理式民主”（Managed Democracy）？你认为它是真实的民主吗？
+// “管理式民主”是一个讽刺的说法，指的是一种表面上看似民主的制度，但实际上是由少数人或特定利益集团控制的。它并不是真正的民主，因为它缺乏真正的选举自由和公民参与。
 /*
  * Super Earth.
  * Our home.
@@ -81,6 +83,11 @@ async fn main() -> std::io::Result<()> {
     // HINT: You can borrow web::Data<T> as &Arc<T>
     // that means you can pass a &web::Data<T> to `Arc::clone`
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
+    // let train_query_service = web::Data::new(
+    //     base::infrastructure::application::service::train_query::TrainQueryServiceImpl::<
+    //         base::infrastructure::application::service::train_query,
+    //     >::new(Arc::clone(&user_repository)),
+    // );
 
     HttpServer::new(move || {
         App::new()

@@ -30,6 +30,9 @@ pub enum GeneralError {
     /// 请求参数无效
     #[error("{0}")]
     BadRequest(String),
+    /// 请求资源不存在
+    #[error("resource not found")]
+    NotFound,
     /// 服务器内部错误
     #[error("an internal server error occurred")]
     InternalServerError,
@@ -40,6 +43,7 @@ impl ApplicationError for GeneralError {
         match self {
             GeneralError::BadRequest(_) => 400,
             GeneralError::InvalidSessionId => 403,
+            GeneralError::NotFound => 404,
             GeneralError::InternalServerError => 500,
         }
     }
@@ -50,6 +54,7 @@ impl ApplicationError for GeneralError {
             GeneralError::InvalidSessionId => {
                 API_FORBIDDEN_MESSAGE_TEMPLATE.format(&["invalid session id"])
             }
+            GeneralError::NotFound => "resource not found".to_owned(),
             GeneralError::InternalServerError => API_INTERNAL_SERVER_ERROR_MESSAGE.to_owned(),
         }
     }
