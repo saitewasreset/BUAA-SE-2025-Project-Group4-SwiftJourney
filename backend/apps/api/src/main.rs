@@ -31,6 +31,7 @@
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH};
 use base::application::service::geo::GeoApplicationService;
+use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
 use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
@@ -41,12 +42,14 @@ use base::domain::repository::user::UserRepository;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
+use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
+use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
@@ -120,6 +123,7 @@ async fn main() -> std::io::Result<()> {
     let route_repository_impl = Arc::new(RouteRepositoryImpl::new(conn.clone()));
     let transaction_repository_impl = Arc::new(TransactionRepositoryImpl::new(conn.clone()));
     let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
+    let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
 
     let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
         Arc::clone(&user_repository_impl),
@@ -187,6 +191,11 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_service_impl),
     ));
 
+    let personal_info_service_impl = Arc::new(PersonalInfoServiceImpl::new(
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&personal_info_repository_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -213,6 +222,9 @@ async fn main() -> std::io::Result<()> {
             transaction_application_service_impl as Arc<dyn TransactionApplicationService>,
         );
 
+    let personal_info_service: web::Data<dyn PersonalInfoService> =
+        web::Data::from(personal_info_service_impl as Arc<dyn PersonalInfoService>);
+
     let app_config_data = web::Data::new(app_config);
 
     let order_status_consumer = vec![];
@@ -236,6 +248,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_profile_service.clone())
             .app_data(train_data_service.clone())
             .app_data(geo_application_service.clone())
+            .app_data(personal_info_service.clone())
             .app_data(transaction_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)

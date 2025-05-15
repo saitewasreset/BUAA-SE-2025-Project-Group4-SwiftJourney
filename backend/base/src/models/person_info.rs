@@ -7,10 +7,12 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub uuid: Uuid,
     pub name: String,
     pub identity_card: String,
     pub preferred_seat_location: String,
-    pub user_id: i64,
+    pub user_id: i32,
+    pub is_default: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
