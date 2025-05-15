@@ -1,2 +1,10 @@
+pub mod city;
+pub mod order;
+pub mod route;
+pub mod seat_availability;
 pub mod session;
+pub mod station;
+pub mod train;
+pub mod train_schedule;
+pub mod transaction;
 pub mod user;

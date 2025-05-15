@@ -5,15 +5,11 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "occupied_seat")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    pub train_id: i64,
-    pub seat_type_id: i64,
-    pub departure_date: Date,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub seat_availability_id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub seat_id: i64,
-    pub begin_station_id: i64,
-    pub end_station_id: i64,
-    pub person_info_id: i64,
+    pub person_info_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -26,55 +22,11 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PersonInfo,
-    #[sea_orm(
-        belongs_to = "super::seat_type::Entity",
-        from = "Column::SeatTypeId",
-        to = "super::seat_type::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    SeatType,
-    #[sea_orm(
-        belongs_to = "super::station::Entity",
-        from = "Column::BeginStationId",
-        to = "super::station::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Station2,
-    #[sea_orm(
-        belongs_to = "super::station::Entity",
-        from = "Column::EndStationId",
-        to = "super::station::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Station1,
-    #[sea_orm(
-        belongs_to = "super::train::Entity",
-        from = "Column::TrainId",
-        to = "super::train::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Train,
 }
 
 impl Related<super::person_info::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PersonInfo.def()
-    }
-}
-
-impl Related<super::seat_type::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::SeatType.def()
-    }
-}
-
-impl Related<super::train::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Train.def()
     }
 }
 

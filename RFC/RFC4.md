@@ -1,9 +1,27 @@
 # Request For Comments 4: API 文档
 
-Version: 5 (2025-04-22 13:25:00)
+Version: 11 (2025-05-11 17:32:00)
 
 最近变更：
 
+- Version 11
+  - 新增修改密码 API
+- Version 10
+  - `TrainOrderInfo`新增始发站、终到站相关信息
+  - `TakeawayOrderInfo`新增用餐时间
+- Version 9
+  - 修复`depature`拼写错误
+- Version 8
+  - 交易查询：现在可获得所有交易的列表
+  - 设置支付密码：应当提供`string`类型的支付密码；新增支付密码格式错误的返回代码
+  - 支付交易：新增部分错误代码、应当提供`string`类型的支付密码
+- Version 7
+  - 订单信息：拆分总价为单价和数量
+  - 酒店订单：修改“旅客姓名”为“订房人姓名”
+  - 外卖订单：新增用餐时间
+  - 酒店预订：新增预订数量
+- Version 6
+  - 新增：城市信息
 - Version 5
   - 订单列表：按交易组合订单，`OrderInfo::status`改为小写
 - Version 4
@@ -109,6 +127,29 @@ type ResponseData = "debug" | "release";
 `GET /api/general/city_stations`
 
 返回从城市到该城市车站列表的映射。
+
+需要 Cookie：
+
+- 无
+
+响应代码表：
+
+| 代码 | 可能的响应消息     | 含义                             |
+| ---- | ------------------ | -------------------------------- |
+| 200  | `For Super Earth!` | 请求已被成功执行，可访问响应数据 |
+
+响应**数据**：
+
+```typescript
+// 城市 -> 车站 []
+type ResponseData = Map<string, string[]>;
+```
+
+### 城市信息
+
+`GET /api/general/city`
+
+返回从省到该城省车城市列表的映射。
 
 需要 Cookie：
 
@@ -401,6 +442,45 @@ type ResponseData = null;
 
 - 无
 
+### 修改密码
+
+`POST /api/user/update_password`
+
+需要 Cookie：
+
+- session_id
+
+请求：
+
+```typescript
+type Request = UpdatePassword;
+
+interface UpdatePassword {
+  // 原密码
+  originPassword: string;
+  // 新密码
+  newPassword: string;
+}
+```
+
+响应代码表：
+
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 15002 | `Invalid phone number or password`                                   | 用户名或密码错误                 |
+
+响应**数据**：
+
+```typescript
+type ResponseData = null;
+```
+
+设置 Cookie：
+
+- 无
+
 ## 缴费系统（FE1.1）
 
 ### 充值（US1.1.1）
@@ -471,7 +551,7 @@ interface BalanceInfo {
 
 ### 交易信息查询（US1.1.3）
 
-`GET /api/transaction/{transaction_id}`
+`GET /api/transaction`
 
 需要 Cookie：
 
@@ -488,7 +568,7 @@ interface BalanceInfo {
 响应**数据**：
 
 ```typescript
-type ResponseData = TransactionInfo;
+type ResponseData = TransactionInfo[];
 
 interface TransactionInfo {
   transactionId: string;
@@ -517,16 +597,18 @@ type Request = PaymentPasswordInfo;
 interface PaymentPasswordInfo {
   // 修改支付密码时，需要传入用户密码进行验证
   userPassword: string;
-  paymentPassword: number;
+  paymentPassword: string;
 }
 ```
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                       | 含义                             |
-| ---- | -------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 代码  | 可能的响应消息                                                       | 含义                             |
+| ----- | -------------------------------------------------------------------- | -------------------------------- |
+| 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                         |
+| 11002 | `Wrong user password`                                                | 用户密码错误                     |
+| 11007 | `Invalid payment password format`                                    | 支付密码格式错误                 |
 
 响应**数据**：
 
@@ -553,7 +635,7 @@ type Request = PaymentConfirmation;
 
 interface PaymentConfirmation {
   userPassword?: string;
-  paymentPassword?: number;
+  paymentPassword?: string;
 }
 ```
 
@@ -567,14 +649,16 @@ interface PaymentConfirmation {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                             | 含义                                          |
-| ----- | -------------------------------------------------------------------------- | --------------------------------------------- |
-| 200   | `For Super Earth!`                                                         | 请求已被成功执行，可访问响应数据              |
-| 400   | `No password provided`                                                     | 请求中`userPassword`和`paymentPassword`都为空 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`       | 会话无效                                      |
-| 11001 | `Wrong payment password`                                                   | 支付密码错误                                  |
-| 11002 | `Wrong user password`                                                      | 用户密码错误                                  |
-| 11003 | `Too many failed payment password attempts. Please use your user password` | 支付密码输入错误次数过多                      |
+| 代码  | 可能的响应消息                                                                     | 含义                                          |
+| ----- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
+| 200   | `For Super Earth!`                                                                 | 请求已被成功执行，可访问响应数据              |
+| 400   | `No password provided`                                                             | 请求中`userPassword`和`paymentPassword`都为空 |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`               | 会话无效                                      |
+| 11001 | `Wrong payment password`                                                           | 支付密码错误                                  |
+| 11002 | `Wrong user password`                                                              | 用户密码错误                                  |
+| 11003 | `Too many failed payment password attempts. Please use your user password`         | 支付密码输入错误次数过多                      |
+| 11004 | `Insufficient funds`                                                               | 余额不足                                      |
+| 11006 | `Invalid transaction status {status} for op {op} for transaction {transaction_id}` | 交易状态错误，例如，支付已经支付过的交易      |
 
 响应**数据**：
 
@@ -657,13 +741,13 @@ interface TrainScheduleQuery {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                               | 含义                                             |
-| ----- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
-| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`departureStation`或`arrivalStation`不存在 |
-| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在        |
-| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                         |
+| 代码  | 可能的响应消息                                                               | 含义                                               |
+| ----- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
+| 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`departureStation`或`departureStation`不存在 |
+| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在         |
+| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                           |
 
 响应**数据**：
 
@@ -749,13 +833,13 @@ interface TrainScheduleQuery {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                               | 含义                                             |
-| ----- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                 |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                         |
+| 代码  | 可能的响应消息                                                               | 含义                                               |
+| ----- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| 200   | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
 | 404   | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的`departureStation`或`departureStation`不存在 |
-| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在        |
-| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                         |
+| 404   | `Sorry, but this was meant to be a private game: invalid city: {station}`    | 查询的`departureCity`或`arrivalCity`不存在         |
+| 12001 | `Inconsistent query`                                                         | 不满足上述查询一致性要求                           |
 
 响应**数据**：
 
@@ -822,13 +906,13 @@ interface TrainOrderRequest {
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                                                         | 含义                                                 |
-| ---- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| 200  | `For Super Earth!`                                                                                     | 请求已被成功执行，可访问响应数据                     |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                                   | 会话无效                                             |
+| 代码 | 可能的响应消息                                                                                          | 含义                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 200  | `For Super Earth!`                                                                                      | 请求已被成功执行，可访问响应数据                     |
+| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                                    | 会话无效                                             |
 | 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {origin_departure_time}` | 车次号不存在，或车次号与离开“始发站”的时间的组合非法 |
-| 404  | `Sorry, but this was meant to be a private game: invalid station: {station_name}`                      | 起始站/到达站不存在                                  |
-| 404  | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}`                    | 乘车人 Id 不存在，或未与当前用户绑定                 |
+| 404  | `Sorry, but this was meant to be a private game: invalid station: {station_name}`                       | 起始站/到达站不存在                                  |
+| 404  | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}`                     | 乘车人 Id 不存在，或未与当前用户绑定                 |
 
 响应**数据**：
 
@@ -883,7 +967,9 @@ interface OrderInfo {
   orderId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
   status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
-  // 订单金额
+  // 订单单价
+  unitPrice: number;
+  // 订单数量
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish" | "takeaway";
@@ -907,8 +993,14 @@ interface SeatLocationInfo {
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
-  // 离开起始站日期时间
+  // 始发站
+  departureStation: string;
+  // 终到站
+  terminalStation: string;
+  // 离开始发站日期时间
   departureTime: string;
+  // 到达终到站的日期时间
+  terminalTime: string;
   // 乘车人姓名
   name: string;
   // 人类可读的座位号
@@ -920,7 +1012,7 @@ interface HotelOrderInfo extends OrderInfo {
   hotelName: string;
   // 酒店 UUID
   hotelId: string;
-  // 旅客姓名
+  // 订房人姓名
   name: string;
   // 人类可读的房间类型，例如：“大床房”
   roomType: string;
@@ -950,6 +1042,8 @@ interface TakeawayOrderInfo extends OrderInfo {
   departureTime: string;
   // 车站
   station: string;
+  // 用餐时间（到达车站的时间）
+  dishTime: string;
   // 店铺名称
   shopName: string;
   // 用餐人姓名
@@ -1207,8 +1301,10 @@ interface HotelOrderRequest {
   // 离开日期
   endDate?: string;
 
-  // 旅客 UUID（见`PersonalInfo`）
+  // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
+  // 预订数量
+  amount: number;
 }
 ```
 
@@ -1496,6 +1592,8 @@ interface DishOrder {
 interface TakeawayOrder {
   // 车站名称
   station: string;
+  // 用餐时间（到达station的时间）
+  arrivalTime: string;
   // 店铺名称
   shopName: string;
   // 餐品名称
