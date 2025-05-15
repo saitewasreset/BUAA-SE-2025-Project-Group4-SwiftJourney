@@ -24,9 +24,9 @@ use crate::application::service::personal_info::{
     PersonalInfoDTO, PersonalInfoError, PersonalInfoService,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::model::personal_info::{PersonalInfo, PreferredSeatLocation};
+use crate::domain::model::personal_info::PreferredSeatLocation;
 use crate::domain::model::session::SessionId;
-use crate::domain::model::user::{IdentityCardId, RealName, UserId};
+use crate::domain::model::user::{IdentityCardId, RealName};
 use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
@@ -249,6 +249,7 @@ mod tests {
     use crate::domain::RepositoryError;
     use crate::domain::model::personal_info::{PersonalInfo, PersonalInfoId};
     use crate::domain::model::session::Session;
+    use crate::domain::model::user::UserId;
     use async_trait::async_trait;
     use mockall::predicate;
     use mockall::{mock, predicate::*};
