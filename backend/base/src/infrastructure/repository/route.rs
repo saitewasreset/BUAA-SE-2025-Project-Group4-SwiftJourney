@@ -14,11 +14,12 @@
 //! - 严格的数据一致性检查
 use crate::domain::model::route::{Route, RouteId, StopId};
 use crate::domain::model::station::StationId;
+use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use sea_orm::{ActiveValue, DatabaseConnection};
+use sea_orm::{ActiveValue, DatabaseBackend, DatabaseConnection, Statement};
 use sea_orm::{ColumnTrait, TransactionTrait};
 use sea_orm::{DatabaseTransaction, QueryFilter};
 use sea_orm::{EntityTrait, QueryOrder};
@@ -383,6 +384,63 @@ impl RouteRepository for RouteRepositoryImpl {
         }
 
         Ok(result)
+    }
+
+    #[instrument(skip(self))]
+    async fn get_by_train_schedule(
+        &self,
+        train_schedule_id: TrainScheduleId,
+    ) -> Result<Option<Route>, RepositoryError> {
+        let models = crate::models::route::Entity::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT
+    "route"."id",
+    "route"."line_id",
+    "route"."station_id",
+    "route"."arrival_time",
+    "route"."departure_time",
+    "route"."order"
+FROM "route"
+    INNER JOIN "train_schedule"
+        ON "train_schedule"."line_id" = "route"."line_id"
+WHERE "train_schedule"."id" = $1;"#,
+                [train_schedule_id.to_db_value().into()],
+            ))
+            .all(&self.db)
+            .await
+            .context(format!(
+                "failed to get route by train schedule id: {}",
+                train_schedule_id.to_db_value()
+            ))
+            .map_err(|e| {
+                error!(
+                    "Failed to get route by train schedule id: {}: {}",
+                    train_schedule_id.to_db_value(),
+                    e
+                );
+                e
+            })?;
+
+        if !models.is_empty() {
+            let route = RouteDataConverter::make_from_do(models)
+                .context(format!(
+                    "failed to convert route with train schedule id: {}",
+                    train_schedule_id.to_db_value()
+                ))
+                .map_err(|e| {
+                    error!(
+                        "Failed to convert route with train schedule id: {}: {}",
+                        train_schedule_id.to_db_value(),
+                        e
+                    );
+                    e
+                })
+                .map_err(RepositoryError::ValidationError)?;
+            Ok(Some(route))
+        } else {
+            Ok(None)
+        }
     }
 
     /// 批量导入原始路线数据

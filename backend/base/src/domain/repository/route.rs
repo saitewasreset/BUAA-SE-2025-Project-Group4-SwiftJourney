@@ -7,6 +7,7 @@
 //!
 //! 注意：具体实现应放在基础设施层(`infrastructure::repository`)。
 use crate::domain::model::route::{Route, RouteId};
+use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
 use shared::data::RouteStationInfo;
@@ -41,6 +42,11 @@ pub trait RouteRepository: Repository<Route> {
     /// # Returns
     /// 成功时返回所有车次路线的列表；失败时返回`RepositoryError`。
     async fn load(&self) -> Result<Vec<Route>, RepositoryError>;
+
+    async fn get_by_train_schedule(
+        &self,
+        train_schedule_id: TrainScheduleId,
+    ) -> Result<Option<Route>, RepositoryError>;
 
     /// 保存原始车次路线数据。
     ///
