@@ -1,5 +1,5 @@
 use crate::m20250411_010614_create_station::Station;
-use crate::m20250411_010617_create_train::Train;
+use crate::m20250411_010620_create_train_schedule::TrainSchedule;
 use crate::m20250411_010621_create_seat_type::SeatType;
 use crate::m20250411_010719_create_person_info::PersonInfo;
 use crate::m20250411_010725_create_transaction::Transaction;
@@ -12,8 +12,8 @@ pub struct Migration;
 pub enum TrainOrder {
     Table,
     Id,
-    TrainId,
-    DepartureDate,
+    Uuid,
+    TrainScheduleId,
     SeatTypeId,
     SeatId,
     BeginStationId,
@@ -37,15 +37,15 @@ impl MigrationTrait for Migration {
                     .table(TrainOrder::Table)
                     .if_not_exists()
                     .col(pk_auto(TrainOrder::Id))
-                    .col(big_integer(TrainOrder::TrainId).not_null())
-                    .col(date(TrainOrder::DepartureDate).not_null())
-                    .col(big_integer(TrainOrder::SeatTypeId).not_null())
+                    .col(uuid(TrainOrder::Uuid).not_null())
+                    .col(integer(TrainOrder::TrainScheduleId).not_null())
+                    .col(integer(TrainOrder::SeatTypeId).not_null())
                     .col(integer(TrainOrder::SeatId).not_null())
-                    .col(big_integer(TrainOrder::BeginStationId).not_null())
-                    .col(big_integer(TrainOrder::EndStationId).not_null())
-                    .col(big_integer(TrainOrder::PersonInfoId).not_null())
-                    .col(big_integer(TrainOrder::PayTransactionId))
-                    .col(big_integer(TrainOrder::RefundTransactionId))
+                    .col(integer(TrainOrder::BeginStationId).not_null())
+                    .col(integer(TrainOrder::EndStationId).not_null())
+                    .col(integer(TrainOrder::PersonInfoId).not_null())
+                    .col(integer(TrainOrder::PayTransactionId))
+                    .col(integer(TrainOrder::RefundTransactionId))
                     .col(
                         decimal_len(TrainOrder::Price, 10, 2)
                             .not_null()
@@ -57,8 +57,8 @@ impl MigrationTrait for Migration {
                     .col(string(TrainOrder::Status).not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .from(TrainOrder::Table, TrainOrder::TrainId)
-                            .to(Train::Table, Train::Id)
+                            .from(TrainOrder::Table, TrainOrder::TrainScheduleId)
+                            .to(TrainSchedule::Table, TrainSchedule::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(

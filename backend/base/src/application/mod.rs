@@ -3,6 +3,7 @@ use shared::{
     API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_MESSAGE_TEMPLATE,
     API_INTERNAL_SERVER_ERROR_MESSAGE,
 };
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 pub mod commands;
@@ -57,5 +58,26 @@ impl ApplicationError for GeneralError {
             GeneralError::NotFound => "resource not found".to_owned(),
             GeneralError::InternalServerError => API_INTERNAL_SERVER_ERROR_MESSAGE.to_owned(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ModeError;
+
+impl Display for ModeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "mode error")
+    }
+}
+
+impl std::error::Error for ModeError {}
+
+impl ApplicationError for ModeError {
+    fn error_code(&self) -> u32 {
+        403
+    }
+
+    fn error_message(&self) -> String {
+        "debug mode is not enabled".to_string()
     }
 }

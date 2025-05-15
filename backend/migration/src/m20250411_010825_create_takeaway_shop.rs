@@ -8,8 +8,10 @@ pub struct Migration;
 pub enum TakeawayShop {
     Table,
     Id,
+    Uuid,
     Name,
     StationId,
+    Images,
 }
 
 #[async_trait::async_trait]
@@ -21,8 +23,10 @@ impl MigrationTrait for Migration {
                     .table(TakeawayShop::Table)
                     .if_not_exists()
                     .col(pk_auto(TakeawayShop::Id))
+                    .col(uuid(TakeawayShop::Uuid))
                     .col(string(TakeawayShop::Name).not_null())
                     .col(big_integer(TakeawayShop::StationId).not_null())
+                    .col(json(TakeawayShop::Images).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(TakeawayShop::Table, TakeawayShop::StationId)

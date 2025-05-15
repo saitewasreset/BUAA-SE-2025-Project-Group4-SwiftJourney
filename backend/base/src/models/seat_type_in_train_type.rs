@@ -6,9 +6,9 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "seat_type_in_train_type")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub seat_type_id: i64,
+    pub seat_type_id: i32,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub train_type_id: i64,
+    pub train_type_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

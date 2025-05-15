@@ -11,6 +11,7 @@ pub struct Migration;
 pub enum HotelOrder {
     Table,
     Id,
+    Uuid,
     HotelId,
     BeginDate,
     EndDate,
@@ -34,6 +35,7 @@ impl MigrationTrait for Migration {
                     .table(HotelOrder::Table)
                     .if_not_exists()
                     .col(pk_auto(HotelOrder::Id))
+                    .col(uuid(HotelOrder::Uuid).not_null())
                     .col(big_integer(HotelOrder::HotelId).not_null())
                     .col(date(HotelOrder::BeginDate).not_null())
                     .col(date(HotelOrder::EndDate).not_null().check(
