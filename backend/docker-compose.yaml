@@ -32,12 +32,19 @@ services:
       timeout: 30s
       retries: 3
 
+  rabbitmq:
+    image: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: swiftjourney
+      RABBITMQ_DEFAULT_PASS: swiftjourney
+
   backend:
     build: .
     volumes:
       - backend_data:/instance
     environment:
       DATABASE_URL: postgres://swiftjourney:swiftjourney@db/swiftjourney
+      RABBITMQ_URL: amqp://swiftjourney:swiftjourney@rabbitmq/
     restart: unless-stopped
     depends_on:
       db:
@@ -45,7 +52,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - 8080:8080
+      - "8080:8080"
 
 volumes:
   postgres_data:

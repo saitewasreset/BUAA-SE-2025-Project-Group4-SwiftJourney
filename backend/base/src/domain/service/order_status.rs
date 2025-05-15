@@ -1,6 +1,7 @@
-use crate::domain::model::order::{Order, OrderStatus};
+use crate::domain::model::order::{Order, OrderStatus, OrderType};
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -14,8 +15,41 @@ pub enum OrderStatusManagerServiceError {
 }
 #[async_trait]
 pub trait OrderStatusManagerService: 'static + Send + Sync {
-    async fn attach(&self, order: &dyn Order) -> Result<(), OrderStatusManagerServiceError>;
-    async fn detach(&self, order: &dyn Order) -> Result<(), OrderStatusManagerServiceError>;
+    async fn notify_status_change(
+        &self,
+        transaction_uuid: Uuid,
+        atomic: bool,
+        orders: &[&dyn Order],
+        new_status: OrderStatus,
+    );
+}
 
-    async fn notify_status_change(&self, order_uuid: Uuid, new_status: OrderStatus);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderStatusMessagePack {
+    pub transaction_uuid: Uuid,
+    pub messages: Vec<OrderStatusMessage>,
+    pub atomic: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderStatusMessage {
+    pub order_id: Uuid,
+    pub order_type: OrderType,
+    pub new_status: OrderStatus,
+}
+
+#[async_trait]
+pub trait OrderStatusConsumer: 'static + Send + Sync {
+    async fn consume_order_status_change(
+        &self,
+        messages: OrderStatusMessagePack,
+    ) -> Result<(), OrderStatusConsumerError>;
+}
+
+#[derive(Debug, Error)]
+pub enum OrderStatusConsumerError {
+    #[error("processing error: {0}")]
+    ProcessingError(anyhow::Error),
+    #[error("related service error: {0}")]
+    RelatedServiceError(anyhow::Error),
 }
