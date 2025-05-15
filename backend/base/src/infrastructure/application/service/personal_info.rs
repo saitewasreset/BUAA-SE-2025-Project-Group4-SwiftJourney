@@ -194,10 +194,7 @@ where
             let preferred_seat_location = match command.preferred_seat_location {
                 Some(ref location) => {
                     if location.is_empty() {
-                        PreferredSeatLocation::try_from('A').map_err(|_| {
-                            Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
-                                as Box<dyn ApplicationError>
-                        })?
+                        PreferredSeatLocation::A
                     } else {
                         PreferredSeatLocation::try_from(location.chars().next().unwrap()).map_err(
                             |_| {
@@ -207,10 +204,7 @@ where
                         )?
                     }
                 }
-                None => PreferredSeatLocation::try_from('A').map_err(|_| {
-                    Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
-                        as Box<dyn ApplicationError>
-                })?,
+                None => PreferredSeatLocation::A,
             };
 
             let is_default = command.default.unwrap_or(false);
