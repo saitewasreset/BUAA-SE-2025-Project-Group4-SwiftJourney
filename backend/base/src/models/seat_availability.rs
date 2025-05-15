@@ -11,7 +11,7 @@ pub struct Model {
     pub seat_type_id: i32,
     pub begin_station_id: i32,
     pub end_station_id: i32,
-    pub available_seats: i32,
+    pub occupied_seats: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

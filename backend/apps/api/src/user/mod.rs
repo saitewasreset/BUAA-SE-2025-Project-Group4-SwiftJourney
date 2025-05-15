@@ -1,8 +1,8 @@
 use actix_web::web;
 
+pub mod personal_info;
 pub mod user_info;
 pub mod user_manager;
-pub mod personal_info;
 
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(user_info::get_user_info);

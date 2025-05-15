@@ -62,6 +62,8 @@ use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
+use base::infrastructure::service::order_status_consumer_service::OrderStatusConsumerService;
+use base::infrastructure::service::order_status_producer_service::OrderStatusProducerService;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
@@ -82,6 +84,7 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
     let mini_io_endpoint = read_file_env("MINIO_ENDPOINT").expect("cannot get minio endpoint");
     let mini_io_access_key =
@@ -150,7 +153,15 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
     ));
 
-    let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new());
+    let order_status_producer_service = Arc::new(
+        OrderStatusProducerService::new(&rabbitmq_url)
+            .await
+            .expect("Failed to start order status producer service"),
+    );
+
+    let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new(
+        Arc::clone(&order_status_producer_service),
+    ));
 
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
@@ -236,6 +247,12 @@ async fn main() -> std::io::Result<()> {
         web::Data::from(s3_object_storage_service_impl as Arc<dyn ObjectStorageService>);
 
     let app_config_data = web::Data::new(app_config);
+
+    let order_status_consumer = vec![];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
 
     // Step 2: Create instance of your application service,
     // and wrap it with `web::Data::new`

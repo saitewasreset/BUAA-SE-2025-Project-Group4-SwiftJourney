@@ -13,6 +13,7 @@ pub struct Model {
     pub amount: Decimal,
     pub status: String,
     pub user_id: i64,
+    pub atomic: bool,
     pub uuid: Uuid,
 }
 

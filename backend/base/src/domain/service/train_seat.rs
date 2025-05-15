@@ -14,14 +14,16 @@ pub enum TrainSeatServiceError {
     UnreservedSeat,
     #[error("specified seat not in seat availability {0}")]
     InvalidSeat(SeatAvailabilityId),
+    #[error("seat availability id {0} not found")]
+    InvalidSeatAvailability(SeatAvailabilityId),
 }
 
 #[async_trait]
-pub trait TrainSeatService {
+pub trait TrainSeatService: 'static + Send + Sync {
     /// 获取指定区间和座位类型的可用座位数
     ///
     /// # Note
-    /// 此函数只统计精确占用StationRange的座位数，更小和更大范围内占用的都**不会**被统计
+    /// - 处理了部分占用问题
     async fn available_seats_count(
         &self,
         seat_availability_id: SeatAvailabilityId,
@@ -30,7 +32,7 @@ pub trait TrainSeatService {
     /// 添加座位占用记录
     ///
     /// # Note
-    /// - 此函数只精确占用StationRange，更小和更大范围都**不会**被自动标记占用
+    /// - 标记占用相关区间
     async fn reserve_seat(
         &self,
         seat_availability_id: SeatAvailabilityId,
@@ -38,6 +40,8 @@ pub trait TrainSeatService {
     ) -> Result<Seat, TrainSeatServiceError>;
 
     /// 移除座位占用记录
+    /// # Note
+    /// - 更新占用相关区间座位情况
     async fn free_seat(
         &self,
         seat_availability_id: SeatAvailabilityId,

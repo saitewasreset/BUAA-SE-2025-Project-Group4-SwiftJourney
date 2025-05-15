@@ -24,9 +24,9 @@ use crate::application::service::personal_info::{
     PersonalInfoDTO, PersonalInfoError, PersonalInfoService,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::model::personal_info::{PersonalInfo, PreferredSeatLocation};
+use crate::domain::model::personal_info::PreferredSeatLocation;
 use crate::domain::model::session::SessionId;
-use crate::domain::model::user::{IdentityCardId, RealName, UserId};
+use crate::domain::model::user::{IdentityCardId, RealName};
 use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
@@ -65,41 +65,6 @@ where
             personal_info_repository,
         }
     }
-
-    /// 根据会话ID获取用户ID和对应的个人信息
-    ///
-    /// # Arguments
-    /// * `session_id` - 会话ID字符串
-    ///
-    /// # Returns
-    /// - `Ok((UserId, Option<PersonalInfo>))`: 用户ID和可能存在的个人信息
-    /// - `Err(Box<dyn ApplicationError>)`: 错误信息
-    ///
-    /// # Errors
-    /// - `GeneralError::InvalidSessionId`: 无效的会话ID
-    /// - `GeneralError::InternalServerError`: 内部服务错误
-    async fn get_user_id_and_personal_info_by_session(
-        &self,
-        session_id: &str,
-    ) -> Result<(UserId, Option<PersonalInfo>), Box<dyn ApplicationError>> {
-        let session_id =
-            SessionId::try_from(session_id).map_err(|_| GeneralError::InvalidSessionId)?;
-
-        let user_id = self
-            .session_manager
-            .get_user_id_by_session(session_id)
-            .await
-            .map_err(|_| GeneralError::InternalServerError)?
-            .ok_or(GeneralError::InvalidSessionId)?;
-
-        let personal_info = self
-            .personal_info_repository
-            .find_by_user_id(user_id)
-            .await
-            .map_err(|_| GeneralError::InternalServerError)?;
-
-        Ok((user_id, personal_info))
-    }
 }
 
 #[async_trait]
@@ -108,13 +73,13 @@ where
     S: SessionManagerService + 'static + Send + Sync,
     P: PersonalInfoRepository + 'static + Send + Sync,
 {
-    /// 获取个人信息
+    /// 获取所有个人信息
     ///
     /// # Arguments
     /// * `query` - 包含会话ID的查询条件
     ///
     /// # Returns
-    /// - `Ok(PersonalInfoDTO)`: 成功获取的个人信息DTO
+    /// - `Ok(Vec<PersonalInfoDTO>)`: 成功获取的个人信息DTO列表
     /// - `Err(Box<dyn ApplicationError>)`: 错误信息
     ///
     /// # Errors
@@ -123,83 +88,148 @@ where
     async fn get_personal_info(
         &self,
         query: PersonalInfoQuery,
-    ) -> Result<PersonalInfoDTO, Box<dyn ApplicationError>> {
-        let (_, personal_info) = self
-            .get_user_id_and_personal_info_by_session(&query.session_id)
-            .await?;
+    ) -> Result<Vec<PersonalInfoDTO>, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_| Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
-        let personal_info: PersonalInfo = personal_info.ok_or_else(|| {
-            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-        })?;
+        let user_id = self
+            .session_manager
+            .get_user_id_by_session(session_id)
+            .await
+            .map_err(|_| Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?
+            .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
-        Ok(personal_info.into())
+        let personal_infos = self
+            .personal_info_repository
+            .find_by_user_id(user_id)
+            .await
+            .map_err(|_| {
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        Ok(personal_infos
+            .into_iter()
+            .map(PersonalInfoDTO::from)
+            .collect())
     }
 
-    /// 设置个人信息
+    /// 设置个人信息（创建、更新或删除）
     ///
     /// # Arguments
-    /// * `command` - 包含更新数据和会话ID的命令对象
+    /// * `command` - 包含操作数据和会话ID的命令对象
     ///
     /// # Returns
-    /// - `Ok(())`: 更新成功
+    /// - `Ok(())`: 操作成功
     /// - `Err(Box<dyn ApplicationError>)`: 错误信息
     ///
     /// # Errors
     /// - `GeneralError::InvalidSessionId`: 无效的会话ID
-    /// - `GeneralError::BadRequest`: 无效的输入数据
+    /// - `PersonalInfoError::InvalidIdentityCardIdFormat`: 身份证号格式错误
+    /// - `PersonalInfoError::InvalidIdentityCardId`: 身份证号对应的个人信息不存在
+    /// - `PersonalInfoError::InvalidPreferredSeatLocation`: 无效的座位偏好
     /// - `GeneralError::InternalServerError`: 内部服务错误
     async fn set_personal_info(
         &self,
         command: SetPersonalInfoCommand,
     ) -> Result<(), Box<dyn ApplicationError>> {
-        let (user_id, personal_info_opt) = self
-            .get_user_id_and_personal_info_by_session(&command.session_id)
-            .await?;
+        let session_id = SessionId::try_from(command.session_id.as_str())
+            .map_err(|_| Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
-        // 解析输入数据
-        let name = RealName::try_from(command.name)
-            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
+        let user_id = self
+            .session_manager
+            .get_user_id_by_session(session_id)
+            .await
+            .map_err(|_| Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?
+            .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
-        let identity_card_id = IdentityCardId::try_from(command.identity_card_id)
-            .map_err(|_| PersonalInfoError::InvalidIdentityCardId)?;
+        // 解析身份证号
+        let identity_card_id = match IdentityCardId::try_from(command.identity_card_id.clone()) {
+            Ok(id) => id,
+            Err(_) => {
+                return Err(Box::new(PersonalInfoError::InvalidIdentityCardIdFormat)
+                    as Box<dyn ApplicationError>);
+            }
+        };
 
-        let preferred_seat_location = PreferredSeatLocation::try_from(
-            command
-                .preferred_seat_location
-                .chars()
-                .next()
-                .ok_or_else(|| {
-                    GeneralError::BadRequest("Preferred seat location cannot be empty".into())
-                })?,
-        )
-        .map_err(|_| PersonalInfoError::InvalidPreferredSeatLocation)?;
+        // 查找现有个人信息
+        let existing_info = self
+            .personal_info_repository
+            .find_by_user_id_and_identity_card(user_id, identity_card_id.clone())
+            .await
+            .map_err(|_| {
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
-        // 更新或创建个人信息
-        if let Some(mut personal_info) = personal_info_opt {
-            // 更新现有个人信息
-            personal_info.set_name(name);
-            personal_info.set_identity_card_id(identity_card_id);
-            personal_info.set_preferred_seat_location(preferred_seat_location);
+        // 根据操作类型进行处理
+        if command.is_delete_operation() {
+            // 删除操作
+            if let Some(info) = existing_info {
+                self.personal_info_repository
+                    .remove(info)
+                    .await
+                    .map_err(|_| {
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
+            } else {
+                return Err(
+                    Box::new(PersonalInfoError::InvalidIdentityCardId) as Box<dyn ApplicationError>
+                );
+            }
+        } else if command.is_update_operation() {
+            // 创建或更新操作
+            let name = match command.name {
+                Some(ref name_str) => match RealName::try_from(name_str.clone()) {
+                    Ok(name) => name,
+                    Err(_) => {
+                        return Err(Box::new(GeneralError::BadRequest("Invalid name".into())));
+                    }
+                },
+                None => {
+                    return Err(Box::new(GeneralError::BadRequest(
+                        "Name is required for update/create".into(),
+                    )));
+                }
+            };
 
-            self.personal_info_repository
-                .save(&mut personal_info)
-                .await
-                .map_err(|_| GeneralError::InternalServerError)?;
+            let preferred_seat_location = match command.preferred_seat_location {
+                Some(ref location) => {
+                    if location.is_empty() {
+                        PreferredSeatLocation::A
+                    } else {
+                        PreferredSeatLocation::try_from(location.chars().next().unwrap()).map_err(
+                            |_| {
+                                Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
+                                    as Box<dyn ApplicationError>
+                            },
+                        )?
+                    }
+                }
+                None => PreferredSeatLocation::A,
+            };
+
+            let is_default = command.default.unwrap_or(false);
+
+            if let Some(mut info) = existing_info {
+                // 更新现有个人信息
+                info.set_name(name);
+                info.set_preferred_seat_location(preferred_seat_location);
+                info.set_default(is_default);
+
+                self.personal_info_repository
+                    .save(&mut info)
+                    .await
+                    .map_err(|_| {
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
+            } else {
+                return Err(
+                    Box::new(PersonalInfoError::InvalidIdentityCardId) as Box<dyn ApplicationError>
+                );
+            }
         } else {
-            // 创建新的个人信息
-            let mut new_personal_info = PersonalInfo::new(
-                None,
-                uuid::Uuid::new_v4(),
-                name,
-                identity_card_id,
-                preferred_seat_location,
-                user_id,
-            );
-
-            self.personal_info_repository
-                .save(&mut new_personal_info)
-                .await
-                .map_err(|_| GeneralError::InternalServerError)?;
+            return Err(Box::new(GeneralError::BadRequest(
+                "Invalid operation parameters".into(),
+            )));
         }
 
         Ok(())
@@ -213,7 +243,9 @@ mod tests {
     use crate::domain::RepositoryError;
     use crate::domain::model::personal_info::{PersonalInfo, PersonalInfoId};
     use crate::domain::model::session::Session;
+    use crate::domain::model::user::UserId;
     use async_trait::async_trait;
+    use mockall::predicate;
     use mockall::{mock, predicate::*};
 
     // 模拟会话管理服务
@@ -239,7 +271,8 @@ mod tests {
         }
         #[async_trait]
         impl PersonalInfoRepository for PersonalInfoRepository {
-            async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<PersonalInfo>, RepositoryError>;
+            async fn find_by_user_id(&self, user_id: UserId) -> Result<Vec<PersonalInfo>, RepositoryError>;
+            async fn find_by_user_id_and_identity_card(&self, user_id: UserId, identity_card_id: IdentityCardId) -> Result<Option<PersonalInfo>, RepositoryError>;
         }
     }
 
@@ -248,9 +281,9 @@ mod tests {
         PersonalInfo::new(
             id,
             uuid::Uuid::new_v4(),
-            RealName::try_from("张三".to_string()).unwrap(),
-            IdentityCardId::try_from("110101199001011234".to_string()).unwrap(),
-            PreferredSeatLocation::try_from('W').unwrap(),
+            RealName::try_from("高松灯".to_string()).unwrap(),
+            IdentityCardId::try_from("110101200903149273".to_string()).unwrap(),
+            PreferredSeatLocation::try_from('A').unwrap(),
             UserId::from(1),
         )
     }
@@ -273,7 +306,7 @@ mod tests {
         mock_personal_info_repo
             .expect_find_by_user_id()
             .with(eq(user_id))
-            .return_once(move |_| Ok(Some(personal_info.clone())));
+            .return_once(move |_| Ok(vec![personal_info.clone()]));
 
         let service =
             PersonalInfoServiceImpl::new(Arc::new(mock_session), Arc::new(mock_personal_info_repo));
@@ -285,10 +318,12 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        let dto = result.unwrap();
-        assert_eq!(dto.name, "张三");
-        assert_eq!(dto.identity_card_id, "110101199001011234");
-        assert_eq!(dto.preferred_seat_location, "W");
+        let dtos = result.unwrap();
+        assert_eq!(dtos.len(), 1);
+        let dto = &dtos[0];
+        assert_eq!(dto.name, "高松灯");
+        assert_eq!(dto.identity_card_id, "110101200903149273");
+        assert_eq!(dto.preferred_seat_location.as_ref().unwrap(), "A");
     }
 
     #[tokio::test]
@@ -307,15 +342,15 @@ mod tests {
 
         // 设置个人信息查询和更新的期望
         mock_personal_info_repo
-            .expect_find_by_user_id()
-            .with(eq(user_id))
-            .return_once(move |_| Ok(Some(personal_info)));
+            .expect_find_by_user_id_and_identity_card()
+            .with(eq(user_id), predicate::always())
+            .return_once(move |_, _| Ok(Some(personal_info)));
 
         mock_personal_info_repo
             .expect_save()
             .withf(|p| {
-                p.name().to_string() == "李四"
-                    && p.identity_card_id().to_string() == "110101199001011235"
+                p.name().to_string() == "要乐奈"
+                    && p.identity_card_id().to_string() == "110101200903149273"
                     && p.preferred_seat_location().to_string() == "A"
             })
             .return_once(|_| Ok(PersonalInfoId::from(1)));
@@ -326,9 +361,10 @@ mod tests {
         let result = service
             .set_personal_info(SetPersonalInfoCommand {
                 session_id: session_id.to_string(),
-                name: "李四".to_string(),
-                identity_card_id: "110101199001011235".to_string(),
-                preferred_seat_location: "A".to_string(),
+                name: Some("要乐奈".to_string()),
+                identity_card_id: "110101200903149273".to_string(),
+                preferred_seat_location: Some("A".to_string()),
+                default: Some(true),
             })
             .await;
 

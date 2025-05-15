@@ -14,7 +14,7 @@ enum SeatAvailability {
     SeatTypeId,
     BeginStationId,
     EndStationId,
-    AvailableSeats,
+    OccupiedSeats,
 }
 
 #[async_trait::async_trait]
@@ -30,8 +30,8 @@ impl MigrationTrait for Migration {
                     .col(integer(SeatAvailability::BeginStationId))
                     .col(integer(SeatAvailability::EndStationId))
                     .col(
-                        integer(SeatAvailability::AvailableSeats)
-                            .check(Expr::col(SeatAvailability::AvailableSeats).gte(0)),
+                        integer(SeatAvailability::OccupiedSeats)
+                            .check(Expr::col(SeatAvailability::OccupiedSeats).gte(0)),
                     )
                     .foreign_key(
                         ForeignKey::create()
