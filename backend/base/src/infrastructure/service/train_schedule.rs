@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId};
@@ -19,7 +20,16 @@ where
 {
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
-    route_service: T,
+    route_service: Arc<T>,
+}
+
+impl<T> TrainScheduleServiceImpl<T>
+where
+    T: RouteService + 'static + Send + Sync,
+{
+    pub fn new(route_service: Arc<T>) -> Self {
+        Self { route_service }
+    }
 }
 
 #[async_trait]
@@ -93,16 +103,16 @@ where
         let mut result = Vec::new();
 
         for schedule in today_schedules {
-            let route_id: RouteId = todo!();
+            let route_id = schedule.route_id();
             if let Some(route) = route_lookup.get(&route_id) {
                 let mut from_idx: Option<usize> = None;
                 let mut to_idx: Option<usize> = None;
 
-                for (i, stop) in route.stops().enumerate() {
-                    if stop.station_id() == from_station {
+                for (i, (first_stop, second_stop)) in route.stop_pairs().enumerate() {
+                    if first_stop.station_id() == from_station {
                         from_idx = Some(i);
                     }
-                    if stop.station_id() == to_station {
+                    if second_stop.station_id() == to_station {
                         to_idx = Some(i);
                     }
                 }

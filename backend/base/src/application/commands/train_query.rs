@@ -7,10 +7,14 @@ use serde::{Deserialize, Serialize};
 pub struct DirectTrainQueryCommand {
     /// 客户端会话，用于校验登录状态
     pub session_id: String,
-    /// 始发站 ID
-    pub from_station_id: String,
-    /// 终到站 ID
-    pub to_station_id: String,
+    /// 始发站
+    pub departure_station: Option<String>,
+    /// 终到站
+    pub arrival_station: Option<String>,
+    /// 始发城市
+    pub departure_city: Option<String>,
+    /// 终到城市
+    pub arrival_city: Option<String>,
     /// 乘车时间
     pub departure_time: NaiveDate,
 }
@@ -19,9 +23,9 @@ pub struct DirectTrainQueryCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferTrainQueryCommand {
     pub session_id: String,
-    /// 始发城市 ID
-    pub from_city_id: String,
-    /// 终到城市 ID
-    pub to_city_id: String,
+    /// 始发城市
+    pub from_city: String,
+    /// 终到城市
+    pub to_city: String,
     pub departure_time: NaiveDate,
 }
