@@ -1,5 +1,5 @@
-use crate::user::{user_info, user_manager};
 use actix_web::web;
+use schedule::query;
 
 pub mod schedule;
 
@@ -8,5 +8,6 @@ pub mod schedule;
 // Exercise 1.2.1D - 7: Your code here. (4 / 5)
 // To `api/main.rs` for following exercise
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    todo!()
+    cfg.service(query::query_direct);
+    cfg.service(query::query_indirect);
 }
