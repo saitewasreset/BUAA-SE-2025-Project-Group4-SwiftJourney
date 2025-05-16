@@ -1,8 +1,8 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId, Stop};
-use crate::domain::model::station;
 use crate::domain::model::train::Train;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService, RouteServiceError};
@@ -19,8 +19,24 @@ where
 {
     // Step 2: Add struct filed to store an implementation of `TrainTypeConfigurationService` service
     // Exercise 1.2.1D - 2: Your code here. (2 / 4)
-    train_type_configuration_service: T,
-    station_service: S,
+    train_type_configuration_service: Arc<T>,
+    station_service: Arc<S>,
+}
+
+impl<T, S> RouteServiceImpl<T, S>
+where
+    T: TrainTypeConfigurationService + 'static + Send + Sync,
+    S: StationService + 'static + Send + Sync,
+{
+    pub fn new(
+        train_type_configuration_service: Arc<T>,
+        station_service: Arc<S>,
+    ) -> Self {
+        Self {
+            train_type_configuration_service,
+            station_service,
+        }
+    }
 }
 
 #[async_trait]

@@ -19,7 +19,7 @@ pub enum RouteServiceError {
 pub type RouteGraph = Graph<StationId, Vec<RouteId>>;
 
 #[async_trait]
-pub trait RouteService {
+pub trait RouteService: 'static + Send +Sync {
     async fn get_route_map(&self) -> Result<RouteGraph, RouteServiceError>;
 
     async fn add_route(&self, stops: Vec<Stop>) -> Result<RouteId, RouteServiceError>;
