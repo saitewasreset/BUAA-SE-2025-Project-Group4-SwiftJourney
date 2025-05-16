@@ -67,7 +67,7 @@ where
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
     // Exercise 1.2.1D - 5: Your code here. (2 / 6)
-    inner: Arc<T>,
+    train_query: Arc<T>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
@@ -77,9 +77,8 @@ impl<T> TrainQueryServiceImpl<T>
 where
     T: TrainQueryService + 'static + Send + Sync,
 {
-    #[inline]
-    pub fn new(inner: Arc<T>) -> Self {
-        Self { inner }
+    pub fn new(train_query: Arc<T>) -> Self {
+        TrainQueryServiceImpl { train_query }
     }
 }
 
@@ -103,7 +102,7 @@ where
         if command.from_station_id.trim().is_empty() || command.to_station_id.trim().is_empty() {
             return Err(GeneralError::BadRequest("station id 不能为空".into()).into());
         }
-        self.inner.query_direct_trains(command).await
+        self.train_query.query_direct_trains(command).await
     }
 
     async fn query_transfer_trains(
@@ -113,7 +112,7 @@ where
         if command.from_city_id.trim().is_empty() || command.to_city_id.trim().is_empty() {
             return Err(GeneralError::BadRequest("city id 不能为空".into()).into());
         }
-        self.inner.query_transfer_trains(command).await
+        self.train_query.query_transfer_trains(command).await
     }
 }
 
@@ -130,9 +129,9 @@ mod tests {
     use std::sync::Arc;
 
     mock! {
-        pub Inner {}
+        pub TrainQuery {}
         #[async_trait]
-        impl TrainQueryService for Inner {
+        impl TrainQueryService for TrainQuery {
             async fn query_direct_trains(
                 &self,
                 cmd: DirectTrainQueryCommand,
@@ -146,7 +145,7 @@ mod tests {
 
     #[tokio::test]
     async fn delegating_direct_trains() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             from_station_id: "A".into(),
@@ -170,7 +169,7 @@ mod tests {
 
     #[tokio::test]
     async fn delegating_transfer_trains() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = TransferTrainQueryCommand {
             session_id: Default::default(),
             from_city_id: "C1".into(),
@@ -194,7 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_direct_with_empty_from_station() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             from_station_id: "".into(), // 空出发站
@@ -217,7 +216,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_direct_with_empty_to_station() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             from_station_id: "A".into(),
@@ -240,7 +239,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_transfer_with_empty_from_city() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = TransferTrainQueryCommand {
             session_id: Default::default(),
             from_city_id: "".into(), // 空出发城市
@@ -263,7 +262,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_transfer_with_empty_to_city() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = TransferTrainQueryCommand {
             session_id: Default::default(),
             from_city_id: "C1".into(),
@@ -286,7 +285,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_transfer_success() {
-        let mut mock = MockInner::new();
+        let mut mock = MockTrainQuery::new();
         let cmd = TransferTrainQueryCommand {
             session_id: Default::default(),
             from_city_id: "C1".into(),
