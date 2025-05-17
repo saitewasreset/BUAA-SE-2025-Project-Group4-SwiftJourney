@@ -1,6 +1,8 @@
 use crate::domain::model::hotel::{HotelDateRange, HotelId, OccupiedRoom};
+use crate::domain::model::order::OrderId;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
+use uuid::Uuid;
 
 #[async_trait]
 pub trait OccupiedRoomRepository: Repository<OccupiedRoom> {
@@ -18,5 +20,16 @@ pub trait OccupiedRoomRepository: Repository<OccupiedRoom> {
         &self,
         hotel_id: HotelId,
         booking_date_range: HotelDateRange,
+    ) -> Result<Vec<OccupiedRoom>, RepositoryError>;
+
+    async fn save_count(
+        &self,
+        occupied_room: &OccupiedRoom,
+        count: i32,
+    ) -> Result<(), RepositoryError>;
+
+    async fn find_by_order_uuid(
+        &self,
+        order_uuid: Uuid,
     ) -> Result<Vec<OccupiedRoom>, RepositoryError>;
 }
