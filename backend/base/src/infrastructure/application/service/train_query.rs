@@ -476,30 +476,15 @@ where
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
 
-        // 收集所有异步构建的 TrainInfoDTO
         let mut solutions = Vec::new();
-        let mut build_errors = Vec::new();
         for schedule in schedules {
-            match self
+            // 对每个查询结果尝试构建 TrainInfoDTO
+            let train_info = self
                 .build_train_info_dto(schedule, &routes, command.departure_time)
-                .await
-            {
-                Ok(train_info) => solutions.push(train_info),
-                Err(e) => {
-                    let error_msg = format!("{:?}", e);
+                .await?;
 
-                    if error_msg.contains("NotFound") {
-                        build_errors.push(e);
-                        continue;
-                    } else {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        if solutions.is_empty() && !build_errors.is_empty() {
-            return Err(build_errors.remove(0));
+            // 成功构建则添加到结果列表
+            solutions.push(train_info);
         }
 
         // 将领域模型转换为DTO返回
