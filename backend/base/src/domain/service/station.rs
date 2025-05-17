@@ -154,4 +154,16 @@ pub trait StationService {
     /// * `NoSuchStationId` - 指定车站ID的火车站不存在
     /// * `InfrastructureError` - 基础设施错误（如数据库访问失败）
     async fn delete_station(&self, station: Station) -> Result<(), StationServiceError>;
+
+    async fn get_station_by_city_name(
+        &self,
+        city_name: &str,
+    ) -> Result<Vec<Station>, StationServiceError>;
+
+    /// 根据城市名组合出所有 `(from_station, to_station)` 对
+    async fn station_pairs_by_city(
+        &self,
+        from_city: &str,
+        to_city: &str,
+    ) -> Result<Vec<(StationId, StationId)>, StationServiceError>;
 }
