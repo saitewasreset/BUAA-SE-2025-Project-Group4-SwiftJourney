@@ -1,5 +1,6 @@
 pub mod city;
 pub mod order;
+pub mod personal_info;
 pub mod route;
 pub mod seat_availability;
 pub mod session;
