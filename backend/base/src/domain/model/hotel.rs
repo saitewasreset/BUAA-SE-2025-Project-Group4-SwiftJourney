@@ -7,6 +7,7 @@ use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use chrono::NaiveDate;
 use id_macro::define_id_type;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::fmt::{Display, Formatter};
 use thiserror::Error;
@@ -203,13 +204,13 @@ impl Aggregate for Hotel {}
 define_id_type!(HotelRoomType);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Rating(f64);
+pub struct Rating(Decimal);
 
-impl TryFrom<f64> for Rating {
+impl TryFrom<Decimal> for Rating {
     type Error = String;
 
-    fn try_from(value: f64) -> Result<Self, Self::Error> {
-        if value < 0.0 || value > 5.0 {
+    fn try_from(value: Decimal) -> Result<Self, Self::Error> {
+        if value < Decimal::ZERO || value > Decimal::from_f64(5.0).unwrap() {
             Err(format!("Rating must be between 0.0 and 5.0, got {}", value))
         } else {
             Ok(Rating(value))
@@ -217,7 +218,7 @@ impl TryFrom<f64> for Rating {
     }
 }
 
-impl From<Rating> for f64 {
+impl From<Rating> for Decimal {
     fn from(value: Rating) -> Self {
         value.0
     }
@@ -286,13 +287,71 @@ impl Identifiable for HotelRoomType {
 
 impl Entity for HotelRoomType {}
 
+define_id_type!(HotelRating);
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HotelRating {
+    id: Option<HotelRatingId>,
     user_id: UserId,
     hotel_id: HotelId,
     time: DateTimeWithTimeZone,
     rating: Rating,
     text: String,
+}
+
+impl Identifiable for HotelRating {
+    type ID = HotelRatingId;
+
+    fn get_id(&self) -> Option<Self::ID> {
+        self.id
+    }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id);
+    }
+}
+
+impl Entity for HotelRating {}
+impl Aggregate for HotelRating {}
+
+impl HotelRating {
+    pub fn new(
+        id: Option<HotelRatingId>,
+        user_id: UserId,
+        hotel_id: HotelId,
+        time: DateTimeWithTimeZone,
+        rating: Rating,
+        text: String,
+    ) -> Self {
+        Self {
+            id,
+            user_id,
+            hotel_id,
+            time,
+            rating,
+            text,
+        }
+    }
+
+    pub fn user_id(&self) -> UserId {
+        self.user_id
+    }
+
+    pub fn hotel_id(&self) -> HotelId {
+        self.hotel_id
+    }
+
+    pub fn time(&self) -> DateTimeWithTimeZone {
+        self.time
+    }
+
+    pub fn rating(&self) -> Rating {
+        self.rating
+    }
+
+    pub fn text(&self) -> &String {
+        &self.text
+    }
 }
 
 pub type HotelRoomTypeStr = String;
