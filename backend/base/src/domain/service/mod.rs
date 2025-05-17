@@ -90,6 +90,7 @@
 pub mod geo;
 pub mod hotel;
 pub mod hotel_booking;
+pub mod hotel_rating;
 pub mod object_storage;
 pub mod order;
 pub mod order_status;
