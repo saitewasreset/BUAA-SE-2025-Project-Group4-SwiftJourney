@@ -1,4 +1,5 @@
 pub mod geo;
+pub mod hotel_booking;
 pub mod object_storage;
 pub mod order;
 pub mod order_status;

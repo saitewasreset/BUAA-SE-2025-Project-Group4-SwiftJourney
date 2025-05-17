@@ -1,8 +1,9 @@
 use crate::HOTEL_MAX_BOOKING_DAYS;
-use crate::domain::Identifier;
 use crate::domain::model::city::City;
+use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::station::Station;
 use crate::domain::model::user::UserId;
+use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use chrono::NaiveDate;
 use id_macro::define_id_type;
 use rust_decimal::Decimal;
@@ -64,8 +65,10 @@ impl HotelDateRange {
 
 define_id_type!(Hotel);
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Hotel {
     id: Option<HotelId>,
+    name: String,
     uuid: Uuid,
     city: City,
     station: Station,
@@ -79,10 +82,11 @@ pub struct Hotel {
 }
 
 impl Hotel {
-    pub fn new(city: City, station: Station, address: String, info: String) -> Self {
+    pub fn new(name: String, city: City, station: Station, address: String, info: String) -> Self {
         Self {
             id: None,
             uuid: Uuid::new_v4(),
+            name,
             city,
             station,
             address,
@@ -97,6 +101,7 @@ impl Hotel {
     pub fn new_full_unchecked(
         id: Option<HotelId>,
         uuid: Uuid,
+        name: String,
         city: City,
         station: Station,
         address: String,
@@ -110,6 +115,7 @@ impl Hotel {
         Self {
             id,
             uuid,
+            name,
             city,
             station,
             address,
@@ -120,6 +126,10 @@ impl Hotel {
             room_type_list,
             info,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn uuid(&self) -> Uuid {
@@ -174,6 +184,21 @@ impl Hotel {
         self.room_type_list.push(room_type);
     }
 }
+
+impl Identifiable for Hotel {
+    type ID = HotelId;
+
+    fn get_id(&self) -> Option<Self::ID> {
+        self.id
+    }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id);
+    }
+}
+
+impl Entity for Hotel {}
+impl Aggregate for Hotel {}
 
 define_id_type!(HotelRoomType);
 
@@ -247,6 +272,20 @@ impl HotelRoomType {
     }
 }
 
+impl Identifiable for HotelRoomType {
+    type ID = HotelRoomTypeId;
+
+    fn get_id(&self) -> Option<Self::ID> {
+        self.id
+    }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id);
+    }
+}
+
+impl Entity for HotelRoomType {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HotelRating {
     user_id: UserId,
@@ -255,3 +294,73 @@ pub struct HotelRating {
     rating: Rating,
     text: String,
 }
+
+pub type HotelRoomTypeStr = String;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HotelRoomStatus {
+    pub capacity: i32,
+    pub remain_count: i32,
+    pub price: Decimal,
+}
+
+define_id_type!(OccupiedRoom);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OccupiedRoom {
+    id: Option<OccupiedRoomId>,
+    hotel_id: HotelId,
+    hotel_room_type_id: HotelRoomTypeId,
+    booking_date_range: HotelDateRange,
+    personal_info: PersonalInfoId,
+}
+
+impl OccupiedRoom {
+    pub fn new(
+        id: Option<OccupiedRoomId>,
+        hotel_id: HotelId,
+        hotel_room_type_id: HotelRoomTypeId,
+        booking_date_range: HotelDateRange,
+        personal_info: PersonalInfoId,
+    ) -> Self {
+        Self {
+            id,
+            hotel_id,
+            hotel_room_type_id,
+            booking_date_range,
+            personal_info,
+        }
+    }
+
+    pub fn hotel_id(&self) -> HotelId {
+        self.hotel_id
+    }
+
+    pub fn hotel_room_type_id(&self) -> HotelRoomTypeId {
+        self.hotel_room_type_id
+    }
+
+    pub fn booking_date_range(&self) -> &HotelDateRange {
+        &self.booking_date_range
+    }
+
+    pub fn personal_info(&self) -> PersonalInfoId {
+        self.personal_info
+    }
+}
+
+impl Identifiable for OccupiedRoom {
+    type ID = OccupiedRoomId;
+
+    fn get_id(&self) -> Option<Self::ID> {
+        self.id
+    }
+
+    fn set_id(&mut self, id: Self::ID) {
+        self.id = Some(id);
+    }
+}
+
+impl Entity for OccupiedRoom {}
+
+impl Aggregate for OccupiedRoom {}
