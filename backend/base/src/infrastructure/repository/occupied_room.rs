@@ -197,7 +197,7 @@ impl OccupiedRoomRepository for OccupiedRoomRepositoryImpl {
 
         for _ in 0..count {
             crate::models::occupied_room::Entity::insert(model.clone())
-                .exec(&self.db)
+                .exec(&tx)
                 .await
                 .context("Failed to insert new occupied room")?;
         }
@@ -248,5 +248,29 @@ WHERE
         }
 
         Ok(result)
+    }
+
+    async fn remove_many(
+        &self,
+        occupied_room_list: Vec<OccupiedRoom>,
+    ) -> Result<(), RepositoryError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
+
+        for occupied_room in occupied_room_list {
+            if let Some(id) = occupied_room.get_id() {
+                crate::models::occupied_room::Entity::delete_by_id(id.to_db_value())
+                    .exec(&tx)
+                    .await
+                    .context(format!("Failed to delete occupied room id: {}", id))?;
+            }
+        }
+
+        tx.commit().await.context("Failed to commit transaction")?;
+
+        Ok(())
     }
 }
