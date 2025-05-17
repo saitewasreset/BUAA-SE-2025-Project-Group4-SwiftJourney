@@ -7,9 +7,9 @@ use crate::infrastructure::repository::city::CityDataConverter;
 use crate::infrastructure::repository::station::StationDataConverter;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use sea_orm::QueryFilter;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
 use sea_orm::{ColumnTrait, Select};
+use sea_orm::{QueryFilter, QuerySelect};
 use std::collections::HashMap;
 use std::result;
 use uuid::Uuid;
@@ -337,6 +337,22 @@ impl Repository<Hotel> for HotelRepositoryImpl {
 
 #[async_trait]
 impl HotelRepository for HotelRepositoryImpl {
+    async fn get_id_by_uuid(&self, uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
+        let result: Option<i32> = crate::models::hotel::Entity::find()
+            .select_only()
+            .column(crate::models::hotel::Column::Id)
+            .filter(crate::models::hotel::Column::Uuid.eq(uuid))
+            .into_tuple()
+            .one(&self.db)
+            .await
+            .context(format!("Failed to get hotel for uuid: {}", uuid))?;
+
+        result
+            .map(|x| HotelId::from_db_value(x))
+            .transpose()
+            .map_err(RepositoryError::ValidationError)
+    }
+
     async fn find_by_uuid(&self, uuid: Uuid) -> Result<Option<Hotel>, RepositoryError> {
         self.query_hotel_lazily(|q| q.filter(crate::models::hotel::Column::Uuid.eq(uuid)))
             .await

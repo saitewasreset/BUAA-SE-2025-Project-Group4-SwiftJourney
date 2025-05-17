@@ -1,5 +1,5 @@
 use crate::domain::model::city::CityId;
-use crate::domain::model::hotel::Hotel;
+use crate::domain::model::hotel::{Hotel, HotelId};
 use crate::domain::model::station::StationId;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait HotelRepository: Repository<Hotel> {
+    async fn get_id_by_uuid(&self, uuid: Uuid) -> Result<Option<HotelId>, RepositoryError>;
     async fn find_by_uuid(&self, uuid: Uuid) -> Result<Option<Hotel>, RepositoryError>;
     async fn find_by_city(
         &self,
