@@ -1,5 +1,4 @@
 use crate::domain::model::hotel::{HotelDateRange, HotelId, OccupiedRoom};
-use crate::domain::model::order::OrderId;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -32,4 +31,9 @@ pub trait OccupiedRoomRepository: Repository<OccupiedRoom> {
         &self,
         order_uuid: Uuid,
     ) -> Result<Vec<OccupiedRoom>, RepositoryError>;
+
+    async fn remove_many(
+        &self,
+        occupied_room_list: Vec<OccupiedRoom>,
+    ) -> Result<(), RepositoryError>;
 }
