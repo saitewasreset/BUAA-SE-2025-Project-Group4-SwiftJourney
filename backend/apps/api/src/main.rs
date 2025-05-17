@@ -272,7 +272,6 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_service_impl),
         Arc::clone(&train_type_service_impl),
         Arc::clone(&route_service_impl),
-        Arc::clone(&city_repository_impl),
     ));
 
     let train_query_service: web::Data<dyn TrainQueryService> =
