@@ -59,6 +59,7 @@ use crate::application::service::train_query::{
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
+use crate::domain::repository::city::CityRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
@@ -66,12 +67,13 @@ use crate::domain::service::train_type::TrainTypeConfigurationService;
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, V, W>
+pub struct TrainQueryServiceImpl<T, U, V, W, X>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    X: CityRepository + 'static + Send + Sync,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
@@ -80,29 +82,33 @@ where
     station_service: Arc<U>,
     train_type_service: Arc<V>,
     route_service: Arc<W>,
+    city_service: Arc<X>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, V, W> TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, V, W, X> TrainQueryServiceImpl<T, U, V, W, X>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    X: CityRepository + 'static + Send + Sync,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
         train_type_service: Arc<V>,
         route_service: Arc<W>,
+        city_service: Arc<X>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
             station_service,
             train_type_service,
             route_service,
+            city_service,
         }
     }
 
@@ -128,7 +134,8 @@ where
         let route = match route_opt {
             Some(r) => r,
             None => {
-                let err: Box<dyn ApplicationError> = Box::new(GeneralError::NotFound);
+                let err: Box<dyn ApplicationError> =
+                    Box::new(TrainQueryServiceError::InvalidStationId);
                 return Err(err);
             }
         };
@@ -177,11 +184,12 @@ where
         {
             Ok(t) => t,
             Err(_) => {
-                let err: Box<dyn ApplicationError> = Box::new(GeneralError::NotFound);
+                let err: Box<dyn ApplicationError> =
+                    Box::new(TrainQueryServiceError::InvalidStationId);
                 return Err(err);
             }
         };
-        // 4. 座位信息
+        // 座位信息
         let mut seat_info = std::collections::HashMap::new();
         for seat_type in train.seats().values() {
             let available_count = seat_type.capacity();
@@ -259,12 +267,13 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, V, W> TrainQueryService for TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, V, W, X> TrainQueryService for TrainQueryServiceImpl<T, U, V, W, X>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    X: CityRepository + 'static + Send + Sync,
 {
     async fn query_direct_trains(
         &self,
@@ -293,78 +302,133 @@ where
 
         if has_arrival_station == has_arrival_city {
             return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
-        } // 如果是按车站ID查询
+        }
+        // 车站查询
         let schedules = if has_departure_station && has_arrival_station {
-            // 将字符串ID转换为数字ID，然后创建StationId
-            let departure_station_id =
-                match command.departure_station.as_ref().unwrap().parse::<u64>() {
-                    Ok(id) => StationId::from(id),
-                    Err(_) => {
-                        return Err(GeneralError::BadRequest(
-                            "Invalid departure station ID".into(),
-                        )
-                        .into());
-                    }
-                };
+            let departure_station_name = command.departure_station.as_ref().unwrap().trim();
+            let departure_station_opt = self
+                .station_service
+                .as_ref()
+                .get_station_by_name(departure_station_name.to_string())
+                .await
+                .map_err(|_| {
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                })?;
 
-            let arrival_station_id = match command.arrival_station.as_ref().unwrap().parse::<u64>()
-            {
-                Ok(id) => StationId::from(id),
-                Err(_) => {
-                    return Err(
-                        GeneralError::BadRequest("Invalid arrival station ID".into()).into(),
-                    );
+            // 检查是否找到了出发站点
+            let departure_station = match departure_station_opt {
+                Some(station) => station,
+                None => {
+                    return Err(Box::new(TrainQueryServiceError::InvalidStationId)
+                        as Box<dyn ApplicationError>);
                 }
             };
 
-            // 直接查询指定的两个车站
+            // 根据站点名称查询到达站点信息
+            let arrival_station_name = command.arrival_station.as_ref().unwrap().trim();
+            let arrival_station_opt = self
+                .station_service
+                .as_ref()
+                .get_station_by_name(arrival_station_name.to_string())
+                .await
+                .map_err(|_| {
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                })?;
+
+            // 检查是否找到了到达站点
+            let arrival_station = match arrival_station_opt {
+                Some(station) => station,
+                None => {
+                    return Err(Box::new(TrainQueryServiceError::InvalidStationId)
+                        as Box<dyn ApplicationError>);
+                }
+            };
+
+            // 使用站点ID进行查询
             self.train_schedule_service
                 .as_ref()
                 .find_schedules(
                     command.departure_time,
-                    departure_station_id,
-                    arrival_station_id,
+                    departure_station.get_id().unwrap(),
+                    arrival_station.get_id().unwrap(),
                 )
+                .await
+                .map_err(|err| {
+                    // 根据领域错误类型返回不同的应用错误
+                    match err {
+                        crate::domain::service::train_schedule::TrainScheduleServiceError::InvalidStationId(_) => {
+                            Box::new(TrainQueryServiceError::InvalidStationId) as Box<dyn ApplicationError>
+                        },
+                        crate::domain::service::train_schedule::TrainScheduleServiceError::InfrastructureError(_) => {
+                            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                        }
+                    }
+                })?
+        } else {
+            // 城市查询
+            let departure_city_name = command.departure_city.as_ref().unwrap().trim();
+            // 使用 city_service 查询城市信息
+            let departure_cities = self
+                .city_service
+                .find_by_name(departure_city_name)
                 .await
                 .map_err(|_| {
                     Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-                })?
-        } else {
-            // 如果是按城市查询，需要找到城市下的所有车站
-            let departure_city_id = match command.departure_city.as_ref().unwrap().parse::<u64>() {
-                Ok(id) => crate::domain::model::city::CityId::from(id),
-                Err(_) => {
-                    return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
-                }
-            };
+                })?;
 
-            let arrival_city_id = match command.arrival_city.as_ref().unwrap().parse::<u64>() {
-                Ok(id) => crate::domain::model::city::CityId::from(id),
-                Err(_) => {
-                    return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
-                }
-            };
+            if departure_cities.is_empty() {
+                return Err(
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                );
+            }
+
+            let departure_city_id = departure_cities[0].get_id().unwrap();
+
+            let arrival_city_name = command.arrival_city.as_ref().unwrap().trim();
+            let arrival_cities = self
+                .city_service
+                .find_by_name(arrival_city_name)
+                .await
+                .map_err(|_| {
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                })?;
+
+            if arrival_cities.is_empty() {
+                return Err(
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                );
+            }
+
+            let arrival_city_id = arrival_cities[0].get_id().unwrap();
 
             // 使用 StationService 查询城市所有车站
             let departure_stations = self
                 .station_service
                 .get_station_by_city(departure_city_id)
                 .await
-                .map_err(|_| Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+                .map_err(|_| {
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                })?;
 
             let arrival_stations = self
                 .station_service
                 .get_station_by_city(arrival_city_id)
                 .await
-                .map_err(|_| Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+                .map_err(|_| {
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                })?;
 
             // 检查查询到的车站是否为空
             if departure_stations.is_empty() {
-                return Err(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>);
+                return Err(
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                );
             }
 
             if arrival_stations.is_empty() {
-                return Err(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>);
+                return Err(
+                    Box::new(TrainQueryServiceError::InvalidCityId) as Box<dyn ApplicationError>
+                );
             }
 
             // 查询所有可能的出发站和到达站组合
@@ -386,12 +450,19 @@ where
                         .await
                     {
                         Ok(schedules) => {
-                            // 将查询结果添加到总结果中
                             all_schedules.extend(schedules);
                         }
-                        Err(_) => {
-                            // 忽略单个组合的错误，只要有一个组合成功即可
-                            continue;
+                        Err(err) => {
+                            match err {
+                                crate::domain::service::train_schedule::TrainScheduleServiceError::InvalidStationId(_) => {
+                                    return Err(Box::new(TrainQueryServiceError::InvalidStationId)
+                                        as Box<dyn ApplicationError>);
+                                }
+                                crate::domain::service::train_schedule::TrainScheduleServiceError::InfrastructureError(_) => {
+                                    return Err(Box::new(GeneralError::InternalServerError)
+                                        as Box<dyn ApplicationError>);
+                                }
+                            }
                         }
                     }
                 }
@@ -400,7 +471,6 @@ where
             all_schedules
         };
 
-        // 将领域模型转换为DTO返回
         // 获取路线信息
         let routes = self.route_service.get_routes().await.map_err(|_| {
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
@@ -408,14 +478,28 @@ where
 
         // 收集所有异步构建的 TrainInfoDTO
         let mut solutions = Vec::new();
+        let mut build_errors = Vec::new();
         for schedule in schedules {
             match self
                 .build_train_info_dto(schedule, &routes, command.departure_time)
                 .await
             {
                 Ok(train_info) => solutions.push(train_info),
-                Err(_) => continue, // 跳过无法构建的列车信息
+                Err(e) => {
+                    let error_msg = format!("{:?}", e);
+
+                    if error_msg.contains("NotFound") {
+                        build_errors.push(e);
+                        continue;
+                    } else {
+                        return Err(e);
+                    }
+                }
             }
+        }
+
+        if solutions.is_empty() && !build_errors.is_empty() {
+            return Err(build_errors.remove(0));
         }
 
         // 将领域模型转换为DTO返回
@@ -558,12 +642,27 @@ mod tests {
         }
     }
 
+    mock! {
+        pub CityRepository {}
+        #[async_trait]
+        impl CityRepository for CityRepository {
+            async fn load(&self) -> Result<Vec<crate::domain::model::city::City>, crate::domain::RepositoryError>;
+            async fn find_by_name(&self, city_name: &str) -> Result<Vec<crate::domain::model::city::City>, crate::domain::RepositoryError>;
+            async fn find_by_province(
+                &self,
+                province_name: crate::domain::model::city::ProvinceName,
+            ) -> Result<Vec<crate::domain::model::city::City>, crate::domain::RepositoryError>;
+            async fn save_raw(&self, city_data: shared::data::CityData) -> Result<(), crate::domain::RepositoryError>;
+        }
+    }
+
     #[tokio::test]
     async fn delegating_direct_trains() {
         let mut mock_train = MockTrainScheduleService::new();
         let mock_station = MockStationService::new();
         let mock_train_type = MockTrainTypeConfigurationService::new();
         let mock_route = MockRouteService::new();
+        let mock_city = MockCityRepository::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             departure_station: Some("1".to_string()),
@@ -593,6 +692,7 @@ mod tests {
             Arc::new(mock_station),
             Arc::new(mock_train_type),
             Arc::new(mock_route),
+            Arc::new(mock_city),
         );
         let res = svc.query_direct_trains(cmd).await.unwrap();
         assert!(res.solutions.is_empty());
@@ -604,6 +704,7 @@ mod tests {
         let mock_station = MockStationService::new();
         let mock_train_type = MockTrainTypeConfigurationService::new();
         let mock_route = MockRouteService::new();
+        let mock_city = MockCityRepository::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             departure_station: Some("".to_string()), // 空出发站
@@ -619,6 +720,7 @@ mod tests {
             Arc::new(mock_station),
             Arc::new(mock_train_type),
             Arc::new(mock_route),
+            Arc::new(mock_city),
         );
         let result = svc.query_direct_trains(cmd).await;
 
@@ -637,6 +739,7 @@ mod tests {
         let mock_station = MockStationService::new();
         let mock_train_type = MockTrainTypeConfigurationService::new();
         let mock_route = MockRouteService::new();
+        let mock_city = MockCityRepository::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             departure_station: Some("1".to_string()),
@@ -652,6 +755,7 @@ mod tests {
             Arc::new(mock_station),
             Arc::new(mock_train_type),
             Arc::new(mock_route),
+            Arc::new(mock_city),
         );
         let result = svc.query_direct_trains(cmd).await;
 
@@ -670,6 +774,7 @@ mod tests {
         let mock_station = MockStationService::new();
         let mock_train_type = MockTrainTypeConfigurationService::new();
         let mock_route = MockRouteService::new();
+        let mock_city = MockCityRepository::new();
         let cmd = DirectTrainQueryCommand {
             session_id: Default::default(),
             departure_station: Some("invalid".to_string()), // 非数字ID
@@ -679,21 +784,29 @@ mod tests {
             departure_time: NaiveDate::from_ymd_opt(2025, 5, 1).unwrap(),
         };
 
-        // 我们期望服务本身拒绝这个请求，因为ID不是有效的数字
+        // 我们需要模拟station_service的行为，因为现在代码使用get_station_by_name
+        mock_station
+            .expect_get_station_by_name()
+            .with(eq("invalid".to_string()))
+            .times(1)
+            .returning(|_| Ok(None)); // 返回None表示未找到站点
+
+        // 我们期望服务返回站点未找到的错误
         let svc = TrainQueryServiceImpl::new(
             Arc::new(mock_train),
             Arc::new(mock_station),
             Arc::new(mock_train_type),
             Arc::new(mock_route),
+            Arc::new(mock_city),
         );
         let result = svc.query_direct_trains(cmd).await;
 
-        // 应该返回错误，表示站点ID无效
+        // 应该返回错误，表示站点未找到
         assert!(result.is_err());
         if let Err(e) = result {
             // 检查错误类型是否正确
             let err_str = format!("{:?}", e);
-            assert!(err_str.contains("Invalid departure station ID"));
+            assert!(err_str.contains("NotFound"));
         }
     }
 
