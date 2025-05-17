@@ -1,6 +1,8 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+use crate::application::service::train_query::TrainQueryServiceError;
+
 /// 直达车次查询（US1.2.1）——Query
 /// 跨层传输时使用 `Serialize / Deserialize` 方便直接反序列化 JSON。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,4 +30,38 @@ pub struct TransferTrainQueryCommand {
     /// 终到城市
     pub to_city: String,
     pub departure_time: NaiveDate,
+}
+
+impl DirectTrainQueryCommand {
+    /// 若格式错误返回 `TrainQueryServiceError`
+    pub fn validate(&self) -> Result<(), TrainQueryServiceError> {
+        let has_dep_station = self
+            .departure_station
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        let has_dep_city = self
+            .departure_city
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        if has_dep_station == has_dep_city {
+            return Err(TrainQueryServiceError::InconsistentQuery);
+        }
+
+        let has_arr_station = self
+            .arrival_station
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        let has_arr_city = self
+            .arrival_city
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        if has_arr_station == has_arr_city {
+            return Err(TrainQueryServiceError::InconsistentQuery);
+        }
+        Ok(())
+    }
 }

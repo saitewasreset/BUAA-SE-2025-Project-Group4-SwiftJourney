@@ -132,4 +132,17 @@ where
 
         Ok(result)
     }
+
+    async fn direct_schedules(
+        &self,
+        date: NaiveDate,
+        pairs: &[(StationId, StationId)],
+    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+        let mut all = Vec::new();
+        for (from, to) in pairs {
+            let mut part = self.find_schedules(date, *from, *to).await?;
+            all.append(&mut part);
+        }
+        Ok(all)
+    }
 }

@@ -34,4 +34,10 @@ pub trait TrainScheduleService {
         from_station: StationId,
         to_station: StationId,
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+
+    async fn direct_schedules(
+        &self,
+        date: chrono::NaiveDate,
+        pairs: &[(StationId, StationId)],
+    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 }
