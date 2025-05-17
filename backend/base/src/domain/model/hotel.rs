@@ -218,6 +218,12 @@ impl TryFrom<Decimal> for Rating {
     }
 }
 
+impl Default for Rating {
+    fn default() -> Self {
+        Rating(Decimal::ZERO)
+    }
+}
+
 impl From<Rating> for Decimal {
     fn from(value: Rating) -> Self {
         value.0
