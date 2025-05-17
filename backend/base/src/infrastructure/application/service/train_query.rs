@@ -54,7 +54,7 @@ use crate::application::commands::train_query::{
     // TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
-    DirectTrainQueryDTO, TrainInfoDTO, TrainQueryService,
+    DirectTrainQueryDTO, TrainInfoDTO, TrainQueryService, TrainQueryServiceError,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
@@ -282,7 +282,7 @@ where
             && !command.departure_city.as_ref().unwrap().trim().is_empty();
 
         if has_departure_station == has_departure_city {
-            return Err(GeneralError::BadRequest("Inconsistent query: departure_station and departure_city must have exactly one set".into()).into());
+            return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
         }
 
         // 验证查询一致性：arrival_station和arrival_city有且仅有一个存在
@@ -292,11 +292,7 @@ where
             && !command.arrival_city.as_ref().unwrap().trim().is_empty();
 
         if has_arrival_station == has_arrival_city {
-            return Err(GeneralError::BadRequest(
-                "Inconsistent query: arrival_station and arrival_city must have exactly one set"
-                    .into(),
-            )
-            .into());
+            return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
         } // 如果是按车站ID查询
         let schedules = if has_departure_station && has_arrival_station {
             // 将字符串ID转换为数字ID，然后创建StationId
@@ -338,14 +334,14 @@ where
             let departure_city_id = match command.departure_city.as_ref().unwrap().parse::<u64>() {
                 Ok(id) => crate::domain::model::city::CityId::from(id),
                 Err(_) => {
-                    return Err(GeneralError::BadRequest("Invalid departure city ID".into()).into());
+                    return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
                 }
             };
 
             let arrival_city_id = match command.arrival_city.as_ref().unwrap().parse::<u64>() {
                 Ok(id) => crate::domain::model::city::CityId::from(id),
                 Err(_) => {
-                    return Err(GeneralError::BadRequest("Invalid arrival city ID".into()).into());
+                    return Err(Box::new(TrainQueryServiceError::InconsistentQuery));
                 }
             };
 
