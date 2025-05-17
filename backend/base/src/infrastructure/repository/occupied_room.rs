@@ -6,9 +6,10 @@ use crate::domain::repository::occupied_room::OccupiedRoomRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use anyhow::Context;
 use async_trait::async_trait;
-use sea_orm::QueryFilter;
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
+use sea_orm::{ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, Statement};
 use sea_orm::{ColumnTrait, Select};
+use sea_orm::{QueryFilter, TransactionTrait};
+use uuid::Uuid;
 
 impl_db_id_from_u64!(OccupiedRoomId, i32, "occupied room");
 
@@ -179,5 +180,73 @@ impl OccupiedRoomRepository for OccupiedRoomRepositoryImpl {
                 )
         })
         .await
+    }
+
+    async fn save_count(
+        &self,
+        occupied_room: &OccupiedRoom,
+        count: i32,
+    ) -> Result<(), RepositoryError> {
+        let model = OccupiedRoomDataConverter::transform_to_do(occupied_room);
+
+        let tx = self
+            .db
+            .begin()
+            .await
+            .context("Failed to start transaction")?;
+
+        for _ in 0..count {
+            crate::models::occupied_room::Entity::insert(model.clone())
+                .exec(&self.db)
+                .await
+                .context("Failed to insert new occupied room")?;
+        }
+
+        tx.commit().await.context("Failed to commit transaction")?;
+
+        Ok(())
+    }
+
+    async fn find_by_order_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Vec<OccupiedRoom>, RepositoryError> {
+        let occupied_do_list = crate::models::occupied_room::Entity::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT
+    "occupied_room"."id",
+    "occupied_room"."hotel_id",
+    "occupied_room"."room_type_id",
+    "occupied_room"."begin_date",
+    "occupied_room"."end_date",
+    "occupied_room"."person_info_id"
+FROM "occupied_room" 
+    INNER JOIN "hotel_order"
+        ON "occupied_room"."hotel_id" = "hotel_order"."hotel_id"
+               AND "occupied_room"."room_type_id" = "hotel_order"."hotel_room_type_id"
+               AND "occupied_room"."begin_date" = "hotel_order"."begin_date"
+               AND "occupied_room"."end_date" = "hotel_order"."end_date"
+WHERE
+    "hotel_order"."uuid" = $1"#,
+                [order_uuid.into()],
+            ))
+            .all(&self.db)
+            .await
+            .context(format!(
+                "Failed to find occupied room by order uuid: {}",
+                order_uuid
+            ))?;
+
+        let mut result = Vec::with_capacity(occupied_do_list.len());
+
+        for occupied_room_do in occupied_do_list {
+            result.push(
+                OccupiedRoomDataConverter::make_from_do(occupied_room_do)
+                    .map_err(RepositoryError::ValidationError)?,
+            );
+        }
+
+        Ok(result)
     }
 }
