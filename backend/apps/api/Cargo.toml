@@ -26,3 +26,5 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-actix-web = "0.7"
 uuid = { version = "1.16.0", features = ["v4"] }
+
+dotenvy = { version = "0.15" }
