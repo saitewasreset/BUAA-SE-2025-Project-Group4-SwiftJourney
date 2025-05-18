@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tracing::{instrument, warn};
+use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(HotelId, i32, "hotel id");
@@ -618,14 +618,28 @@ impl HotelRepository for HotelRepositoryImpl {
         let mut hotel_room_type_do_list = Vec::new();
 
         for hotel_info in hotel_data {
-            let city = city_name_to_city.get(&hotel_info.city).cloned().ok_or(
-                RepositoryError::InconsistentState(anyhow!("Invalid city: {}", &hotel_info.city)),
-            )?;
+            let city = city_name_to_city
+                .get(&hotel_info.city)
+                .cloned()
+                .ok_or(RepositoryError::InconsistentState(anyhow!(
+                    "Invalid city: {}",
+                    &hotel_info.city
+                )))
+                .inspect_err(|e| {
+                    error!("Invalid city: {}: {}", &hotel_info.city, e);
+                })?;
 
             if let Some(station) = hotel_info.station {
-                let station = station_name_to_station.get(&station).cloned().ok_or(
-                    RepositoryError::InconsistentState(anyhow!("Invalid station: {}", &station)),
-                )?;
+                let station = station_name_to_station
+                    .get(&station)
+                    .cloned()
+                    .ok_or(RepositoryError::InconsistentState(anyhow!(
+                        "Invalid station: {}",
+                        &station
+                    )))
+                    .inspect_err(|e| {
+                        error!("Invalid station: {}: {}", &station, e);
+                    })?;
 
                 let mut hotel = Hotel::new(
                     hotel_info.name,
@@ -646,12 +660,19 @@ impl HotelRepository for HotelRepositoryImpl {
                         *uuid
                     } else {
                         let image_data = fs::read(&image_path)
-                            .context(format!("cannot read from: {:?}", &image_path))?;
+                            .context(format!("cannot read from: {:?}", &image_path))
+                            .inspect_err(|e| {
+                                error!("failed load hotel image: {}", e);
+                            })?;
 
                         let uuid = object_storage
                             .put_object(ObjectCategory::Hotel, "image/jpeg", image_data)
                             .await
-                            .map_err(|e| RepositoryError::Db(e.into()))?;
+                            .map_err(|e| {
+                                error!("failed save image: {}", e);
+
+                                RepositoryError::Db(e.into())
+                            })?;
 
                         images_cache.insert(image_path, uuid);
 
@@ -692,12 +713,16 @@ impl HotelRepository for HotelRepositoryImpl {
         crate::models::hotel::Entity::insert_many(hotel_do_list)
             .exec(&tx)
             .await
-            .context("Failed to insert hotel")?;
+            .context("Failed to insert hotel")
+            .inspect_err(|e| {
+                error!("Failed to insert hotel: {}", e);
+            })?;
 
         crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_list)
             .exec(&tx)
             .await
-            .context("Failed to insert hotel room type")?;
+            .context("Failed to insert hotel room type")
+            .inspect_err(|e| error!("Failed to insert hotel room type: {}", e))?;
 
         tx.commit().await.context("Failed to commit transaction")?;
 
