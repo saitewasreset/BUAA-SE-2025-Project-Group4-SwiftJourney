@@ -132,43 +132,102 @@ where
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
         cmd.validate()?;
 
-        let schedules =
-            if let (Some(from), Some(to)) = (&cmd.departure_station, &cmd.arrival_station) {
-                // 站点 -> 站点
-                let from_id = from
-                    .trim()
-                    .parse::<u64>()
-                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?;
-                let to_id = to
-                    .trim()
-                    .parse::<u64>()
-                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?;
-                self.train_schedule_service
-                    .direct_schedules(cmd.departure_time, &[(from_id.into(), to_id.into())])
-                    .await
-                    .map_err(map_schedule_err)?
-            } else {
-                // 城市 -> 城市
-                let pairs = self
+        let station_pairs = match (
+            &cmd.departure_station,
+            &cmd.arrival_station,
+            &cmd.departure_city,
+            &cmd.arrival_city,
+        ) {
+            // 情况1: 站点 -> 站点
+            (Some(from_station), Some(to_station), None, None) => {
+                let from_id = self
                     .station_service
-                    .station_pairs_by_city(
-                        cmd.departure_city.as_ref().unwrap(),
-                        cmd.arrival_city.as_ref().unwrap(),
-                    )
+                    .get_station_by_name(from_station.trim().to_string())
+                    .await
+                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?
+                    .unwrap()
+                    .get_id()
+                    .unwrap();
+                let to_id = self
+                    .station_service
+                    .get_station_by_name(to_station.trim().to_string())
+                    .await
+                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?
+                    .unwrap()
+                    .get_id()
+                    .unwrap();
+                vec![(from_id, to_id)]
+            }
+
+            // 情况2: 城市 -> 城市
+            (None, None, Some(from_city), Some(to_city)) => {
+                self.station_service
+                    .station_pairs_by_city(from_city, to_city)
+                    .await
+                    .map_err(map_station_err)?
+            }
+
+            // 情况3: 站点 -> 城市
+            (Some(from_station), None, None, Some(to_city)) => {
+                let from_id = self
+                    .station_service
+                    .get_station_by_name(from_station.trim().to_string())
+                    .await
+                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?
+                    .unwrap()
+                    .get_id()
+                    .unwrap();
+
+                let to_stations = self
+                    .station_service
+                    .get_station_by_city_name(to_city)
                     .await
                     .map_err(map_station_err)?;
 
-                self.train_schedule_service
-                    .direct_schedules(cmd.departure_time, &pairs)
-                    .await
-                    .map_err(map_schedule_err)?
-            };
+                to_stations
+                    .into_iter()
+                    .filter_map(|station| station.get_id().map(|to_id| (from_id, to_id)))
+                    .collect()
+            }
 
-        let routes = self
-            .route_service
-            .get_routes()
+            // 情况4: 城市 -> 站点
+            (None, Some(to_station), Some(from_city), None) => {
+                let to_id = self
+                    .station_service
+                    .get_station_by_name(to_station.trim().to_string())
+                    .await
+                    .map_err(|_| TrainQueryServiceError::InvalidStationId)?
+                    .unwrap()
+                    .get_id()
+                    .unwrap();
+
+                let from_stations = self
+                    .station_service
+                    .get_station_by_city_name(from_city)
+                    .await
+                    .map_err(map_station_err)?;
+
+                from_stations
+                    .into_iter()
+                    .filter_map(|station| station.get_id().map(|from_id| (from_id, to_id)))
+                    .collect()
+            }
+
+            _ => {
+                return Err(Box::new(TrainQueryServiceError::InconsistentQuery)
+                    as Box<dyn ApplicationError>);
+            }
+        };
+
+        let schedules = self
+            .train_schedule_service
+            .direct_schedules(cmd.departure_time, &station_pairs)
             .await
-            .map_err(|_| GeneralError::InternalServerError)?;
+            .map_err(map_schedule_err)?;
+
+        let routes = self.route_service.get_routes().await.map_err(|_| {
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
         let mut infos = Vec::new();
         for sch in schedules {
             infos.push(self.build_dto(&sch, &routes, cmd.departure_time).await?);
