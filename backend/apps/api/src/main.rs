@@ -83,9 +83,10 @@ use tracing::{error, instrument, warn};
 use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
+
 async fn main() -> std::io::Result<()> {
     // env_logger::init_from_env(Env::default().default_filter_or("info"));
-
+    let _ = dotenvy::dotenv();
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
