@@ -7,6 +7,8 @@ pub type StationData = Vec<StationDataItem>;
 pub type TrainTypeData = Vec<TrainTypeInfoItem>;
 pub type TrainNumberData = Vec<TrainNumberInfoItem>;
 
+pub type HotelData = Vec<HotelInfo>;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StationDataItem {
     pub name: String,
@@ -54,4 +56,35 @@ pub struct TrainNumberInfoItem {
     #[serde(rename = "originDepatureTime")]
     pub origin_departure_time: u32,
     pub route: Vec<RouteStationInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct HotelRoomType {
+    pub capacity: i32,
+    pub price: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct HotelComment {
+    pub time: String,
+    pub rating: f64,
+    pub text: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct HotelInfo {
+    pub name: String,
+    pub address: String,
+    pub city: String,
+    pub station: Option<String>,
+
+    pub images: Vec<String>,
+
+    pub phone: Vec<String>,
+
+    pub info: String,
+
+    pub room_info: HashMap<String, HotelRoomType>,
+
+    pub comments: Vec<HotelComment>,
 }

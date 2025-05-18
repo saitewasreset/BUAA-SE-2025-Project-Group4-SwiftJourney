@@ -75,7 +75,7 @@ pub struct Hotel {
     station: Station,
     address: String,
     phone: Vec<String>,
-    images: Vec<String>,
+    images: Vec<Uuid>,
     total_rating_count: i32,
     total_booking_count: i32,
     room_type_list: Vec<HotelRoomType>,
@@ -107,7 +107,7 @@ impl Hotel {
         station: Station,
         address: String,
         phone: Vec<String>,
-        images: Vec<String>,
+        images: Vec<Uuid>,
         total_rating_count: i32,
         total_booking_count: i32,
         room_type_list: Vec<HotelRoomType>,
@@ -153,7 +153,7 @@ impl Hotel {
         &self.phone
     }
 
-    pub fn images(&self) -> &Vec<String> {
+    pub fn images(&self) -> &Vec<Uuid> {
         &self.images
     }
 
@@ -177,7 +177,7 @@ impl Hotel {
         self.phone.push(phone);
     }
 
-    pub fn add_image(&mut self, image: String) {
+    pub fn add_image(&mut self, image: Uuid) {
         self.images.push(image);
     }
 
@@ -195,6 +195,10 @@ impl Identifiable for Hotel {
 
     fn set_id(&mut self, id: Self::ID) {
         self.id = Some(id);
+
+        for room_type in &mut self.room_type_list {
+            room_type.hotel_id = Some(id);
+        }
     }
 }
 
@@ -239,7 +243,7 @@ impl Display for Rating {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HotelRoomType {
     id: Option<HotelRoomTypeId>,
-    hotel_id: HotelId,
+    hotel_id: Option<HotelId>,
     type_name: String,
     capacity: i32,
     price: Decimal,
@@ -248,7 +252,7 @@ pub struct HotelRoomType {
 impl HotelRoomType {
     pub fn new(
         id: Option<HotelRoomTypeId>,
-        hotel_id: HotelId,
+        hotel_id: Option<HotelId>,
         type_name: String,
         capacity: i32,
         price: Decimal,
@@ -262,8 +266,12 @@ impl HotelRoomType {
         }
     }
 
-    pub fn hotel_id(&self) -> HotelId {
+    pub fn hotel_id(&self) -> Option<HotelId> {
         self.hotel_id
+    }
+
+    pub fn set_hotel_id(&mut self, hotel_id: HotelId) {
+        self.hotel_id = Some(hotel_id);
     }
 
     pub fn type_name(&self) -> &String {
