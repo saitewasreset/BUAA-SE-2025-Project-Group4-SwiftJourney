@@ -26,6 +26,7 @@ impl S3ObjectStorageServiceImpl {
             .credentials_provider(cred)
             .force_path_style(true)
             .region(aws_sdk_s3::config::Region::new("super-earth"))
+            .behavior_version_latest()
             .build();
 
         let client = aws_sdk_s3::Client::from_conf(s3_config);
