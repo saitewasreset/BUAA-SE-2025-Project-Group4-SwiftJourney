@@ -1,3 +1,4 @@
+use crate::DB_CHUNK_SIZE;
 use crate::domain::model::city::CityId;
 use crate::domain::model::hotel::{Hotel, HotelId, HotelRoomType, HotelRoomTypeId};
 use crate::domain::model::station::StationId;
@@ -24,7 +25,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tracing::{error, instrument, warn};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(HotelId, i32, "hotel id");
@@ -351,12 +352,14 @@ impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
         Arc::clone(&self.aggregate_manager)
     }
 
+    #[instrument(skip(self))]
     async fn on_insert(&self, aggregate: Hotel) -> Result<HotelId, RepositoryError> {
         let hotel_do = HotelDataConverter::transform_to_do(&aggregate);
 
         let result = crate::models::hotel::Entity::insert(hotel_do)
             .exec(&self.db)
             .await
+            .inspect_err(|e| error!("Failed to insert hotel: {}", e))
             .context("Failed to insert hotel")?;
 
         let hotel_id = HotelId::from_db_value(result.last_insert_id)?;
@@ -375,6 +378,7 @@ impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
         crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_list)
             .exec(&self.db)
             .await
+            .inspect_err(|e| error!("Failed to insert hotel room types: {}", e))
             .context("Failed to insert hotel room types")?;
 
         Ok(hotel_id)
@@ -615,7 +619,10 @@ impl HotelRepository for HotelRepositoryImpl {
         let mut images_cache: HashMap<PathBuf, Uuid> = HashMap::new();
 
         let mut hotel_do_list = Vec::new();
-        let mut hotel_room_type_do_list = Vec::new();
+        let mut hotel_uuid_to_room_type: HashMap<
+            Uuid,
+            Vec<crate::models::hotel_room_type::ActiveModel>,
+        > = HashMap::new();
 
         for hotel_info in hotel_data {
             let city = city_name_to_city
@@ -696,7 +703,8 @@ impl HotelRepository for HotelRepositoryImpl {
                 }
 
                 hotel_do_list.push(HotelDataConverter::transform_to_do(&hotel));
-                hotel_room_type_do_list.extend(
+                hotel_uuid_to_room_type.insert(
+                    hotel.uuid(),
                     hotel
                         .room_type_list()
                         .iter()
@@ -710,19 +718,57 @@ impl HotelRepository for HotelRepositoryImpl {
             }
         }
 
-        crate::models::hotel::Entity::insert_many(hotel_do_list)
-            .exec(&tx)
-            .await
-            .context("Failed to insert hotel")
-            .inspect_err(|e| {
-                error!("Failed to insert hotel: {}", e);
-            })?;
+        for hotel_do_part in hotel_do_list.chunks(DB_CHUNK_SIZE) {
+            crate::models::hotel::Entity::insert_many(hotel_do_part.to_vec())
+                .exec(&tx)
+                .await
+                .inspect_err(|e| {
+                    error!("Failed to insert hotel: {}", e);
+                })
+                .context("Failed to insert hotel")?;
+        }
 
-        crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_list)
-            .exec(&tx)
+        let hotel_id_uuid_list: Vec<(i32, Uuid)> = crate::models::hotel::Entity::find()
+            .select_only()
+            .columns([
+                crate::models::hotel::Column::Id,
+                crate::models::hotel::Column::Uuid,
+            ])
+            .into_tuple()
+            .all(&tx)
             .await
-            .context("Failed to insert hotel room type")
-            .inspect_err(|e| error!("Failed to insert hotel room type: {}", e))?;
+            .inspect_err(|e| {
+                error!("Failed to load hotel: {}", e);
+            })
+            .context("Failed to load hotel")?;
+
+        let hotel_uuid_map = hotel_id_uuid_list
+            .into_iter()
+            .map(|(id, uuid)| (uuid, id))
+            .collect::<HashMap<_, _>>();
+
+        for (hotel_uuid, hotel_room_type_list) in &mut hotel_uuid_to_room_type {
+            let hotel_id = *hotel_uuid_map.get(hotel_uuid).unwrap();
+
+            hotel_room_type_list.iter_mut().for_each(|x| {
+                x.hotel_id = ActiveValue::Set(hotel_id);
+            })
+        }
+
+        let hotel_room_type_do_list = hotel_uuid_to_room_type
+            .into_values()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        for hotel_room_type_do_part in hotel_room_type_do_list.chunks(DB_CHUNK_SIZE) {
+            crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_part.to_vec())
+                .exec(&tx)
+                .await
+                .inspect_err(|e| {
+                    error!("Failed to insert hotel room type: {}", e);
+                })
+                .context("Failed to insert hotel room type")?;
+        }
 
         tx.commit().await.context("Failed to commit transaction")?;
 

@@ -519,10 +519,10 @@ pub enum RepositoryError {
     #[error("database error: {0}")]
     Db(anyhow::Error),
 
-    #[error("invalid data object from db")]
+    #[error("invalid data object from db: {0}")]
     ValidationError(#[from] anyhow::Error),
 
-    #[error("inconsistent database state")]
+    #[error("inconsistent database state: {0}")]
     InconsistentState(anyhow::Error),
 }
 
