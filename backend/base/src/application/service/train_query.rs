@@ -107,62 +107,27 @@ pub struct StoppingStationInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrainInfoDTO {
-    departure_station: String,
+    pub departure_station: String,
     // 离开“起始站”的日期时间
-    departure_time: String,
-    arrival_station: String,
+    pub departure_time: String,
+    pub arrival_station: String,
     // 到达“到达站”的日期时间
-    arrival_time: String,
-    origin_station: String,
+    pub arrival_time: String,
+    pub origin_station: String,
     // 离开“始发站”的日期时间
-    origin_departure_time: String,
-    terminal_station: String,
+    pub origin_departure_time: String,
+    pub terminal_station: String,
     // 到达“终到站”的日期时间
-    terminal_arrival_time: String,
+    pub terminal_arrival_time: String,
     // 车次号，例如：“G53”
-    train_number: String,
+    pub train_number: String,
     // 行程时间：到达“到达站”的时间 - 离开“起始站”的时间，单位：秒
-    travel_time: u32,
-    price: u32,
+    pub travel_time: u32,
+    pub price: u32,
     // 车次经停车站信息
-    route: Vec<StoppingStationInfo>,
+    pub route: Vec<StoppingStationInfo>,
     // 座位类型，如：二等座 -> SeatInfoDTO
-    seat_info: HashMap<String, SeatInfoDTO>,
-}
-
-#[allow(clippy::too_many_arguments)]
-impl TrainInfoDTO {
-    pub fn new(
-        departure_station: String,
-        departure_time: String,
-        arrival_station: String,
-        arrival_time: String,
-        origin_station: String,
-        origin_departure_time: String,
-        terminal_station: String,
-        terminal_arrival_time: String,
-        train_number: String,
-        travel_time: u32,
-        price: u32,
-        route: Vec<StoppingStationInfo>,
-        seat_info: HashMap<String, SeatInfoDTO>,
-    ) -> Self {
-        Self {
-            departure_station,
-            departure_time,
-            arrival_station,
-            arrival_time,
-            origin_station,
-            origin_departure_time,
-            terminal_station,
-            terminal_arrival_time,
-            train_number,
-            travel_time,
-            price,
-            route,
-            seat_info,
-        }
-    }
+    pub seat_info: HashMap<String, SeatInfoDTO>,
 }
 
 /// 直达查询的响应 DTO
