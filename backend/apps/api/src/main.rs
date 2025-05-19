@@ -1,6 +1,8 @@
 // Step 1: Read the sentences below.
 // Thinking 1.2.1D - 6: 你认为下面的句子来自哪个游戏？其用意是什么？
+// 用意是夹带私货，宣传“管理式民主”
 // Thinking 1.2.1D - 7: 什么是“管理式民主”（Managed Democracy）？你认为它是真实的民主吗？
+// “管理式民主”是一个讽刺的说法，指的是一种表面上看似民主的制度，但实际上是由少数人或特定利益集团控制的。它并不是真正的民主，因为它缺乏真正的选举自由和公民参与。
 /*
  * Super Earth.
  * Our home.
@@ -33,17 +35,21 @@ use api::{AppConfig, MAX_BODY_LENGTH};
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
+use base::application::service::train_query::TrainQueryService;
 use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
 use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
+use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
+use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
+use base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
 use base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
@@ -62,8 +68,11 @@ use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use base::infrastructure::service::order_status_consumer_service::OrderStatusConsumerService;
 use base::infrastructure::service::order_status_producer_service::OrderStatusProducerService;
 use base::infrastructure::service::password::Argon2PasswordServiceImpl;
+use base::infrastructure::service::route::RouteServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
+use base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
+use base::infrastructure::service::train_type::TrainTypeConfigurationServiceImpl;
 use base::infrastructure::service::transaction::TransactionServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
 use migration::MigratorTrait;
@@ -165,6 +174,10 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&geo_service_impl),
     ));
 
+    let train_type_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(Arc::clone(
+        &train_repository_impl,
+    )));
+
     let order_service_impl = Arc::new(OrderServiceImpl::new(
         Arc::clone(&order_repository_impl),
         tz_offset_hour,
@@ -196,6 +209,11 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&personal_info_repository_impl),
     ));
 
+    let route_service_impl = Arc::new(RouteServiceImpl::new(
+        Arc::clone(&train_type_service_impl),
+        Arc::clone(&station_service_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -213,6 +231,13 @@ async fn main() -> std::io::Result<()> {
 
     let train_data_service: web::Data<dyn TrainDataService> =
         web::Data::from(train_data_service_impl as Arc<dyn TrainDataService>);
+
+    let route_service: web::Data<dyn RouteService> =
+        web::Data::from(Arc::clone(&route_service_impl) as Arc<dyn RouteService>);
+
+    let train_type_service: web::Data<dyn TrainTypeConfigurationService> = web::Data::from(
+        Arc::clone(&train_type_service_impl) as Arc<dyn TrainTypeConfigurationService>,
+    );
 
     let geo_application_service: web::Data<dyn GeoApplicationService> =
         web::Data::from(geo_application_service_impl as Arc<dyn GeoApplicationService>);
@@ -238,6 +263,19 @@ async fn main() -> std::io::Result<()> {
     // HINT: You can borrow web::Data<T> as &Arc<T>
     // that means you can pass a &web::Data<T> to `Arc::clone`
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(Arc::clone(
+        &route_service_impl,
+    )));
+
+    let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
+        Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&station_service_impl),
+        Arc::clone(&train_type_service_impl),
+        Arc::clone(&route_service_impl),
+    ));
+
+    let train_query_service: web::Data<dyn TrainQueryService> =
+        web::Data::from(train_query_service_impl as Arc<dyn TrainQueryService>);
 
     HttpServer::new(move || {
         App::new()
@@ -250,8 +288,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(geo_application_service.clone())
             .app_data(personal_info_service.clone())
             .app_data(transaction_application_service.clone())
+            .app_data(route_service.clone())
+            .app_data(train_type_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
+            .app_data(train_query_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
@@ -263,11 +304,14 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/general").configure(api::general::scoped_config))
                     .service(web::scope("/data").configure(api::data::scoped_config))
                     .service(web::scope("/payment").configure(api::payment::scoped_config))
-                    .service(web::scope("/order").configure(api::order::scoped_config)),
+                    .service(web::scope("/order").configure(api::order::scoped_config))
+                    // Step 6: Register your endpoint using `.service()` function
+                    // Exercise 1.2.1D - 7: Your code here. (5 / 5)
+                    .service(
+                        web::scope("/train/schedule")
+                            .configure(api::train::schedule::scoped_config),
+                    ), // Congratulations! You have finished Task 1.2.1D!
             )
-        // Step 6: Register your endpoint using `.service()` function
-        // Exercise 1.2.1D - 7: Your code here. (5 / 5)
-        // Congratulations! You have finished Task 1.2.1D!
     })
     .bind(("0.0.0.0", 8080))?
     .run()
