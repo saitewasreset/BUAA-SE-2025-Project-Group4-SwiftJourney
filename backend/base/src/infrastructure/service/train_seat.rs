@@ -44,10 +44,10 @@ fn calc_available_seat_count_map(
 
     for ((begin_station_id, end_station_id), seat_list) in inner_map {
         let begin_order = *station_id_to_order_map
-            .get(&begin_station_id)
+            .get(begin_station_id)
             .expect("begin station id should in station id to order map");
         let end_order = *station_id_to_order_map
-            .get(&end_station_id)
+            .get(end_station_id)
             .expect("end station id should in station id to order map");
 
         for seat_id in seat_list {
@@ -55,9 +55,7 @@ fn calc_available_seat_count_map(
                 .entry(*seat_id)
                 .or_insert_with(|| vec![false; route_stops_count]);
 
-            for i in begin_order as usize..end_order as usize {
-                occupied_bitmap[i] = true;
-            }
+            occupied_bitmap[begin_order as usize..end_order as usize].fill(true);
         }
     }
 

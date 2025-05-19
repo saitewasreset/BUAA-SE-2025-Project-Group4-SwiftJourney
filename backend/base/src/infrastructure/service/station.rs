@@ -213,4 +213,33 @@ where
 
         Ok(())
     }
+
+    async fn get_station_by_city_name(
+        &self,
+        city_name: &str,
+    ) -> Result<Vec<Station>, StationServiceError> {
+        if let Some(city) = self.geo_service.get_city_by_name(city_name).await? {
+            self.station_repository
+                .find_by_city(city.get_id().unwrap())
+                .await
+                .map_err(Into::into)
+        } else {
+            Err(StationServiceError::InvalidGeoInfo(
+                GeoServiceError::InvalidCityName(city_name.to_owned()),
+            ))
+        }
+    }
+
+    async fn station_pairs_by_city(
+        &self,
+        from_city: &str,
+        to_city: &str,
+    ) -> Result<Vec<(StationId, StationId)>, StationServiceError> {
+        let from_list = self.get_station_by_city_name(from_city).await?;
+        let to_list   = self.get_station_by_city_name(to_city).await?;
+        Ok(from_list
+            .iter()
+            .flat_map(|f| to_list.iter().map(move |t| (f.get_id().unwrap(), t.get_id().unwrap())))
+            .collect())
+    }
 }

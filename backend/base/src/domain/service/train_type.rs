@@ -43,7 +43,7 @@ impl From<RepositoryError> for TrainTypeConfigurationServiceError {
 /// 定义了对列车类型实体进行业务操作的核心契约。
 /// 所有方法都是异步的，返回实现了`Future` trait的结果。
 #[async_trait]
-pub trait TrainTypeConfigurationService {
+pub trait TrainTypeConfigurationService: 'static + Send + Sync {
     /// 验证座位类型名称
     ///
     /// # Arguments
