@@ -727,8 +727,8 @@ interface TrainScheduleQuery {
   arrivalStation?: string;
   departureCity?: string;
   arrivalCity?: string;
-  // deparuteDate：YYYY-MM-DD
-  deparuteDate: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
 }
 ```
 
@@ -781,7 +781,7 @@ interface TrainScheduleInfo {
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -819,8 +819,8 @@ interface TrainScheduleQuery {
   arrivalStation?: string;
   departureCity?: string;
   arrivalCity?: string;
-  // deparuteDate：YYYY-MM-DD
-  deparuteDate: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
 }
 ```
 
