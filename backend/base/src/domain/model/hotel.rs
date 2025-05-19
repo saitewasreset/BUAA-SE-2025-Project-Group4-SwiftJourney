@@ -99,6 +99,8 @@ impl Hotel {
             info,
         }
     }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn new_full_unchecked(
         id: Option<HotelId>,
         uuid: Uuid,

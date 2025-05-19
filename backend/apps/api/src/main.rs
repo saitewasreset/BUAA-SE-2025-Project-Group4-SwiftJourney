@@ -30,7 +30,7 @@
  * Become a LEGEND.
  * Become a Helldiver!
  */
-use actix_web::{App, HttpServer, web, web::resource};
+use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::hotel_data::HotelDataService;

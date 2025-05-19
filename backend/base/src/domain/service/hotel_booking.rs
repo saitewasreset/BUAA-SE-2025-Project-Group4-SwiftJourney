@@ -1,7 +1,5 @@
 use crate::domain::RepositoryError;
-use crate::domain::model::hotel::{
-    HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId, HotelRoomTypeStr,
-};
+use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId};
 use crate::domain::model::order::{HotelOrder, OrderStatus};
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
