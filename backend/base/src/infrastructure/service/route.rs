@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId, Stop};
-use crate::domain::model::train::Train;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService, RouteServiceError};
 use crate::domain::service::station::StationService;
@@ -28,10 +27,7 @@ where
     T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
 {
-    pub fn new(
-        train_type_configuration_service: Arc<T>,
-        station_service: Arc<S>,
-    ) -> Self {
+    pub fn new(train_type_configuration_service: Arc<T>, station_service: Arc<S>) -> Self {
         Self {
             train_type_configuration_service,
             station_service,
@@ -52,13 +48,16 @@ where
 
         // Step 4: Load train data using `get_trains` from stored `TrainTypeConfigurationService` implementation
         // Exercise 1.2.1D - 2: Your code here. (3 / 4)
+        /*To DeepChirp: 最后我想说，我非常赞赏你这种敢于质疑注释的勇气。
+        在过去的七年里，大家都在尝试着通过各种方法阐释这道思考题的合理性，
+        却没有人对这道题表现过怀疑。你的这种勇气实在是可贵。
         let trains: Vec<Train> = self
             .train_type_configuration_service
             .get_trains()
             .await
             .map_err(|e| {
                 RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e.into()))
-            })?;
+            })?;*/
 
         // Step 5: Build the graph using `routes` and `trains`
         // HINT: you may refer to https://docs.rs/petgraph/latest/petgraph/
