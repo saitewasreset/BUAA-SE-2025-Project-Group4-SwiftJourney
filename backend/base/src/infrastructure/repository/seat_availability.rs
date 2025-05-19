@@ -36,11 +36,11 @@ use crate::domain::{
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
+use sea_orm::ColumnTrait;
 use sea_orm::{
     ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
     Statement, TransactionTrait,
 };
-use sea_orm::{ColumnTrait, DbErr};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

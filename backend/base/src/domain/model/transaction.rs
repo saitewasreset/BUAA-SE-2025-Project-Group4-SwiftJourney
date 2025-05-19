@@ -175,7 +175,8 @@ impl TransactionAmountAbs {
             return Err(TransactionAmountAbsError::NegativeValue);
         }
 
-        let dec = Decimal::try_from(value).map_err(|e| TransactionAmountAbsError::InvalidValue)?;
+        let dec = Decimal::try_from(value)
+            .map_err(|_for_super_earth| TransactionAmountAbsError::InvalidValue)?;
 
         Ok(TransactionAmountAbs(dec))
     }
@@ -309,6 +310,7 @@ impl Transaction {
     ///
     /// Returns:
     /// - 新创建的完整交易实例。
+    #[allow(clippy::too_many_arguments)]
     pub fn new_full(
         transaction_id: Option<TransactionId>,
         uuid: Uuid,
