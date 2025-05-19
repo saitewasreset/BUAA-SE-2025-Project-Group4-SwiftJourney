@@ -108,8 +108,8 @@ interface TrainScheduleQuery {
   arrivalStation?: string;
   departureCity?: string;
   arrivalCity?: string;
-  // deparuteDate：YYYY-MM-DD
-  deparuteDate: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
 }
 
 // 站点停靠信息

@@ -76,7 +76,7 @@ where
         &self,
         order: Box<dyn Order>,
     ) -> Result<OrderInfoDto, RepositoryError> {
-        let type_id = order.type_id();
+        let type_id = (*order).type_id();
 
         let order_any = order.clone() as Box<dyn Any>;
 

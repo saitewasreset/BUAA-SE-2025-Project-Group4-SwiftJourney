@@ -198,6 +198,11 @@ impl Route {
         &self.stops
     }
 
+    /// 获取停靠记录迭代器(按order排序)
+    pub fn stop_pairs(&self) -> impl Iterator<Item = (&Stop, &Stop)> {
+        self.stops.windows(2).map(|pair| (&pair[0], &pair[1]))
+    }
+
     /// 消费self返回所有停靠记录
     pub fn into_stops(self) -> Vec<Stop> {
         self.stops
