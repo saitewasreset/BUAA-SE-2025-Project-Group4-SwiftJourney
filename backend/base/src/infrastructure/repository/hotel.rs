@@ -8,8 +8,8 @@ use crate::domain::repository::station::StationRepository;
 use crate::domain::service::object_storage::{ObjectCategory, ObjectStorageService};
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
-    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, Repository,
-    RepositoryError, TypedDiff,
+    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
+    TypedDiff,
 };
 use crate::infrastructure::repository::city::CityDataConverter;
 use crate::infrastructure::repository::station::StationDataConverter;
@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tracing::{error, info, instrument, warn};
+use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(HotelId, i32, "hotel id");
@@ -121,7 +121,7 @@ impl HotelDataConverter {
     pub fn transform_to_do(hotel: &Hotel) -> crate::models::hotel::ActiveModel {
         let mut model = crate::models::hotel::ActiveModel {
             id: ActiveValue::NotSet,
-            uuid: ActiveValue::Set(hotel.uuid().clone()),
+            uuid: ActiveValue::Set(hotel.uuid()),
             name: ActiveValue::Set(hotel.name().to_string()),
             city_id: ActiveValue::Set(
                 hotel
@@ -539,7 +539,7 @@ impl HotelRepository for HotelRepositoryImpl {
             .context(format!("Failed to get hotel for uuid: {}", uuid))?;
 
         result
-            .map(|x| HotelId::from_db_value(x))
+            .map(HotelId::from_db_value)
             .transpose()
             .map_err(RepositoryError::ValidationError)
     }

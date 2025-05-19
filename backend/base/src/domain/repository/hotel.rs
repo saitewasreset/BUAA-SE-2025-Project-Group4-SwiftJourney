@@ -2,7 +2,6 @@ use crate::domain::model::city::CityId;
 use crate::domain::model::hotel::{Hotel, HotelId};
 use crate::domain::model::station::StationId;
 use crate::domain::repository::city::CityRepository;
-use crate::domain::repository::hotel_rating::HotelRatingRepository;
 use crate::domain::repository::station::StationRepository;
 use crate::domain::service::object_storage::ObjectStorageService;
 use crate::domain::{Repository, RepositoryError};
