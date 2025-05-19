@@ -1,5 +1,5 @@
-use crate::domain::model::order::{Order, OrderId, OrderStatus, TrainOrder};
-use crate::domain::model::transaction::{Transaction, TransactionId, TransactionStatus};
+use crate::domain::model::order::{OrderStatus, TrainOrder};
+use crate::domain::model::transaction::TransactionStatus;
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
 use thiserror::Error;
