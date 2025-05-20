@@ -24,7 +24,7 @@
 //! - 使用聚合管理器跟踪变更
 //! - 支持四种订单类型的混合处理
 use crate::domain::model::dish::DishId;
-use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomId};
+use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomTypeId};
 use crate::domain::model::order::{
     BaseOrder, DishOrder, HotelOrder, Order, OrderId, OrderStatus, OrderTimeInfo, PaymentInfo,
     TakeawayOrder, TrainOrder,
@@ -307,7 +307,7 @@ impl OrderDataConverter {
         let date_range = HotelDateRange::new(hotel_order_do.begin_date, hotel_order_do.end_date)?;
 
         let hotel_room_type_id =
-            HotelRoomId::from_db_value(hotel_order_do.hotel_room_type_id as i32)?;
+            HotelRoomTypeId::from_db_value(hotel_order_do.hotel_room_type_id as i32)?;
 
         Ok(HotelOrder::new(
             base,

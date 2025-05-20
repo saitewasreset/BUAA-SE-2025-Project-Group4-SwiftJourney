@@ -13,6 +13,7 @@ pub enum PersonInfo {
     IdentityCard,
     PreferredSeatLocation,
     UserId,
+    IsDefault,
 }
 
 #[async_trait::async_trait]
@@ -29,6 +30,7 @@ impl MigrationTrait for Migration {
                     .col(string(PersonInfo::IdentityCard).not_null())
                     .col(char(PersonInfo::PreferredSeatLocation))
                     .col(integer(PersonInfo::UserId).not_null())
+                    .col(boolean(PersonInfo::IsDefault).not_null())
                     .index(
                         Index::create()
                             .col(PersonInfo::UserId)

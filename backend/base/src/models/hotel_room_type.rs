@@ -11,7 +11,7 @@ pub struct Model {
     pub capacity: i32,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
-    pub hotel_id: i64,
+    pub hotel_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
