@@ -1,8 +1,10 @@
 use crate::domain::RepositoryError;
+use crate::domain::model::hotel::HotelId;
 use crate::domain::model::order::{
     DishOrder, HotelOrder, Order, OrderId, TakeawayOrder, TrainOrder,
 };
 use crate::domain::model::train_schedule::TrainScheduleId;
+use crate::domain::model::user::UserId;
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use sea_orm::FromQueryResult;
@@ -145,6 +147,12 @@ pub trait OrderRepository: 'static + Send + Sync {
         &self,
         order_uuid: Uuid,
     ) -> Result<Option<HotelOrder>, RepositoryError>;
+
+    async fn find_hotel_order_by_userid(
+        &self,
+        user_id: UserId,
+        hotel_id: HotelId,
+    ) -> Result<Vec<HotelOrder>, RepositoryError>;
 
     async fn find_dish_order_by_uuid(
         &self,

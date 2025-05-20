@@ -34,7 +34,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .check(Expr::col(HotelRoomType::Price).gte(0)),
                     )
-                    .col(big_integer(HotelRoomType::HotelId).not_null())
+                    .col(integer(HotelRoomType::HotelId).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(HotelRoomType::Table, HotelRoomType::HotelId)

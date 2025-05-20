@@ -25,9 +25,9 @@ impl MigrationTrait for Migration {
                     .table(HotelRating::Table)
                     .if_not_exists()
                     .col(pk_auto(HotelRating::Id))
-                    .col(big_integer(HotelRating::UserId).not_null())
-                    .col(big_integer(HotelRating::HotelId).not_null())
-                    .col(timestamp(HotelRating::Time).not_null())
+                    .col(integer(HotelRating::UserId).not_null())
+                    .col(integer(HotelRating::HotelId).not_null())
+                    .col(timestamp_with_time_zone(HotelRating::Time).not_null())
                     .col(
                         decimal_len(HotelRating::Rating, 2, 1)
                             .not_null()
