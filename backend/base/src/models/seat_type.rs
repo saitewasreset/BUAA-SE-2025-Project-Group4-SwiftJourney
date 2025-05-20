@@ -15,8 +15,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::occupied_seat::Entity")]
-    OccupiedSeat,
+    #[sea_orm(has_many = "super::seat_availability::Entity")]
+    SeatAvailability,
     #[sea_orm(has_many = "super::seat_type_in_train_type::Entity")]
     SeatTypeInTrainType,
     #[sea_orm(has_many = "super::seat_type_mapping::Entity")]
@@ -25,9 +25,9 @@ pub enum Relation {
     TrainOrder,
 }
 
-impl Related<super::occupied_seat::Entity> for Entity {
+impl Related<super::seat_availability::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::OccupiedSeat.def()
+        Relation::SeatAvailability.def()
     }
 }
 
