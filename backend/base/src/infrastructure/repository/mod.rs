@@ -1,4 +1,5 @@
 use anyhow::Context;
+use tracing::{error, instrument};
 
 pub mod session;
 pub mod user;
@@ -10,7 +11,15 @@ pub mod route;
 pub mod station;
 pub mod train;
 pub mod train_schedule;
+pub mod transaction;
 
+pub mod dish;
+pub mod hotel;
+pub mod order;
+pub mod seat_availability;
+pub mod takeaway;
+
+#[instrument(level = "trace", skip_all)]
 pub fn transform_list<T, U, I>(
     list: Vec<T>,
     converter: impl Fn(T) -> Result<U, anyhow::Error>,
@@ -23,8 +32,12 @@ where
 
     for model in list {
         let id = get_id(&model);
-        let city =
-            converter(model).context(format!("Failed to validate entity with id: {}", id))?;
+        let city = converter(model)
+            .context(format!("Failed to validate entity with id: {}", id))
+            .map_err(|e| {
+                error!("Failed to validate entity with id: {}. Error: {}", id, e);
+                e
+            })?;
         result_list.push(city);
     }
 

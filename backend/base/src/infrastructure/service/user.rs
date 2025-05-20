@@ -166,6 +166,30 @@ where
         }
     }
 
+    async fn verify_payment_password(
+        &self,
+        user: &User,
+        raw_payment_password: String,
+    ) -> Result<(), UserServiceError> {
+        if let Some(hashed_payment_password) = user.hashed_payment_password() {
+            let pass = P::verify(
+                raw_payment_password.as_bytes(),
+                hashed_payment_password.clone(),
+            )
+            .map_err(|e| {
+                UserServiceError::InfrastructureError(ServiceError::RelatedServiceError(e))
+            })?;
+
+            if !pass {
+                Err(UserServiceError::InvalidPassword)
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(UserServiceError::InvalidPassword)
+        }
+    }
+
     /// 设置登录密码实现
     ///
     /// # Arguments
