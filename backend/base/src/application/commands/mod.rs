@@ -1,3 +1,4 @@
+pub mod hotel_data;
 pub mod personal_info;
 pub mod train_data;
 pub mod transaction;
