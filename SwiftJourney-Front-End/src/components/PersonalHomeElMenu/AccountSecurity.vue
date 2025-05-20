@@ -53,7 +53,7 @@
   
 <script>
 import { ElMessage } from 'element-plus';
-import { paymentApi } from '@/api/PaymentApi/paymentApi'
+import { paymentApi } from '@/api/paymentApi/paymentApi'
 
 export default{
     data() {
