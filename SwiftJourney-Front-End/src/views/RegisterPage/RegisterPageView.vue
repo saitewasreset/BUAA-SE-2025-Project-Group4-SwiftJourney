@@ -43,7 +43,7 @@
         </a-input>
         <p class="input-error" v-if="inputNickNameError">{{ nickNameErrorMsg }}</p>
         <a-tooltip
-          title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的三种，且不能包含空格"
+          title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的两种，且不能包含空格"
           placement="right"
         >
           <a-input-password
@@ -130,6 +130,8 @@ import {
   IdcardOutlined,
 } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
+import { userApi } from '@/api/UserApi/userApi'
+import { message } from 'ant-design-vue'
 
 const inputPhone = ref('')
 const inputNickName = ref('')
@@ -152,7 +154,7 @@ function goToLoginPage() {
 
 // -------------------- 处理注册逻辑 --------------------
 
-function postRegisterMsg() {
+async function postRegisterMsg() {
   console.log(
     'post register message: ' +
       inputPhone.value +
@@ -161,7 +163,22 @@ function postRegisterMsg() {
       ' ' +
       inputConfirmPassword.value,
   )
-  // TODO
+  await userApi.userRegister({ phone: inputPhone.value, password: inputPassword.value }).then((res) => {
+    if (res.status === 200) {
+      message.success('注册成功')
+      router.push({ name: 'login' })
+    } else if (res.status === 13001) {
+      message.error('身份证号格式错误')
+    } else if (res.status === 15001) {
+      message.error('该手机号对应的用户已经存在')
+    } else if (res.status === 15003) {
+      message.error('用户名格式错误')
+    } else if (res.status === 15004) {
+      message.error('密码格式错误')
+    } else if (res.status === 15005) {
+      message.error('姓名格式错误')
+    } 
+  })
 }
 
 // -------------------- 手机号检查 --------------------
@@ -334,12 +351,12 @@ function checkPassword() {
   }
 
   let matchedTypes = 0
-  if (/[a-z]/.test(inputPassword.value)) {
+  if (/[A-Za-z]/.test(inputPassword.value)) {
     matchedTypes += 1
   }
-  if (/[A-Z]/.test(inputPassword.value)) {
-    matchedTypes += 1
-  }
+  // if (/[A-Z]/.test(inputPassword.value)) {
+  //   matchedTypes += 1
+  // }
   if (/\d/.test(inputPassword.value)) {
     matchedTypes += 1
   }
@@ -347,10 +364,10 @@ function checkPassword() {
   if (/[\W_]/.test(inputPassword.value)) {
     matchedTypes += 1
   }
-  if (matchedTypes < 3) {
+  if (matchedTypes < 2) {
     inputPasswordStatus.value = 'error'
     inputPasswordError.value = true
-    passwordErrorMsg.value = '密码必须至少包含大小写字母、数字或特殊符号中的三种'
+    passwordErrorMsg.value = '密码必须至少包含大小写字母、数字或特殊符号中的两种'
   }
 }
 

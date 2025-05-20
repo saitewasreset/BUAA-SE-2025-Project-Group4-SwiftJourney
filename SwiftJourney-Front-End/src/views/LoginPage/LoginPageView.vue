@@ -51,6 +51,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue';
 import { userApi } from '@/api/UserApi/userApi'
 import { useUserStore } from '@/stores/user'
+import Cookies from 'js-cookie'
 
 const inputPhone = ref('')
 const inputPassword = ref('')
@@ -72,12 +73,11 @@ function goToRegisterPage() {
 async function postLoginMsg() {
   console.log('post login message: ' + inputPhone.value + ' ' + inputPassword.value)
   await userApi.userLogin({ phone: inputPhone.value, password: inputPassword.value })
-    .then((res) => {
+    .then(async (res) => {
       if (res.status === 200) {
         const nowUser = useUserStore();
-        localStorage.setItem('userId', res.data.userId);
+        await nowUser.restoreUserFromCookie();
         message.success('登录成功');
-        
         goToHomePage();
       } else {
         throw new Error('登录失败')
