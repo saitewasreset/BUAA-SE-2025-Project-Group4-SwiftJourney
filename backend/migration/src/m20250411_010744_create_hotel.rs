@@ -9,6 +9,7 @@ pub struct Migration;
 pub enum Hotel {
     Table,
     Id,
+    Uuid,
     Name,
     CityId,
     StationId,
@@ -29,6 +30,7 @@ impl MigrationTrait for Migration {
                     .table(Hotel::Table)
                     .if_not_exists()
                     .col(pk_auto(Hotel::Id))
+                    .col(uuid(Hotel::Uuid))
                     .col(string(Hotel::Name).not_null())
                     .col(big_integer(Hotel::CityId).not_null())
                     .col(big_integer(Hotel::StationId))

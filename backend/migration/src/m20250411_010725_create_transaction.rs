@@ -13,6 +13,7 @@ pub enum Transaction {
     Amount,
     Status,
     UserId,
+    Atomic,
 }
 
 #[async_trait::async_trait]
@@ -29,6 +30,7 @@ impl MigrationTrait for Migration {
                     .col(decimal_len(Transaction::Amount, 10, 2).not_null())
                     .col(string(Transaction::Status).not_null())
                     .col(big_integer(Transaction::UserId).not_null())
+                    .col(boolean(Transaction::Atomic).default(false))
                     .foreign_key(
                         ForeignKey::create()
                             .from(Transaction::Table, Transaction::UserId)

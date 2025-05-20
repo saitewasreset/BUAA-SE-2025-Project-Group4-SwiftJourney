@@ -12,6 +12,7 @@ pub struct Model {
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
     pub takeaway_shop_id: i64,
+    pub images: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

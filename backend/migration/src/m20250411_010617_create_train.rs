@@ -10,6 +10,7 @@ pub enum Train {
     Id,
     Number,
     TypeId,
+    DefaultOriginDepartureTime,
 }
 
 #[async_trait::async_trait]
@@ -23,6 +24,7 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(Train::Id))
                     .col(string(Train::Number).not_null().unique_key())
                     .col(big_integer(Train::TypeId).not_null())
+                    .col(integer(Train::DefaultOriginDepartureTime))
                     .foreign_key(
                         ForeignKey::create()
                             .from(Train::Table, Train::TypeId)

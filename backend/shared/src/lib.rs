@@ -25,6 +25,8 @@
  * Become a LEGEND.
  * Become a Helldiver!
  */
+pub mod data;
+
 use phf::{Set, phf_set};
 use regex::Regex;
 use std::sync::LazyLock;
@@ -42,6 +44,8 @@ pub static PHONE_PREFIX_SET: Set<&'static str> = phf_set! {
 "191", "193", "199", "192"};
 
 pub const API_SUCCESS_CODE: u32 = 200;
+
+pub const API_FORBIDDEN_CODE: u32 = 403;
 pub const API_SUCCESS_MESSAGE: &str = "For Super Earth!";
 
 pub const API_FORBIDDEN_MESSAGE_TEMPLATE: &str =

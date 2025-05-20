@@ -116,6 +116,21 @@ pub trait UserService: 'static + Sync + Send {
         raw_password: String,
     ) -> Result<(), UserServiceError>;
 
+    /// 验证用户支付密码
+    ///
+    /// # Arguments
+    /// * `user` - 用户实体
+    /// * `raw_password` - 用户提供的明文支付密码
+    ///
+    /// # Errors
+    /// * `NoSuchUser` - 用户不存在
+    /// * `InfrastructureError` - 基础设施或密码服务错误
+    async fn verify_payment_password(
+        &self,
+        user: &User,
+        raw_payment_password: String,
+    ) -> Result<(), UserServiceError>;
+
     /// 设置用户登录密码
     ///
     /// # Arguments

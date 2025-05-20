@@ -7,8 +7,10 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub uuid: Uuid,
     pub name: String,
     pub station_id: i64,
+    pub images: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
