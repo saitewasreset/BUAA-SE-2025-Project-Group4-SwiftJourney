@@ -6,7 +6,13 @@ export const userApi = {
     userLogin: (params: Object) => {
         return postRequest('/api/user/login', params);
     },
-    setUserInfo: (params: Object) => {
+    getUserInfo: (params: Object) => {
         return postRequest('/api/user/user_info', params);
+    },
+    userRegister: (params: Object) => {
+        return postRequest('/api/user/register', params);
+    },
+    userLogout: (params: Object) => {
+        return postRequest('/api/user/logout', params);
     }
 };
