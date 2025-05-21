@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
                     .table(Dish::Table)
                     .if_not_exists()
                     .col(pk_auto(Dish::Id))
-                    .col(big_integer(Dish::TrainId).not_null())
+                    .col(integer(Dish::TrainId).not_null())
                     .col(string(Dish::Type).not_null())
                     .col(string(Dish::Time).not_null())
                     .col(string(Dish::Name).not_null())
