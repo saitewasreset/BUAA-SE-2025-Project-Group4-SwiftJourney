@@ -1,3 +1,8 @@
+export interface UserApiResponseData {
+  code: number;
+  message: string;
+  data: Object;
+}
 export interface UserInfo {
   username: string;
   gender?: "male" | "female";

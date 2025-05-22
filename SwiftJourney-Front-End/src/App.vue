@@ -6,11 +6,10 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import TitleBar from './components/TitleBar/TitleBar.vue';
 import { computed, onMounted } from 'vue';
 import { useUserStore } from './stores/user';
-import Cookie from 'js-cookie';
 
 const route = useRoute();
 
@@ -25,7 +24,7 @@ const shouldTitleBarDisplay = computed(() => {
 
 onMounted(async () => {
   const nowUser = useUserStore();
-  await nowUser.restoreUserFromCookie();
+  await nowUser.restoreUserFromCookie(useRouter());
 })
 
 </script>

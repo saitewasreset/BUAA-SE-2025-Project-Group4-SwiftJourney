@@ -58,12 +58,12 @@
                         </div>
                     </div>
                     <template #reference>
-                        <el-button type="dashed" class="UserInfoButton" round>
+                        <el-button type="dashed" class="UserInfoButton" round @click="goToPersonalDataPage">
                           {{ user.name }}
                         </el-button>
                     </template>
                 </el-popover>
-                <el-button class="LogoutButton" @click="user.logout" type="danger" round>登出</el-button>
+                <el-button class="LogoutButton" @click="confirmLogout" type="danger" round>登出</el-button>
             </div>
         </div>
     </div>
@@ -71,6 +71,7 @@
   
 <script lang="ts" setup>
     import { useUserStore } from '@/stores/user';
+    import { Modal } from 'ant-design-vue';
     import { ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
     import { useRouter } from 'vue-router';
@@ -107,6 +108,18 @@
 
     function goToTransactionRecordPage() {
         router.push({ name: 'personalhomepage', params: { activeIndex: 'transactionrecord' }});
+    }
+
+    function confirmLogout() {
+        Modal.confirm({
+            title: '确认登出',
+            content: '您确定要登出吗？',
+            okText: '确认',
+            cancelText: '取消',
+            onOk: async () => {
+                await user.logout(router);
+            }
+        });
     }
 </script>
 
@@ -197,7 +210,7 @@
 
 .LogoutButton {
     margin-left: 20px;
-    margin-right: 10px;
+    margin-right: 20px;
 }
 
 </style>
