@@ -15,9 +15,10 @@
 
 配置环境变量：
 
-| 名称           | 含义                                                                         |
-| -------------- | ---------------------------------------------------------------------------- |
+| 名称             | 含义                                                                    |
+|----------------|-----------------------------------------------------------------------|
 | `DATABASE_URL` | 连接数据库的 URL：`postgres://<db_user>:<db_passwd>@<db_address>/<database>` |
+| `RABBITMQ_URL` | 连接RabbitMQ的 URL：`amqp://<amqp_user>:<amqp_passwd>@<db_address>/`      |
 
 请替换`DATABASE_URL`中的`<db_user>`、`<db_passwd>`、`<db_address>`、`<database>`分别为数据库用户、用户密码、数据库地址、Database
 
@@ -37,7 +38,7 @@ Release 模式（启用优化）：`cargo build --release --bin api`
 
 请确保环境变量`DATABASE_URL`的值已经正确设置，或者，在运行时显式地指定值：
 
-`DATABASE_URL=xxx cargo run --bin api`
+`DATABASE_URL=xxx RABBITMQ_URL=xxx cargo run --bin api`
 
 后端启动后，将监听`8080`端口。
 
