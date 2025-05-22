@@ -11,6 +11,7 @@ mod m20250411_010701_create_route;
 mod m20250411_010715_create_user;
 mod m20250411_010719_create_person_info;
 mod m20250411_010725_create_transaction;
+mod m20250411_010730_create_seat_availability;
 mod m20250411_010735_create_occupied_seat;
 mod m20250411_010744_create_hotel;
 mod m20250411_010751_create_hotel_room_type;
@@ -35,6 +36,14 @@ mod m20250421_083028_modify_city_add_province;
 mod m20250426_031246_modify_station_change_city_id_type;
 mod m20250426_041251_modify_train_change_train_type_id_type;
 mod m20250426_060711_modify_seat_type_in_train_type_change_type;
+mod m20250430_062929_modify_city_add_unique_name;
+mod m20250430_063613_modify_station_add_unique_name_city;
+mod m20250430_064614_modify_train_add_unique_number;
+mod m20250430_065037_modify_train_type_add_unique_type_name;
+mod m20250501_024033_modify_route_change_station_id_type;
+mod m20250501_034231_modify_train_add_default_line_id;
+mod m20250503_032006_modify_transaction_add_uuid;
+mod m20250503_052335_create_balance_view;
 
 pub struct Migrator;
 
@@ -77,6 +86,15 @@ impl MigratorTrait for Migrator {
             Box::new(m20250426_031246_modify_station_change_city_id_type::Migration),
             Box::new(m20250426_041251_modify_train_change_train_type_id_type::Migration),
             Box::new(m20250426_060711_modify_seat_type_in_train_type_change_type::Migration),
+            Box::new(m20250430_062929_modify_city_add_unique_name::Migration),
+            Box::new(m20250430_063613_modify_station_add_unique_name_city::Migration),
+            Box::new(m20250430_064614_modify_train_add_unique_number::Migration),
+            Box::new(m20250430_065037_modify_train_type_add_unique_type_name::Migration),
+            Box::new(m20250501_024033_modify_route_change_station_id_type::Migration),
+            Box::new(m20250501_034231_modify_train_add_default_line_id::Migration),
+            Box::new(m20250503_032006_modify_transaction_add_uuid::Migration),
+            Box::new(m20250503_052335_create_balance_view::Migration),
+            Box::new(m20250411_010730_create_seat_availability::Migration),
         ]
     }
 }

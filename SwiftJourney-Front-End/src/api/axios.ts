@@ -2,17 +2,12 @@ import { useUserStore } from '@/stores/user';
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+//   baseURL: import.meta.env.VITE_API_URL,
   timeout: 10000,
 });
 
 instance.interceptors.request.use(
   (config) => {
-    const userStore = useUserStore();
-    const token = userStore.token;
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
     return config;
   },
   (error) => {

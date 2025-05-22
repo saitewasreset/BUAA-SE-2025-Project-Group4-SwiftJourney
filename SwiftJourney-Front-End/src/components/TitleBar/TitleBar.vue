@@ -18,7 +18,7 @@
             <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
-            <div v-if="!debugUser.isLogin">
+            <div v-if="!user.isLogin">
                 <el-button @click="goToLoginPage" type="primary" round>登录</el-button>
                 <el-button @click="goToRegisterPage" class="TailButton" type="success" round>注册</el-button>
             </div>
@@ -30,16 +30,16 @@
                     >
                     <div class="Popover">
                         <div class="PopoverTitle">
-                            {{ debugUser.name }}
+                            {{ user.name }}
                         </div>
                         <div class="PopoverSubTitle">
-                            {{ debugUser.phone }}
+                            {{ user.phone }}
                         </div>
                         <div class="PopoverContent">
                             
                             <div class="RemainingMoney">
                                 <p>账户余额</p>
-                                <div class="Money"> {{ debugUser.remainingMoney }} </div>
+                                <div class="Money"> {{ user.remainingMoney }} </div>
                             </div>
 
                             <div class="UserButtonLine">
@@ -58,27 +58,25 @@
                         </div>
                     </div>
                     <template #reference>
-                        <el-button type="dashed" class="UserInfoButton" round>
-                          {{ debugUser.name }}
+                        <el-button type="dashed" class="UserInfoButton" round @click="goToPersonalDataPage">
+                          {{ user.name }}
                         </el-button>
                     </template>
                 </el-popover>
-                <el-button class="LogoutButton" @click="debugUser.logout" type="danger" round>登出</el-button>
+                <el-button class="LogoutButton" @click="confirmLogout" type="danger" round>登出</el-button>
             </div>
         </div>
     </div>
 </template>
   
 <script lang="ts" setup>
-    import { useDebugUserStore } from '@/stores/user';
     import { useUserStore } from '@/stores/user';
+    import { Modal } from 'ant-design-vue';
     import { ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
     import { useRouter } from 'vue-router';
 
     const user = useUserStore();
-
-    const debugUser = useDebugUserStore();
 
     const router = useRouter();
 
@@ -110,6 +108,18 @@
 
     function goToTransactionRecordPage() {
         router.push({ name: 'personalhomepage', params: { activeIndex: 'transactionrecord' }});
+    }
+
+    function confirmLogout() {
+        Modal.confirm({
+            title: '确认登出',
+            content: '您确定要登出吗？',
+            okText: '确认',
+            cancelText: '取消',
+            onOk: async () => {
+                await user.logout(router);
+            }
+        });
     }
 </script>
 
@@ -200,7 +210,7 @@
 
 .LogoutButton {
     margin-left: 20px;
-    margin-right: 10px;
+    margin-right: 20px;
 }
 
 </style>

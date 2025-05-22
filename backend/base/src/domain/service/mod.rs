@@ -88,12 +88,21 @@
 //! - 大规模聚合根集合应考虑分片管理
 
 pub mod geo;
+pub mod hotel;
+pub mod hotel_booking;
+pub mod hotel_rating;
+pub mod object_storage;
+pub mod order;
+pub mod order_status;
 pub mod password;
 pub mod route;
 pub mod session;
 pub mod station;
+pub mod train_booking;
 pub mod train_schedule;
+pub mod train_seat;
 pub mod train_type;
+pub mod transaction;
 pub mod user;
 
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};

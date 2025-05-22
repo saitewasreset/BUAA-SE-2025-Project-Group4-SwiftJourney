@@ -331,19 +331,13 @@ pub trait Diff {
 /// - `old_value`: 变更前的值（None表示新增）
 /// - `new_value`: 变更后的值（None表示删除）
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TypedDiff<T>
-where
-    T: Entity,
-{
+pub struct TypedDiff<T> {
     pub diff_type: DiffType,
     pub old_value: Option<T>,
     pub new_value: Option<T>,
 }
 
-impl<T> TypedDiff<T>
-where
-    T: Entity,
-{
+impl<T> TypedDiff<T> {
     /// 创建新的类型化变更记录
     ///
     /// # 参数
@@ -361,7 +355,7 @@ where
 
 impl<T> Diff for TypedDiff<T>
 where
-    T: Entity,
+    T: 'static + Send + Sync,
 {
     fn diff_type(&self) -> DiffType {
         self.diff_type
@@ -382,7 +376,7 @@ trait AnyDiff: Send {
 
 impl<T> AnyDiff for TypedDiff<T>
 where
-    T: Entity,
+    T: 'static + Send + Sync,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -455,7 +449,7 @@ impl MultiEntityDiff {
     /// - `diff`: 类型化变更记录
     pub fn add_change<T>(&mut self, diff: TypedDiff<T>)
     where
-        T: Entity,
+        T: 'static + Send + Sync,
     {
         self.changes
             .entry(TypeId::of::<TypedDiff<T>>())
@@ -472,7 +466,7 @@ impl MultiEntityDiff {
     /// 返回该类型的所有变更记录的`Vec`
     pub fn get_changes<T>(&self) -> Vec<TypedDiff<T>>
     where
-        T: Entity,
+        T: Clone + 'static,
     {
         self.changes
             .get(&TypeId::of::<TypedDiff<T>>())
@@ -525,10 +519,10 @@ pub enum RepositoryError {
     #[error("database error: {0}")]
     Db(anyhow::Error),
 
-    #[error("invalid data object from db")]
+    #[error("invalid data object from db: {0}")]
     ValidationError(#[from] anyhow::Error),
 
-    #[error("inconsistent database state")]
+    #[error("inconsistent database state: {0}")]
     InconsistentState(anyhow::Error),
 }
 
@@ -544,7 +538,7 @@ pub enum RepositoryError {
 /// - `remove`: 移除指定的聚合根
 /// - `save`: 保存聚合根（根据ID是否存在自动判断插入或更新）
 #[async_trait]
-pub trait Repository<AG>
+pub trait Repository<AG>: 'static + Send + Sync
 where
     AG: Aggregate,
 {
@@ -617,7 +611,7 @@ where
 impl<AG, T> Repository<AG> for T
 where
     AG: Aggregate,
-    T: DbRepositorySupport<AG> + Send + Sync,
+    T: DbRepositorySupport<AG> + 'static + Send + Sync,
 {
     async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError> {
         let entity = self.on_select(id).await?;
@@ -681,7 +675,7 @@ where
 /// - `detach`: 从仓储仓储聚合根管理器中分离聚合根
 impl<AG, T> SnapshottingRepository<AG> for T
 where
-    T: DbRepositorySupport<AG> + Send + Sync,
+    T: DbRepositorySupport<AG> + 'static + Send + Sync,
     AG: Aggregate,
 {
     fn attach(&self, aggregate: AG) {

@@ -8,10 +8,12 @@ pub struct Migration;
 pub enum PersonInfo {
     Table,
     Id,
+    Uuid,
     Name,
     IdentityCard,
     PreferredSeatLocation,
     UserId,
+    IsDefault,
 }
 
 #[async_trait::async_trait]
@@ -23,10 +25,12 @@ impl MigrationTrait for Migration {
                     .table(PersonInfo::Table)
                     .if_not_exists()
                     .col(pk_auto(PersonInfo::Id))
+                    .col(uuid(PersonInfo::Uuid))
                     .col(string(PersonInfo::Name).not_null())
                     .col(string(PersonInfo::IdentityCard).not_null())
                     .col(char(PersonInfo::PreferredSeatLocation))
-                    .col(big_integer(PersonInfo::UserId).not_null())
+                    .col(integer(PersonInfo::UserId).not_null())
+                    .col(boolean(PersonInfo::IsDefault).not_null())
                     .index(
                         Index::create()
                             .col(PersonInfo::UserId)

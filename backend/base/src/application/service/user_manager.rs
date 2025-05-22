@@ -12,7 +12,7 @@
 //! - `UserManagerError`: 用户管理特定错误类型
 
 use crate::application::commands::user_manager::{
-    UserLoginCommand, UserLogoutCommand, UserRegisterCommand,
+    UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
@@ -75,6 +75,13 @@ pub struct UserRegisterDTO {
 pub struct UserLoginDTO {
     pub phone: String,
     pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct UserUpdatePasswordDTO {
+    pub origin_password: String,
+    pub new_password: String,
 }
 
 /// 用户管理服务错误类型
@@ -181,4 +188,9 @@ pub trait UserManagerService: 'static + Send + Sync {
     /// 可能返回以下错误：
     /// - `GeneralError::InvalidSessionId`: 无效的会话ID
     async fn logout(&self, command: UserLogoutCommand) -> Result<(), Box<dyn ApplicationError>>;
+
+    async fn update_password(
+        &self,
+        command: UserUpdatePasswordCommand,
+    ) -> Result<(), Box<dyn ApplicationError>>;
 }

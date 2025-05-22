@@ -10,6 +10,7 @@ pub enum TrainSchedule {
     Id,
     TrainId,
     DepartureDate,
+    OriginDepartureTime,
     LineId,
 }
 
@@ -23,6 +24,7 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(TrainSchedule::Id))
                     .col(integer(TrainSchedule::TrainId))
                     .col(date(TrainSchedule::DepartureDate))
+                    .col(integer(TrainSchedule::OriginDepartureTime))
                     .col(big_integer(TrainSchedule::LineId))
                     .foreign_key(
                         ForeignKey::create()

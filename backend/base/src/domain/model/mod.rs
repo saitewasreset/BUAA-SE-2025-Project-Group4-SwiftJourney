@@ -1,4 +1,6 @@
 pub mod city;
+pub mod dish;
+pub mod hotel;
 pub mod order;
 pub mod password;
 pub mod personal_info;
@@ -6,6 +8,7 @@ pub mod route;
 pub mod session;
 pub mod session_config;
 pub mod station;
+pub mod takeaway;
 pub mod train;
 pub mod train_schedule;
 pub mod transaction;
