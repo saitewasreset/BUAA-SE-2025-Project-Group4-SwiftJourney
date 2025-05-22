@@ -9,6 +9,14 @@ pub type TrainNumberData = Vec<TrainNumberInfoItem>;
 
 pub type HotelData = Vec<HotelInfo>;
 
+// train number -> [DishInfo]
+pub type DishData = HashMap<String, Vec<DishInfo>>;
+
+// station -> shop -> [TakeawayDishInfo]
+pub type TakeawayData = HashMap<String, HashMap<String, Vec<TakeawayDishInfo>>>;
+
+pub type RawDishTakeawayData = Vec<RawDishTakeawayInfo>;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StationDataItem {
     pub name: String,
@@ -87,4 +95,31 @@ pub struct HotelInfo {
     pub room_info: HashMap<String, HotelRoomType>,
 
     pub comments: Vec<HotelComment>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DishInfo {
+    pub available_time: Vec<String>,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub dish_type: String,
+    pub picture: String,
+    pub price: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TakeawayDishInfo {
+    pub name: String,
+    pub picture: String,
+    pub price: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RawDishTakeawayInfo {
+    pub train_number: String,
+    pub dish_info: Vec<DishInfo>,
+    pub takeaway_info: HashMap<String, HashMap<String, Vec<TakeawayDishInfo>>>,
 }
