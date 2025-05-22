@@ -36,3 +36,6 @@ pub struct Unverified;
 pub struct Verified;
 
 pub const HOTEL_MAX_BOOKING_DAYS: u32 = 7;
+pub const HOTEL_MAX_COMMENT_LENGTH: usize = 8192;
+
+pub const DB_CHUNK_SIZE: usize = 4096;

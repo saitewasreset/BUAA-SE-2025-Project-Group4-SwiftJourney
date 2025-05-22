@@ -13,7 +13,7 @@
 //! - `TakeawayOrder`: 结构体，表示外卖订单。
 use crate::Verified;
 use crate::domain::model::dish::DishId;
-use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomId};
+use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomTypeId};
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::takeaway::TakeawayDishId;
 use crate::domain::model::train_schedule::{Seat, StationRange, TrainScheduleId};
@@ -534,7 +534,7 @@ impl Aggregate for TrainOrder {}
 pub struct HotelOrder {
     base: BaseOrder,
     hotel_id: HotelId,
-    room_id: HotelRoomId,
+    room_id: HotelRoomTypeId,
     booking_date_range: HotelDateRange,
 }
 
@@ -552,7 +552,7 @@ impl HotelOrder {
     pub fn new(
         base_order: BaseOrder,
         hotel_id: HotelId,
-        room_id: HotelRoomId,
+        room_id: HotelRoomTypeId,
         booking_date_range: HotelDateRange,
     ) -> Self {
         Self {
@@ -575,7 +575,7 @@ impl HotelOrder {
     ///
     /// Returns:
     /// - 房间的唯一标识符。
-    pub fn room_id(&self) -> HotelRoomId {
+    pub fn room_id(&self) -> HotelRoomTypeId {
         self.room_id
     }
 

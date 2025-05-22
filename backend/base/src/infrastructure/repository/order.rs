@@ -1,7 +1,9 @@
+use crate::domain::model::hotel::HotelId;
 use crate::domain::model::order::{
     DishOrder, HotelOrder, Order, OrderId, TakeawayOrder, TrainOrder,
 };
 use crate::domain::model::train_schedule::TrainScheduleId;
+use crate::domain::model::user::UserId;
 use crate::domain::repository::order::{
     DishOrderRelatedData, HotelOrderRelatedData, OrderRepository, RouteInfo,
     TakeawayOrderRelatedData, TrainOrderRelatedData,
@@ -179,6 +181,52 @@ FROM "train_order"
         } else {
             Ok(None)
         }
+    }
+
+    async fn find_hotel_order_by_userid(
+        &self,
+        user_id: UserId,
+        hotel_id: HotelId,
+    ) -> Result<Vec<HotelOrder>, RepositoryError> {
+        crate::models::hotel_order::Entity::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT
+    "hotel_order"."id",
+    "hotel_order"."uuid",
+    "hotel_order"."hotel_id",
+    "hotel_order"."begin_date",
+    "hotel_order"."end_date",
+    "hotel_order"."hotel_room_type_id",
+    "hotel_order"."person_info_id",
+    "hotel_order"."pay_transaction_id",
+    "hotel_order"."refund_transaction_id",
+    "hotel_order"."price",
+    "hotel_order"."create_time",
+    "hotel_order"."active_time",
+    "hotel_order"."complete_time",
+    "hotel_order"."status"
+FROM "hotel_order"
+    INNER JOIN "person_info"
+        ON "hotel_order"."person_info_id" = "person_info"."id"
+    INNER JOIN "user"
+        ON "person_info"."user_id" = "user"."id"
+WHERE "user"."id" = $1 AND "hotel_order"."hotel_id" = $2"#,
+                [user_id.to_db_value().into(), hotel_id.to_db_value().into()],
+            ))
+            .all(&self.db)
+            .await
+            .context(format!(
+                "failed to find hotel order for user id: {} and hotel id: {}",
+                user_id.to_db_value(),
+                hotel_id.to_db_value()
+            ))?
+            .into_iter()
+            .map(|x| {
+                OrderDataConverter::make_from_do_hotel(x)
+                    .map_err(RepositoryError::InconsistentState)
+            })
+            .collect()
     }
 
     async fn find_dish_order_by_uuid(

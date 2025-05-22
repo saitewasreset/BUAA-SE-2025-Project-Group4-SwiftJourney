@@ -88,6 +88,9 @@
 //! - 大规模聚合根集合应考虑分片管理
 
 pub mod geo;
+pub mod hotel_booking;
+pub mod hotel_rating;
+pub mod object_storage;
 pub mod order;
 pub mod order_status;
 pub mod password;

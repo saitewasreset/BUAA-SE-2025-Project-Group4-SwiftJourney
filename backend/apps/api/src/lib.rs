@@ -9,6 +9,10 @@ pub mod payment;
 
 pub mod order;
 
+pub mod resource;
+
+pub mod hotel;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
