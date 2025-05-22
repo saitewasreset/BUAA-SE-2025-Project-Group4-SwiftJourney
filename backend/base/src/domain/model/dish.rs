@@ -12,6 +12,7 @@
 //! use base::domain::model::train::TrainId;
 //! use base::domain::model::dish::{Dish, DishTime};
 //! use rust_decimal::Decimal;
+//! use uuid::Uuid;
 //!
 //! let train_id = TrainId::from(1);
 //! let dish = Dish::new(
@@ -21,7 +22,7 @@
 //!     DishTime::Lunch,
 //!     "Grilled Salmon".to_string(),
 //!     Decimal::new(3500, 2), // 35.00
-//!     vec!["image1.jpg".to_string(), "image2.jpg".to_string()],
+//!     vec![Uuid::from("2cb2e067-37e5-4a7b-9ca1-347bd0f6b4c0"), Uuid::from("3e59d2ea-cbc8-4f4c-ab18-d68a52ae6204")],
 //! );
 //!
 //! assert_eq!(dish.name(), "Grilled Salmon");
@@ -45,6 +46,7 @@ use id_macro::define_id_type;
 use rust_decimal::Decimal;
 use std::fmt::Formatter;
 use thiserror::Error;
+use uuid::Uuid;
 
 define_id_type!(Dish);
 
@@ -123,7 +125,7 @@ pub struct Dish {
     dish_time: DishTime,
     name: String,
     unit_price: Decimal,
-    images: Vec<String>,
+    images: Vec<Uuid>,
 }
 
 impl Dish {
@@ -147,7 +149,7 @@ impl Dish {
         dish_time: DishTime,
         name: String,
         unit_price: Decimal,
-        images: Vec<String>,
+        images: Vec<Uuid>,
     ) -> Self {
         Self {
             id,
@@ -204,7 +206,7 @@ impl Dish {
     ///
     /// Returns：
     /// - 餐点图片列表的不可变引用。
-    pub fn images(&self) -> &[String] {
+    pub fn images(&self) -> &[Uuid] {
         &self.images
     }
 }
