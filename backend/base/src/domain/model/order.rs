@@ -335,6 +335,8 @@ pub trait Order: DynClone + Debug + Send + Sync + 'static + Any {
     /// Returns:
     /// - 订单关联的个人信息唯一标识符。
     fn personal_info_id(&self) -> PersonalInfoId;
+
+    fn set_status(&mut self, status: OrderStatus);
 }
 
 clone_trait_object!(Order);
@@ -506,6 +508,10 @@ impl Order for TrainOrder {
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
+
+    fn set_status(&mut self, status: OrderStatus) {
+        self.base.order_status = status;
+    }
 }
 
 impl Identifiable for TrainOrder {
@@ -642,6 +648,10 @@ impl Order for HotelOrder {
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
+
+    fn set_status(&mut self, status: OrderStatus) {
+        self.base.order_status = status;
+    }
 }
 
 /// 结构体，表示火车餐订单。
@@ -776,6 +786,10 @@ impl Order for DishOrder {
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
+
+    fn set_status(&mut self, status: OrderStatus) {
+        self.base.order_status = status;
+    }
 }
 
 /// 结构体，表示外卖订单。
@@ -894,6 +908,10 @@ impl Order for TakeawayOrder {
     }
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
+    }
+
+    fn set_status(&mut self, status: OrderStatus) {
+        self.base.order_status = status;
     }
 }
 
