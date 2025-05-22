@@ -40,7 +40,8 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
+  //const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
+  const isLogin: Boolean = true;
   if (!isLogin) {
     // 未登录，跳转到登录页
     if (to.path !== '/login' && to.path !== '/register') {
