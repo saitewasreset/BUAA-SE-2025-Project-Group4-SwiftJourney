@@ -10,7 +10,8 @@
 //! 该服务由基础设施层实现，供应用层调用以初始化系统基础数据。
 use crate::application::ApplicationError;
 use crate::application::commands::train_data::{
-    LoadCityCommand, LoadStationCommand, LoadTrainNumberCommand, LoadTrainTypeCommand,
+    LoadCityCommand, LoadDishTakeawayCommand, LoadStationCommand, LoadTrainNumberCommand,
+    LoadTrainTypeCommand,
 };
 use async_trait::async_trait;
 
@@ -70,5 +71,10 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
+    ) -> Result<(), Box<dyn ApplicationError>>;
+
+    async fn load_dish_takeaway(
+        &self,
+        command: LoadDishTakeawayCommand,
     ) -> Result<(), Box<dyn ApplicationError>>;
 }

@@ -45,7 +45,6 @@ use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
 use base::domain::service::object_storage::ObjectStorageService;
-use base::domain::service::order_status::OrderStatusConsumer;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
@@ -64,6 +63,7 @@ use base::infrastructure::messaging::consumer::order_status::{
     TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
+use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
@@ -71,6 +71,7 @@ use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
+use base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
@@ -163,6 +164,8 @@ async fn main() -> std::io::Result<()> {
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
     let hotel_repository_impl = Arc::new(HotelRepositoryImpl::new(conn.clone()));
     let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
+    let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
+    let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
         &mini_io_endpoint,
@@ -201,10 +204,14 @@ async fn main() -> std::io::Result<()> {
 
     let train_data_service_impl = Arc::new(TrainDataServiceImpl::new(
         debug_mode,
+        data_base_path.clone(),
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&route_repository_impl),
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_repository_impl),
+        Arc::clone(&s3_object_storage_service_impl),
     ));
 
     let geo_service_impl = Arc::new(GeoServiceImpl::new(Arc::clone(&city_repository_impl)));
