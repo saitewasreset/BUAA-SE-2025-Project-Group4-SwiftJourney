@@ -2,20 +2,27 @@ use crate::domain::model::hotel::Hotel;
 use crate::domain::model::route::{RouteId, Stop, StopId};
 use crate::domain::model::station::StationId;
 use crate::domain::model::takeaway::{TakeawayDish, TakeawayDishId, TakeawayShop, TakeawayShopId};
+use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::takeaway::TakeawayShopRepository;
+use crate::domain::repository::train::TrainRepository;
+use crate::domain::service::object_storage::{ObjectCategory, ObjectStorageService};
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
-    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
-    TypedDiff,
+    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, Repository,
+    RepositoryError, TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 use sea_orm::{
     ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue,
     QueryFilter, Statement, TransactionTrait,
 };
+use shared::data::TakeawayData;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tracing::{error, instrument};
 use uuid::Uuid;
@@ -38,7 +45,7 @@ impl TakeawayDishDataConverter {
 
         Ok(TakeawayDish::new(
             Some(id),
-            takeaway_shop_id,
+            Some(takeaway_shop_id),
             takeaway_dish_do.name,
             takeaway_dish_do.dish_type,
             takeaway_dish_do.price,
@@ -548,5 +555,140 @@ WHERE "route"."line_id" = $1;"#,
         }
 
         Ok(result)
+    }
+
+    async fn save_many_atomic(&self, entities: Vec<TakeawayShop>) -> Result<(), RepositoryError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to begin transaction: {}", e);
+            })
+            .context("Failed to begin transaction")?;
+
+        for entity in entities {
+            let mut do_pack = TakeawayShopDataConverter::transform_to_do(&entity);
+
+            let result = crate::models::takeaway_shop::Entity::insert(do_pack.takeaway_shop_do)
+                .exec(&tx)
+                .await
+                .inspect_err(|e| {
+                    error!("Failed to insert takeaway shop: {}", e);
+                })
+                .map_err(|e| RepositoryError::Db(e.into()))?;
+
+            let takeaway_shop_id = result.last_insert_id;
+
+            do_pack
+                .takeaway_shop_dish_do_list
+                .iter_mut()
+                .for_each(|dish| dish.takeaway_shop_id = ActiveValue::Set(takeaway_shop_id));
+
+            crate::models::takeaway_dish::Entity::insert_many(do_pack.takeaway_shop_dish_do_list)
+                .exec(&tx)
+                .await
+                .inspect_err(|e| {
+                    error!("Failed to insert takeaway dish: {}", e);
+                })
+                .map_err(|e| RepositoryError::Db(e.into()))?;
+        }
+
+        tx.commit()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to commit transaction: {}", e);
+            })
+            .context("Failed to commit transaction")?;
+
+        Ok(())
+    }
+
+    async fn save_raw_takeaway<S: StationRepository, OS: ObjectStorageService>(
+        &self,
+        data: TakeawayData,
+        data_path: &Path,
+        station_repository: Arc<S>,
+        object_storage_service: Arc<OS>,
+    ) -> Result<(), RepositoryError> {
+        let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
+
+        let station_list = station_repository
+            .load()
+            .await
+            .inspect_err(|e| {
+                error!("failed to get stations: {}", e);
+            })
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        let station_name_to_id = station_list
+            .iter()
+            .map(|station| (station.name().to_string(), station.get_id().unwrap()))
+            .collect::<HashMap<_, _>>();
+
+        let mut entity_list = Vec::new();
+
+        for (station_name, inner_map) in data {
+            let station_id = *station_name_to_id.get(&station_name).ok_or_else(|| {
+                RepositoryError::InconsistentState(anyhow!(
+                    "station name {} not found in database",
+                    station_name
+                ))
+            })?;
+
+            for (shop_name, takeaway_list) in inner_map {
+                let mut shop = TakeawayShop::new(shop_name, station_id);
+
+                for takeaway in takeaway_list {
+                    let image_uuid = if let Some(uuid) = image_path_to_uuid.get(&takeaway.picture) {
+                        *uuid
+                    } else {
+                        let image_path = data_path.join(&takeaway.picture);
+
+                        let image_data = fs::read(&image_path)
+                            .context(format!("cannot read from: {:?}", &image_path))
+                            .inspect_err(|e| {
+                                error!("failed load takeaway image: {}", e);
+                            })?;
+
+                        let uuid = object_storage_service
+                            .put_object(ObjectCategory::Takeaway, "image/jpeg", image_data)
+                            .await
+                            .map_err(|e| {
+                                error!("failed save image: {}", e);
+
+                                RepositoryError::Db(e.into())
+                            })?;
+
+                        image_path_to_uuid.insert(takeaway.picture.clone(), uuid);
+                        uuid
+                    };
+
+                    let takeaway_dish = TakeawayDish::new(
+                        None,
+                        None,
+                        takeaway.name,
+                        "".to_string(),
+                        Decimal::from_f64(takeaway.price).ok_or(
+                            RepositoryError::ValidationError(anyhow!(
+                                "invalid price: {}",
+                                takeaway.price
+                            )),
+                        )?,
+                        vec![image_uuid],
+                    );
+
+                    shop.add_dish(takeaway_dish);
+                }
+
+                entity_list.push(shop);
+            }
+        }
+
+        self.save_many_atomic(entity_list).await.inspect_err(|e| {
+            error!("failed to save takeaway: {}", e);
+        })?;
+
+        Ok(())
     }
 }
