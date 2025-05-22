@@ -4,6 +4,9 @@
     "words": [
         "actix",
         "chrono",
-        "Saite"
+        "mockall",
+        "rabbitmq",
+        "Saite",
+        "thiserror"
     ]
 }

@@ -307,6 +307,7 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/order").configure(api::order::scoped_config))
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
+                    .service(web::scope("/train").configure(api::train::scoped_config))
                     .service(
                         web::scope("/train/schedule")
                             .configure(api::train::schedule::scoped_config),
