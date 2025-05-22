@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub line_id: i64,
-    pub station_id: i64,
+    pub station_id: i32,
     pub arrival_time: i32,
     pub departure_time: i32,
     pub order: i32,
@@ -21,7 +21,7 @@ pub enum Relation {
         from = "Column::StationId",
         to = "super::station::Column::Id",
         on_update = "NoAction",
-        on_delete = "Cascade"
+        on_delete = "NoAction"
     )]
     Station,
 }

@@ -9,13 +9,14 @@ pub struct Model {
     pub id: i32,
     pub train_id: i32,
     pub departure_date: Date,
+    pub origin_departure_time: i32,
     pub line_id: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::occupied_seat::Entity")]
-    OccupiedSeat,
+    #[sea_orm(has_many = "super::seat_availability::Entity")]
+    SeatAvailability,
     #[sea_orm(
         belongs_to = "super::train::Entity",
         from = "Column::TrainId",
@@ -28,9 +29,9 @@ pub enum Relation {
     TrainOrder,
 }
 
-impl Related<super::occupied_seat::Entity> for Entity {
+impl Related<super::seat_availability::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::OccupiedSeat.def()
+        Relation::SeatAvailability.def()
     }
 }
 
