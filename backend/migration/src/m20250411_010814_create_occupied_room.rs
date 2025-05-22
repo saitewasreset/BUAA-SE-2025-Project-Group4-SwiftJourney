@@ -26,13 +26,13 @@ impl MigrationTrait for Migration {
                     .table(OccupiedRoom::Table)
                     .if_not_exists()
                     .col(pk_auto(OccupiedRoom::Id))
-                    .col(big_integer(OccupiedRoom::HotelId).not_null())
-                    .col(big_integer(OccupiedRoom::RoomTypeId).not_null())
+                    .col(integer(OccupiedRoom::HotelId).not_null())
+                    .col(integer(OccupiedRoom::RoomTypeId).not_null())
                     .col(date(OccupiedRoom::BeginDate).not_null())
                     .col(date(OccupiedRoom::EndDate).not_null().check(
                         Expr::col(OccupiedRoom::EndDate).gte(Expr::col(OccupiedRoom::BeginDate)),
                     ))
-                    .col(big_integer(OccupiedRoom::PersonInfoId).not_null())
+                    .col(integer(OccupiedRoom::PersonInfoId).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(OccupiedRoom::Table, OccupiedRoom::HotelId)

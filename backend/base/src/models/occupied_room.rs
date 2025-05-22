@@ -7,11 +7,11 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub hotel_id: i64,
-    pub room_type_id: i64,
+    pub hotel_id: i32,
+    pub room_type_id: i32,
     pub begin_date: Date,
     pub end_date: Date,
-    pub person_info_id: i64,
+    pub person_info_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
