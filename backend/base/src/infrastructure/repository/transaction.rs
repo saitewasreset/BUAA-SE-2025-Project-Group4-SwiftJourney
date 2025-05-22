@@ -1369,4 +1369,14 @@ impl TransactionRepository for TransactionRepositoryImpl {
 
         Ok(r.map(|item| item.balance))
     }
+
+    async fn find_by_id(&self, id: TransactionId) -> Result<Option<Transaction>, RepositoryError> {
+        let r = self
+            .query_transaction(|q| {
+                q.filter(crate::models::transaction::Column::Id.eq(id.to_db_value()))
+            })
+            .await?;
+
+        Ok(r.into_iter().next())
+    }
 }
