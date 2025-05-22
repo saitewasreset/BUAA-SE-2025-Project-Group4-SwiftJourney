@@ -33,6 +33,7 @@
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
 use base::application::service::geo::GeoApplicationService;
+use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
@@ -49,6 +50,7 @@ use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
+use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
@@ -58,6 +60,7 @@ use base::infrastructure::application::service::user_manager::UserManagerService
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
+use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
@@ -67,6 +70,7 @@ use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
@@ -151,6 +155,7 @@ async fn main() -> std::io::Result<()> {
     let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
     let hotel_repository_impl = Arc::new(HotelRepositoryImpl::new(conn.clone()));
+    let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
         &mini_io_endpoint,
@@ -251,6 +256,17 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&hotel_repository_impl),
     ));
 
+    let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_rating_repository_impl),
+        Arc::clone(&order_repository_impl),
+    ));
+
+    let hotel_service_impl = Arc::new(HotelServiceImpl::new(
+        Arc::clone(&hotel_rating_service_impl),
+        Arc::clone(&session_manager_service_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -292,6 +308,9 @@ async fn main() -> std::io::Result<()> {
 
     let hotel_data_service: web::Data<dyn HotelDataService> =
         web::Data::from(hotel_data_service_impl as Arc<dyn HotelDataService>);
+
+    let hotel_service: web::Data<dyn HotelService> =
+        web::Data::from(hotel_service_impl as Arc<dyn HotelService>);
 
     let app_config_data = web::Data::new(app_config);
 
@@ -335,6 +354,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(hotel_data_service.clone())
             .app_data(route_service.clone())
             .app_data(train_type_service.clone())
+            .app_data(hotel_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
@@ -356,7 +376,8 @@ async fn main() -> std::io::Result<()> {
                     .service(
                         web::scope("/train/schedule")
                             .configure(api::train::schedule::scoped_config),
-                    ), // Congratulations! You have finished Task 1.2.1D!
+                    )
+                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)), // Congratulations! You have finished Task 1.2.1D!
             )
     })
     .bind(("0.0.0.0", 8080))?
