@@ -162,7 +162,7 @@ impl TakeawayDish {
     /// - 新创建的 `TakeawayDish` 实例。
     pub fn new(
         id: Option<TakeawayDishId>,
-        shop_id: TakeawayShopId,
+        shop_id: Option<TakeawayShopId>,
         name: String,
         dish_type: String,
         unit_price: Decimal,
@@ -170,7 +170,7 @@ impl TakeawayDish {
     ) -> Self {
         Self {
             id,
-            shop_id: Some(shop_id),
+            shop_id,
             name,
             dish_type,
             unit_price,
