@@ -132,6 +132,7 @@ import {
 import { useRouter } from 'vue-router'
 import { userApi } from '@/api/UserApi/userApi'
 import { message } from 'ant-design-vue'
+import type { UserApiResponseData } from '@/interface/userInterface'
 
 const inputPhone = ref('')
 const inputNickName = ref('')
@@ -163,22 +164,33 @@ async function postRegisterMsg() {
       ' ' +
       inputConfirmPassword.value,
   )
-  await userApi.userRegister({ phone: inputPhone.value, password: inputPassword.value }).then((res) => {
-    if (res.status === 200) {
-      message.success('注册成功')
-      router.push({ name: 'login' })
-    } else if (res.status === 13001) {
-      message.error('身份证号格式错误')
-    } else if (res.status === 15001) {
-      message.error('该手机号对应的用户已经存在')
-    } else if (res.status === 15003) {
-      message.error('用户名格式错误')
-    } else if (res.status === 15004) {
-      message.error('密码格式错误')
-    } else if (res.status === 15005) {
-      message.error('姓名格式错误')
-    } 
-  })
+  const params: Object = {
+    phone: inputPhone.value,
+    username: inputNickName.value,
+    // 明文密码
+    password: inputPassword.value,
+    // 姓名
+    name: inputName.value,
+    // 身份证号
+    identityCardId: inputIdNumber.value,
+  };
+  const res: UserApiResponseData = (await userApi.userRegister(params)).data;
+  if (res.code === 200) {
+    message.success('注册成功')
+    router.push({ name: 'login' })
+  } else if (res.code === 13001) {
+    message.error('身份证号格式错误')
+  } else if (res.code === 15001) {
+    message.error('该手机号对应的用户已经存在')
+  } else if (res.code === 15003) {
+    message.error('用户名格式错误')
+  } else if (res.code === 15004) {
+    message.error('密码格式错误')
+  } else if (res.code === 15005) {
+    message.error('姓名格式错误')
+  } else {
+    message.error('其他错误');
+  }
 }
 
 // -------------------- 手机号检查 --------------------
