@@ -1,4 +1,7 @@
 pub mod city;
+pub mod hotel;
+pub mod hotel_rating;
+pub mod occupied_room;
 pub mod order;
 pub mod personal_info;
 pub mod route;

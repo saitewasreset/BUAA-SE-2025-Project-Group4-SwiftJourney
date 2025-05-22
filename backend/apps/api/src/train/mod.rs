@@ -5,12 +5,13 @@ use schedule::query;
 pub mod order;
 pub mod schedule;
 
-// 配置train模块的路由
+// Step 5: Register your endpoint
+// HINT: You may refer to `api/user/mod.rs` for example
+// Exercise 1.2.1D - 7: Your code here. (4 / 5)
+// To `api/main.rs` for following exercise
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    // 注册schedule模块的查询接口
     cfg.service(query::query_direct);
     // cfg.service(query::query_indirect);
 
-    // 注册order模块的创建订单接口
     cfg.service(new::create_train_order);
 }
