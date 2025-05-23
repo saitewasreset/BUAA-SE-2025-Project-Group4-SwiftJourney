@@ -9,6 +9,7 @@ use shared::{API_SUCCESS_CODE, API_SUCCESS_MESSAGE};
 
 // 定义请求数据结构
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct TrainOrderRequestDTO {
     /// 车次号，例如："G53"
     pub train_number: String,
@@ -81,9 +82,6 @@ pub async fn create_train_order(
     // 解析请求体为订单包列表
     let order_packs: OrderPacksDTO = parse_request_body(body)?;
 
-    // 处理订单逻辑实现
-    let transaction_id = "transaction_123456".to_string();
-
     // 处理每一个订单包
     for pack in order_packs {
         let order_dtos: Vec<CreateTrainOrderDTO> = pack
@@ -115,6 +113,8 @@ pub async fn create_train_order(
     Ok(ApiResponse {
         code: API_SUCCESS_CODE,
         message: API_SUCCESS_MESSAGE.to_string(),
-        data: Some(TransactionInfoDTO { transaction_id }),
+        data: Some(TransactionInfoDTO {
+            transaction_id: todo!("Your code here"),
+        }),
     })
 }

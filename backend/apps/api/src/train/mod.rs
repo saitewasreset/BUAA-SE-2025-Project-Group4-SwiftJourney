@@ -10,9 +10,9 @@ pub mod schedule;
 // Exercise 1.2.1D - 7: Your code here. (4 / 5)
 // To `api/main.rs` for following exercise
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(query::query_direct);
+    cfg.configure(schedule::scoped_config);
     // cfg.service(query::query_indirect);
 
     // 注册order模块的创建订单接口
-    cfg.service(new::create_train_order);
+    cfg.configure(order::scoped_config);
 }
