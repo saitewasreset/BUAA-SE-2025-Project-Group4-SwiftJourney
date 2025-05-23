@@ -43,6 +43,8 @@ services:
     environment:
       MINIO_ROOT_USER: swiftjourney
       MINIO_ROOT_PASSWORD: swiftjourney
+    ports:
+      - "9001:9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -51,9 +53,17 @@ services:
     build: .
     volumes:
       - backend_data:/instance
+      - ../data:/init_data
     environment:
+      DEBUG: 1
+      RUST_LOG: info
       DATABASE_URL: postgres://swiftjourney:swiftjourney@db/swiftjourney
-      RABBITMQ_URL: amqp://swiftjourney:swiftjourney@rabbitmq/
+      RABBITMQ_URL: amqp://swiftjourney:swiftjourney@rabbitmq/%2f
+      TZ_OFFSET_HOUR: 8
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: SVeGmJodT2ZhGUMmCkZH
+      MINIO_SECRET_KEY: TjbyipoXxy9bflZAewwHdpVUCUKcIoqATzndPJZn
+      DATA_PATH: /init_data
     restart: unless-stopped
     depends_on:
       db:
