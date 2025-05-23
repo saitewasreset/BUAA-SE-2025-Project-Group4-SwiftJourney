@@ -63,17 +63,16 @@ impl TakeawayDishDataConverter {
             name: ActiveValue::Set(takeaway_dish.name().to_string()),
             dish_type: ActiveValue::Set(takeaway_dish.dish_type().to_string()),
             price: ActiveValue::Set(takeaway_dish.unit_price()),
-            takeaway_shop_id: ActiveValue::Set(
-                takeaway_dish
-                    .shop_id()
-                    .expect("takeaway dish should have shop id")
-                    .to_db_value(),
-            ),
+            takeaway_shop_id: ActiveValue::NotSet,
             images: ActiveValue::Set(images_json),
         };
 
         if let Some(id) = takeaway_dish.get_id() {
             model.id = ActiveValue::Set(id.to_db_value());
+        }
+
+        if let Some(shop_id) = takeaway_dish.shop_id() {
+            model.takeaway_shop_id = ActiveValue::Set(shop_id.to_db_value());
         }
 
         model
