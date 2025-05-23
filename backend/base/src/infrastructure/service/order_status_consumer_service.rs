@@ -9,7 +9,7 @@ use lapin::{ConnectionProperties, ExchangeKind};
 use thiserror::Error;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use tracing::{error, instrument};
+use tracing::{debug, error, instrument};
 
 pub struct OrderStatusConsumerService {
     consumer_handler: Vec<JoinHandle<()>>,
@@ -53,6 +53,7 @@ async fn consume_task(channel: lapin::Channel, consumer: Box<dyn RabbitMQOrderSt
             Ok(delivery) => {
                 match serde_json::from_slice::<OrderStatusMessagePack>(&delivery.data) {
                     Ok(order_status) => {
+                        debug!("Got message: {:?}", order_status);
                         if let Err(e) = consumer.consume(order_status).await {
                             error!("Failed to consume message: {}", e);
 

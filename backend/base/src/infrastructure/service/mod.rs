@@ -1,3 +1,4 @@
+pub mod dish_booking;
 pub mod geo;
 pub mod hotel_booking;
 pub mod hotel_rating;
@@ -10,6 +11,7 @@ pub mod password;
 pub mod route;
 pub mod session;
 pub mod station;
+pub mod takeaway_booking;
 pub mod train_booking;
 pub mod train_schedule;
 pub mod train_seat;
