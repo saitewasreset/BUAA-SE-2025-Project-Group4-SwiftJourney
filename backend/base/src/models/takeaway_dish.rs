@@ -11,7 +11,7 @@ pub struct Model {
     pub dish_type: String,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
-    pub takeaway_shop_id: i64,
+    pub takeaway_shop_id: i32,
     pub images: Json,
 }
 

@@ -8,6 +8,7 @@ use crate::domain::model::station::StationId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use id_macro::define_id_type;
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
 define_id_type!(TakeawayShop);
 
@@ -21,12 +22,25 @@ define_id_type!(TakeawayShop);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TakeawayShop {
     id: Option<TakeawayShopId>,
+    uuid: Uuid,
     name: String,
     station_id: StationId,
-    images: Vec<String>,
+    images: Vec<Uuid>,
+    dishes: Vec<TakeawayDish>,
 }
 
 impl TakeawayShop {
+    pub fn new(name: String, station_id: StationId) -> Self {
+        Self {
+            id: None,
+            uuid: Uuid::new_v4(),
+            name,
+            station_id,
+            images: Vec::new(),
+            dishes: Vec::new(),
+        }
+    }
+
     /// 创建一个新的 `TakeawayShop` 实例。
     ///
     /// Arguments:
@@ -37,17 +51,21 @@ impl TakeawayShop {
     ///
     /// Returns:
     /// - 新创建的 `TakeawayShop` 实例。
-    pub fn new(
+    pub fn new_full(
         id: Option<TakeawayShopId>,
+        uuid: Uuid,
         name: String,
         station_id: StationId,
-        images: Vec<String>,
+        images: Vec<Uuid>,
+        dishes: Vec<TakeawayDish>,
     ) -> Self {
         Self {
             id,
+            uuid,
             name,
             station_id,
             images,
+            dishes,
         }
     }
 
@@ -67,12 +85,28 @@ impl TakeawayShop {
         self.station_id
     }
 
+    pub fn uuid(&self) -> Uuid {
+        self.uuid
+    }
+
     /// 获取外卖商户的图片列表。
     ///
     /// Returns:
     /// - 外卖商户的图片列表的不可变引用。
-    pub fn images(&self) -> &[String] {
+    pub fn images(&self) -> &[Uuid] {
         &self.images
+    }
+
+    pub fn dishes(&self) -> &[TakeawayDish] {
+        &self.dishes
+    }
+
+    pub fn add_image(&mut self, image_uuid: Uuid) {
+        self.images.push(image_uuid);
+    }
+
+    pub fn add_dish(&mut self, dish: TakeawayDish) {
+        self.dishes.push(dish);
     }
 }
 
@@ -85,6 +119,8 @@ impl Identifiable for TakeawayShop {
 
     fn set_id(&mut self, id: Self::ID) {
         self.id = Some(id);
+
+        self.dishes.iter_mut().for_each(|x| x.set_shop_id(id));
     }
 }
 
@@ -104,11 +140,11 @@ define_id_type!(TakeawayDish);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TakeawayDish {
     id: Option<TakeawayDishId>,
-    shop_id: TakeawayShopId,
+    shop_id: Option<TakeawayShopId>,
     name: String,
     dish_type: String,
     unit_price: Decimal,
-    images: Vec<String>,
+    images: Vec<Uuid>,
 }
 
 impl TakeawayDish {
@@ -126,11 +162,11 @@ impl TakeawayDish {
     /// - 新创建的 `TakeawayDish` 实例。
     pub fn new(
         id: Option<TakeawayDishId>,
-        shop_id: TakeawayShopId,
+        shop_id: Option<TakeawayShopId>,
         name: String,
         dish_type: String,
         unit_price: Decimal,
-        images: Vec<String>,
+        images: Vec<Uuid>,
     ) -> Self {
         Self {
             id,
@@ -146,8 +182,12 @@ impl TakeawayDish {
     ///
     /// Returns:
     /// - 外卖商户的唯一标识符。
-    pub fn shop_id(&self) -> TakeawayShopId {
+    pub fn shop_id(&self) -> Option<TakeawayShopId> {
         self.shop_id
+    }
+
+    pub fn set_shop_id(&mut self, shop_id: TakeawayShopId) {
+        self.shop_id = Some(shop_id);
     }
 
     /// 获取外卖菜品的名称。
@@ -178,7 +218,7 @@ impl TakeawayDish {
     ///
     /// Returns:
     /// - 外卖菜品的图片列表的不可变引用。
-    pub fn images(&self) -> &[String] {
+    pub fn images(&self) -> &[Uuid] {
         &self.images
     }
 }
