@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(TakeawayShop::Id))
                     .col(uuid(TakeawayShop::Uuid))
                     .col(string(TakeawayShop::Name).not_null())
-                    .col(big_integer(TakeawayShop::StationId).not_null())
+                    .col(integer(TakeawayShop::StationId).not_null())
                     .col(json(TakeawayShop::Images).not_null())
                     .foreign_key(
                         ForeignKey::create()
