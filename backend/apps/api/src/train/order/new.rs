@@ -13,6 +13,8 @@ use tracing::error;
 #[serde(rename_all = "camelCase")]
 pub struct TransactionInfoDTO {
     pub transaction_id: String,
+    pub amount: f64,
+    pub status: String,
 }
 
 /// 创建火车票订单
@@ -31,7 +33,7 @@ pub async fn create_train_order(
     let session_id = get_session_id(&req)?;
     let order_packs: OrderPacksDTO = parse_request_body(body)?;
 
-    let transaction_id = train_order_service
+    let transaction_result = train_order_service
         .process_train_order_packs(session_id, order_packs)
         .await
         .map_err(|e| {
@@ -41,7 +43,7 @@ pub async fn create_train_order(
             )
         })?;
 
-    if transaction_id.is_empty() {
+    if transaction_result.transaction_id.is_nil() {
         error!("No transaction was created");
         return Err(ApplicationErrorBox::from(
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>,
@@ -51,6 +53,10 @@ pub async fn create_train_order(
     Ok(ApiResponse {
         code: API_SUCCESS_CODE,
         message: API_SUCCESS_MESSAGE.to_string(),
-        data: Some(TransactionInfoDTO { transaction_id }),
+        data: Some(TransactionInfoDTO {
+            transaction_id: transaction_result.transaction_id.to_string(),
+            amount: transaction_result.amount,
+            status: "unpaid".to_string(),
+        }),
     })
 }
