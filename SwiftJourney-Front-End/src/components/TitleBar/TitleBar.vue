@@ -44,7 +44,7 @@
 
                             <div class="UserButtonLine">
                                 <el-button link plain @click="goToPersonalDataPage">个人资料</el-button>
-                                <el-button link plain @click="goToRechargePage">余额重置</el-button>
+                                <el-button link plain @click="gotoRechargePage">余额充值</el-button>
                             </div>
 
                             <div class="UserButtonLine">
@@ -67,11 +67,39 @@
             </div>
         </div>
     </div>
+    <a-modal
+        v-model:visible="rechargeModalVisible"
+        width="500px"
+        @cancel="rechargeModalVisible = false; rechargeAmount = 0"
+    >
+        <template #title>
+            <h3 style="text-align: center;">充值</h3>
+        </template>
+        <a-form>
+            <a-form-item label="当前余额">
+                <span>{{ user.remainingMoney }}</span>
+            </a-form-item>
+            <a-form-item label="充值金额">
+                <a-input-number @change="checkRechargeAmount" v-model:value="rechargeAmount" style="width: 80%" />
+            </a-form-item>
+            <a-form-item label="充值方式">
+                <a-select v-model:value="rechargeMethod" style="width: 80%" placeholder="请选择充值方式">
+                    <a-select-option value="alipay">支付宝</a-select-option>
+                    <a-select-option value="wechat">微信</a-select-option>
+                    <a-select-option value="bank">银行卡</a-select-option>
+                </a-select>
+            </a-form-item>
+        </a-form>
+        <template #footer>
+            <a-button type="primary" @click="handleUserRecharge">充值</a-button>
+            <a-button @click="rechargeModalVisible = false; rechargeAmount = 0">取消</a-button>
+        </template>
+    </a-modal>
 </template>
   
 <script lang="ts" setup>
     import { useUserStore } from '@/stores/user';
-    import { Modal } from 'ant-design-vue';
+    import { message, Modal } from 'ant-design-vue';
     import { ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
     import { useRouter } from 'vue-router';
@@ -102,10 +130,6 @@
         router.push({name: 'personalhomepage', params: { activeIndex: 'prefilledinformation' }});
     }
 
-    function goToRechargePage() {
-        router.push({name: 'personalhomepage', params: { activeIndex: 'recharge' }});
-    }
-
     function goToTransactionRecordPage() {
         router.push({ name: 'personalhomepage', params: { activeIndex: 'transactionrecord' }});
     }
@@ -120,6 +144,26 @@
                 await user.logout(router);
             }
         });
+    }
+
+
+    const rechargeModalVisible = ref<Boolean>(false);
+    const rechargeAmount = ref<number>(0);
+    const rechargeMethod = ref<string>('alipay');
+
+    function gotoRechargePage() {
+        rechargeModalVisible.value = true;
+    }
+
+    function checkRechargeAmount(value: number) {
+        if (value <= 0) {
+            message.warning('充值金额必须大于0');
+            rechargeAmount.value = 0;
+        }
+    }
+
+    async function handleUserRecharge() {
+
     }
 </script>
 
