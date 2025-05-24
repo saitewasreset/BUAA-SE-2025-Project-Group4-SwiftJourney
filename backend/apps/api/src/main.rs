@@ -60,12 +60,12 @@ use base::infrastructure::application::service::user_manager::UserManagerService
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
     DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer,
-    TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
+use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
@@ -77,6 +77,7 @@ use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
@@ -166,6 +167,7 @@ async fn main() -> std::io::Result<()> {
     let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
     let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
     let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
+    let occupied_room_repository_impl = Arc::new(OccupiedRoomRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
         &mini_io_endpoint,
@@ -276,8 +278,17 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&order_repository_impl),
     ));
 
+    let hotel_query_service_impl = Arc::new(HotelQueryServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_rating_repository_impl),
+        Arc::clone(&city_repository_impl),
+        Arc::clone(&station_repository_impl),
+        Arc::clone(&occupied_room_repository_impl),
+    ));
+
     let hotel_service_impl = Arc::new(HotelServiceImpl::new(
         Arc::clone(&hotel_rating_service_impl),
+        Arc::clone(&hotel_query_service_impl),
         Arc::clone(&session_manager_service_impl),
     ));
 
