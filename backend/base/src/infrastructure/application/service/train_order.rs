@@ -158,13 +158,23 @@ where
 
         let stations = route.stops();
 
+        let station_ids: Vec<_> = stations.iter().map(|stop| stop.station_id()).collect();
+
+        let mut station_map = std::collections::HashMap::new();
+        for station_id in station_ids {
+            if let Ok(Some(station)) = self.station_repository.find(station_id).await {
+                station_map.insert(station_id, station);
+            }
+        }
+
+        // 验证出发站和到达站
         let mut departure_exists = false;
         let mut arrival_exists = false;
         let mut departure_station_id = None;
         let mut arrival_station_id = None;
 
         for stop in stations {
-            if let Ok(Some(station)) = self.station_repository.find(stop.station_id()).await {
+            if let Some(station) = station_map.get(&stop.station_id()) {
                 let station_name = station.name().to_string();
 
                 if station_name == dto.departure_station {
@@ -287,7 +297,7 @@ where
         let mut arrival_index = None;
 
         for (index, stop) in route.stops().iter().enumerate() {
-            if let Ok(Some(station)) = self.station_repository.find(stop.station_id()).await {
+            if let Some(station) = station_map.get(&stop.station_id()) {
                 let station_name = station.name().to_string();
 
                 if station_name == dto.departure_station {
@@ -393,9 +403,10 @@ where
                                 order_uuid
                             );
                             return Err(TrainOrderServiceError::InfrastructureError(
-                                ServiceError::RelatedServiceError(
-                                    anyhow!("Order {} not found for refund", order_uuid),
-                                ),
+                                ServiceError::RelatedServiceError(anyhow!(
+                                    "Order {} not found for refund",
+                                    order_uuid
+                                )),
                             ));
                         }
                         Err(err) => {
