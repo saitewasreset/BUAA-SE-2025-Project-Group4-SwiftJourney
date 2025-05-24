@@ -518,14 +518,6 @@ where
                 ))
             })?;
 
-        if let Err(e) = self
-            .process_order_message(transaction_id, all_order_uuids, all_atomic)
-            .await
-        {
-            error!("Failed to process orders immediately: {:?}", e);
-            return Err(Box::new(e));
-        }
-
         Ok(TransactionInfoDTO {
             transaction_id,
             amount: total_amount,
