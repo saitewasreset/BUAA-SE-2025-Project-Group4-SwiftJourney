@@ -12,10 +12,10 @@
                 <p style="font-size: larger">风行旅途</p>
             </div>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
-            <el-menu-item index="homepage">首页</el-menu-item>
-            <el-menu-item index="trainTicket">车票</el-menu-item>
-            <el-menu-item index="hotel">酒店</el-menu-item>
-            <el-menu-item index="trainmeal">火车餐</el-menu-item>
+            <el-menu-item index="/homepage">首页</el-menu-item>
+            <el-menu-item index="/trainTicket">车票</el-menu-item>
+            <el-menu-item index="/hotel">酒店</el-menu-item>
+            <el-menu-item index="/trainmeal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
             <div v-if="!user.isLogin">
@@ -105,6 +105,8 @@
     import { useRouter } from 'vue-router';
 
     const user = useUserStore();
+    //import { useDebugUserStore } from '@/stores/user';
+    //const user = useDebugUserStore();
 
     const router = useRouter();
 
