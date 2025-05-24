@@ -1,5 +1,5 @@
 use crate::domain::RepositoryError;
-use crate::domain::model::order::{DishOrder, OrderStatus, TrainOrder};
+use crate::domain::model::order::{DishOrder, OrderStatus};
 use crate::domain::model::transaction::TransactionStatus;
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;

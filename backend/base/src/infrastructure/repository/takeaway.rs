@@ -1,15 +1,13 @@
-use crate::domain::model::hotel::Hotel;
 use crate::domain::model::route::{RouteId, Stop, StopId};
 use crate::domain::model::station::StationId;
 use crate::domain::model::takeaway::{TakeawayDish, TakeawayDishId, TakeawayShop, TakeawayShopId};
 use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::takeaway::TakeawayShopRepository;
-use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::object_storage::{ObjectCategory, ObjectStorageService};
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
-    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, Repository,
-    RepositoryError, TypedDiff,
+    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
+    TypedDiff,
 };
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -17,7 +15,7 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 use sea_orm::{
     ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue,
-    QueryFilter, Statement, TransactionTrait,
+    Statement, TransactionTrait,
 };
 use shared::data::TakeawayData;
 use std::collections::HashMap;
@@ -132,7 +130,7 @@ impl TakeawayShopDataConverter {
     }
 
     pub fn transform_to_do(takeaway_shop: &TakeawayShop) -> TakeawayShopActiveModelPack {
-        let mut model = Self::transform_to_do_shop_only(takeaway_shop);
+        let model = Self::transform_to_do_shop_only(takeaway_shop);
 
         let mut takeaway_dish_do_list = Vec::with_capacity(takeaway_shop.dishes().len());
 
@@ -533,7 +531,7 @@ WHERE "route"."line_id" = $1;"#,
             station_id_to_stop.insert(data.route_station_id, stop);
         }
 
-        for (_, (takeaway_shop_do, takeaway_dish_do_list)) in &takeaway_shop_id_to_do_pack {
+        for (takeaway_shop_do, takeaway_dish_do_list) in takeaway_shop_id_to_do_pack.values() {
             let takeaway_shop_do_pack = TakeawayShopDoPack {
                 takeaway_shop_do: takeaway_shop_do.clone(),
                 takeaway_shop_dish_do_list: takeaway_dish_do_list.clone(),
@@ -550,7 +548,7 @@ WHERE "route"."line_id" = $1;"#,
                     ))
                 })?;
 
-            result.entry(stop.clone()).or_default().push(takeaway_shop);
+            result.entry(*stop).or_default().push(takeaway_shop);
         }
 
         Ok(result)
