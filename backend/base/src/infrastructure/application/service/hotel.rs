@@ -143,15 +143,13 @@ where
         let session_id = SessionId::try_from(query.session_id.as_str())
             .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
 
-        // 仅查询应该只需要验证 session ID 是否有效，而不需要获取用户 ID？
         self.session_manager
-            .get_user_id_by_session(session_id)
+            .get_session(session_id)
             .await
             .map_err(|e| {
-                error!("Failed to get user ID by session: {:?}", e);
-                GeneralError::InternalServerError
-            })?
-            .ok_or(GeneralError::InvalidSessionId)?;
+                error!("Failed to get session: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         self.hotel_query_service
             .validate_date_range(query.begin_date, query.end_date)
