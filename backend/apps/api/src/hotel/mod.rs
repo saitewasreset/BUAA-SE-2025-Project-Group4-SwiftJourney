@@ -120,4 +120,5 @@ async fn query_hotels(
 
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_quota).service(add_comment);
+    cfg.service(query_hotels);
 }
