@@ -3,11 +3,12 @@ use crate::application::service::hotel::{
     HotelCommentQuotaDTO, HotelGeneralInfoDTO, HotelService, HotelServiceError,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::model::hotel::Rating;
+use crate::domain::model::hotel::{HotelDateRange, Rating};
 use crate::domain::model::session::SessionId;
 use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
 use crate::domain::service::hotel_rating::{HotelRatingService, HotelRatingServiceError};
 use crate::domain::service::session::SessionManagerService;
+use crate::HOTEL_MAX_BOOKING_DAYS;
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
@@ -151,36 +152,47 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
-        self.hotel_query_service
-            .validate_date_range(query.begin_date, query.end_date)
-            .await
-            .map_err(|e| match e {
-                HotelQueryError::InvalidDateRange(msg) => {
-                    Box::new(HotelServiceError::InvalidDateRangeMessage(msg))
-                        as Box<dyn ApplicationError>
+        let date_range = match (query.begin_date, query.end_date) {
+            (None, None) => None,
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                    "Both dates must be specified or none".into(),
+                )));
+            }
+            (Some(begin), Some(end)) => {
+                if end <= begin {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "End date must be after begin date".into(),
+                    )));
                 }
-                _ => {
-                    error!("Failed to validate date range: {:?}", e);
-                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-                }
-            })?;
 
-        self.hotel_query_service
-            .validate_target(&query.target, &query.target_type)
-            .await
-            .map_err(|e| match e {
-                HotelQueryError::TargetNotFound(target) => {
-                    Box::new(HotelServiceError::TargetNotFound(target)) as Box<dyn ApplicationError>
+                let duration = end.signed_duration_since(begin).num_days();
+                if duration > HOTEL_MAX_BOOKING_DAYS as i64 {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(format!(
+                        "Stay cannot exceed {} days",
+                        HOTEL_MAX_BOOKING_DAYS
+                    ))));
                 }
-                _ => {
-                    error!("Failed to validate target: {:?}", e);
-                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+
+                match HotelDateRange::new(begin, end) {
+                    Ok(range) => Some(range),
+                    Err(e) => {
+                        return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                            e.to_string(),
+                        )));
+                    }
                 }
-            })?;
+            }
+        };
 
         let hotel_infos = self
             .hotel_query_service
-            .query_hotels(&query)
+            .query_hotels(
+                &query.target,
+                &query.target_type,
+                query.search.as_deref(),
+                date_range.as_ref(),
+            )
             .await
             .map_err(|e| match e {
                 HotelQueryError::TargetNotFound(target) => {
