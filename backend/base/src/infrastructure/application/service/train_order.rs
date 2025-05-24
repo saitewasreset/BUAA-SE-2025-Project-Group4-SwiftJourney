@@ -98,6 +98,7 @@ where
         user_id: UserId,
     ) -> Result<(Uuid, Box<dyn Order>), TrainOrderServiceError> {
         // == 验证订单 ==
+        // SAFETY: 正确性将在find_by_train_number中检查
         let train_number = TrainNumber::from_unchecked(dto.train_number.clone());
 
         let train = self
@@ -183,6 +184,7 @@ where
 
         let order_uuid = Uuid::new_v4();
 
+        // SAFETY: 这里的 departure_station_id 和 arrival_station_id 已经在上面验证过了
         let station_range = StationRange::from_unchecked(
             departure_station_id.unwrap(),
             arrival_station_id.unwrap(),
