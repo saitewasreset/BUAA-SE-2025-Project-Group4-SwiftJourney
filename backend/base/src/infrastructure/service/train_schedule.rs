@@ -195,21 +195,26 @@ where
             .ok_or_else(|| TrainScheduleServiceError::InvalidStationId(station_id.into()))?;
 
         let base_date = train_schedule.date();
-        let arrival_time_seconds = stop.arrival_time() as i64;
+
+        let origin_departure_seconds = train_schedule.origin_departure_time() as i64;
+
+        let station_arrival_offset = stop.arrival_time() as i64;
 
         let base_datetime = chrono::NaiveDateTime::new(
             base_date,
             chrono::NaiveTime::from_num_seconds_from_midnight_opt(0, 0).unwrap(),
         );
 
-        let arrival_datetime = base_datetime + chrono::Duration::seconds(arrival_time_seconds);
+        let arrival_datetime = base_datetime
+            + chrono::Duration::seconds(origin_departure_seconds)
+            + chrono::Duration::seconds(station_arrival_offset);
 
-        let arrival_time = sea_orm::prelude::DateTimeWithTimeZone::from(chrono::DateTime::<
-            chrono::Utc,
-        >::from_naive_utc_and_offset(
-            arrival_datetime,
-            chrono::Utc,
-        ));
+        let arrival_time = sea_orm::prelude::DateTimeWithTimeZone::from(
+            chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                arrival_datetime,
+                chrono::Utc,
+            )
+        );
 
         Ok(arrival_time)
     }
