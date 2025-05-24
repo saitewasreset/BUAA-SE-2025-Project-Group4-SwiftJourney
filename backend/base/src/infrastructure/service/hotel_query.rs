@@ -312,12 +312,6 @@ where
         &self,
         query: &HotelQuery,
     ) -> Result<Vec<HotelGeneralInfoDTO>, HotelQueryError> {
-        self.validate_date_range(query.begin_date, query.end_date)
-            .await?;
-
-        self.validate_target(&query.target, &query.target_type)
-            .await?;
-
         let hotels = self
             .find_hotels_by_target(&query.target, &query.target_type, query.search.as_deref())
             .await?;
