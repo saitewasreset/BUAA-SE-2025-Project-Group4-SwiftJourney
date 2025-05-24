@@ -25,6 +25,7 @@ export interface HotelGeneralInfo {
   // 累计预订人次
   totalBookings: number;
   price: number;
+  info: string;
 }
 
 // 用户评价
@@ -81,5 +82,5 @@ export interface HotelRoomDetailInfo {
 }
 
 export interface HotelGInfoWRoom extends HotelGeneralInfo {
-  roomTypeMap: Map<string, HotelRoomDetailInfo>;
+  roomTypeMap: Map<string, HotelRoomDetailInfo>,
 }
