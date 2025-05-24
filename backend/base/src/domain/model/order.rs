@@ -479,6 +479,22 @@ impl TrainOrder {
     pub fn preferred_seat_location(&self) -> &Option<PreferredSeatLocation> {
         &self.preferred_seat_location
     }
+
+    /// 设置座位信息
+    ///
+    /// Arguments:
+    /// - `seat`: 新的座位信息
+    pub fn set_seat(&mut self, seat: Option<Seat>) {
+        self.seat = seat;
+    }
+
+    /// 设置首选座位位置
+    ///
+    /// Arguments:
+    /// - `location`: 新的首选座位位置
+    pub fn set_preferred_seat_location(&mut self, location: Option<PreferredSeatLocation>) {
+        self.preferred_seat_location = location;
+    }
 }
 
 impl Order for TrainOrder {

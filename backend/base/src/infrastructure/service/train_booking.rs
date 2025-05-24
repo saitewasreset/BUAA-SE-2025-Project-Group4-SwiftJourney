@@ -1,4 +1,4 @@
-use crate::domain::model::order::{BaseOrder, Order, OrderStatus, TrainOrder};
+use crate::domain::model::order::{Order, OrderStatus, TrainOrder};
 use crate::domain::repository::order::OrderRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::repository::transaction::TransactionRepository;
@@ -61,7 +61,7 @@ where
     OR: OrderRepository,
 {
     async fn booking_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
-        let train_order = match self
+        let mut train_order = match self
             .order_repository
             .find_train_order_by_uuid(order_uuid)
             .await
@@ -113,31 +113,7 @@ where
             Ok(seat) => seat,
             Err(err) => {
                 if let TrainSeatServiceError::NoAvailableSeat = err {
-                    // Saite haven't provided a way to update specific properties of the order, so I have to create a new order with the same properties and update the status to Failed.
-                    let failed_order = TrainOrder::new(
-                        BaseOrder::new(
-                            train_order.order_id(),
-                            train_order.uuid(),
-                            OrderStatus::Failed,
-                            train_order.order_time_info(),
-                            train_order.unit_price(),
-                            train_order.amount(),
-                            train_order.payment_info(),
-                            train_order.personal_info_id(),
-                        ),
-                        train_order.train_schedule_id(),
-                        train_order.seat().clone(),
-                        *train_order.preferred_seat_location(),
-                        train_order.station_range(),
-                    );
-
-                    if let Err(update_err) =
-                        self.order_repository.update(Box::new(failed_order)).await
-                    {
-                        return Err(TrainBookingServiceError::InfrastructureError(
-                            update_err.into(),
-                        ));
-                    }
+                    train_order.set_status(OrderStatus::Failed);
 
                     return Err(TrainBookingServiceError::NoAvailableTickets(order_uuid));
                 }
@@ -148,34 +124,14 @@ where
             }
         };
 
-        let updated_order = TrainOrder::new(
-            BaseOrder::new(
-                train_order.order_id(),
-                train_order.uuid(),
-                OrderStatus::Ongoing,
-                train_order.order_time_info(),
-                train_order.unit_price(),
-                train_order.amount(),
-                train_order.payment_info(),
-                train_order.personal_info_id(),
-            ),
-            train_order.train_schedule_id(),
-            Some(seat),
-            *train_order.preferred_seat_location(),
-            train_order.station_range(),
-        );
-
-        if let Err(update_err) = self.order_repository.update(Box::new(updated_order)).await {
-            return Err(TrainBookingServiceError::InfrastructureError(
-                update_err.into(),
-            ));
-        }
+        train_order.set_status(OrderStatus::Ongoing);
+        train_order.set_seat(Some(seat.clone()));
 
         Ok(())
     }
 
     async fn cancel_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
-        let train_order = match self
+        let mut train_order = match self
             .order_repository
             .find_train_order_by_uuid(order_uuid)
             .await
@@ -237,28 +193,7 @@ where
             }
         }
 
-        let canceled_order = TrainOrder::new(
-            BaseOrder::new(
-                train_order.order_id(),
-                train_order.uuid(),
-                OrderStatus::Cancelled,
-                train_order.order_time_info(),
-                train_order.unit_price(),
-                train_order.amount(),
-                train_order.payment_info(),
-                train_order.personal_info_id(),
-            ),
-            train_order.train_schedule_id(),
-            train_order.seat().clone(),
-            *train_order.preferred_seat_location(),
-            train_order.station_range(),
-        );
-
-        if let Err(update_err) = self.order_repository.update(Box::new(canceled_order)).await {
-            return Err(TrainBookingServiceError::InfrastructureError(
-                update_err.into(),
-            ));
-        }
+        train_order.set_status(OrderStatus::Cancelled);
 
         if status == OrderStatus::Paid || status == OrderStatus::Ongoing {
             if let Some(transaction_id) = train_order.payment_info().refund_transaction_id() {
