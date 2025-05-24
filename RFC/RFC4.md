@@ -1,9 +1,12 @@
 # Request For Comments 4: API 文档
 
-Version: 11 (2025-05-11 17:32:00)
+Version: 12 (2025-05-24 15:07:00)
 
 最近变更：
 
+- Version 12
+  - 修复“城市信息”API的错误描述
+  - “酒店查询”返回新增酒店info
 - Version 11
   - 新增修改密码 API
 - Version 10
@@ -149,7 +152,7 @@ type ResponseData = Map<string, string[]>;
 
 `GET /api/general/city`
 
-返回从省到该城省车城市列表的映射。
+返回从省到该省城市列表的映射。
 
 需要 Cookie：
 
@@ -164,7 +167,7 @@ type ResponseData = Map<string, string[]>;
 响应**数据**：
 
 ```typescript
-// 城市 -> 车站 []
+// 省 -> 城市[]
 type ResponseData = Map<string, string[]>;
 ```
 
@@ -1152,7 +1155,10 @@ interface HotelGeneralInfo {
   ratingCount: number;
   // 累计预订人次
   totalBookings: number;
+  // 在住宿时间beginDate、endDate内，可用的房间的价格的最小值
   price: number;
+  // 酒店信息
+  info: string;
 }
 ```
 
