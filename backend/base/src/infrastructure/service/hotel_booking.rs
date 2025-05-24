@@ -1,5 +1,5 @@
 use crate::domain::model::hotel::{
-    HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId, HotelRoomTypeStr, OccupiedRoom,
+    HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId, OccupiedRoom,
 };
 use crate::domain::model::order::{HotelOrder, Order, OrderStatus};
 use crate::domain::repository::hotel::HotelRepository;

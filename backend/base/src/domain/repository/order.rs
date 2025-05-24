@@ -1,7 +1,7 @@
 use crate::domain::RepositoryError;
 use crate::domain::model::hotel::HotelId;
 use crate::domain::model::order::{
-    DishOrder, HotelOrder, Order, OrderId, OrderStatus, TakeawayOrder, TrainOrder
+    DishOrder, HotelOrder, Order, OrderId, TakeawayOrder, TrainOrder,
 };
 use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::model::user::UserId;
