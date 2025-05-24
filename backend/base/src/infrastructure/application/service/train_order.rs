@@ -1,9 +1,10 @@
+use crate::application::ApplicationError;
+use crate::application::GeneralError;
 use crate::application::service::train_order::CreateTrainOrderDTO;
 use crate::application::service::train_order::OrderPackDTO;
 use crate::application::service::train_order::TrainOrderService;
 use crate::application::service::train_order::TrainOrderServiceError;
 use crate::application::service::transaction::TransactionInfoDTO;
-use crate::application::ApplicationError;
 use crate::domain::Identifiable;
 use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
@@ -23,6 +24,7 @@ use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::train_booking::TrainBookingService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::transaction::TransactionService;
+use anyhow::anyhow;
 use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
@@ -100,7 +102,7 @@ where
         &self,
         dto: &CreateTrainOrderDTO,
         user_id: UserId,
-    ) -> Result<(Uuid, Box<dyn Order>), TrainOrderServiceError> {
+    ) -> Result<(Uuid, Box<dyn Order>), Box<dyn ApplicationError>> {
         // == 验证订单 ==
         // SAFETY: 正确性将在find_by_train_number中检查
         let train_number = TrainNumber::from_unchecked(dto.train_number.clone());
@@ -109,17 +111,24 @@ where
             .train_repository
             .find_by_train_number(train_number)
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidTrainNumber)?;
+            .map_err(|e| {
+                error!("Database error when finding train: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
-        let train_id = train
-            .get_id()
-            .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
+        let train_id = train.get_id().ok_or_else(|| {
+            error!("Failed to get train ID from train entity");
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
 
         let schedules_result = self
             .train_schedule_repository
             .find_by_train_id(train_id)
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidTrainNumber)?;
+            .map_err(|e| {
+                error!("Database error when finding train schedules: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let train_schedule = schedules_result
             .iter()
@@ -135,8 +144,17 @@ where
             .route_repository
             .find(route_id)
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidStationId)?
-            .ok_or(TrainOrderServiceError::InvalidStationId)?;
+            .map_err(|e| {
+                error!("Database error when finding route: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or_else(|| {
+                error!(
+                    "Data inconsistency: Route {} referenced by train schedule not found",
+                    route_id
+                );
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let stations = route.stops();
 
@@ -165,15 +183,24 @@ where
         }
 
         if !departure_exists || !arrival_exists {
-            return Err(TrainOrderServiceError::InvalidStationId);
+            return Err(Box::new(TrainOrderServiceError::InvalidStationId));
         }
 
         let train_details = self
             .train_repository
             .find(train_id)
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidTrainNumber)?
-            .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
+            .map_err(|e| {
+                error!("Database error when finding train details: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or_else(|| {
+                error!(
+                    "Data inconsistency: Train details for ID {} not found despite train existing",
+                    train_id
+                );
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let seat_type_exists = train_details
             .seats()
@@ -181,7 +208,7 @@ where
             .any(|(key, _)| key == &dto.seat_type);
 
         if !seat_type_exists {
-            return Err(TrainOrderServiceError::InvalidTrainNumber);
+            return Err(Box::new(TrainOrderServiceError::InvalidTrainNumber));
         }
 
         // === 创建订单 ===
@@ -196,21 +223,28 @@ where
 
         let now = sea_orm::prelude::DateTimeWithTimeZone::from(chrono::Utc::now());
 
-        let train_schedule_id = train_schedule
-            .get_id()
-            .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
+        let train_schedule_id = train_schedule.get_id().ok_or_else(|| {
+            error!("Failed to get train schedule ID");
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
 
         let departure_arrival_time = self
             .train_schedule_service
             .get_station_arrival_time(train_schedule_id, departure_station_id.unwrap())
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidStationId)?;
+            .map_err(|e| {
+                error!("Failed to get station arrival time: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let arrival_arrival_time = self
             .train_schedule_service
             .get_station_arrival_time(train_schedule_id, arrival_station_id.unwrap())
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidStationId)?;
+            .map_err(|e| {
+                error!("Failed to get station arrival time: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let order_time_info = OrderTimeInfo::new(now, departure_arrival_time, arrival_arrival_time);
 
@@ -221,14 +255,17 @@ where
 
         let personal_uuid = match Uuid::parse_str(&dto.personal_id) {
             Ok(uuid) => uuid,
-            Err(_) => return Err(TrainOrderServiceError::InvalidPassengerId),
+            Err(_) => return Err(Box::new(TrainOrderServiceError::InvalidPassengerId)),
         };
 
         let personal_infos = self
             .personal_info_repository
             .find_by_user_id(user_id)
             .await
-            .map_err(|_| TrainOrderServiceError::InvalidPassengerId)?;
+            .map_err(|e| {
+                error!("Database error when finding personal info: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
 
         let personal_info = personal_infos
             .into_iter()
@@ -271,10 +308,10 @@ where
                 if a > d {
                     (a - d) as i64
                 } else {
-                    return Err(TrainOrderServiceError::InvalidStationId);
+                    return Err(Box::new(TrainOrderServiceError::InvalidStationId));
                 }
             }
-            _ => return Err(TrainOrderServiceError::InvalidStationId),
+            _ => return Err(Box::new(TrainOrderServiceError::InvalidStationId)),
         };
 
         // let total_price = unit_price * Decimal::from(stations_count);
@@ -351,12 +388,26 @@ where
                             to_refund_orders.push(Box::new(order));
                         }
                         Ok(None) => {
-                            error!("Order {} not found for refund", order_uuid);
-                            return Err(TrainOrderServiceError::InvalidTrainNumber);
+                            error!(
+                                "Data inconsistency: Order {} not found for refund despite being created earlier",
+                                order_uuid
+                            );
+                            return Err(TrainOrderServiceError::InfrastructureError(
+                                ServiceError::RelatedServiceError(
+                                    anyhow!("Order {} not found for refund", order_uuid),
+                                ),
+                            ));
                         }
                         Err(err) => {
-                            error!("Error finding order {} for refund: {:?}", order_uuid, err);
-                            return Err(TrainOrderServiceError::InvalidTrainNumber);
+                            error!(
+                                "Database error finding order {} for refund: {:?}",
+                                order_uuid, err
+                            );
+                            return Err(TrainOrderServiceError::InfrastructureError(
+                                ServiceError::RepositoryError(
+                                    anyhow!("Error finding order: {:?}", err).into(),
+                                ),
+                            ));
                         }
                     }
                 }
@@ -451,7 +502,9 @@ where
             .new_transaction(user_id, all_train_orders, all_atomic)
             .await
             .map_err(|e| {
-                TrainOrderServiceError::InfrastructureError(ServiceError::RelatedServiceError(e.into()))
+                TrainOrderServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
             })?;
 
         if let Err(e) = self
