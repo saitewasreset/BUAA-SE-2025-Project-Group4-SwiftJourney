@@ -1,9 +1,9 @@
-use crate::application::GeneralError;
 use crate::application::service::train_order::CreateTrainOrderDTO;
 use crate::application::service::train_order::OrderPackDTO;
 use crate::application::service::train_order::TrainOrderService;
 use crate::application::service::train_order::TrainOrderServiceError;
 use crate::application::service::transaction::TransactionInfoDTO;
+use crate::application::ApplicationError;
 use crate::domain::Identifiable;
 use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
@@ -402,7 +402,7 @@ where
         &self,
         session_id: String,
         order_packs: Vec<OrderPackDTO>,
-    ) -> Result<TransactionInfoDTO, TrainOrderServiceError> {
+    ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>> {
         let user_id = self
             .session_manager_service
             .get_user_id_by_session(
@@ -459,7 +459,7 @@ where
             .await
         {
             error!("Failed to process orders immediately: {:?}", e);
-            return Err(e);
+            return Err(Box::new(e));
         }
 
         Ok(TransactionInfoDTO {
