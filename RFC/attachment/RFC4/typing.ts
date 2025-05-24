@@ -326,7 +326,10 @@ interface HotelGeneralInfo {
   ratingCount: number;
   // 累计预订人次
   totalBookings: number;
+  // 在住宿时间beginDate、endDate内，可用的房间的价格的最小值
   price: number;
+  // 酒店信息
+  info: string;
 }
 
 // 用户评价
