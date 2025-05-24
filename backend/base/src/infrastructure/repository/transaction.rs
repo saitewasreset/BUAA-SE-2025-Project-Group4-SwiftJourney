@@ -115,7 +115,7 @@ impl OrderDataConverter {
         let personal_info_id = PersonalInfoId::from_db_value(train_order_do.person_info_id)?;
 
         let base = BaseOrder::new(
-            order_id,
+            Some(order_id),
             uuid,
             order_status,
             order_time_info,
@@ -181,7 +181,8 @@ impl OrderDataConverter {
         Ok(TrainOrder::new(
             base,
             train_schedule_id,
-            seat,
+            Some(seat),
+            None,
             station_range,
         ))
     }
@@ -202,7 +203,7 @@ impl OrderDataConverter {
             status: ActiveValue::Set(
                 <OrderStatus as Into<&str>>::into(train_order.order_status()).to_string(),
             ),
-            create_time: ActiveValue::Set(train_order.order_time_info().crate_time()),
+            create_time: ActiveValue::Set(train_order.order_time_info().create_time()),
             active_time: ActiveValue::Set(train_order.order_time_info().active_time()),
             complete_time: ActiveValue::Set(train_order.order_time_info().complete_time()),
             price: ActiveValue::Set(train_order.unit_price()),
@@ -214,6 +215,8 @@ impl OrderDataConverter {
             seat_type_id: ActiveValue::Set(
                 train_order
                     .seat()
+                    .as_ref()
+                    .expect("seat should not be None")
                     .seat_type()
                     .get_id()
                     .expect("seat type should have id")
@@ -222,6 +225,8 @@ impl OrderDataConverter {
             seat_id: ActiveValue::Set(
                 train_order
                     .seat()
+                    .as_ref()
+                    .expect("seat should not be None")
                     .get_id()
                     .expect("seat should have id")
                     .to_db_value() as i32,
@@ -292,7 +297,7 @@ impl OrderDataConverter {
         let personal_info_id = PersonalInfoId::from_db_value(hotel_order_do.person_info_id as i32)?;
 
         let base = BaseOrder::new(
-            order_id,
+            Some(order_id),
             uuid,
             order_status,
             order_time_info,
@@ -333,7 +338,7 @@ impl OrderDataConverter {
             status: ActiveValue::Set(
                 <OrderStatus as Into<&str>>::into(hotel_order.order_status()).to_string(),
             ),
-            create_time: ActiveValue::Set(hotel_order.order_time_info().crate_time()),
+            create_time: ActiveValue::Set(hotel_order.order_time_info().create_time()),
             active_time: ActiveValue::Set(hotel_order.order_time_info().active_time()),
             complete_time: ActiveValue::Set(hotel_order.order_time_info().complete_time()),
             price: ActiveValue::Set(hotel_order.unit_price()),
@@ -399,7 +404,7 @@ impl OrderDataConverter {
         let personal_info_id = PersonalInfoId::from_db_value(dish_order_do.person_info_id as i32)?;
 
         let base = BaseOrder::new(
-            order_id,
+            Some(order_id),
             uuid,
             order_status,
             order_time_info,
@@ -436,7 +441,7 @@ impl OrderDataConverter {
             status: ActiveValue::Set(
                 <OrderStatus as Into<&str>>::into(dish_order.order_status()).to_string(),
             ),
-            create_time: ActiveValue::Set(dish_order.order_time_info().crate_time()),
+            create_time: ActiveValue::Set(dish_order.order_time_info().create_time()),
             active_time: ActiveValue::Set(dish_order.order_time_info().active_time()),
             complete_time: ActiveValue::Set(dish_order.order_time_info().complete_time()),
             price: ActiveValue::Set(dish_order.unit_price()),
@@ -502,7 +507,7 @@ impl OrderDataConverter {
             PersonalInfoId::from_db_value(takeaway_order_do.person_info_id as i32)?;
 
         let base = BaseOrder::new(
-            order_id,
+            Some(order_id),
             uuid,
             order_status,
             order_time_info,
@@ -542,7 +547,7 @@ impl OrderDataConverter {
             status: ActiveValue::Set(
                 <OrderStatus as Into<&str>>::into(takeaway_order.order_status()).to_string(),
             ),
-            create_time: ActiveValue::Set(takeaway_order.order_time_info().crate_time()),
+            create_time: ActiveValue::Set(takeaway_order.order_time_info().create_time()),
             active_time: ActiveValue::Set(takeaway_order.order_time_info().active_time()),
             complete_time: ActiveValue::Set(takeaway_order.order_time_info().complete_time()),
             price: ActiveValue::Set(takeaway_order.unit_price()),
@@ -1081,12 +1086,12 @@ impl TransactionRepositoryImpl {
             let old_orders_map = old
                 .iter()
                 .flat_map(|item| item.orders())
-                .map(|order| (order.order_id().to_db_value(), order.clone()))
+                .map(|order| (order.uuid(), order.clone()))
                 .collect::<HashMap<_, _>>();
             let new_orders_map = new
                 .iter()
                 .flat_map(|item| item.orders())
-                .map(|order| (order.order_id().to_db_value(), order.clone()))
+                .map(|order| (order.uuid(), order.clone()))
                 .collect::<HashMap<_, _>>();
 
             for (order_id, old_order) in &old_orders_map {
