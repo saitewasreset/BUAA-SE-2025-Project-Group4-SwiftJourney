@@ -21,6 +21,11 @@ const router = createRouter({
       component: () => import('../views/TrainTicket/TrainTicketView.vue'),
     },
     {
+      path: '/hotel',
+      name: 'hotel',
+      component: () => import('../views/Hotel/HotelPageView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginPage/LoginPageView.vue'),
@@ -41,6 +46,7 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
+  //const isLogin: Boolean = true;
   if (!isLogin) {
     // 未登录，跳转到登录页
     if (to.path !== '/login' && to.path !== '/register') {
