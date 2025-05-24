@@ -62,7 +62,7 @@
                 <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
                     <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
                         <div class="HotelImageContainer">
-                            <img class="HotelImage" :src="info.picture" alt="hotel-image">
+                            <img class="HotelImage" :src="info.picture" alt="hotel-image" @click="goToDetail(info)">
                         </div>
                         <div class="HotelInfoShow">
                             <p class="HotelName">{{ info.name }}</p>
@@ -81,7 +81,7 @@
                                 <p class="p1">起</p>
                             </div>
                             <p class="LiveNum">{{ info.totalBookings }}人住过</p>
-                            <el-button class="DetailButton" type="primary" size="large">查看详情</el-button>
+                            <el-button class="DetailButton" type="primary" size="large" @click="goToDetail(info)">查看详情</el-button>
                         </div>
                     </el-card>
                 </div>
@@ -101,8 +101,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import { ElMessage } from 'element-plus';
 import { hotelApi } from '@/api/HotelApi/hotelApi';
-import { fa } from 'element-plus/es/locales.mjs';
-import type { IndexInfo } from 'typescript';
+import { useRouter } from 'vue-router';
 
 dayjs.locale('zh-cn');
 
@@ -116,6 +115,8 @@ const hotelQuery = ref<HotelQuery> ({
 });
 
 //---------------------------日期---------------------------
+const beginDate = ref(hotelQuery.value.beginDate);
+const endDate = ref(hotelQuery.value.endDate);
 
 const dateFormat = 'YYYY-MM-DD(dddd)';
 const selectedDateRange = ref([today, nextday]);
@@ -246,6 +247,8 @@ const toggleRoomShowAll = (value: boolean) => {
 
 
 async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
+    beginDate.value = hotelQuery.value.beginDate;
+    endDate.value = hotelQuery.value.endDate;
     hotelGInfoWRoom.value = [];
     roomSet.clear();
     roomList.value = [];
@@ -316,6 +319,22 @@ function minMoney(map: Map<string, HotelRoomDetailInfo>, flag: boolean, roomStat
         }
     }
     return minMoney;
+}
+
+//-------------------------------详情-----------------------------------
+const router = useRouter();
+
+function goToDetail(info: HotelGInfoWRoom) {
+    const routeUrl = router.resolve({
+        name: 'hotelDetail',
+        params: { id: info.hotelId },
+        query: {
+          beginDate: beginDate.value,
+          endDate: endDate.value,
+        }
+      });
+
+    window.open(routeUrl.href, '_blank');
 }
 
 //-------------------------------筛选------------------------------------
@@ -396,6 +415,7 @@ const moneyDisplays = computed(() =>{
 
 //-----------------------------------debug-----------------------------------
 import hotelImage from '../../assets/hotel.jpg'
+import { en } from 'element-plus/es/locales.mjs';
 const debugdataMap = new Map<string, HotelRoomDetailInfo>();
 const debugHotelRoomDetailInfo1: HotelRoomDetailInfo = {
     capacity: 1,
