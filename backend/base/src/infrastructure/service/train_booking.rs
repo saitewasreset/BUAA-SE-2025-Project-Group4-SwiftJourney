@@ -71,7 +71,7 @@ where
             Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
         };
 
-        if train_order.order_status() != OrderStatus::Unpaid {
+        if train_order.order_status() != OrderStatus::Paid {
             return Err(TrainBookingServiceError::InvalidOrderStatus(
                 order_uuid,
                 train_order.order_status(),
