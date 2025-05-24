@@ -1,8 +1,11 @@
-use crate::application::commands::hotel::{NewCommentCommand, QuotaQuery};
-use crate::application::service::hotel::{HotelCommentQuotaDTO, HotelService, HotelServiceError};
+use crate::application::commands::hotel::{HotelQuery, NewCommentCommand, QuotaQuery};
+use crate::application::service::hotel::{
+    HotelCommentQuotaDTO, HotelGeneralInfoDTO, HotelService, HotelServiceError,
+};
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::hotel::Rating;
 use crate::domain::model::session::SessionId;
+use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
 use crate::domain::service::hotel_rating::{HotelRatingService, HotelRatingServiceError};
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
@@ -11,32 +14,41 @@ use rust_decimal::prelude::FromPrimitive;
 use std::sync::Arc;
 use tracing::{error, instrument};
 
-pub struct HotelServiceImpl<HRS, SS>
+pub struct HotelServiceImpl<HRS, HQS, SS>
 where
     HRS: HotelRatingService,
+    HQS: HotelQueryService,
     SS: SessionManagerService,
 {
     hotel_rating_service: Arc<HRS>,
+    hotel_query_service: Arc<HQS>,
     session_manager: Arc<SS>,
 }
 
-impl<HRS, SS> HotelServiceImpl<HRS, SS>
+impl<HRS, HQS, SS> HotelServiceImpl<HRS, HQS, SS>
 where
     HRS: HotelRatingService,
+    HQS: HotelQueryService,
     SS: SessionManagerService,
 {
-    pub fn new(hotel_rating_service: Arc<HRS>, session_manager: Arc<SS>) -> Self {
+    pub fn new(
+        hotel_rating_service: Arc<HRS>,
+        hotel_query_service: Arc<HQS>,
+        session_manager: Arc<SS>,
+    ) -> Self {
         HotelServiceImpl {
             hotel_rating_service,
+            hotel_query_service,
             session_manager,
         }
     }
 }
 
 #[async_trait]
-impl<HRS, SS> HotelService for HotelServiceImpl<HRS, SS>
+impl<HRS, HQS, SS> HotelService for HotelServiceImpl<HRS, HQS, SS>
 where
     HRS: HotelRatingService,
+    HQS: HotelQueryService,
     SS: SessionManagerService,
 {
     #[instrument(skip(self))]
@@ -122,5 +134,70 @@ where
             })?;
 
         Ok(())
+    }
+
+    async fn query_hotels(
+        &self,
+        query: HotelQuery,
+    ) -> Result<Vec<HotelGeneralInfoDTO>, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
+
+        // 仅查询应该只需要验证 session ID 是否有效，而不需要获取用户 ID？
+        self.session_manager
+            .get_user_id_by_session(session_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get user ID by session: {:?}", e);
+                GeneralError::InternalServerError
+            })?
+            .ok_or(GeneralError::InvalidSessionId)?;
+
+        self.hotel_query_service
+            .validate_date_range(query.begin_date, query.end_date)
+            .await
+            .map_err(|e| match e {
+                HotelQueryError::InvalidDateRange(msg) => {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(msg))
+                        as Box<dyn ApplicationError>
+                }
+                _ => {
+                    error!("Failed to validate date range: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        self.hotel_query_service
+            .validate_target(&query.target, &query.target_type)
+            .await
+            .map_err(|e| match e {
+                HotelQueryError::TargetNotFound(target) => {
+                    Box::new(HotelServiceError::TargetNotFound(target)) as Box<dyn ApplicationError>
+                }
+                _ => {
+                    error!("Failed to validate target: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        let hotel_infos = self
+            .hotel_query_service
+            .query_hotels(&query)
+            .await
+            .map_err(|e| match e {
+                HotelQueryError::TargetNotFound(target) => {
+                    Box::new(HotelServiceError::TargetNotFound(target)) as Box<dyn ApplicationError>
+                }
+                HotelQueryError::InvalidDateRange(msg) => {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(msg))
+                        as Box<dyn ApplicationError>
+                }
+                _ => {
+                    error!("Failed to query hotels: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        Ok(hotel_infos)
     }
 }
