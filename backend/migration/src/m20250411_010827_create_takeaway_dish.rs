@@ -31,7 +31,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .check(Expr::col(TakeawayDish::Price).gte(0)),
                     )
-                    .col(big_integer(TakeawayDish::TakeawayShopId).not_null())
+                    .col(integer(TakeawayDish::TakeawayShopId).not_null())
                     .col(json(TakeawayDish::Images).not_null())
                     .foreign_key(
                         ForeignKey::create()

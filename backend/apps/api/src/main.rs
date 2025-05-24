@@ -59,9 +59,10 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
-    RabbitMQOrderStatusConsumer, TrainOrderStatusConsumer,
+    TrainOrderStatusConsumer, DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
+use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
@@ -70,10 +71,12 @@ use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::seat_availability::SeatAvailabilityRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
+use base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::train_schedule::TrainScheduleRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
+use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
@@ -85,6 +88,7 @@ use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::route::RouteServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
+use base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
 use base::infrastructure::service::train_booking::TrainBookingServiceImpl;
 use base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
 use base::infrastructure::service::train_seat::TrainSeatServiceImpl;
@@ -166,6 +170,8 @@ async fn main() -> std::io::Result<()> {
     let seat_availability_repository_impl =
         Arc::new(SeatAvailabilityRepositoryImpl::new(conn.clone()));
     let train_schedule_repository_impl = Arc::new(TrainScheduleRepositoryImpl::new(conn.clone()));
+    let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
+    let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
         &mini_io_endpoint,
@@ -204,10 +210,14 @@ async fn main() -> std::io::Result<()> {
 
     let train_data_service_impl = Arc::new(TrainDataServiceImpl::new(
         debug_mode,
+        data_base_path.clone(),
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&route_repository_impl),
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_repository_impl),
+        Arc::clone(&s3_object_storage_service_impl),
     ));
 
     let geo_service_impl = Arc::new(GeoServiceImpl::new(Arc::clone(&city_repository_impl)));
@@ -290,6 +300,14 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&order_repository_impl),
     ));
 
+    let dish_booking_service_impl = Arc::new(DishBookingServiceImpl::new(Arc::clone(
+        &order_repository_impl,
+    )));
+
+    let takeaway_booking_service_impl = Arc::new(TakeawayBookingServiceImpl::new(Arc::clone(
+        &order_repository_impl,
+    )));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -337,13 +355,24 @@ async fn main() -> std::io::Result<()> {
 
     let app_config_data = web::Data::new(app_config);
 
+    let dish_order_status_consumer = Box::new(DishOrderStatusConsumer::new(
+        Arc::clone(&dish_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let takeaway_order_status_consumer = Box::new(TakeawayOrderStatusConsumer::new(
+        Arc::clone(&takeaway_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
     let train_order_status_consumer = Box::new(TrainOrderStatusConsumer::new(
         Arc::clone(&train_booking_service_impl),
         Arc::clone(&transaction_service_impl),
     ));
 
-    let order_status_consumer: Vec<Box<dyn RabbitMQOrderStatusConsumer>> =
-        vec![train_order_status_consumer];
+    let order_status_consumer = vec![train_order_status_consumer, dish_order_status_consumer, takeaway_order_status_consumer];
+
+
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
