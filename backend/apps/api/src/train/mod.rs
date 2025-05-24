@@ -1,6 +1,4 @@
 use actix_web::web;
-use order::new;
-use schedule::query;
 
 pub mod order;
 pub mod schedule;
