@@ -1,8 +1,36 @@
-use crate::application::{ApplicationError, commands::train_order::CreateTrainOrderCommand};
+use crate::application::ApplicationError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use uuid::Uuid;
+
+// 定义请求数据结构
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainOrderRequestDTO {
+    /// 车次号，例如："G53"
+    pub train_number: String,
+    /// 离开"始发站"的日期时间
+    pub origin_departure_time: String,
+    /// 起始站
+    pub departure_station: String,
+    /// 到达站
+    pub arrival_station: String,
+    /// 乘车人 Id（见`PersonalInfo`）
+    pub personal_id: String,
+    /// 座位类别，如：二等座
+    pub seat_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderPackDTO {
+    /// 原子操作，若为 true，则`order_list`中任意订单失败将回滚已成功的订单
+    pub atomic: bool,
+    /// 订单列表
+    pub order_list: Vec<TrainOrderRequestDTO>,
+}
+
+pub type OrderPacksDTO = Vec<OrderPackDTO>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -48,15 +76,13 @@ impl ApplicationError for TrainOrderServiceError {
 
 #[async_trait]
 pub trait TrainOrderService: 'static + Send + Sync {
-    async fn create_train_order(
+    /// 处理火车票订单包列表
+    ///
+    /// 此方法接收会话ID和订单包列表，验证并创建订单，然后创建交易
+    /// 注意会话ID用于获取用户ID，订单包中包含原子性设置
+    async fn process_train_order_packs(
         &self,
-        dto: CreateTrainOrderDTO,
-    ) -> Result<CreateTrainOrderCommand, TrainOrderServiceError>;
-
-    /// 基于交易ID和订单UUID列表进行退款
-    async fn refund_order_transaction(
-        &self,
-        transaction_id: Uuid,
-        order_uuids: Vec<Uuid>,
-    ) -> Result<Uuid, TrainOrderServiceError>;
+        session_id: String,
+        order_packs: Vec<OrderPackDTO>,
+    ) -> Result<String, TrainOrderServiceError>;
 }

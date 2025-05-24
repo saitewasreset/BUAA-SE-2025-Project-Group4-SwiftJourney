@@ -26,6 +26,31 @@ where
     order_repository: Arc<OR>,
 }
 
+impl<TSR, TSS, TS, TR, OR> TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
+where
+    TSR: TrainScheduleRepository,
+    TSS: TrainSeatService,
+    TS: TransactionService,
+    TR: TransactionRepository,
+    OR: OrderRepository,
+{
+    pub fn new(
+        train_schedule_repository: Arc<TSR>,
+        train_seat_service: Arc<TSS>,
+        transaction_server: Arc<TS>,
+        transaction_repository: Arc<TR>,
+        order_repository: Arc<OR>,
+    ) -> Self {
+        Self {
+            train_schedule_repository,
+            train_seat_service,
+            transaction_server,
+            transaction_repository,
+            order_repository,
+        }
+    }
+}
+
 #[async_trait]
 impl<TSR, TSS, TS, TR, OR> TrainBookingService for TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
 where
@@ -54,7 +79,15 @@ where
         }
 
         let train_schedule_id = train_order.train_schedule_id();
-        let seat_type = train_order.seat().seat_type();
+        let seat = match train_order.seat() {
+            Some(seat) => seat,
+            None => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!("Seat information is missing")),
+                ));
+            }
+        };
+        let seat_type = seat.seat_type();
         let station_range = train_order.station_range();
 
         let train_schedule = match self.train_schedule_repository.find(train_schedule_id).await {
@@ -70,7 +103,7 @@ where
         let seat_availability_id =
             train_schedule.get_seat_availability_id(station_range, seat_type.clone());
 
-        let seat_location_info = train_order.seat().location_info();
+        let seat_location_info = seat.location_info();
 
         let seat = match self
             .train_seat_service
@@ -94,6 +127,7 @@ where
                         ),
                         train_order.train_schedule_id(),
                         train_order.seat().clone(),
+                        *train_order.preferred_seat_location(),
                         train_order.station_range(),
                     );
 
@@ -126,7 +160,8 @@ where
                 train_order.personal_info_id(),
             ),
             train_order.train_schedule_id(),
-            seat,
+            Some(seat),
+            *train_order.preferred_seat_location(),
             train_order.station_range(),
         );
 
@@ -164,7 +199,17 @@ where
         // 释放座位
         if status == OrderStatus::Ongoing {
             let train_schedule_id = train_order.train_schedule_id();
-            let seat_type = train_order.seat().seat_type();
+
+            let seat = match train_order.seat() {
+                Some(seat) => seat,
+                None => {
+                    return Err(TrainBookingServiceError::InfrastructureError(
+                        ServiceError::RelatedServiceError(anyhow!("Seat information is missing")),
+                    ));
+                }
+            };
+            let seat_type = seat.seat_type();
+
             let station_range = train_order.station_range();
 
             let train_schedule = match self.train_schedule_repository.find(train_schedule_id).await
@@ -180,8 +225,6 @@ where
 
             let seat_availability_id =
                 train_schedule.get_seat_availability_id(station_range, seat_type.clone());
-
-            let seat = train_order.seat();
 
             if let Err(err) = self
                 .train_seat_service
@@ -207,6 +250,7 @@ where
             ),
             train_order.train_schedule_id(),
             train_order.seat().clone(),
+            *train_order.preferred_seat_location(),
             train_order.station_range(),
         );
 
@@ -218,8 +262,7 @@ where
 
         if status == OrderStatus::Paid || status == OrderStatus::Ongoing {
             if let Some(transaction_id) = train_order.payment_info().refund_transaction_id() {
-                let transaction = match self.transaction_repository.find_by_id(transaction_id).await
-                {
+                let transaction = match self.transaction_repository.find(transaction_id).await {
                     Ok(Some(transaction)) => transaction,
                     Ok(None) => {
                         return Err(TrainBookingServiceError::InfrastructureError(

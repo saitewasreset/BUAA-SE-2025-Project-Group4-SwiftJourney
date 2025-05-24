@@ -29,6 +29,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use uuid::Uuid;
 
+use super::personal_info::PreferredSeatLocation;
+
 /// 枚举类型，表示订单的状态。
 ///
 /// 主要包含以下状态：
@@ -142,19 +144,19 @@ impl OrderTimeInfo {
     /// 创建一个新的 `OrderTimeInfo` 实例。
     ///
     /// Arguments:
-    /// - `crate_time`: 订单创建时间。
+    /// - `create_time`: 订单创建时间。
     /// - `active_time`: 订单活动时间。
     /// - `complete_time`: 订单完成时间。
     ///
     /// Returns:
     /// - 新创建的 `OrderTimeInfo` 实例。
     pub fn new(
-        crate_time: DateTimeWithTimeZone,
+        create_time: DateTimeWithTimeZone,
         active_time: DateTimeWithTimeZone,
         complete_time: DateTimeWithTimeZone,
     ) -> Self {
         Self {
-            create_time: crate_time,
+            create_time,
             active_time,
             complete_time,
         }
@@ -164,7 +166,7 @@ impl OrderTimeInfo {
     ///
     /// Returns:
     /// - 订单创建时间。
-    pub fn crate_time(&self) -> DateTimeWithTimeZone {
+    pub fn create_time(&self) -> DateTimeWithTimeZone {
         self.create_time
     }
 
@@ -284,7 +286,7 @@ pub trait Order: DynClone + Debug + Send + Sync + 'static + Any {
     ///
     /// Returns:
     /// - 订单的唯一标识符。
-    fn order_id(&self) -> OrderId;
+    fn order_id(&self) -> Option<OrderId>;
 
     /// 获取订单的 UUID。
     ///
@@ -352,7 +354,7 @@ clone_trait_object!(Order);
 /// - `personal_info_id`: 订单关联的个人信息唯一标识符。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BaseOrder {
-    order_id: OrderId,
+    order_id: Option<OrderId>,
     uuid: Uuid,
     order_status: OrderStatus,
     order_time_info: OrderTimeInfo,
@@ -379,7 +381,7 @@ impl BaseOrder {
     /// - 新创建的 `BaseOrder` 实例。
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        order_id: OrderId,
+        order_id: Option<OrderId>,
         uuid: Uuid,
         order_status: OrderStatus,
         order_time_info: OrderTimeInfo,
@@ -412,7 +414,8 @@ impl BaseOrder {
 pub struct TrainOrder {
     base: BaseOrder,
     train_schedule_id: TrainScheduleId,
-    seat: Seat,
+    seat: Option<Seat>,
+    preferred_seat_location: Option<PreferredSeatLocation>,
     station_range: StationRange<Verified>,
 }
 
@@ -430,13 +433,15 @@ impl TrainOrder {
     pub fn new(
         base_order: BaseOrder,
         train_schedule_id: TrainScheduleId,
-        seat: Seat,
+        seat: Option<Seat>,
+        preferred_seat_location: Option<PreferredSeatLocation>,
         station_range: StationRange<Verified>,
     ) -> Self {
         Self {
             base: base_order,
             train_schedule_id,
             seat,
+            preferred_seat_location,
             station_range,
         }
     }
@@ -461,13 +466,21 @@ impl TrainOrder {
     ///
     /// Returns:
     /// - 座位信息的引用。
-    pub fn seat(&self) -> &Seat {
+    pub fn seat(&self) -> &Option<Seat> {
         &self.seat
+    }
+
+    /// 获取首选座位位置。
+    ///
+    /// Returns:
+    /// - 首选座位位置的引用。
+    pub fn preferred_seat_location(&self) -> &Option<PreferredSeatLocation> {
+        &self.preferred_seat_location
     }
 }
 
 impl Order for TrainOrder {
-    fn order_id(&self) -> OrderId {
+    fn order_id(&self) -> Option<OrderId> {
         self.base.order_id
     }
 
@@ -512,11 +525,11 @@ impl Identifiable for TrainOrder {
     type ID = OrderId;
 
     fn get_id(&self) -> Option<Self::ID> {
-        Some(self.base.order_id)
+        self.base.order_id
     }
 
     fn set_id(&mut self, id: Self::ID) {
-        self.base.order_id = id
+        self.base.order_id = Some(id)
     }
 }
 
@@ -592,11 +605,11 @@ impl Identifiable for HotelOrder {
     type ID = OrderId;
 
     fn get_id(&self) -> Option<Self::ID> {
-        Some(self.base.order_id)
+        self.base.order_id
     }
 
     fn set_id(&mut self, id: Self::ID) {
-        self.base.order_id = id
+        self.base.order_id = Some(id)
     }
 }
 
@@ -604,7 +617,7 @@ impl Entity for HotelOrder {}
 impl Aggregate for HotelOrder {}
 
 impl Order for HotelOrder {
-    fn order_id(&self) -> OrderId {
+    fn order_id(&self) -> Option<OrderId> {
         self.base.order_id
     }
 
@@ -726,11 +739,11 @@ impl Identifiable for DishOrder {
     type ID = OrderId;
 
     fn get_id(&self) -> Option<Self::ID> {
-        Some(self.base.order_id)
+        self.base.order_id
     }
 
     fn set_id(&mut self, id: Self::ID) {
-        self.base.order_id = id
+        self.base.order_id = Some(id);
     }
 }
 
@@ -738,7 +751,7 @@ impl Entity for DishOrder {}
 impl Aggregate for DishOrder {}
 
 impl Order for DishOrder {
-    fn order_id(&self) -> OrderId {
+    fn order_id(&self) -> Option<OrderId> {
         self.base.order_id
     }
 
@@ -857,7 +870,7 @@ impl TakeawayOrder {
 }
 
 impl Order for TakeawayOrder {
-    fn order_id(&self) -> OrderId {
+    fn order_id(&self) -> Option<OrderId> {
         self.base.order_id
     }
 
@@ -901,11 +914,11 @@ impl Identifiable for TakeawayOrder {
     type ID = OrderId;
 
     fn get_id(&self) -> Option<Self::ID> {
-        Some(self.base.order_id)
+        self.base.order_id
     }
 
     fn set_id(&mut self, id: Self::ID) {
-        self.base.order_id = id
+        self.base.order_id = Some(id)
     }
 }
 

@@ -4,7 +4,12 @@
     "words": [
         "actix",
         "chrono",
+        "codegen",
+        "dotenv",
+        "dotenvy",
+        "dtos",
         "mockall",
+        "petgraph",
         "rabbitmq",
         "Saite",
         "thiserror"
