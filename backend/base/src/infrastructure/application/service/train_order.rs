@@ -26,6 +26,7 @@ use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::transaction::TransactionService;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -324,15 +325,15 @@ where
             _ => return Err(Box::new(TrainOrderServiceError::InvalidStationId)),
         };
 
-        // let total_price = unit_price * Decimal::from(stations_count);
+        let total_price = unit_price * Decimal::from(stations_count);
 
         let base_order = BaseOrder::new(
             None,
             order_uuid,
             OrderStatus::Unpaid,
             order_time_info,
-            unit_price,
-            stations_count.into(),
+            total_price,
+            Decimal::from(1), // 一笔订单应该对应一张票
             payment_info,
             personal_info_id,
         );
