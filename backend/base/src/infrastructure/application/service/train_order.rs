@@ -1,7 +1,9 @@
+use crate::application::GeneralError;
 use crate::application::service::train_order::CreateTrainOrderDTO;
 use crate::application::service::train_order::OrderPackDTO;
 use crate::application::service::train_order::TrainOrderService;
 use crate::application::service::train_order::TrainOrderServiceError;
+use crate::application::service::transaction::TransactionInfoDTO;
 use crate::domain::Identifiable;
 use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
@@ -16,11 +18,13 @@ use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
+use crate::domain::service::ServiceError;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::train_booking::TrainBookingService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::transaction::TransactionService;
 use async_trait::async_trait;
+use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -398,7 +402,7 @@ where
         &self,
         session_id: String,
         order_packs: Vec<OrderPackDTO>,
-    ) -> Result<String, TrainOrderServiceError> {
+    ) -> Result<TransactionInfoDTO, TrainOrderServiceError> {
         let user_id = self
             .session_manager_service
             .get_user_id_by_session(
@@ -412,13 +416,13 @@ where
             })?
             .ok_or(TrainOrderServiceError::InvalidSessionId)?;
 
-        let mut transaction_id = String::new();
+        let mut all_train_orders: Vec<Box<dyn Order>> = Vec::new();
+        let mut all_order_uuids: Vec<Uuid> = Vec::new();
+        let mut all_atomic = true;
+        let mut total_amount: f64 = 0.0;
 
         for pack in order_packs {
-            let atomic = pack.atomic;
-
-            let mut train_orders: Vec<Box<dyn Order>> = Vec::new();
-            let mut order_uuids = Vec::new();
+            all_atomic &= pack.atomic;
 
             for order_request in pack.order_list {
                 let dto = CreateTrainOrderDTO {
@@ -433,31 +437,35 @@ where
                 let (order_uuid, train_order) =
                     self.validate_and_create_train_order(&dto, user_id).await?;
 
-                order_uuids.push(order_uuid);
-                train_orders.push(train_order);
-            }
+                total_amount += (train_order.unit_price() * train_order.amount())
+                    .to_f64()
+                    .expect("Failed to convert amount to f64");
 
-            let tx_id = self
-                .transaction_service
-                .new_transaction(user_id, train_orders, atomic)
-                .await
-                .map_err(|e| {
-                    error!("Failed to create transaction: {:?}", e);
-                    TrainOrderServiceError::InvalidTrainNumber
-                })?;
-
-            transaction_id = tx_id.to_string();
-
-            if let Err(e) = self.process_order_message(tx_id, order_uuids, atomic).await {
-                error!("Failed to process orders immediately: {:?}", e);
-                return Err(e);
+                all_order_uuids.push(order_uuid);
+                all_train_orders.push(train_order);
             }
         }
 
-        info!(
-            "Successfully processed all order packs, transaction_id={}",
-            transaction_id
-        );
-        Ok(transaction_id)
+        let transaction_id = self
+            .transaction_service
+            .new_transaction(user_id, all_train_orders, all_atomic)
+            .await
+            .map_err(|e| {
+                TrainOrderServiceError::InfrastructureError(ServiceError::RelatedServiceError(e.into()))
+            })?;
+
+        if let Err(e) = self
+            .process_order_message(transaction_id, all_order_uuids, all_atomic)
+            .await
+        {
+            error!("Failed to process orders immediately: {:?}", e);
+            return Err(e);
+        }
+
+        Ok(TransactionInfoDTO {
+            transaction_id,
+            amount: total_amount,
+            status: "unpaid".to_string(),
+        })
     }
 }

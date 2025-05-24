@@ -1,7 +1,9 @@
-use crate::application::ApplicationError;
+use crate::{application::ApplicationError, domain::service::ServiceError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use super::transaction::TransactionInfoDTO;
 
 // 定义请求数据结构
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,6 +47,9 @@ pub struct CreateTrainOrderDTO {
 
 #[derive(Error, Debug)]
 pub enum TrainOrderServiceError {
+    /// 底层基础设施错误（如数据库访问失败）
+    #[error("an infrastructure error occurred: {0}")]
+    InfrastructureError(ServiceError),
     /// 会话无效
     #[error("invalid session id:")]
     InvalidSessionId,
@@ -62,6 +67,7 @@ pub enum TrainOrderServiceError {
 impl ApplicationError for TrainOrderServiceError {
     fn error_code(&self) -> u32 {
         match self {
+            TrainOrderServiceError::InfrastructureError(_) => 500,
             TrainOrderServiceError::InvalidSessionId => 403,
             TrainOrderServiceError::InvalidTrainNumber => 404,
             TrainOrderServiceError::InvalidStationId => 404,
@@ -84,5 +90,5 @@ pub trait TrainOrderService: 'static + Send + Sync {
         &self,
         session_id: String,
         order_packs: Vec<OrderPackDTO>,
-    ) -> Result<String, TrainOrderServiceError>;
+    ) -> Result<TransactionInfoDTO, TrainOrderServiceError>;
 }
