@@ -46,53 +46,52 @@
         <div class="Grid">
             <div class="Selected">
                 <p class="title">筛选</p>
-                <p class="sub-title">价格 {{ moneyFormat(moneyValue) }}</p>
+                <p class="sub-title">最低价格 {{ moneyFormat(moneyValue) }}</p>
                 <el-slider class="rating-slider" range v-model="moneyValue" :marks="moneyMarks" :show-tooltip="false" />
                 <p class="sub-title" style="margin-top: 25px;">房型</p>
+                <el-checkbox class="CheckBox" v-model="roomShowAll" label="全部房型" 
+                @change="toggleRoomShowAll"/>
                 <el-checkbox class="CheckBox" v-model="roomTypeFree" label="只看剩余房型" />
-                <div v-for="(key, index) in roomList" :key="index">
-                    <el-checkbox class="CheckBox" v-model="key.isShow" :label="key.type" />
-                </div>
+                <el-checkbox class="CheckBox" v-for="(key, index) in roomList" :key="index" v-model="key.isShow" :label="key.type" />
                 <p class="sub-title">评分 {{ ratingFormat(ratingValue) }}</p>
                 <el-slider class="rating-slider" v-model="ratingValue" :show-tooltip="false" />
                 <p class="sub-title">评论数 {{ ratingCountFormat(ratingCountValue) }}</p>
                 <el-slider class="rating-slider" v-model="ratingCountValue" :marks="ratingCountMarks" :show-tooltip="false" />
             </div>
             <el-scrollbar height="540px" class="HotelInfo">
-                <el-card v-if="isCardShow(rateValue, 1000, 300)" class="HotelInfoCard" shadow="always">
-                    <div class="HotelImageContainer">
-                        <img class="HotelImage" src="../../assets/hotel.jpg" alt="hotel-image">
-                    </div>
-                    <div class="HotelInfoShow">
-                        <p class="HotelName">桔子水晶酒店</p>
-                        <p class="HotelRoomType"> {{ roomTypeDisplay(debugdata) }} </p>
-                        <div class="HotelRateContainer">
-                            <el-rate class="HotelRate" v-model="rateValue" disabled show-score 
-                            text-color="#ff9900" size="large" score-template="{value}"/>
-                            <p class="RatingNum">300人评论</p>
+                <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
+                    <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
+                        <div class="HotelImageContainer">
+                            <img class="HotelImage" :src="info.picture" alt="hotel-image">
                         </div>
-                    </div>
-                    <div class="RightInfoShow">
-                        <div class="HotelMoney">
-                            <p class="p1">SC</p>
-                            <p class="p2">1000</p>
-                            <p class="p1">起</p>
+                        <div class="HotelInfoShow">
+                            <p class="HotelName">{{ info.name }}</p>
+                            <p class="HotelGeneralInfo">{{ info.info }}</p>
+                            <p class="HotelRoomType"> {{ roomTypeDisplays[index] }} </p>
+                            <div class="HotelRateContainer">
+                                <el-rate class="HotelRate" v-model="info.rating" disabled show-score 
+                                text-color="#ff9900" size="large" score-template="{value}"/>
+                                <p class="RatingNum">{{ info.ratingCount }}人评论</p>
+                            </div>
                         </div>
-                        <p class="LiveNum">1000人住过</p>
-                        <el-button class="DetailButton" type="primary" size="large">查看详情</el-button>
-                    </div>
-                </el-card>
-                <el-card class="HotelInfoCard">1111</el-card>
-                <el-card class="HotelInfoCard">1111</el-card>
-                <el-card class="HotelInfoCard">1111</el-card>
-                <el-card class="HotelInfoCard">1111</el-card>
+                        <div class="RightInfoShow">
+                            <div class="HotelMoney">
+                                <p class="p1">SC</p>
+                                <p class="p2">{{ moneyDisplays[index] }}</p>
+                                <p class="p1">起</p>
+                            </div>
+                            <p class="LiveNum">{{ info.totalBookings }}人住过</p>
+                            <el-button class="DetailButton" type="primary" size="large">查看详情</el-button>
+                        </div>
+                    </el-card>
+                </div>
             </el-scrollbar>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive, computed } from 'vue';
+import { ref, nextTick, reactive, computed, watch } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import type { HotelQuery, HotelGeneralInfo, HotelGInfoWRoom, HotelOrderQuery, HotelRoomDetailInfo } from '@/interface/hotelInterface';
 import CitySelect from '../TicketSearch/CitySelect/CitySelect.vue';
@@ -103,6 +102,7 @@ import 'dayjs/locale/zh-cn';
 import { ElMessage } from 'element-plus';
 import { hotelApi } from '@/api/HotelApi/hotelApi';
 import { fa } from 'element-plus/es/locales.mjs';
+import type { IndexInfo } from 'typescript';
 
 dayjs.locale('zh-cn');
 
@@ -224,15 +224,36 @@ function checkHotelQuery() {
 const hotelGInfoWRoom = ref<HotelGInfoWRoom[]>([]);
 const roomSet = new Set<string>();
 const roomList = ref<{type: string, isShow: boolean}[]>([]);
+const roomMapIndex = new Map<string, number>();
+const roomTypeFree = ref(false);
+const roomShowAll = ref(true);
+// 计算属性，判断是否所有房间都显示且 roomTypeFree 为 false
+const roomShowAllComputed = computed(() => {
+    return !roomList.value.some(room => !room.isShow) && !roomTypeFree.value;
+});
+// 监听 roomList 或 roomTypeFree 的变化，更新 roomShowAll
+watch([roomList, roomTypeFree], () => {
+    roomShowAll.value = roomShowAllComputed.value;
+}, { deep: true });
+// 方法，用于手动切换 roomShowAll
+const toggleRoomShowAll = (value: boolean) => {
+    roomTypeFree.value = false;
+    roomList.value.forEach(room => {
+        room.isShow = true;
+    });
+    roomShowAll.value = true;
+};
+
 
 async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
     hotelGInfoWRoom.value = [];
     roomSet.clear();
     roomList.value = [];
     for(let tepInfo of hotelGeneralInfo) {
+        let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
             ...tepInfo,
-            roomTypeMap: await hotelDetailRoom(tepInfo.hotelId),
+            roomTypeMap: map,
         }
         hotelGInfoWRoom.value.push(tepInfoWRoom);
     }
@@ -241,6 +262,9 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
             type: key,
             isShow: true,
         });
+    })
+    roomList.value.forEach((key, index) => {
+        roomMapIndex.set(key.type, index);
     })
 }
 
@@ -264,16 +288,34 @@ async function hotelDetailRoom(id: string) {
     })
 }
 
-function MapToRoomType(map: Map<string, HotelRoomDetailInfo>, flag: boolean) {
+function MapToRoomType(map: Map<string, HotelRoomDetailInfo>, flag: boolean, roomStatusList: {type: string, isShow: boolean}[]) {
     let roomType = '';
     for(const [key, value] of map) {
-        if(flag && value.remainCount > 0) {
-            roomType = roomType + key + ' ';
-        } else if(!flag) {
-            roomType = roomType + key + ' ';
+        let index = roomMapIndex.get(key);
+        if(index != null && roomStatusList[index].type == key && roomStatusList[index].isShow) {
+            if(flag && value.remainCount > 0) {
+                roomType = roomType + key + ' ';
+            } else if(!flag) {
+                roomType = roomType + key + ' ';
+            }
         }
     }
     return roomType.trim();
+}
+
+function minMoney(map: Map<string, HotelRoomDetailInfo>, flag: boolean, roomStatusList: {type: string, isShow: boolean}[]) {
+    let minMoney = -1;
+    for(const [key, value] of map) {
+        let index = roomMapIndex.get(key);
+        if(index != null && roomStatusList[index].type == key && roomStatusList[index].isShow && (minMoney == -1 || minMoney > value.price)) {
+            if(flag && value.remainCount > 0) {
+                minMoney = value.price;
+            } else if(!flag) {
+                minMoney = value.price;
+            }
+        }
+    }
+    return minMoney;
 }
 
 //-------------------------------筛选------------------------------------
@@ -340,51 +382,102 @@ function isCardShow(rate: number, money: number, ratingCount: number) {
     return isRatingShow(rate) && isMoneyShow(money) && isRatingCountShow(ratingCount);
 }
 
+const roomTypeDisplays = computed(() => {
+    return hotelGInfoWRoom.value.map(info => 
+        MapToRoomType(info.roomTypeMap, roomTypeFree.value, roomList.value)
+    );
+});
 
-const roomTypeFree = ref(false);
-
-function roomTypeDisplay(map: Map<string, HotelRoomDetailInfo>) {
-    return computed(() => {
-        return MapToRoomType(map, roomTypeFree.value);
-    })
-}
+const moneyDisplays = computed(() =>{
+    return hotelGInfoWRoom.value.map(info =>
+        minMoney(info.roomTypeMap, roomTypeFree.value, roomList.value)
+    )
+})
 
 //-----------------------------------debug-----------------------------------
-const rateValue = ref(3.4);
-const debugdata = new Map<string, HotelRoomDetailInfo>();
+import hotelImage from '../../assets/hotel.jpg'
+const debugdataMap = new Map<string, HotelRoomDetailInfo>();
 const debugHotelRoomDetailInfo1: HotelRoomDetailInfo = {
     capacity: 1,
     remainCount: 5,
-    price: 50,
+    price: 200,
 }
-debugdata.set('单人间', debugHotelRoomDetailInfo1);
+debugdataMap.set('标间', debugHotelRoomDetailInfo1);
 const debugHotelRoomDetailInfo2: HotelRoomDetailInfo = {
     capacity: 2,
     remainCount: 3,
-    price: 100,
+    price: 796,
 }
-debugdata.set('大床房', debugHotelRoomDetailInfo2);
+debugdataMap.set('大床房', debugHotelRoomDetailInfo2);
 const debugHotelRoomDetailInfo3: HotelRoomDetailInfo = {
     capacity: 2,
     remainCount: 0,
-    price: 90,
+    price: 599,
 }
-debugdata.set('双床房', debugHotelRoomDetailInfo3);
+debugdataMap.set('双床房', debugHotelRoomDetailInfo3);
 const debugHotelRoomDetailInfo4: HotelRoomDetailInfo = {
     capacity: 3,
     remainCount: 1,
-    price: 150,
+    price: 999,
 }
-debugdata.set('三人间', debugHotelRoomDetailInfo4);
+debugdataMap.set('三人间', debugHotelRoomDetailInfo4);
 const debugHotelRoomDetailInfo5: HotelRoomDetailInfo = {
     capacity: 3,
     remainCount: 0,
-    price: 500,
+    price: 4000,
 }
-debugdata.set('总统套房', debugHotelRoomDetailInfo5);
+debugdataMap.set('总统套房', debugHotelRoomDetailInfo5);
+
+const debugHoteldata1: HotelGInfoWRoom = {
+    hotelId: '11111',
+    name: '桔子水晶酒店',
+    picture: hotelImage,
+    rating: 4.8,
+    ratingCount: 365,
+    totalBookings: 1245,
+    price: 200,
+    roomTypeMap: debugdataMap,
+    info: "本酒店距离火车站步行约5分钟，配备免费Wi-Fi与早餐。"
+}
+
+const debugdataMap2 = new Map<string, HotelRoomDetailInfo>();
+const debugHotelRoomDetailInfo6: HotelRoomDetailInfo = {
+    capacity: 3,
+    remainCount: 0,
+    price: 999,
+}
+debugdataMap2.set('三人间', debugHotelRoomDetailInfo6);
+const debugHotelRoomDetailInfo7: HotelRoomDetailInfo = {
+    capacity: 2,
+    remainCount: 2,
+    price: 496,
+}
+debugdataMap2.set('大床房', debugHotelRoomDetailInfo7);
+const debugHotelRoomDetailInfo8: HotelRoomDetailInfo = {
+    capacity: 1,
+    remainCount: 1,
+    price: 159,
+}
+debugdataMap2.set('标间', debugHotelRoomDetailInfo8);
+const debugHoteldata2: HotelGInfoWRoom = {
+    hotelId: '11112',
+    name: '日升大酒店',
+    picture: hotelImage,
+    rating: 4.5,
+    ratingCount: 86,
+    totalBookings: 264,
+    price: 159,
+    roomTypeMap: debugdataMap2,
+    info: "本酒店距离火车站步行约5分钟，配备免费Wi-Fi与早餐。"
+}
+
+hotelGInfoWRoom.value.push(debugHoteldata1);
+hotelGInfoWRoom.value.push(debugHoteldata2);
+hotelGInfoWRoom.value.push(debugHoteldata1);
+hotelGInfoWRoom.value.push(debugHoteldata1);
 
 const debugRoomSet = new Set<string>();
-debugRoomSet.add('单人间');
+debugRoomSet.add('标间');
 debugRoomSet.add('大床房');
 debugRoomSet.add('双床房');
 debugRoomSet.add('三人间');
@@ -396,6 +489,9 @@ debugRoomSet.forEach((key) => {
         type: key,
         isShow: true,
     });
+})
+roomList.value.forEach((key, index) => {
+    roomMapIndex.set(key.type, index);
 })
 </script>
 
@@ -554,10 +650,12 @@ debugRoomSet.forEach((key) => {
     margin-top: 30px;
     display: flex;
     justify-content: space-between;
+    gap: 5px;
 }
 
 .Selected {
     margin-left: 10px;
+    width: 280px;
 }
 .title {
     font-size: 1.25rem;
@@ -571,14 +669,15 @@ debugRoomSet.forEach((key) => {
 }
 
 .rating-slider {
-    width: 210px;
+    width: 220px;
 }
 ::v-deep(.CheckBox .el-checkbox__label) {
-    font-size: 16px;    
+    font-size: 16px; 
+    width: 85px;   
 }
 
 .HotelInfo {
-    width: 740px;
+    width: 730px;
 }
 
 .HotelInfoCard {
@@ -628,14 +727,33 @@ debugRoomSet.forEach((key) => {
     justify-content: flex-start;
     gap: 15px;
 }
+::v-deep(.el-rate--large) {
+    height: 0;
+}
+::v-deep(.el-rate) {
+    --el-rate-font-size: 16px;
+    --el-rate-icon-size: 20px;
+}
+
 .RatingNum {
     font-size: 16px;
     color: rgb(189,190,194);
     margin-bottom: 0;
 }
+
+.HotelGeneralInfo {
+    font-size: 14px;
+    margin-top: 0;
+    margin-bottom: 0;
+    width: 400px;
+    white-space: nowrap; /* 防止文本换行 */
+    overflow: hidden; /* 隐藏溢出的部分 */
+    text-overflow: ellipsis; /* 使用省略号表示被隐藏的文本 */
+}
+
 .HotelRoomType {
-    font-size: 20px;
-    margin-top: 5px;
+    font-size: 18px;
+    margin-top: 0;
     margin-bottom: 0;
     width: 400px;
     white-space: nowrap; /* 防止文本换行 */
