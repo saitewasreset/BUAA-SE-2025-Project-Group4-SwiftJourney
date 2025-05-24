@@ -76,9 +76,9 @@
     import { RouterLink, RouterView } from 'vue-router';
     import { useRouter } from 'vue-router';
 
-    //const user = useUserStore();
-    import { useDebugUserStore } from '@/stores/user';
-    const user = useDebugUserStore();
+    const user = useUserStore();
+    //import { useDebugUserStore } from '@/stores/user';
+    //const user = useDebugUserStore();
 
     const router = useRouter();
 
