@@ -231,7 +231,7 @@ where
             arrival_station_id.unwrap(),
         );
 
-        let now = sea_orm::prelude::DateTimeWithTimeZone::from(chrono::Utc::now());
+        let now = sea_orm::prelude::DateTimeWithTimeZone::from(chrono::Local::now());
 
         let train_schedule_id = train_schedule.get_id().ok_or_else(|| {
             error!("Failed to get train schedule ID");
