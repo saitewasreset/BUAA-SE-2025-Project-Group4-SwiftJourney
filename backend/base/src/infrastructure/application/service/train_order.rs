@@ -103,7 +103,7 @@ where
         &self,
         dto: &CreateTrainOrderDTO,
         user_id: UserId,
-    ) -> Result<(Uuid, Box<dyn Order>), Box<dyn ApplicationError>> {
+    ) -> Result<Box<dyn Order>, Box<dyn ApplicationError>> {
         // == 验证订单 ==
         // SAFETY: 正确性将在find_by_train_number中检查
         let train_number = TrainNumber::from_unchecked(dto.train_number.clone());
@@ -348,7 +348,7 @@ where
             station_range,
         );
 
-        Ok((order_uuid, Box::new(train_order)))
+        Ok(Box::new(train_order))
     }
 
     // 处理订单消息（模拟消息队列消费者处理）
@@ -497,14 +497,13 @@ where
                     seat_type: order_request.seat_type.clone(),
                 };
 
-                let (order_uuid, train_order) =
-                    self.validate_and_create_train_order(&dto, user_id).await?;
+                let train_order = self.validate_and_create_train_order(&dto, user_id).await?;
 
                 total_amount += (train_order.unit_price() * train_order.amount())
                     .to_f64()
                     .expect("Failed to convert amount to f64");
 
-                all_order_uuids.push(order_uuid);
+                all_order_uuids.push(train_order.uuid());
                 all_train_orders.push(train_order);
             }
         }
