@@ -25,7 +25,7 @@ impl<R> OrderServiceImpl<R> where R: OrderRepository {}
 macro_rules! base_order_fields {
     ($dto:ident, $order:expr, $order_type:expr) => {
         $dto {
-            order_id: $order.order_id().to_string(),
+            order_id: $order.uuid().to_string(),
             status: $order.order_status().to_string(),
             unit_price: $order.unit_price().to_f64().unwrap_or(0.0),
             amount: $order.amount().to_i32().unwrap_or(0),
@@ -88,11 +88,16 @@ where
             let related_info = self
                 .order_repository
                 .get_train_order_related_data(
-                    train_order.order_id(),
+                    train_order.order_id().expect("order should have id"),
                     train_order.train_schedule_id(),
                     self.tz_offset_hour,
                 )
                 .await?;
+
+            let seat = train_order
+                .seat()
+                .as_ref()
+                .expect("train order should have a seat");
 
             let order_info_dto = TrainOrderDto {
                 base,
@@ -103,10 +108,10 @@ where
                 terminal_time: related_info.terminal_time,
                 name: related_info.name,
                 seat: SeatLocationInfoDTO {
-                    carriage: train_order.seat().location_info().carriage,
-                    row: train_order.seat().location_info().row,
-                    location: String::from(train_order.seat().location_info().location),
-                    type_name: train_order.seat().seat_type().name().to_string(),
+                    carriage: seat.location_info().carriage,
+                    row: seat.location_info().row,
+                    location: String::from(seat.location_info().location),
+                    type_name: seat.seat_type().name().to_string(),
                 },
             };
 
@@ -118,7 +123,7 @@ where
 
             let related_info = self
                 .order_repository
-                .get_hotel_order_related_data(hotel_order.order_id())
+                .get_hotel_order_related_data(hotel_order.order_id().expect("order should have id"))
                 .await?;
 
             let order_info_dto = HotelOrderDto {
@@ -139,7 +144,10 @@ where
 
             let related_info = self
                 .order_repository
-                .get_dish_order_related_data(dish_order.order_id(), self.tz_offset_hour)
+                .get_dish_order_related_data(
+                    dish_order.order_id().expect("order should have id"),
+                    self.tz_offset_hour,
+                )
                 .await?;
 
             let order_info_dto = DishOrderDto {
@@ -160,7 +168,7 @@ where
             let related_info = self
                 .order_repository
                 .get_takeaway_order_related_data(
-                    takeaway_order.order_id(),
+                    takeaway_order.order_id().expect("order should have id"),
                     takeaway_order.train_order_id(),
                     self.tz_offset_hour,
                 )

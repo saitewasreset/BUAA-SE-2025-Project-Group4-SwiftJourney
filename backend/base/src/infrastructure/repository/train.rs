@@ -40,7 +40,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
 impl_db_id_from_u64!(TrainId, i32, "train");
 impl_db_id_from_u64!(SeatTypeId, i32, "seat type");
