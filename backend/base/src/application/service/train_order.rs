@@ -90,5 +90,5 @@ pub trait TrainOrderService: 'static + Send + Sync {
         &self,
         session_id: String,
         order_packs: Vec<OrderPackDTO>,
-    ) -> Result<TransactionInfoDTO, TrainOrderServiceError>;
+    ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>>;
 }
