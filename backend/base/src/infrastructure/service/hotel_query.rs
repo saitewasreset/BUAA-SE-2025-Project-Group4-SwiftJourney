@@ -1,5 +1,4 @@
-use crate::HOTEL_MAX_BOOKING_DAYS;
-use crate::application::commands::hotel::{HotelQuery, TargetType};
+use crate::application::commands::hotel::TargetType;
 use crate::application::service::hotel::HotelGeneralInfoDTO;
 use crate::domain::Identifiable;
 use crate::domain::model::hotel::{
@@ -144,71 +143,6 @@ where
     SR: StationRepository,
     ORR: OccupiedRoomRepository,
 {
-    async fn validate_date_range(
-        &self,
-        begin_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<(), HotelQueryError> {
-        match (begin_date, end_date) {
-            (None, None) => Ok(()),
-
-            (Some(_), None) | (None, Some(_)) => Err(HotelQueryError::InvalidDateRange(
-                "Both dates must be specified or none".into(),
-            )),
-
-            (Some(begin), Some(end)) => {
-                if end <= begin {
-                    return Err(HotelQueryError::InvalidDateRange(
-                        "End date must be after begin date".into(),
-                    ));
-                }
-
-                let duration = end.signed_duration_since(begin).num_days();
-                if duration > HOTEL_MAX_BOOKING_DAYS as i64 {
-                    return Err(HotelQueryError::InvalidDateRange(format!(
-                        "Stay cannot exceed {} days",
-                        HOTEL_MAX_BOOKING_DAYS
-                    )));
-                }
-
-                Ok(())
-            }
-        }
-    }
-
-    async fn validate_target(
-        &self,
-        target: &str,
-        target_type: &TargetType,
-    ) -> Result<(), HotelQueryError> {
-        match target_type {
-            TargetType::City => {
-                let cities = self
-                    .city_repository
-                    .find_by_name(target)
-                    .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?;
-
-                if cities.is_empty() {
-                    return Err(HotelQueryError::TargetNotFound(target.to_string()));
-                }
-            }
-            TargetType::Station => {
-                let stations = self
-                    .station_repository
-                    .find_by_name(target)
-                    .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?;
-
-                if stations.is_none() {
-                    return Err(HotelQueryError::TargetNotFound(target.to_string()));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     async fn find_hotels_by_target(
         &self,
         target: &str,
@@ -258,12 +192,11 @@ where
     async fn calculate_minimum_prices(
         &self,
         hotels: &[Hotel],
-        begin_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
+        date_range: Option<&HotelDateRange>,
     ) -> Result<HashMap<HotelId, Decimal>, HotelQueryError> {
         let mut result = HashMap::with_capacity(hotels.len());
 
-        if begin_date.is_none() || end_date.is_none() {
+        if date_range.is_none() {
             for hotel in hotels {
                 if let Some(hotel_id) = hotel.get_id() {
                     let min_price = hotel
@@ -279,14 +212,11 @@ where
             return Ok(result);
         }
 
-        let date_range = match HotelDateRange::new(begin_date.unwrap(), end_date.unwrap()) {
-            Ok(range) => range,
-            Err(e) => return Err(HotelQueryError::InvalidDateRange(e.to_string())),
-        };
+        let date_range = date_range.unwrap();
 
         for hotel in hotels {
             if let Some(hotel_id) = hotel.get_id() {
-                let room_statuses = match self.get_all_room_status(hotel_id, &date_range).await {
+                let room_statuses = match self.get_all_room_status(hotel_id, date_range).await {
                     Ok(statuses) => statuses,
                     Err(e) => {
                         error!("Failed to get room status for hotel {}: {}", hotel_id, e);
@@ -310,19 +240,20 @@ where
 
     async fn query_hotels(
         &self,
-        query: &HotelQuery,
+        target: &str,
+        target_type: &TargetType,
+        search_term: Option<&str>,
+        date_range: Option<&HotelDateRange>,
     ) -> Result<Vec<HotelGeneralInfoDTO>, HotelQueryError> {
         let hotels = self
-            .find_hotels_by_target(&query.target, &query.target_type, query.search.as_deref())
+            .find_hotels_by_target(target, target_type, search_term)
             .await?;
 
         if hotels.is_empty() {
             return Ok(Vec::new());
         }
 
-        let prices = self
-            .calculate_minimum_prices(&hotels, query.begin_date, query.end_date)
-            .await?;
+        let prices = self.calculate_minimum_prices(&hotels, date_range).await?;
 
         let mut hotel_infos = Vec::with_capacity(hotels.len());
         for hotel in hotels {
