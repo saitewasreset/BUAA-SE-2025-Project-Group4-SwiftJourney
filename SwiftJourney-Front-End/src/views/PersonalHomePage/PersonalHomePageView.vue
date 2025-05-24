@@ -58,7 +58,7 @@ const pageRefs: Array<{ label: string; ref: Component }> = [
   {label: 'transactionrecord', ref: TransactionRecord}
 ];
 
-const pageRef = ref<Component>(PersonalData);
+const pageRef = ref<Component>(pageRefs.find((page) => page.label ===  route.params.activeIndex)?.ref || PersonalData);
 
 function handleClick(e: { key: string }) {
   const pageKey = e.key;
