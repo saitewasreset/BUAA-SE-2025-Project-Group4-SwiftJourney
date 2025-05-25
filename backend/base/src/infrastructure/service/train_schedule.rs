@@ -10,7 +10,7 @@ use crate::domain::service::ServiceError;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{FixedOffset, NaiveDate};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
@@ -21,14 +21,18 @@ where
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
     route_service: Arc<T>,
+    tz_offset_hour: i32,
 }
 
 impl<T> TrainScheduleServiceImpl<T>
 where
     T: RouteService + 'static + Send + Sync,
 {
-    pub fn new(route_service: Arc<T>) -> Self {
-        Self { route_service }
+    pub fn new(route_service: Arc<T>, tz_offset_hour: i32) -> Self {
+        Self {
+            route_service,
+            tz_offset_hour,
+        }
     }
 }
 
@@ -209,12 +213,9 @@ where
             + chrono::Duration::seconds(origin_departure_seconds)
             + chrono::Duration::seconds(station_arrival_offset);
 
-        let arrival_time = sea_orm::prelude::DateTimeWithTimeZone::from(
-            chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
-                arrival_datetime,
-                chrono::Utc,
-            )
-        );
+        let arrival_time = arrival_datetime
+            .and_local_timezone(FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap())
+            .unwrap();
 
         Ok(arrival_time)
     }
