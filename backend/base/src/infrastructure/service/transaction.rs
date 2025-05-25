@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{ToPrimitive, Zero};
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 pub struct TransactionServiceImpl<U, R, O, OS>
@@ -139,6 +139,7 @@ where
 
     #[instrument(skip(self))]
     async fn pay_transaction(&self, transaction_id: Uuid) -> Result<(), TransactionServiceError> {
+        info!("Paying transaction: {}", transaction_id);
         let mut tx = self
             .transaction_repository
             .find_by_uuid(transaction_id)
@@ -171,6 +172,8 @@ where
             },
             _ => panic!("Unexpected error: {:?}", e),
         })?;
+
+        debug!("saving paid transaction: {:?}", tx);
 
         self.transaction_repository
             .save(&mut tx)
