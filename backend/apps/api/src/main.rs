@@ -382,9 +382,11 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&transaction_service_impl),
     ));
 
-    let order_status_consumer = vec![train_order_status_consumer, dish_order_status_consumer, takeaway_order_status_consumer];
-
-
+    let order_status_consumer = vec![
+        train_order_status_consumer,
+        dish_order_status_consumer,
+        takeaway_order_status_consumer,
+    ];
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
@@ -395,9 +397,10 @@ async fn main() -> std::io::Result<()> {
     // HINT: You can borrow web::Data<T> as &Arc<T>
     // that means you can pass a &web::Data<T> to `Arc::clone`
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
-    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(Arc::clone(
-        &route_service_impl,
-    )));
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
+        Arc::clone(&route_service_impl),
+        tz_offset_hour,
+    ));
 
     let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
         Arc::clone(&train_schedule_service_impl),
