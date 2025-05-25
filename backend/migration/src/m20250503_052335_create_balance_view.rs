@@ -21,6 +21,8 @@ SELECT
     END) AS balance
 FROM
     transaction
+WHERE
+    status = 'Paid'
 GROUP BY
     user_id",
             ))
