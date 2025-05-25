@@ -1,8 +1,8 @@
 <template>
     <div>
-        {{ hotelId }}
-        {{ beginDate }}
-        {{ endDate }}
+    <div v-for="(key, index) in 1000" :key="index">
+        {{ index }}
+    </div>
     </div>
 </template>
 
