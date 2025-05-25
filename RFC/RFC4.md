@@ -677,7 +677,7 @@ type ResponseData = null;
 
 ### （Debug）生成测试订单（US1.1.3）
 
-`POST /api/transaction/generate`
+`POST /api/payment/generate`
 
 注意：本 API 仅在 Debug 模式下可用
 
