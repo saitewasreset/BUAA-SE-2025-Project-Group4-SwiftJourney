@@ -77,7 +77,10 @@ where
 
         let mut tx = Transaction::new_recharge(user_id, amount);
 
-        self.transaction_repository.save(&mut tx).await?;
+        self.transaction_repository
+            .save(&mut tx)
+            .await
+            .inspect_err(|e| error!("failed to save transaction: {}", e))?;
 
         Ok(tx.uuid())
     }

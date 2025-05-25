@@ -1,9 +1,9 @@
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RechargeCommand {
     pub session_id: String,
-    pub amount: u32,
+    pub amount: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
