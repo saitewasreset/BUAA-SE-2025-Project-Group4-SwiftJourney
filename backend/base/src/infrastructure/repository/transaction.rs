@@ -54,7 +54,7 @@ use sea_orm::{ColumnTrait, FromQueryResult};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{error, instrument};
+use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
@@ -1142,6 +1142,30 @@ impl TransactionRepositoryImpl {
                 }
             }
 
+            match (old, new) {
+                (Some(old), Some(new)) => {
+                    if !(old.uuid() == new.uuid()
+                        && old.create_time() == new.create_time()
+                        && old.finish_time() == new.finish_time()
+                        && old.amount() == new.amount()
+                        && old.status() == new.status()
+                        && old.user_id() == new.user_id()
+                        && old.atomic() == new.atomic())
+                    {
+                        result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+                    }
+                }
+                (Some(old), None) => {
+                    result.add_change(TypedDiff::new(DiffType::Removed, Some(old.clone()), None));
+                }
+                (None, Some(new)) => {
+                    // 聚合管理器里没有旧状态，并非说明聚合根不存在，而是说明聚合根里没有旧状态的缓存（例如，服务重启）
+                    // 此时默认状态已经变更
+                    result.add_change(TypedDiff::new(DiffType::Modified, None, Some(new.clone())));
+                }
+                (None, None) => {}
+            }
+
             result
         };
 
@@ -1238,6 +1262,7 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
 
     #[instrument(skip(self))]
     async fn on_insert(&self, aggregate: Transaction) -> Result<TransactionId, RepositoryError> {
+        debug!("inserting transaction: {:?}", aggregate);
         let txn = self
             .db
             .begin()
@@ -1292,6 +1317,7 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
 
     #[instrument(skip_all)]
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
+        debug!("on_update called");
         let txn = self
             .db
             .begin()
@@ -1309,13 +1335,25 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             match changes.diff_type {
                 DiffType::Unchanged => {}
                 DiffType::Added => {
-                    to_add_orders.push(changes.new_value.unwrap());
+                    let order = changes.new_value.unwrap();
+
+                    debug!("order added: {:?}", order);
+
+                    to_add_orders.push(order);
                 }
                 DiffType::Modified => {
-                    to_update_orders.push(changes.new_value.unwrap());
+                    let order = changes.new_value.unwrap();
+
+                    debug!("order added: {:?}", order);
+
+                    to_update_orders.push(order);
                 }
                 DiffType::Removed => {
-                    to_remove_orders.push(changes.old_value.unwrap());
+                    let order = changes.old_value.unwrap();
+
+                    debug!("order removed: {:?}", order);
+
+                    to_remove_orders.push(order);
                 }
             }
         }
@@ -1358,6 +1396,8 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
                 }
                 DiffType::Modified => {
                     let new = changes.new_value.unwrap();
+
+                    debug!("transaction modified: {:?}", new);
 
                     crate::models::transaction::Entity::update(
                         TransactionDataConverter::transform_to_do_transaction_only(&new),
