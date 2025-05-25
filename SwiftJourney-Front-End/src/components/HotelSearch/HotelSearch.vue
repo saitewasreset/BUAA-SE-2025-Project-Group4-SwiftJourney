@@ -88,6 +88,12 @@
             </el-scrollbar>
         </div>
     </div>
+    <div class="fixed-order-card"><HotelOrderCard v-if="isOrderShow" /></div>
+    <div class="fixed-icon">
+        <el-button class="FixedButton" type="primary" circle @click="showRoomOrder">
+            <el-icon><Goods /></el-icon>
+        </el-button>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -324,6 +330,7 @@ function minMoney(map: Map<string, HotelRoomDetailInfo>, flag: boolean, roomStat
 //-------------------------------详情-----------------------------------
 const router = useRouter();
 
+/* 打开新标签页 Store中的数据会丢失
 function goToDetail(info: HotelGInfoWRoom) {
     const routeUrl = router.resolve({
         name: 'hotelDetail',
@@ -333,8 +340,18 @@ function goToDetail(info: HotelGInfoWRoom) {
           endDate: endDate.value,
         }
       });
-
     window.open(routeUrl.href, '_blank');
+}*/
+
+function goToDetail(info: HotelGInfoWRoom) {
+    router.push({
+        name: 'hotelDetail',
+        params: { id: info.hotelId },
+        query: {
+            beginDate: beginDate.value,
+            endDate: endDate.value,
+        }
+    });
 }
 
 //-------------------------------筛选------------------------------------
@@ -412,6 +429,12 @@ const moneyDisplays = computed(() =>{
         minMoney(info.roomTypeMap, roomTypeFree.value, roomList.value)
     )
 })
+//-----------------------------------roomOrder-------------------------------
+import HotelOrderCard from '@/components/HotelSearch/HotelOrderCard.vue';
+const isOrderShow = ref<boolean>(false);
+function showRoomOrder() {
+    isOrderShow.value = !isOrderShow.value;
+}
 
 //-----------------------------------debug-----------------------------------
 import hotelImage from '../../assets/hotel.jpg'
@@ -813,5 +836,26 @@ roomList.value.forEach((key, index) => {
 .DetailButton {
     font-size: 20px;
     font-weight: bold;
+}
+
+.fixed-order-card {
+    position: fixed;
+    bottom: 200px;
+    right: 30px;
+    z-index: 1000;
+}
+.fixed-icon {
+    position: fixed;
+    bottom: 140px; /* 距离窗口底部的距离 */
+    right: 150px; /* 距离窗口右侧的距离 */
+    z-index: 1000; /* 确保图标在其他元素之上 */
+    cursor: pointer;
+}
+::v-deep(.FixedButton span){
+    font-size: 2rem;
+}
+.FixedButton {
+    width: 50px;
+    height: 50px;
 }
 </style>
