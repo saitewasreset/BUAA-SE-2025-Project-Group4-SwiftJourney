@@ -3,6 +3,11 @@ export interface UserApiResponseData {
   message: string;
   data: Object;
 }
+export interface UserApiBalanceData {
+  code: number;
+  message: string;
+  data: {balance: number};
+}
 export interface UserInfo {
   username: string;
   gender?: "male" | "female";

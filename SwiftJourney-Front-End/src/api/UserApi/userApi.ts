@@ -20,5 +20,8 @@ export const userApi = {
     },
     userLogout: () => {
         return postRequest('/api/user/logout');
-    }
+    },
+    queryUserBalance: () => {
+        return getRequest('/api/payment/balance');
+    },
 };

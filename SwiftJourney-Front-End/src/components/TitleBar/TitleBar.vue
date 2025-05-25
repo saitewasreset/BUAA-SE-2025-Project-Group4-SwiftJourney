@@ -98,7 +98,9 @@
 </template>
   
 <script lang="ts" setup>
-    import { useUserStore } from '@/stores/user';
+    import { paymentApi } from '@/api/PaymentApi/paymentApi';
+import type { PaymentApiResponseData, RechargeRequest } from '@/interface/paymentInterface';
+import { useUserStore } from '@/stores/user';
     import { message, Modal } from 'ant-design-vue';
     import { ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
@@ -155,15 +157,29 @@
         rechargeModalVisible.value = true;
     }
 
-    function checkRechargeAmount(value: number) {
-        if (value <= 0) {
+    function checkRechargeAmount() {
+        if (rechargeAmount.value <= 0) {
             message.warning('充值金额必须大于0');
             rechargeAmount.value = 0;
         }
     }
 
     async function handleUserRecharge() {
-
+        try {
+            const params: RechargeRequest = {
+                amount: rechargeAmount.value,
+                externalPaymentId: null,
+            };
+            const res: PaymentApiResponseData = (await paymentApi.recharge(params)).data;
+            if(res.code === 200)
+                message.success('充值成功');
+            else {
+                message.error('登录信息过期，请重新登录');
+            }
+            await user.restoreUserFromCookie(router);
+        } catch(error) {
+            console.log(error);
+        }
     }
 </script>
 
