@@ -528,7 +528,7 @@ roomList.value.forEach((key, index) => {
     background: linear-gradient(to bottom right, #40A5F8, #ffffff);
     position: relative; /* 用于支持绝对定位的子元素 */
     border-radius: 8px; /* 圆角大小 */
-    margin-top: 60px;
+    margin-top: 70px;
 }
 
 .background-hotel-image {
