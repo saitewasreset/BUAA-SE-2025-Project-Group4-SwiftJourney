@@ -9,6 +9,7 @@ pub enum Message {
     Table,
     Id,
     UserId,
+    MessageType,
     Time,
     Content,
 }
@@ -22,7 +23,8 @@ impl MigrationTrait for Migration {
                     .table(Message::Table)
                     .if_not_exists()
                     .col(pk_auto(Message::Id))
-                    .col(big_integer(Message::UserId).not_null())
+                    .col(integer(Message::UserId).not_null())
+                    .col(string(Message::MessageType).not_null())
                     .col(timestamp(Message::Time).not_null())
                     .col(json(Message::Content).not_null())
                     .foreign_key(
