@@ -627,7 +627,7 @@ type ResponseData = null;
 
 ### 支付订单（US1.1.6 US1.3.2）
 
-`POST /api/transaction/pay/{transaction_id}`
+`POST /api/payment/pay/{transaction_id}`
 
 需要 Cookie：
 
