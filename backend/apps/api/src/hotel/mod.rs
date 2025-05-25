@@ -1,11 +1,11 @@
 use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, get, post, web};
+use base::application::GeneralError;
 use base::application::commands::hotel::{HotelQuery, NewCommentCommand, QuotaQuery, TargetType};
 use base::application::service::hotel::{
     HotelCommentQuotaDTO, HotelGeneralInfoDTO, HotelService, NewHotelCommentDTO,
 };
-use base::application::GeneralError;
 use chrono::NaiveDate;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -83,23 +83,31 @@ async fn query_hotels(
     let target_type = match query_dto.target_type.as_str() {
         "city" => TargetType::City,
         "station" => TargetType::Station,
-        _ => return Err(ApplicationErrorBox(Box::new(GeneralError::BadRequest("Invalid target type".into())))),
+        _ => {
+            return Err(ApplicationErrorBox(Box::new(GeneralError::BadRequest(
+                "Invalid target type".into(),
+            ))));
+        }
     };
 
     let begin_date = if let Some(date_str) = query_dto.begin_date {
-        Some(NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
-            Box::new(GeneralError::BadRequest("Invalid begin date format".into()))
-                as Box<dyn base::application::ApplicationError>
-        })?)
+        Some(
+            NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
+                Box::new(GeneralError::BadRequest("Invalid begin date format".into()))
+                    as Box<dyn base::application::ApplicationError>
+            })?,
+        )
     } else {
         None
     };
 
     let end_date = if let Some(date_str) = query_dto.end_date {
-        Some(NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
-            Box::new(GeneralError::BadRequest("Invalid end date format".into()))
-                as Box<dyn base::application::ApplicationError>
-        })?)
+        Some(
+            NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
+                Box::new(GeneralError::BadRequest("Invalid end date format".into()))
+                    as Box<dyn base::application::ApplicationError>
+            })?,
+        )
     } else {
         None
     };
@@ -119,6 +127,7 @@ async fn query_hotels(
 }
 
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_quota).service(add_comment);
-    cfg.service(query_hotels);
+    cfg.service(get_quota)
+        .service(add_comment)
+        .service(query_hotels);
 }
