@@ -54,6 +54,7 @@ use sea_orm::{ColumnTrait, FromQueryResult};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tracing::{error, instrument};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
@@ -739,6 +740,7 @@ pub struct OrderActiveModelPack {
 }
 
 impl OrderActiveModelPack {
+    #[instrument(skip_all)]
     async fn insert_or_update_all(self, txn: &DatabaseTransaction) -> Result<(), DbErr> {
         let mut train_insert_list = Vec::new();
         let mut train_update_list = Vec::new();
@@ -784,42 +786,60 @@ impl OrderActiveModelPack {
             }
         }
 
-        crate::models::train_order::Entity::insert_many(train_insert_list)
-            .exec(txn)
-            .await?;
+        if !train_insert_list.is_empty() {
+            crate::models::train_order::Entity::insert_many(train_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert train order: {}", e))?;
+        }
 
         for order in train_update_list {
             crate::models::train_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update train order: {}", e))?;
         }
 
-        crate::models::hotel_order::Entity::insert_many(hotel_insert_list)
-            .exec(txn)
-            .await?;
+        if !hotel_insert_list.is_empty() {
+            crate::models::hotel_order::Entity::insert_many(hotel_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert hotel order: {}", e))?;
+        }
 
         for order in hotel_update_list {
             crate::models::hotel_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update hotel order: {}", e))?;
         }
 
-        crate::models::dish_order::Entity::insert_many(dish_insert_list)
-            .exec(txn)
-            .await?;
+        if !dish_insert_list.is_empty() {
+            crate::models::dish_order::Entity::insert_many(dish_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert dish order: {}", e))?;
+        }
+
         for order in dish_update_list {
             crate::models::dish_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update dish order: {}", e))?;
         }
 
-        crate::models::takeaway_order::Entity::insert_many(takeaway_insert_list)
-            .exec(txn)
-            .await?;
+        if !takeaway_insert_list.is_empty() {
+            crate::models::takeaway_order::Entity::insert_many(takeaway_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert takeaway order: {}", e))?;
+        }
+
         for order in takeaway_update_list {
             crate::models::takeaway_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update takeaway order: {}", e))?;
         }
 
         Ok(())
@@ -1216,11 +1236,15 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
         Arc::clone(&self.aggregate_manager)
     }
 
+    #[instrument(skip(self))]
     async fn on_insert(&self, aggregate: Transaction) -> Result<TransactionId, RepositoryError> {
         let txn = self
             .db
             .begin()
             .await
+            .inspect_err(|e| {
+                error!("Failed to start transaction: {}", e);
+            })
             .context("Failed to start transaction")?;
 
         let model_pack = TransactionDataConverter::transform_to_do(aggregate);
@@ -1228,34 +1252,53 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
         let result = crate::models::transaction::Entity::insert(model_pack.transaction)
             .exec(&txn)
             .await
+            .inspect_err(|e| {
+                error!("Failed to insert transaction: {}", e);
+            })
             .context("Failed to insert transaction")?;
 
         model_pack
             .orders
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to insert or update orders: {}", e);
+            })
             .context("Failed to insert orders")?;
 
-        txn.commit().await.context("Failed to commit transaction")?;
+        txn.commit()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to commit transaction: {}", e);
+            })
+            .context("Failed to commit transaction")?;
 
         Ok(TransactionId::from_db_value(result.last_insert_id)?)
     }
 
+    #[instrument(skip(self))]
     async fn on_select(&self, id: TransactionId) -> Result<Option<Transaction>, RepositoryError> {
         let result = self
             .query_transaction(|q| {
                 q.filter(crate::models::transaction::Column::Id.eq(id.to_db_value()))
             })
-            .await?;
+            .await
+            .inspect_err(|e| {
+                error!("Failed to query transaction: {}", e);
+            })?;
 
         Ok(result.into_iter().next())
     }
 
+    #[instrument(skip_all)]
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
         let txn = self
             .db
             .begin()
             .await
+            .inspect_err(|e| {
+                error!("Failed to start transaction: {}", e);
+            })
             .context("Failed to start transaction")?;
 
         let mut to_add_orders = Vec::new();
@@ -1285,17 +1328,26 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             .into_active_model()
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to insert order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         to_update_order_pack
             .into_active_model()
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to update order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         to_remove_order_pack
             .delete_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to delete order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         for changes in diff.get_changes::<Transaction>() {
@@ -1312,6 +1364,9 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
                     )
                     .exec(&txn)
                     .await
+                    .inspect_err(|e| {
+                        error!("failed to update transaction: {}", e);
+                    })
                     .map_err(|e| RepositoryError::Db(e.into()))?;
                 }
                 DiffType::Removed => {
@@ -1320,16 +1375,25 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             }
         }
 
-        txn.commit().await.context("Failed to commit transaction")?;
+        txn.commit()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to commit transaction: {}", e);
+            })
+            .context("Failed to commit transaction")?;
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_delete(&self, aggregate: Transaction) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             crate::models::transaction::Entity::delete_by_id(id.to_db_value())
                 .exec(&self.db)
                 .await
+                .inspect_err(|e| {
+                    error!("failed to delete transaction: {}", e);
+                })
                 .map_err(|e| RepositoryError::Db(e.into()))?;
         }
 

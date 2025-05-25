@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RechargeDTO {
-    pub amount: u32,
+    pub amount: f64,
     #[serde(rename = "externalPaymentId")]
     pub external_payment_id: Option<Uuid>,
 }
