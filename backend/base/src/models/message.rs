@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub user_id: i32,
     pub message_type: String,
-    pub time: DateTime,
+    pub time: DateTimeWithTimeZone,
     pub content: Json,
 }
 
