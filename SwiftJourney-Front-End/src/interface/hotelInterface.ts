@@ -50,6 +50,7 @@ export interface HotelDetailInfo {
   address: string;
   // 联系电话
   phone: string[];
+  info: string;
 
   // 酒店图片列表，URL
   picture?: string[];
@@ -83,4 +84,32 @@ export interface HotelRoomDetailInfo {
 
 export interface HotelGInfoWRoom extends HotelGeneralInfo {
   roomTypeMap: Map<string, HotelRoomDetailInfo>,
+}
+
+interface HotelOrderRequest {
+  // 欲预订酒店的 UUID
+  hotelId: string;
+
+  // 人类可读的房间类型
+  roomType: string;
+
+  // 入住日期
+  beginDate?: string;
+  // 离开日期
+  endDate?: string;
+
+  // 预订人 UUID（见`PersonalInfo`）
+  personalId: string;
+  // 预订数量
+  amount: number;
+}
+
+export interface HotelRoomInfo extends HotelRoomDetailInfo {
+    roomType: string,
+}
+
+export interface HotelOrderInfo extends HotelOrderRequest {
+  name: string,
+  maxCount: number,
+  price: number,
 }

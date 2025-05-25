@@ -415,7 +415,6 @@ const moneyDisplays = computed(() =>{
 
 //-----------------------------------debug-----------------------------------
 import hotelImage from '../../assets/hotel.jpg'
-import { en } from 'element-plus/es/locales.mjs';
 const debugdataMap = new Map<string, HotelRoomDetailInfo>();
 const debugHotelRoomDetailInfo1: HotelRoomDetailInfo = {
     capacity: 1,
