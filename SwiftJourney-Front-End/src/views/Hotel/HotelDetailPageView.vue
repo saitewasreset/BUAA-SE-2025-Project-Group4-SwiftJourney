@@ -88,6 +88,11 @@
             <HotelOrderCard />
         </div>
     </div>
+    <div class="fixed-icon">
+        <el-button class="FixedButton" type="primary" circle @click="routeBack">
+            <el-icon><Back /></el-icon>
+        </el-button>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -238,6 +243,14 @@ const orderRoom = (room: HotelRoomInfo) => {
         ElMessage.success('加入预订列表成功，可在预定列表中修改数量');
     }
 }
+
+//-----------------------------返回上一个页面------------------------------
+import { useRouter } from 'vue-router';
+const router = useRouter();
+function routeBack() {
+    router.back();
+}
+
 //-----------------------------debugInfo-----------------------------------
 import debugHotelImage1 from '../../assets/hotel.jpg';
 import debugHotelImage2 from '../../assets/hotel2.jpg';
@@ -586,5 +599,20 @@ function getdebugInfo() {
 }
 ::v-deep(.DeleteIcon) {
     --color: rgb(160, 160, 160);
+}
+
+.fixed-icon {
+    position: fixed;
+    top: 100px; /* 距离窗口底部的距离 */
+    left: 220px; /* 距离窗口右侧的距离 */
+    z-index: 1000; /* 确保图标在其他元素之上 */
+    cursor: pointer;
+}
+::v-deep(.FixedButton span){
+    font-size: 2rem;
+}
+.FixedButton {
+    width: 50px;
+    height: 50px;
 }
 </style>
