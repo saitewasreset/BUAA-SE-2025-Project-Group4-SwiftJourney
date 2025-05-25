@@ -9,8 +9,9 @@ use crate::domain::service::order_status::OrderStatusManagerService;
 use crate::domain::service::transaction::{TransactionService, TransactionServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::{ToPrimitive, Zero};
 use std::sync::Arc;
+use tracing::{error, instrument};
 use uuid::Uuid;
 
 pub struct TransactionServiceImpl<U, R, O, OS>
@@ -56,12 +57,21 @@ where
     O: OrderService,
     OS: OrderStatusManagerService,
 {
+    #[instrument(skip(self))]
     async fn recharge(
         &self,
         user_id: UserId,
         amount: TransactionAmountAbs,
     ) -> Result<Uuid, TransactionServiceError> {
-        if self.user_repository.find(user_id).await?.is_none() {
+        if self
+            .user_repository
+            .find(user_id)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to find user: {:?}", e);
+            })?
+            .is_none()
+        {
             return Err(TransactionServiceError::InvalidUser(user_id));
         }
 
@@ -72,13 +82,19 @@ where
         Ok(tx.uuid())
     }
 
+    #[instrument(skip(self))]
     async fn get_balance(&self, user_id: UserId) -> Result<Decimal, TransactionServiceError> {
-        self.transaction_repository
+        Ok(self
+            .transaction_repository
             .get_user_balance(user_id)
-            .await?
-            .ok_or(TransactionServiceError::InvalidUser(user_id))
+            .await
+            .inspect_err(|e| {
+                error!("Failed to get user balance: {:?}", e);
+            })?
+            .unwrap_or(Decimal::zero()))
     }
 
+    #[instrument(skip(self))]
     async fn new_transaction(
         &self,
         user_id: UserId,
@@ -96,27 +112,44 @@ where
             }
         }
 
-        if self.user_repository.find(user_id).await?.is_none() {
+        if self
+            .user_repository
+            .find(user_id)
+            .await
+            .inspect_err(|e| error!("Failed to find user: {:?}", e))?
+            .is_none()
+        {
             return Err(TransactionServiceError::InvalidUser(user_id));
         }
 
         let mut tx = Transaction::new(user_id, orders.clone(), atomic);
 
-        self.transaction_repository.save(&mut tx).await?;
+        self.transaction_repository
+            .save(&mut tx)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to save transaction: {:?}", e);
+            })?;
 
         Ok(tx.uuid())
     }
 
+    #[instrument(skip(self))]
     async fn pay_transaction(&self, transaction_id: Uuid) -> Result<(), TransactionServiceError> {
         let mut tx = self
             .transaction_repository
             .find_by_uuid(transaction_id)
-            .await?
+            .await
+            .inspect_err(|e| {
+                error!("Failed to find transaction: {:?}", e);
+            })?
             .ok_or(TransactionServiceError::InvalidTransactionId(
                 transaction_id,
             ))?;
 
-        let available_balance = self.get_balance(tx.user_id()).await?;
+        let available_balance = self.get_balance(tx.user_id()).await.inspect_err(|e| {
+            error!("Failed to get user balance: {:?}", e);
+        })?;
 
         // 注意，若交易是充值/退款交易，其raw_amount < 0，将通过此检查，而在之后的pay方法中被拒绝
         if available_balance < tx.raw_amount() {
@@ -136,7 +169,12 @@ where
             _ => panic!("Unexpected error: {:?}", e),
         })?;
 
-        self.transaction_repository.save(&mut tx).await?;
+        self.transaction_repository
+            .save(&mut tx)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to save transaction: {:?}", e);
+            })?;
 
         let orders = tx
             .orders()
@@ -151,6 +189,7 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn refund_transaction(
         &self,
         transaction_id: Uuid,
@@ -159,14 +198,22 @@ where
         let mut tx = self
             .transaction_repository
             .find_by_uuid(transaction_id)
-            .await?
+            .await
+            .inspect_err(|e| {
+                error!("Failed to find transaction: {:?}", e);
+            })?
             .ok_or(TransactionServiceError::InvalidTransactionId(
                 transaction_id,
             ))?;
 
         let refund_tx = tx.refund_transaction_partial(to_refund_orders)?;
 
-        self.transaction_repository.save(&mut tx).await?;
+        self.transaction_repository
+            .save(&mut tx)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to save transaction: {:?}", e);
+            })?;
 
         let orders = tx
             .orders()
