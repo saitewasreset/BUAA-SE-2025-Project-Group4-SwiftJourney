@@ -212,7 +212,7 @@ where
             if let Some(mut info) = existing_info {
                 // 更新现有个人信息
                 info.set_name(name);
-                info.set_preferred_seat_location(preferred_seat_location);
+                info.set_preferred_seat_location(Some(preferred_seat_location));
                 info.set_default(is_default);
 
                 self.personal_info_repository
@@ -283,7 +283,7 @@ mod tests {
             uuid::Uuid::new_v4(),
             RealName::try_from("高松灯".to_string()).unwrap(),
             IdentityCardId::try_from("110101200903149273".to_string()).unwrap(),
-            PreferredSeatLocation::try_from('A').unwrap(),
+            Some(PreferredSeatLocation::try_from('A').unwrap()),
             UserId::from(1),
         )
     }
@@ -351,7 +351,7 @@ mod tests {
             .withf(|p| {
                 p.name().to_string() == "要乐奈"
                     && p.identity_card_id().to_string() == "110101200903149273"
-                    && p.preferred_seat_location().to_string() == "A"
+                    && p.preferred_seat_location() == Some(PreferredSeatLocation::A)
             })
             .return_once(|_| Ok(PersonalInfoId::from(1)));
 

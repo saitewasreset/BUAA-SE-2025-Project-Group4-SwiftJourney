@@ -69,10 +69,12 @@ use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
+use base::infrastructure::repository::seat_availability::SeatAvailabilityRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
 use base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
+use base::infrastructure::repository::train_schedule::TrainScheduleRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
@@ -88,7 +90,9 @@ use base::infrastructure::service::route::RouteServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
 use base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
+use base::infrastructure::service::train_booking::TrainBookingServiceImpl;
 use base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
+use base::infrastructure::service::train_seat::TrainSeatServiceImpl;
 use base::infrastructure::service::train_type::TrainTypeConfigurationServiceImpl;
 use base::infrastructure::service::transaction::TransactionServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
@@ -164,6 +168,9 @@ async fn main() -> std::io::Result<()> {
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
     let hotel_repository_impl = Arc::new(HotelRepositoryImpl::new(conn.clone()));
     let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
+    let seat_availability_repository_impl =
+        Arc::new(SeatAvailabilityRepositoryImpl::new(conn.clone()));
+    let train_schedule_repository_impl = Arc::new(TrainScheduleRepositoryImpl::new(conn.clone()));
     let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
     let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
 
@@ -281,6 +288,19 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
     ));
 
+    let train_seat_service_impl = Arc::new(TrainSeatServiceImpl::new(
+        Arc::clone(&seat_availability_repository_impl),
+        Arc::clone(&route_repository_impl),
+    ));
+
+    let train_booking_service_impl = Arc::new(TrainBookingServiceImpl::new(
+        Arc::clone(&train_schedule_repository_impl),
+        Arc::clone(&train_seat_service_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&transaction_repository_impl),
+        Arc::clone(&order_repository_impl),
+    ));
+
     let dish_booking_service_impl = Arc::new(DishBookingServiceImpl::new(Arc::clone(
         &order_repository_impl,
     )));
@@ -346,7 +366,16 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&transaction_service_impl),
     )) as Box<dyn RabbitMQOrderStatusConsumer>;
 
-    let order_status_consumer = vec![dish_order_status_consumer, takeaway_order_status_consumer];
+    let train_order_status_consumer = Box::new(TrainOrderStatusConsumer::new(
+        Arc::clone(&train_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    ));
+
+    let order_status_consumer = vec![
+        train_order_status_consumer,
+        dish_order_status_consumer,
+        takeaway_order_status_consumer,
+    ];
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
@@ -357,9 +386,10 @@ async fn main() -> std::io::Result<()> {
     // HINT: You can borrow web::Data<T> as &Arc<T>
     // that means you can pass a &web::Data<T> to `Arc::clone`
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
-    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(Arc::clone(
-        &route_service_impl,
-    )));
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
+        Arc::clone(&route_service_impl),
+        tz_offset_hour,
+    ));
 
     let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
         Arc::clone(&train_schedule_service_impl),
@@ -405,10 +435,7 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/order").configure(api::order::scoped_config))
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
-                    .service(
-                        web::scope("/train/schedule")
-                            .configure(api::train::schedule::scoped_config),
-                    )
+                    .service(web::scope("/train").configure(api::train::scoped_config))
                     .service(web::scope("/hotel").configure(api::hotel::scoped_config)), // Congratulations! You have finished Task 1.2.1D!
             )
     })
