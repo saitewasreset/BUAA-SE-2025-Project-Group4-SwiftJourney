@@ -5,8 +5,8 @@ Version: 12 (2025-05-24 15:07:00)
 最近变更：
 
 - Version 12
-  - 修复“城市信息”API的错误描述
-  - “酒店查询”返回新增酒店info
+  - 修复“城市信息”API 的错误描述
+  - “酒店查询”返回新增酒店 info
 - Version 11
   - 新增修改密码 API
 - Version 10
@@ -554,7 +554,9 @@ interface BalanceInfo {
 
 ### 交易信息查询（US1.1.3）
 
-`GET /api/transaction`
+`GET /api/payment/`
+
+**注意：不要遗漏最后的斜杠！**
 
 需要 Cookie：
 
