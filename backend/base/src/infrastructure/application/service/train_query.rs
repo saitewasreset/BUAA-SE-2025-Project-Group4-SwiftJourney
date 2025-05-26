@@ -45,6 +45,7 @@ use crate::application::service::train_query::{
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
+use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainNumber;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::station::StationService;
@@ -96,6 +97,42 @@ where
             route_service,
         }
     }
+
+    async fn resolve_station_ids(
+        &self,
+        station_opt: &Option<String>,
+        city_opt: &Option<String>,
+    ) -> Result<Vec<StationId>, Box<dyn ApplicationError>> {
+        match (station_opt, city_opt) {
+            (Some(s), None) => {
+                let id = self
+                    .station_service
+                    .get_station_by_name(s.trim().to_owned())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get station by station name: {:?}", e);
+                        GeneralError::InternalServerError
+                    })?
+                    .ok_or(TrainQueryServiceError::InvalidStationId)?
+                    .get_id()
+                    // SAFETY：get_station_by_name 返回的 Station 实例必定有 ID
+                    .unwrap();
+                Ok(vec![id])
+            }
+            (None, Some(city)) => {
+                let stations = self
+                    .station_service
+                    .get_station_by_city_name(city)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get stations by city name: {:?}", e);
+                        GeneralError::InternalServerError
+                    })?;
+                Ok(stations.into_iter().filter_map(|st| st.get_id()).collect())
+            }
+            _ => Err(Box::new(TrainQueryServiceError::InconsistentQuery)),
+        }
+    }
 }
 
 // Step 5: Implement `TrainQueryService` trait for `TrainQueryServiceImpl`
@@ -121,119 +158,17 @@ where
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
         cmd.validate()?;
 
-        let station_pairs = match (
-            &cmd.departure_station,
-            &cmd.arrival_station,
-            &cmd.departure_city,
-            &cmd.arrival_city,
-        ) {
-            // 情况1: 站点 -> 站点
-            (Some(from_station), Some(to_station), None, None) => {
-                let from_id = self
-                    .station_service
-                    .get_station_by_name(from_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
+        let from_ids = self
+            .resolve_station_ids(&cmd.departure_station, &cmd.departure_city)
+            .await?;
+        let to_ids = self
+            .resolve_station_ids(&cmd.arrival_station, &cmd.arrival_city)
+            .await?;
 
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-                let to_id = self
-                    .station_service
-                    .get_station_by_name(to_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-                vec![(from_id, to_id)]
-            }
-
-            // 情况2: 城市 -> 城市
-            (None, None, Some(from_city), Some(to_city)) => self
-                .station_service
-                .station_pairs_by_city(from_city, to_city)
-                .await
-                .map_err(|e| {
-                    error!("Failed to get station by name: {:?}", e);
-
-                    GeneralError::InternalServerError
-                })?,
-
-            // 情况3: 站点 -> 城市
-            (Some(from_station), None, None, Some(to_city)) => {
-                let from_id = self
-                    .station_service
-                    .get_station_by_name(from_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-
-                let to_stations = self
-                    .station_service
-                    .get_station_by_city_name(to_city)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?;
-
-                to_stations
-                    .into_iter()
-                    .filter_map(|station| station.get_id().map(|to_id| (from_id, to_id)))
-                    .collect()
-            }
-
-            // 情况4: 城市 -> 站点
-            (None, Some(to_station), Some(from_city), None) => {
-                let to_id = self
-                    .station_service
-                    .get_station_by_name(to_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-
-                let from_stations = self
-                    .station_service
-                    .get_station_by_city_name(from_city)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?;
-
-                from_stations
-                    .into_iter()
-                    .filter_map(|station| station.get_id().map(|from_id| (from_id, to_id)))
-                    .collect()
-            }
-
-            _ => {
-                return Err(Box::new(TrainQueryServiceError::InconsistentQuery)
-                    as Box<dyn ApplicationError>);
-            }
-        };
+        let station_pairs: Vec<(StationId, StationId)> = from_ids
+            .iter()
+            .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
+            .collect();
 
         let schedules = self
             .train_schedule_service
