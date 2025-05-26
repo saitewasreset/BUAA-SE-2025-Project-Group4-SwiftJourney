@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub uuid: Uuid,
     pub name: String,
-    pub station_id: i64,
+    pub station_id: i32,
     pub images: Json,
 }
 

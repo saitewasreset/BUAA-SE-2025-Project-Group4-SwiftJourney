@@ -1,6 +1,6 @@
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainId;
-use crate::domain::model::train_schedule::TrainSchedule;
+use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -40,4 +40,10 @@ pub trait TrainScheduleService {
         date: chrono::NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+
+    async fn get_station_arrival_time(
+        &self,
+        train_schedule_id: TrainScheduleId,
+        station_id: StationId,
+    ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError>;
 }

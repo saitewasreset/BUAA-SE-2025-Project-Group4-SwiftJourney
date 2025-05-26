@@ -91,6 +91,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+use tracing::{debug, instrument};
 
 pub mod model;
 pub mod repository;
@@ -613,6 +614,7 @@ where
     AG: Aggregate,
     T: DbRepositorySupport<AG> + 'static + Send + Sync,
 {
+    #[instrument(skip(self))]
     async fn find(&self, id: AG::ID) -> Result<Option<AG>, RepositoryError> {
         let entity = self.on_select(id).await?;
 
@@ -626,6 +628,7 @@ where
         Ok(entity)
     }
 
+    #[instrument(skip(self))]
     async fn remove(&self, aggregate: AG) -> Result<(), RepositoryError> {
         self.get_aggregate_manager()
             .lock()
@@ -635,22 +638,30 @@ where
         self.on_delete(aggregate).await
     }
 
+    #[instrument(skip(self))]
     async fn save(&self, aggregate: &mut AG) -> Result<AG::ID, RepositoryError> {
+        debug!("saving aggregate: {:?} with cache", aggregate);
         if let Some(id) = aggregate.get_id() {
+            debug!("aggregate has id, checking difference");
+
             let diff = self
                 .get_aggregate_manager()
                 .lock()
                 .unwrap()
                 .detect_changes(aggregate.clone());
             if !diff.is_empty() {
+                debug!("found update, calling on_update");
                 self.on_update(diff).await?;
                 self.get_aggregate_manager()
                     .lock()
                     .unwrap()
                     .merge(aggregate.clone());
+            } else {
+                debug!("no update found");
             }
             Ok(id)
         } else {
+            debug!("aggregate doesn't have id, inserting");
             let id = self.on_insert(aggregate.clone()).await?;
 
             aggregate.set_id(id);

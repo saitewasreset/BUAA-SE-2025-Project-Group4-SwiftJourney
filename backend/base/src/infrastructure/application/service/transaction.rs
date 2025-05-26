@@ -19,7 +19,7 @@ use crate::domain::service::transaction::TransactionService;
 use crate::domain::service::user::{UserService, UserServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use std::sync::Arc;
 use tracing::{error, instrument};
 
@@ -148,14 +148,27 @@ where
 {
     #[instrument(skip(self))]
     async fn recharge(&self, command: RechargeCommand) -> Result<(), Box<dyn ApplicationError>> {
-        let user_id = self.get_user_id_by_session_id(&command.session_id).await?;
+        let user_id = self
+            .get_user_id_by_session_id(&command.session_id)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to get user id by session id {}: {}",
+                    command.session_id, e
+                );
+            })?;
 
         self.transaction_service
             .recharge(
                 user_id,
-                TransactionAmountAbs::from(Decimal::from(command.amount)),
+                TransactionAmountAbs::from(Decimal::from_f64(command.amount).ok_or(
+                    GeneralError::BadRequest(format!("Invalid amount: {}", command.amount)),
+                )?),
             )
-            .await?;
+            .await
+            .inspect_err(|e| {
+                error!("failed to recharge user {}: {}", user_id, e);
+            })?;
 
         Ok(())
     }
