@@ -70,8 +70,8 @@ TSK2.1.5A：后端：实现撰写评价功能 : tsk-2-1-5-A-review-api
 TSK2.1.5B：前端：实现撰写评价功能 : tsk-2-1-5-B-write-review
 TSK2.2.1A：搜集/建立数据 : tsk-2-2-1-A-meal-data
 TSK2.2.1B：后端：火车餐及外卖系统基本模型与接口 : tsk-2-2-1-B-meal-sys
-TSK2.1.1C：后端：实现火车餐及外卖查询接口 : tsk-2-1-1-C-meal-query-api
-TSK2.1.1D：前端：编写火车餐查询页面 : tsk-2-1-1-D-meal-query-ui
+TSK2.2.1C：后端：实现火车餐及外卖查询接口 : tsk-2-2-1-C-meal-query-api
+TSK2.2.1D：前端：编写火车餐查询页面 : tsk-2-2-1-D-meal-query-ui
 TSK2.2.2A：后端：火车餐及外卖预订 : tsk-2-2-2-A-order-meal-api
 TSK2.2.2B：前端：火车餐及外卖预订 : tsk-2-2-2-B-order-meal-ui
 TSK2.2.2C：前端：预订列表管理 : tsk-2-2-2-C-meal-orders

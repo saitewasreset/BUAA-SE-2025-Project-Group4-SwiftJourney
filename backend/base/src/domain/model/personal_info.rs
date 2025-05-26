@@ -55,7 +55,7 @@ pub struct PersonalInfo {
     uuid: Uuid,
     name: RealName,
     identity_card_id: IdentityCardId,
-    preferred_seat_location: PreferredSeatLocation,
+    preferred_seat_location: Option<PreferredSeatLocation>,
     user_id: UserId,
     is_default: bool,
 }
@@ -66,7 +66,7 @@ impl PersonalInfo {
         uuid: Uuid,
         name: RealName,
         identity_card_id: IdentityCardId,
-        preferred_seat_location: PreferredSeatLocation,
+        preferred_seat_location: Option<PreferredSeatLocation>,
         user_id: UserId,
     ) -> Self {
         Self {
@@ -96,7 +96,7 @@ impl PersonalInfo {
         &self.identity_card_id
     }
 
-    pub fn preferred_seat_location(&self) -> PreferredSeatLocation {
+    pub fn preferred_seat_location(&self) -> Option<PreferredSeatLocation> {
         self.preferred_seat_location
     }
 
@@ -104,7 +104,7 @@ impl PersonalInfo {
         &self.user_id
     }
 
-    pub fn set_preferred_seat_location(&mut self, location: PreferredSeatLocation) {
+    pub fn set_preferred_seat_location(&mut self, location: Option<PreferredSeatLocation>) {
         self.preferred_seat_location = location;
     }
 
