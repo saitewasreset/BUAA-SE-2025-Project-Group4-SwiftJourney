@@ -15,7 +15,7 @@ Version: 13 (2025-05-26 16:18:00)
   - `TrainOrderInfo`新增始发站、终到站相关信息
   - `TakeawayOrderInfo`新增用餐时间
 - Version 9
-  - 修复`depature`拼写错误
+  - 修复`departure`拼写错误
 - Version 8
   - 交易查询：现在可获得所有交易的列表
   - 设置支付密码：应当提供`string`类型的支付密码；新增支付密码格式错误的返回代码
@@ -410,7 +410,7 @@ interface PersonalInfo {
 请求：
 
 ```typescript
-type Request = type Request = UpdatePersonalInfo;
+type Request = UpdatePersonalInfo;
 
 interface UpdatePersonalInfo {
   // 姓名
@@ -556,7 +556,9 @@ interface BalanceInfo {
 
 ### 交易信息查询（US1.1.3）
 
-`GET /api/transaction`
+`GET /api/payment/`
+
+**注意：不要遗漏最后的斜杠！**
 
 需要 Cookie：
 
@@ -627,7 +629,7 @@ type ResponseData = null;
 
 ### 支付订单（US1.1.6 US1.3.2）
 
-`POST /api/transaction/pay/{transaction_id}`
+`POST /api/payment/pay/{transaction_id}`
 
 需要 Cookie：
 
@@ -677,7 +679,7 @@ type ResponseData = null;
 
 ### （Debug）生成测试订单（US1.1.3）
 
-`POST /api/transaction/generate`
+`POST /api/payment/generate`
 
 注意：本 API 仅在 Debug 模式下可用
 
@@ -895,7 +897,7 @@ interface TrainOrderRequest {
   // 车次号，例如：“G53”
   trainNumber: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
 
   // 起始站
   departureStation: string;
@@ -1433,7 +1435,7 @@ interface DishQuery {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
 }
 ```
 
@@ -1483,7 +1485,7 @@ interface TrainDishInfo {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
 
@@ -1551,7 +1553,7 @@ interface FullTrainDishInfo {
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -1616,7 +1618,7 @@ interface TrainDishOrderRequest {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  origindepartureTime: string;
+  originDepartureTime: string;
 
   // 要预订的火车餐列表
   dishes: DishOrder[];
