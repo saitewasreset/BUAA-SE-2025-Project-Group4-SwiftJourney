@@ -1,6 +1,5 @@
 use crate::application::ApplicationError;
 use crate::application::commands::message::HistoryMessageQuery;
-use crate::domain::model::user::UserId;
 use crate::domain::service::ServiceError;
 use crate::domain::service::order::order_dto::OrderInfoDto;
 use async_trait::async_trait;

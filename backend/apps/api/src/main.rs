@@ -63,14 +63,15 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
-    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
+    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer,
+    TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
-use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::notify::NotifyRepositoryImpl;
+use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
@@ -343,7 +344,6 @@ async fn main() -> std::io::Result<()> {
     ));
 
     let message_application_service_impl = Arc::new(MessageApplicationServiceImpl::new(
-        Arc::clone(&order_service_impl),
         Arc::clone(&message_service_impl),
         Arc::clone(&session_manager_service_impl),
     ));
