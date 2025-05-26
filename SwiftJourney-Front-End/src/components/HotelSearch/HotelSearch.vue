@@ -330,7 +330,6 @@ function minMoney(map: Map<string, HotelRoomDetailInfo>, flag: boolean, roomStat
 //-------------------------------详情-----------------------------------
 const router = useRouter();
 
-/* 打开新标签页 Store中的数据会丢失
 function goToDetail(info: HotelGInfoWRoom) {
     const routeUrl = router.resolve({
         name: 'hotelDetail',
@@ -341,18 +340,8 @@ function goToDetail(info: HotelGInfoWRoom) {
         }
       });
     window.open(routeUrl.href, '_blank');
-}*/
-
-function goToDetail(info: HotelGInfoWRoom) {
-    router.push({
-        name: 'hotelDetail',
-        params: { id: info.hotelId },
-        query: {
-            beginDate: beginDate.value,
-            endDate: endDate.value,
-        }
-    });
 }
+
 
 //-------------------------------筛选------------------------------------
 const ratingValue = ref<number>(0);
