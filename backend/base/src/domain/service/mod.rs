@@ -91,6 +91,7 @@ pub mod dish_booking;
 pub mod geo;
 pub mod hotel_booking;
 pub mod hotel_rating;
+pub mod message;
 pub mod object_storage;
 pub mod order;
 pub mod order_status;
