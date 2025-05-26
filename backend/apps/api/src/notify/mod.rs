@@ -9,7 +9,6 @@ use base::domain::service::message::MessageListenerService;
 use base::domain::service::session::SessionManagerService;
 use base::infrastructure::service::message::MessageListenerImpl;
 use dyn_fmt::AsStrFormatExt;
-use sea_orm::sqlx::query;
 use shared::{
     API_FORBIDDEN_CODE, API_FORBIDDEN_MESSAGE_TEMPLATE, API_INTERNAL_SERVER_ERROR_MESSAGE,
 };

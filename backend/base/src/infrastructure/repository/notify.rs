@@ -30,7 +30,7 @@ mod ser_order {
         BaseOrder, DishOrder, HotelOrder, Order, OrderId, OrderStatus, OrderTimeInfo, PaymentInfo,
         TakeawayOrder, TrainOrder,
     };
-    use crate::domain::model::personal_info::PersonalInfoId;
+    use crate::domain::model::personal_info::{PersonalInfoId, PreferredSeatLocation};
     use crate::domain::model::station::StationId;
     use crate::domain::model::takeaway::TakeawayDishId;
     use crate::domain::model::train::{SeatType, SeatTypeId, SeatTypeName};
@@ -99,7 +99,7 @@ mod ser_order {
 
     #[derive(Serialize, Deserialize)]
     pub struct BaseOrderDto {
-        pub order_id: i32,
+        pub order_id: Option<i32>,
         pub uuid: Uuid,
         pub order_status: String,
         pub order_time_info: OrderTimeInfoDto,
@@ -113,7 +113,8 @@ mod ser_order {
     pub struct TrainOrderDto {
         pub base: BaseOrderDto,
         pub train_schedule_id: i32,
-        pub seat: SeatDTO,
+        pub seat: Option<SeatDTO>,
+        pub preferred_seat_location: Option<char>,
         pub station_range: StationRangeDTO,
     }
 
@@ -246,7 +247,7 @@ mod ser_order {
             Self {
                 id: value.get_id().expect("seat should have id").to_db_value(),
                 seat_type: seat_type.clone().into(),
-                info: seat_location.clone().into(),
+                info: seat_location.into(),
                 status: value.status().to_string(),
             }
         }
@@ -271,7 +272,7 @@ mod ser_order {
     impl From<OrderTimeInfo> for OrderTimeInfoDto {
         fn from(info: OrderTimeInfo) -> Self {
             Self {
-                create_time: info.crate_time().to_rfc3339(),
+                create_time: info.create_time().to_rfc3339(),
                 active_time: info.active_time().to_rfc3339(),
                 complete_time: info.complete_time().to_rfc3339(),
             }
@@ -305,11 +306,11 @@ mod ser_order {
         fn try_from(dto: PaymentInfoDto) -> Result<Self, Self::Error> {
             let pay_transaction_id = dto
                 .pay_transaction_id
-                .map(|s| TransactionId::from_db_value(s))
+                .map(TransactionId::from_db_value)
                 .transpose()?;
             let refund_transaction_id = dto
                 .refund_transaction_id
-                .map(|s| TransactionId::from_db_value(s))
+                .map(TransactionId::from_db_value)
                 .transpose()?;
             Ok(PaymentInfo::new(pay_transaction_id, refund_transaction_id))
         }
@@ -319,7 +320,7 @@ mod ser_order {
     impl From<BaseOrder> for BaseOrderDto {
         fn from(base: BaseOrder) -> Self {
             Self {
-                order_id: base.order_id.to_db_value(),
+                order_id: base.order_id.map(|x| x.to_db_value()),
                 uuid: base.uuid,
                 order_status: base.order_status.to_string(),
                 order_time_info: base.order_time_info.into(),
@@ -336,7 +337,7 @@ mod ser_order {
 
         fn try_from(dto: BaseOrderDto) -> Result<Self, Self::Error> {
             Ok(BaseOrder::new(
-                OrderId::from_db_value(dto.order_id)?,
+                dto.order_id.map(OrderId::from_db_value).transpose()?,
                 dto.uuid,
                 OrderStatus::try_from(dto.order_status.as_str())
                     .map_err(|e| anyhow!("Invalid order status: {}", e))?,
@@ -355,8 +356,9 @@ mod ser_order {
             Self {
                 base: order.base().clone().into(),
                 train_schedule_id: order.train_schedule_id().to_db_value(),
-                seat: order.seat().clone().into(),
-                station_range: order.station_range().clone().into(),
+                seat: order.seat().as_ref().map(|x| x.clone().into()),
+                preferred_seat_location: order.preferred_seat_location().map(|x| x.into()),
+                station_range: order.station_range().into(),
             }
         }
     }
@@ -369,7 +371,11 @@ mod ser_order {
             Ok(TrainOrder::new(
                 base,
                 TrainScheduleId::from_db_value(dto.train_schedule_id)?,
-                Seat::try_from(dto.seat)?,
+                dto.seat.map(Seat::try_from).transpose()?,
+                dto.preferred_seat_location
+                    .map(PreferredSeatLocation::try_from)
+                    .transpose()
+                    .map_err(|e| anyhow!("invalid preferred seat location: {}", e))?,
                 dto.station_range.try_into()?,
             ))
         }
