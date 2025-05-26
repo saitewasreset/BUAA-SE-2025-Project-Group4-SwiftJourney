@@ -1,4 +1,3 @@
-use crate::domain::model::message::Notify;
 use crate::domain::model::user::UserId;
 use crate::domain::service::ServiceError;
 use crate::domain::service::order::order_dto::OrderInfoDto;
@@ -8,12 +7,19 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Serialize)]
+pub struct Message<T: Serialize> {
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub data: T,
+}
+
+#[derive(Serialize, Clone)]
 pub enum NotifyDTO {
     Order(OrderNotifyDTO),
     Trip(TripNotifyDTO),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct OrderNotifyDTO {
     pub title: String,
     pub message_time: DateTimeWithTimeZone,
@@ -36,13 +42,20 @@ pub enum MessageApplicationServiceError {
     InfrastructureError(ServiceError),
 }
 
+impl From<NotifyDTO> for Message<NotifyDTO> {
+    fn from(notify: NotifyDTO) -> Self {
+        Message {
+            type_name: match notify {
+                NotifyDTO::Order(_) => "order".to_string(),
+                NotifyDTO::Trip(_) => "trip".to_string(),
+            },
+            data: notify,
+        }
+    }
+}
+
 #[async_trait]
 pub trait MessageApplicationService: 'static + Send + Sync {
-    async fn convert_notify_to_dto(
-        &self,
-        notify: Box<dyn Notify>,
-    ) -> Result<NotifyDTO, MessageApplicationServiceError>;
-
     async fn get_history(
         &self,
         user_id: UserId,
