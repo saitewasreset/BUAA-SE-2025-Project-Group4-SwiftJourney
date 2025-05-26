@@ -354,14 +354,14 @@ clone_trait_object!(Order);
 /// - `personal_info_id`: 订单关联的个人信息唯一标识符。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BaseOrder {
-    order_id: OrderId,
-    uuid: Uuid,
-    order_status: OrderStatus,
-    order_time_info: OrderTimeInfo,
-    unit_price: Decimal,
-    amount: Decimal,
-    payment_info: PaymentInfo,
-    personal_info_id: PersonalInfoId,
+    pub order_id: OrderId,
+    pub uuid: Uuid,
+    pub order_status: OrderStatus,
+    pub order_time_info: OrderTimeInfo,
+    pub unit_price: Decimal,
+    pub amount: Decimal,
+    pub payment_info: PaymentInfo,
+    pub personal_info_id: PersonalInfoId,
 }
 
 impl BaseOrder {
@@ -465,6 +465,10 @@ impl TrainOrder {
     /// - 座位信息的引用。
     pub fn seat(&self) -> &Seat {
         &self.seat
+    }
+
+    pub fn base(&self) -> &BaseOrder {
+        &self.base
     }
 }
 
@@ -591,6 +595,10 @@ impl HotelOrder {
     /// - 预订日期范围。
     pub fn booking_date_range(&self) -> HotelDateRange {
         self.booking_date_range
+    }
+
+    pub fn base(&self) -> &BaseOrder {
+        &self.base
     }
 }
 
@@ -730,6 +738,10 @@ impl DishOrder {
     pub fn amount(&self) -> Decimal {
         self.amount
     }
+
+    pub fn base(&self) -> &BaseOrder {
+        &self.base
+    }
 }
 
 impl Identifiable for DishOrder {
@@ -867,6 +879,10 @@ impl TakeawayOrder {
     /// - 外卖的数量。
     pub fn amount(&self) -> Decimal {
         self.amount
+    }
+
+    pub fn base(&self) -> &BaseOrder {
+        &self.base
     }
 }
 
