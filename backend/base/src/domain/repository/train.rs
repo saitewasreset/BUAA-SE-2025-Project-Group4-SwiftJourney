@@ -47,7 +47,7 @@ use std::sync::Arc;
 ///
 /// 如果发生错误（如数据库连接失败），将返回`RepositoryError`。
 #[async_trait]
-pub trait TrainRepository: Repository<Train> {
+pub trait TrainRepository: Repository<Train> + 'static + Send + Sync {
     /// 获取所有已验证的车次编号（字符串）。
     ///
     /// # Returns
