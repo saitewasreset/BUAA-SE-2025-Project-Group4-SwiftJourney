@@ -575,7 +575,7 @@ impl TrainRepositoryImpl {
 
         for train in train_model_list {
             let train_type = train_type_map
-                .get(&train.id)
+                .get(&train.type_id)
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no train type for train id: {}",
                     train.id
@@ -587,7 +587,7 @@ impl TrainRepositoryImpl {
                 .clone();
 
             let seat_type = seat_type_map
-                .get(&train.id)
+                .get(&train.type_id)
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
                     "no seat type for train id: {}",
                     train.id
@@ -712,14 +712,18 @@ impl TrainRepository for TrainRepositoryImpl {
                 error!("failed to query train type: {}", e);
                 e
             })?;
-        let seat_type_map = self
-            .cache_table_vec::<crate::models::seat_type::Entity, _, _, _>(|q| q, |m| m.id)
+
+        let r = crate::models::seat_type_in_train_type::Entity::find()
+            .find_with_related(crate::models::seat_type::Entity)
+            .all(&self.db)
             .await
-            .context("failed to query train route")
-            .map_err(|e| {
-                error!("failed to query train route: {}", e);
-                e
-            })?;
+            .inspect_err(|e| error!("failed to query seat_type: {}", e))
+            .context("failed to query seat type")?;
+
+        let seat_type_map = r
+            .into_iter()
+            .map(|(x, seat_type_list)| (x.train_type_id, seat_type_list))
+            .collect::<HashMap<_, _>>();
 
         self.query_trains_cached(|q| q, &train_type_map, &seat_type_map)
             .await

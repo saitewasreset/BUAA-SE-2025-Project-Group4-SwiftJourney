@@ -11,6 +11,8 @@ pub mod order;
 
 pub mod resource;
 
+pub mod hotel;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
@@ -26,7 +28,7 @@ use shared::{
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
 
-pub const MAX_BODY_LENGTH: usize = 64 * 1024 * 1024;
+pub const MAX_BODY_LENGTH: usize = 5 * 1024 * 1024 * 1024;
 
 pub struct ApplicationErrorBox(pub Box<dyn ApplicationError>);
 

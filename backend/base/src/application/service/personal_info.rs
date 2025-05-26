@@ -69,7 +69,7 @@ impl From<PersonalInfo> for PersonalInfoDTO {
                 .map_or_else(|| "".to_string(), |id| id.to_string()),
             name: value.name().to_string(),
             identity_card_id: value.identity_card_id().to_string(),
-            preferred_seat_location: Some(value.preferred_seat_location().to_string()),
+            preferred_seat_location: value.preferred_seat_location().map(|seat| seat.to_string()),
             default: value.is_default(),
         }
     }

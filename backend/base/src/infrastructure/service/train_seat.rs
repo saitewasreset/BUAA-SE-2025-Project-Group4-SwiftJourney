@@ -122,6 +122,12 @@ where
     SAR: SeatAvailabilityRepository,
     RR: RouteRepository,
 {
+    pub fn new(seat_availability_repository: Arc<SAR>, route_repository: Arc<RR>) -> Self {
+        Self {
+            seat_availability_repository,
+            route_repository,
+        }
+    }
 }
 
 #[async_trait]

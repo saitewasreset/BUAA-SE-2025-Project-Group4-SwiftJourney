@@ -87,9 +87,10 @@
 //! - 差异检测函数应避免复杂计算
 //! - 大规模聚合根集合应考虑分片管理
 
+pub mod dish_booking;
 pub mod geo;
-pub mod hotel;
 pub mod hotel_booking;
+pub mod hotel_query;
 pub mod hotel_rating;
 pub mod object_storage;
 pub mod order;
@@ -98,6 +99,7 @@ pub mod password;
 pub mod route;
 pub mod session;
 pub mod station;
+pub mod takeaway_booking;
 pub mod train_booking;
 pub mod train_schedule;
 pub mod train_seat;

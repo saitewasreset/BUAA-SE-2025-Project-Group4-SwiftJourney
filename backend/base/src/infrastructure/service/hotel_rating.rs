@@ -1,3 +1,4 @@
+use crate::HOTEL_MAX_COMMENT_LENGTH;
 use crate::domain::model::hotel::{HotelRating, Rating};
 use crate::domain::model::order::{Order, OrderStatus};
 use crate::domain::model::user::UserId;
@@ -139,6 +140,13 @@ where
                 return Err(HotelRatingServiceError::NoCommentsQuotaLeft(
                     hotel_uuid, quota,
                 ));
+            }
+
+            if text.len() > HOTEL_MAX_COMMENT_LENGTH {
+                return Err(HotelRatingServiceError::CommentLengthExceed {
+                    limit: HOTEL_MAX_COMMENT_LENGTH,
+                    actual: text.len(),
+                });
             }
 
             let mut rating = HotelRating::new(None, user_id, hotel_id, Self::now(), rating, text);

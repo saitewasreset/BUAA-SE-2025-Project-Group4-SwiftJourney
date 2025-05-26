@@ -33,6 +33,7 @@
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
 use base::application::service::geo::GeoApplicationService;
+use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
@@ -49,6 +50,7 @@ use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
+use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
@@ -56,17 +58,29 @@ use base::infrastructure::application::service::train_query::TrainQueryServiceIm
 use base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
+use base::infrastructure::messaging::consumer::order_status::{
+    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
+};
 use base::infrastructure::repository::city::CityRepositoryImpl;
+use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
+use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
+use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
+use base::infrastructure::repository::seat_availability::SeatAvailabilityRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
 use base::infrastructure::repository::station::StationRepositoryImpl;
+use base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
+use base::infrastructure::repository::train_schedule::TrainScheduleRepositoryImpl;
 use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
+use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
+use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
@@ -76,7 +90,10 @@ use base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use base::infrastructure::service::route::RouteServiceImpl;
 use base::infrastructure::service::session::SessionManagerServiceImpl;
 use base::infrastructure::service::station::StationServiceImpl;
+use base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
+use base::infrastructure::service::train_booking::TrainBookingServiceImpl;
 use base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
+use base::infrastructure::service::train_seat::TrainSeatServiceImpl;
 use base::infrastructure::service::train_type::TrainTypeConfigurationServiceImpl;
 use base::infrastructure::service::transaction::TransactionServiceImpl;
 use base::infrastructure::service::user::UserServiceImpl;
@@ -151,6 +168,13 @@ async fn main() -> std::io::Result<()> {
     let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
     let hotel_repository_impl = Arc::new(HotelRepositoryImpl::new(conn.clone()));
+    let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
+    let seat_availability_repository_impl =
+        Arc::new(SeatAvailabilityRepositoryImpl::new(conn.clone()));
+    let train_schedule_repository_impl = Arc::new(TrainScheduleRepositoryImpl::new(conn.clone()));
+    let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
+    let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
+    let occupied_room_repository_impl = Arc::new(OccupiedRoomRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
         &mini_io_endpoint,
@@ -189,10 +213,14 @@ async fn main() -> std::io::Result<()> {
 
     let train_data_service_impl = Arc::new(TrainDataServiceImpl::new(
         debug_mode,
+        data_base_path.clone(),
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&route_repository_impl),
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_repository_impl),
+        Arc::clone(&s3_object_storage_service_impl),
     ));
 
     let geo_service_impl = Arc::new(GeoServiceImpl::new(Arc::clone(&city_repository_impl)));
@@ -251,6 +279,47 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&hotel_repository_impl),
     ));
 
+    let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_rating_repository_impl),
+        Arc::clone(&order_repository_impl),
+    ));
+
+    let hotel_query_service_impl = Arc::new(HotelQueryServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_rating_repository_impl),
+        Arc::clone(&city_repository_impl),
+        Arc::clone(&station_repository_impl),
+        Arc::clone(&occupied_room_repository_impl),
+    ));
+
+    let hotel_service_impl = Arc::new(HotelServiceImpl::new(
+        Arc::clone(&hotel_rating_service_impl),
+        Arc::clone(&hotel_query_service_impl),
+        Arc::clone(&session_manager_service_impl),
+    ));
+
+    let train_seat_service_impl = Arc::new(TrainSeatServiceImpl::new(
+        Arc::clone(&seat_availability_repository_impl),
+        Arc::clone(&route_repository_impl),
+    ));
+
+    let train_booking_service_impl = Arc::new(TrainBookingServiceImpl::new(
+        Arc::clone(&train_schedule_repository_impl),
+        Arc::clone(&train_seat_service_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&transaction_repository_impl),
+        Arc::clone(&order_repository_impl),
+    ));
+
+    let dish_booking_service_impl = Arc::new(DishBookingServiceImpl::new(Arc::clone(
+        &order_repository_impl,
+    )));
+
+    let takeaway_booking_service_impl = Arc::new(TakeawayBookingServiceImpl::new(Arc::clone(
+        &order_repository_impl,
+    )));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -293,9 +362,31 @@ async fn main() -> std::io::Result<()> {
     let hotel_data_service: web::Data<dyn HotelDataService> =
         web::Data::from(hotel_data_service_impl as Arc<dyn HotelDataService>);
 
+    let hotel_service: web::Data<dyn HotelService> =
+        web::Data::from(hotel_service_impl as Arc<dyn HotelService>);
+
     let app_config_data = web::Data::new(app_config);
 
-    let order_status_consumer = vec![];
+    let dish_order_status_consumer = Box::new(DishOrderStatusConsumer::new(
+        Arc::clone(&dish_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let takeaway_order_status_consumer = Box::new(TakeawayOrderStatusConsumer::new(
+        Arc::clone(&takeaway_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let train_order_status_consumer = Box::new(TrainOrderStatusConsumer::new(
+        Arc::clone(&train_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    ));
+
+    let order_status_consumer = vec![
+        train_order_status_consumer,
+        dish_order_status_consumer,
+        takeaway_order_status_consumer,
+    ];
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
@@ -306,9 +397,10 @@ async fn main() -> std::io::Result<()> {
     // HINT: You can borrow web::Data<T> as &Arc<T>
     // that means you can pass a &web::Data<T> to `Arc::clone`
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
-    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(Arc::clone(
-        &route_service_impl,
-    )));
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
+        Arc::clone(&route_service_impl),
+        tz_offset_hour,
+    ));
 
     let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
         Arc::clone(&train_schedule_service_impl),
@@ -335,6 +427,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(hotel_data_service.clone())
             .app_data(route_service.clone())
             .app_data(train_type_service.clone())
+            .app_data(hotel_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
@@ -353,10 +446,8 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/order").configure(api::order::scoped_config))
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
-                    .service(
-                        web::scope("/train/schedule")
-                            .configure(api::train::schedule::scoped_config),
-                    ), // Congratulations! You have finished Task 1.2.1D!
+                    .service(web::scope("/train").configure(api::train::scoped_config))
+                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)), // Congratulations! You have finished Task 1.2.1D!
             )
     })
     .bind(("0.0.0.0", 8080))?
