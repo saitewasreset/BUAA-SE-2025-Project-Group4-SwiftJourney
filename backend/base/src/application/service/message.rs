@@ -1,3 +1,5 @@
+use crate::application::ApplicationError;
+use crate::application::commands::message::HistoryMessageQuery;
 use crate::domain::model::user::UserId;
 use crate::domain::service::ServiceError;
 use crate::domain::service::order::order_dto::OrderInfoDto;
@@ -38,7 +40,7 @@ pub struct TripNotifyDTO {
 
 #[derive(Debug, Error)]
 pub enum MessageApplicationServiceError {
-    #[error("an infrastructure error occurred: {0}")]
+    #[error("an infrastructure error occurred")]
     InfrastructureError(ServiceError),
 }
 
@@ -54,10 +56,22 @@ impl From<NotifyDTO> for Message<NotifyDTO> {
     }
 }
 
+impl ApplicationError for MessageApplicationServiceError {
+    fn error_code(&self) -> u32 {
+        match self {
+            MessageApplicationServiceError::InfrastructureError(_) => 500, // Internal Server Error
+        }
+    }
+
+    fn error_message(&self) -> String {
+        self.to_string()
+    }
+}
+
 #[async_trait]
 pub trait MessageApplicationService: 'static + Send + Sync {
     async fn get_history(
         &self,
-        user_id: UserId,
-    ) -> Result<Vec<NotifyDTO>, MessageApplicationServiceError>;
+        query: HistoryMessageQuery,
+    ) -> Result<Vec<NotifyDTO>, Box<dyn ApplicationError>>;
 }
