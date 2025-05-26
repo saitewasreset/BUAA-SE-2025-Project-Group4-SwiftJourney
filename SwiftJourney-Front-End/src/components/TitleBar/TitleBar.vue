@@ -158,13 +158,17 @@ import { useUserStore } from '@/stores/user';
     }
 
     function checkRechargeAmount() {
-        if (rechargeAmount.value <= 0) {
+        if (rechargeAmount.value < 0) {
             message.warning('充值金额必须大于0');
             rechargeAmount.value = 0;
         }
     }
 
     async function handleUserRecharge() {
+        if(rechargeAmount.value === 0) {
+            message.warning('充值金额不能为0');
+            return;
+        }
         try {
             const params: RechargeRequest = {
                 amount: rechargeAmount.value,
