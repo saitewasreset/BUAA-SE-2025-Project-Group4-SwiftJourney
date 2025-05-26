@@ -27,10 +27,21 @@ export const useHotelOrderStore = defineStore('hotelOrder', {
                 }
             }
             this.hotelOrderInfoList.push(hotelOrderInfo);
+            this.syncToLocalStorage();
             return true;
         },
         delete(hotelId: string, roomType: string) {
             this.hotelOrderInfoList = this.hotelOrderInfoList.filter(key => !(hotelId == key.hotelId && roomType == key.roomType));
+            this.syncToLocalStorage();
+        },
+        syncToLocalStorage() {
+            localStorage.setItem('hotelOrderInfoList', JSON.stringify(this.hotelOrderInfoList));
+        },
+        loadFromLocalStorage() {
+            const storedList = localStorage.getItem('hotelOrderInfoList');
+            if (storedList) {
+                this.hotelOrderInfoList = JSON.parse(storedList) as HotelOrderInfo[];
+            }
         },
     },
 })
