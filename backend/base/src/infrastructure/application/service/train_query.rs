@@ -37,12 +37,13 @@ use std::sync::Arc;
 
 use crate::application::commands::train_query::{
     DirectTrainQueryCommand,
-    TrainQueryValidate, TransferTrainQueryCommand,
+    TrainQueryValidate,
+    TransferTrainQueryCommand,
     // TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
     DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryService,
-    TrainQueryServiceError,
+    TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
@@ -198,10 +199,7 @@ where
     async fn query_transfer_trains(
         &self,
         cmd: TransferTrainQueryCommand,
-    ) -> Result<
-        crate::application::service::train_query::TransferTrainQueryDTO,
-        Box<dyn ApplicationError>,
-    > {
+    ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>> {
         cmd.validate()?;
 
         let from_ids = self
@@ -216,7 +214,94 @@ where
             .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
             .collect();
 
-        todo!()
+        let transfer_solutions = self
+            .train_schedule_service
+            .transfer_schedules(cmd.departure_time, &station_pairs)
+            .await
+            .map_err(|e| {
+                error!("Failed to get transfer schedules: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        let routes = self.route_service.get_routes().await.map_err(|e| {
+            error!("Failed to get routes: {:?}", e);
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
+
+        let mut solutions = Vec::new();
+        for (schedule_ids, mid_station) in transfer_solutions {
+            if schedule_ids.len() != 2 || mid_station.is_none() {
+                continue;
+            }
+
+            let mut train_infos = Vec::new();
+            for schedule_id in &schedule_ids {
+                let schedules = self
+                    .train_schedule_service
+                    .get_schedules(cmd.departure_time)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get schedules: {:?}", e);
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
+
+                let schedule = schedules.iter().find(|s| s.get_id() == Some(*schedule_id));
+
+                if let Some(sch) = schedule {
+                    train_infos.push(self.build_dto(sch, &routes, cmd.departure_time).await?);
+                }
+            }
+
+            if train_infos.len() == 2 {
+                let station_name = self
+                    .station_service
+                    .get_station_by_name(mid_station.unwrap().to_string())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get station by id: {:?}", e);
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?
+                    .map(|s| s.name().to_string())
+                    .unwrap_or_else(|| "未知站点".to_string());
+
+                let first_train_arrival_time = train_infos[0]
+                    .route
+                    .iter()
+                    .find(|stop| stop.station_name == station_name)
+                    .map(|stop| stop.arrival_time.clone())
+                    .unwrap_or_else(|| train_infos[0].terminal_arrival_time.clone());
+
+                let second_train_departure_time = train_infos[1]
+                    .route
+                    .iter()
+                    .find(|stop| stop.station_name == station_name)
+                    .map(|stop| stop.departure_time.clone())
+                    .unwrap_or_else(|| train_infos[1].origin_departure_time.clone());
+
+                let first_dt =
+                    NaiveDateTime::parse_from_str(&first_train_arrival_time, "%Y-%m-%d %H:%M:%S")
+                        .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+                let second_dt = NaiveDateTime::parse_from_str(
+                    &second_train_departure_time,
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+
+                let relaxing_time = if second_dt > first_dt {
+                    (second_dt - first_dt).num_seconds() as u32
+                } else {
+                    (second_dt + Duration::hours(24) - first_dt).num_seconds() as u32
+                };
+
+                solutions.push(TransferSolutionDTO {
+                    first_ride: train_infos[0].clone(),
+                    second_ride: train_infos[1].clone(),
+                    relaxing_time,
+                });
+            }
+        }
+
+        Ok(TransferTrainQueryDTO { solutions })
     }
 }
 
