@@ -1,10 +1,9 @@
-use crate::application::service::message::{Message, MessageApplicationServiceError, NotifyDTO};
+use crate::application::service::message::NotifyDTO;
 use crate::domain::model::message::Notify;
 use crate::domain::model::user::UserId;
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
