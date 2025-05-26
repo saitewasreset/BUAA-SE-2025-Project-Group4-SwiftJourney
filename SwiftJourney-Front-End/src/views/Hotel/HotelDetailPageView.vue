@@ -88,11 +88,6 @@
             <HotelOrderCard />
         </div>
     </div>
-    <div class="fixed-icon">
-        <el-button class="FixedButton" type="primary" circle @click="routeBack">
-            <el-icon><Back /></el-icon>
-        </el-button>
-    </div>
 </template>
 
 <script setup lang="ts">
@@ -100,7 +95,7 @@ import { ref, computed, onBeforeMount } from 'vue'
 import { useRoute } from 'vue-router';
 import { hotelApi } from "@/api/HotelApi/hotelApi";
 import type { HotelOrderQuery, HotelRoomDetailInfo, HotelDetailInfo, HotelComment, HotelRoomInfo } from '@/interface/hotelInterface';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { SearchOutlined } from '@ant-design/icons-vue';
 
 const route = useRoute();
@@ -245,11 +240,6 @@ const orderRoom = (room: HotelRoomInfo) => {
 }
 
 //-----------------------------返回上一个页面------------------------------
-import { useRouter } from 'vue-router';
-const router = useRouter();
-function routeBack() {
-    router.back();
-}
 
 //-----------------------------debugInfo-----------------------------------
 import debugHotelImage1 from '../../assets/hotel.jpg';

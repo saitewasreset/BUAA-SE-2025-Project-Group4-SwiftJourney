@@ -28,10 +28,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeMount, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useHotelOrderStore } from '@/stores/hotelOrder';
 const hotelOrderStore = useHotelOrderStore();
+
+onBeforeMount(() => {
+    hotelOrderStore.loadFromLocalStorage();
+})
+
+// 定义一个函数来处理页面可见性变化的事件
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        hotelOrderStore.loadFromLocalStorage();
+    }
+};
+
+// 在组件挂载时添加事件监听器
+onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+// 在组件卸载时移除事件监听器
+onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
 
 const totalMoney = computed(() => {
     let sum = 0;
