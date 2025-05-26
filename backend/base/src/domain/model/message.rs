@@ -2,7 +2,7 @@ use crate::domain::Identifier;
 use crate::domain::model::order::Order;
 use crate::domain::model::user::UserId;
 use chrono::Local;
-use dyn_clone::DynClone;
+use dyn_clone::{DynClone, clone_trait_object};
 use id_macro::define_id_type;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::any::Any;
@@ -47,6 +47,8 @@ pub trait Notify: DynClone + Debug + 'static + Send + Sync + Any {
     fn message_time(&self) -> DateTimeWithTimeZone;
     fn notify_type(&self) -> NotifyType;
 }
+
+clone_trait_object!(Notify);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BaseNotify {
