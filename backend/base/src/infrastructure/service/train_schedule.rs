@@ -150,6 +150,14 @@ where
         Ok(all)
     }
 
+    async fn transfer_schedules(
+        &self,
+        date: NaiveDate,
+        pairs: &[(StationId, StationId)],
+    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+        todo!()
+    }
+
     async fn get_station_arrival_time(
         &self,
         train_schedule_id: TrainScheduleId,
