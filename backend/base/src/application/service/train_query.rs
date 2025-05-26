@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::application::ApplicationError;
-use crate::application::commands::train_query::DirectTrainQueryCommand;
+use crate::application::commands::train_query::{DirectTrainQueryCommand, TransferTrainQueryCommand};
 
 // Step 2: Define `TrainQueryServiceError` for possible errors
 // HINT: You may refer to RFC4 "直达车次查询（US1.2.1）" and "中转车次查询（US3.1.1）" for possible errors
@@ -139,10 +139,9 @@ pub struct DirectTrainQueryDTO {
 /// 中转方案（两段行程 + 中转站）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferSolutionDTO {
-    pub first_leg: TrainInfoDTO,
-    pub second_leg: TrainInfoDTO,
-    pub transfer_station: String,
-    pub total_duration_minutes: u32,
+    pub first_ride: TrainInfoDTO,
+    pub second_ride: TrainInfoDTO,
+    pub relaxing_time: u32,
 }
 
 /// 中转查询的响应 DTO
@@ -170,9 +169,9 @@ pub trait TrainQueryService: 'static + Send + Sync {
         cmd: DirectTrainQueryCommand,
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>>;
 
-    // /// 查询中转方案
-    // async fn query_transfer_trains(
-    //     &self,
-    //     cmd: TransferTrainQueryCommand,
-    // ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>>;
+    /// 查询中转方案
+    async fn query_transfer_trains(
+        &self,
+        cmd: TransferTrainQueryCommand,
+    ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>>;
 }

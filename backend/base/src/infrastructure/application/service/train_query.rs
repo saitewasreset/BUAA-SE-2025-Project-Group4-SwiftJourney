@@ -37,6 +37,7 @@ use std::sync::Arc;
 
 use crate::application::commands::train_query::{
     DirectTrainQueryCommand,
+    TrainQueryValidate, TransferTrainQueryCommand,
     // TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
@@ -191,6 +192,31 @@ where
         }
 
         Ok(DirectTrainQueryDTO { solutions: infos })
+    }
+
+    #[instrument(skip(self))]
+    async fn query_transfer_trains(
+        &self,
+        cmd: TransferTrainQueryCommand,
+    ) -> Result<
+        crate::application::service::train_query::TransferTrainQueryDTO,
+        Box<dyn ApplicationError>,
+    > {
+        cmd.validate()?;
+
+        let from_ids = self
+            .resolve_station_ids(&cmd.departure_station, &cmd.departure_city)
+            .await?;
+        let to_ids = self
+            .resolve_station_ids(&cmd.arrival_station, &cmd.arrival_city)
+            .await?;
+
+        let station_pairs: Vec<(StationId, StationId)> = from_ids
+            .iter()
+            .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
+            .collect();
+
+        todo!()
     }
 }
 
