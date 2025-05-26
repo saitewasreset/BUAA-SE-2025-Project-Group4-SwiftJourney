@@ -11,6 +11,7 @@ pub enum Message {
     UserId,
     MessageType,
     Time,
+    Title,
     Content,
 }
 
@@ -26,6 +27,7 @@ impl MigrationTrait for Migration {
                     .col(integer(Message::UserId).not_null())
                     .col(string(Message::MessageType).not_null())
                     .col(timestamp_with_time_zone(Message::Time).not_null())
+                    .col(string(Message::Title).not_null())
                     .col(json(Message::Content).not_null())
                     .foreign_key(
                         ForeignKey::create()
