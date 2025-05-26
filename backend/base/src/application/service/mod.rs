@@ -9,3 +9,4 @@ pub mod train_data;
 pub mod train_query;
 pub mod transaction;
 pub mod user_manager;
+pub mod train_order;
