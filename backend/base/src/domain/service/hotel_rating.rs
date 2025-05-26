@@ -15,6 +15,8 @@ pub enum HotelRatingServiceError {
     InvalidHotelUuid(Uuid),
     #[error("no comments quota left for hotel uuid: {0}, quota: {1}")]
     NoCommentsQuotaLeft(Uuid, i32),
+    #[error("comment length exceed: {actual} < {limit}")]
+    CommentLengthExceed { limit: usize, actual: usize },
 }
 
 impl From<RepositoryError> for HotelRatingServiceError {
