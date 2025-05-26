@@ -53,6 +53,12 @@ minio-1     | Docs: https://docs.min.io
 
 打开`./backend/.env`配置文件，将其中的`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`替换为上图中的值。
 
+#### 后端运行配置
+
+打开`./backend/.env`配置文件，将其中的`SERVER_NAME`替换为**前端**访问后端服务时的**域名**，**含端口号**。
+
+例如，前端通过`http://127.0.0.1:8080/api/xxx`访问后端，则将`SERVER_NAME`设置为`127.0.0.1:8080`。
+
 #### 运行后端
 
 （在`backend`目录下执行）
@@ -107,3 +113,9 @@ minio-1     | Docs: https://docs.min.io
 打开`docker-compose.yaml`配置文件，将其中的`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`替换为上图中的值。
 
 后端启动后，将监听`8080`端口。
+
+##### 后端运行配置
+
+打开`docker-compose.yaml`配置文件，将其中的`SERVER_NAME`替换为**前端**访问后端服务时的**域名**，**含端口号**。
+
+例如，前端通过`http://127.0.0.1:8080/api/xxx`访问后端，则将`SERVER_NAME`设置为`127.0.0.1:8080`。
