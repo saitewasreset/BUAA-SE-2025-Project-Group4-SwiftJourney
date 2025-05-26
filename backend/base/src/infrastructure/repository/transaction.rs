@@ -54,6 +54,7 @@ use sea_orm::{ColumnTrait, FromQueryResult};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
@@ -739,6 +740,7 @@ pub struct OrderActiveModelPack {
 }
 
 impl OrderActiveModelPack {
+    #[instrument(skip_all)]
     async fn insert_or_update_all(self, txn: &DatabaseTransaction) -> Result<(), DbErr> {
         let mut train_insert_list = Vec::new();
         let mut train_update_list = Vec::new();
@@ -784,42 +786,60 @@ impl OrderActiveModelPack {
             }
         }
 
-        crate::models::train_order::Entity::insert_many(train_insert_list)
-            .exec(txn)
-            .await?;
+        if !train_insert_list.is_empty() {
+            crate::models::train_order::Entity::insert_many(train_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert train order: {}", e))?;
+        }
 
         for order in train_update_list {
             crate::models::train_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update train order: {}", e))?;
         }
 
-        crate::models::hotel_order::Entity::insert_many(hotel_insert_list)
-            .exec(txn)
-            .await?;
+        if !hotel_insert_list.is_empty() {
+            crate::models::hotel_order::Entity::insert_many(hotel_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert hotel order: {}", e))?;
+        }
 
         for order in hotel_update_list {
             crate::models::hotel_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update hotel order: {}", e))?;
         }
 
-        crate::models::dish_order::Entity::insert_many(dish_insert_list)
-            .exec(txn)
-            .await?;
+        if !dish_insert_list.is_empty() {
+            crate::models::dish_order::Entity::insert_many(dish_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert dish order: {}", e))?;
+        }
+
         for order in dish_update_list {
             crate::models::dish_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update dish order: {}", e))?;
         }
 
-        crate::models::takeaway_order::Entity::insert_many(takeaway_insert_list)
-            .exec(txn)
-            .await?;
+        if !takeaway_insert_list.is_empty() {
+            crate::models::takeaway_order::Entity::insert_many(takeaway_insert_list)
+                .exec(txn)
+                .await
+                .inspect_err(|e| error!("failed to insert takeaway order: {}", e))?;
+        }
+
         for order in takeaway_update_list {
             crate::models::takeaway_order::Entity::update(order)
                 .exec(txn)
-                .await?;
+                .await
+                .inspect_err(|e| error!("failed to update takeaway order: {}", e))?;
         }
 
         Ok(())
@@ -1122,6 +1142,30 @@ impl TransactionRepositoryImpl {
                 }
             }
 
+            match (old, new) {
+                (Some(old), Some(new)) => {
+                    if !(old.uuid() == new.uuid()
+                        && old.create_time() == new.create_time()
+                        && old.finish_time() == new.finish_time()
+                        && old.amount() == new.amount()
+                        && old.status() == new.status()
+                        && old.user_id() == new.user_id()
+                        && old.atomic() == new.atomic())
+                    {
+                        result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+                    }
+                }
+                (Some(old), None) => {
+                    result.add_change(TypedDiff::new(DiffType::Removed, Some(old.clone()), None));
+                }
+                (None, Some(new)) => {
+                    // 聚合管理器里没有旧状态，并非说明聚合根不存在，而是说明聚合根里没有旧状态的缓存（例如，服务重启）
+                    // 此时默认状态已经变更
+                    result.add_change(TypedDiff::new(DiffType::Modified, None, Some(new.clone())));
+                }
+                (None, None) => {}
+            }
+
             result
         };
 
@@ -1216,11 +1260,16 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
         Arc::clone(&self.aggregate_manager)
     }
 
+    #[instrument(skip(self))]
     async fn on_insert(&self, aggregate: Transaction) -> Result<TransactionId, RepositoryError> {
+        debug!("inserting transaction: {:?}", aggregate);
         let txn = self
             .db
             .begin()
             .await
+            .inspect_err(|e| {
+                error!("Failed to start transaction: {}", e);
+            })
             .context("Failed to start transaction")?;
 
         let model_pack = TransactionDataConverter::transform_to_do(aggregate);
@@ -1228,34 +1277,54 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
         let result = crate::models::transaction::Entity::insert(model_pack.transaction)
             .exec(&txn)
             .await
+            .inspect_err(|e| {
+                error!("Failed to insert transaction: {}", e);
+            })
             .context("Failed to insert transaction")?;
 
         model_pack
             .orders
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to insert or update orders: {}", e);
+            })
             .context("Failed to insert orders")?;
 
-        txn.commit().await.context("Failed to commit transaction")?;
+        txn.commit()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to commit transaction: {}", e);
+            })
+            .context("Failed to commit transaction")?;
 
         Ok(TransactionId::from_db_value(result.last_insert_id)?)
     }
 
+    #[instrument(skip(self))]
     async fn on_select(&self, id: TransactionId) -> Result<Option<Transaction>, RepositoryError> {
         let result = self
             .query_transaction(|q| {
                 q.filter(crate::models::transaction::Column::Id.eq(id.to_db_value()))
             })
-            .await?;
+            .await
+            .inspect_err(|e| {
+                error!("Failed to query transaction: {}", e);
+            })?;
 
         Ok(result.into_iter().next())
     }
 
+    #[instrument(skip_all)]
     async fn on_update(&self, diff: MultiEntityDiff) -> Result<(), RepositoryError> {
+        debug!("on_update called");
         let txn = self
             .db
             .begin()
             .await
+            .inspect_err(|e| {
+                error!("Failed to start transaction: {}", e);
+            })
             .context("Failed to start transaction")?;
 
         let mut to_add_orders = Vec::new();
@@ -1266,13 +1335,25 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             match changes.diff_type {
                 DiffType::Unchanged => {}
                 DiffType::Added => {
-                    to_add_orders.push(changes.new_value.unwrap());
+                    let order = changes.new_value.unwrap();
+
+                    debug!("order added: {:?}", order);
+
+                    to_add_orders.push(order);
                 }
                 DiffType::Modified => {
-                    to_update_orders.push(changes.new_value.unwrap());
+                    let order = changes.new_value.unwrap();
+
+                    debug!("order added: {:?}", order);
+
+                    to_update_orders.push(order);
                 }
                 DiffType::Removed => {
-                    to_remove_orders.push(changes.old_value.unwrap());
+                    let order = changes.old_value.unwrap();
+
+                    debug!("order removed: {:?}", order);
+
+                    to_remove_orders.push(order);
                 }
             }
         }
@@ -1285,17 +1366,26 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             .into_active_model()
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to insert order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         to_update_order_pack
             .into_active_model()
             .insert_or_update_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to update order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         to_remove_order_pack
             .delete_all(&txn)
             .await
+            .inspect_err(|e| {
+                error!("failed to delete order: {}", e);
+            })
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         for changes in diff.get_changes::<Transaction>() {
@@ -1307,11 +1397,16 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
                 DiffType::Modified => {
                     let new = changes.new_value.unwrap();
 
+                    debug!("transaction modified: {:?}", new);
+
                     crate::models::transaction::Entity::update(
                         TransactionDataConverter::transform_to_do_transaction_only(&new),
                     )
                     .exec(&txn)
                     .await
+                    .inspect_err(|e| {
+                        error!("failed to update transaction: {}", e);
+                    })
                     .map_err(|e| RepositoryError::Db(e.into()))?;
                 }
                 DiffType::Removed => {
@@ -1320,16 +1415,25 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             }
         }
 
-        txn.commit().await.context("Failed to commit transaction")?;
+        txn.commit()
+            .await
+            .inspect_err(|e| {
+                error!("Failed to commit transaction: {}", e);
+            })
+            .context("Failed to commit transaction")?;
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_delete(&self, aggregate: Transaction) -> Result<(), RepositoryError> {
         if let Some(id) = aggregate.get_id() {
             crate::models::transaction::Entity::delete_by_id(id.to_db_value())
                 .exec(&self.db)
                 .await
+                .inspect_err(|e| {
+                    error!("failed to delete transaction: {}", e);
+                })
                 .map_err(|e| RepositoryError::Db(e.into()))?;
         }
 
