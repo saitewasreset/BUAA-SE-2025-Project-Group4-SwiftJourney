@@ -45,7 +45,10 @@ impl PersonalInfoDataConverter {
             name: ActiveValue::Set(personal_info.name().to_string()),
             identity_card: ActiveValue::Set(personal_info.identity_card_id().to_string()),
             preferred_seat_location: ActiveValue::Set(
-                personal_info.preferred_seat_location().to_string(),
+                personal_info
+                    .preferred_seat_location()
+                    .map(|loc| loc.to_string())
+                    .unwrap_or_default(),
             ),
             user_id: ActiveValue::Set(personal_info.user_id().to_db_value()),
             is_default: ActiveValue::Set(personal_info.is_default()),
@@ -83,7 +86,7 @@ impl PersonalInfoDataConverter {
             uuid,
             name,
             identity_card_id,
-            preferred_seat_location,
+            Some(preferred_seat_location),
             user_id,
         );
         personal_info.set_default(user_do.is_default);

@@ -5,12 +5,12 @@ use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId};
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainId;
-use crate::domain::model::train_schedule::TrainSchedule;
+use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{FixedOffset, NaiveDate};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
@@ -21,14 +21,18 @@ where
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
     route_service: Arc<T>,
+    tz_offset_hour: i32,
 }
 
 impl<T> TrainScheduleServiceImpl<T>
 where
     T: RouteService + 'static + Send + Sync,
 {
-    pub fn new(route_service: Arc<T>) -> Self {
-        Self { route_service }
+    pub fn new(route_service: Arc<T>, tz_offset_hour: i32) -> Self {
+        Self {
+            route_service,
+            tz_offset_hour,
+        }
     }
 }
 
@@ -144,5 +148,75 @@ where
             all.append(&mut part);
         }
         Ok(all)
+    }
+
+    async fn get_station_arrival_time(
+        &self,
+        train_schedule_id: TrainScheduleId,
+        station_id: StationId,
+    ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError> {
+        let today = chrono::Local::now().date_naive();
+        let mut found_schedule = None;
+
+        for days_diff in -30..=30 {
+            let check_date = today + chrono::Duration::days(days_diff);
+            let schedules = self.get_schedules(check_date).await?;
+
+            if let Some(schedule) = schedules
+                .iter()
+                .find(|s| s.get_id() == Some(train_schedule_id))
+            {
+                found_schedule = Some(schedule.clone());
+                break;
+            }
+        }
+
+        let train_schedule = found_schedule.ok_or_else(|| {
+            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                anyhow::anyhow!("Train schedule not found"),
+            ))
+        })?;
+
+        let all_routes = self.route_service.get_routes().await.map_err(|e| {
+            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                e.into(),
+            ))
+        })?;
+
+        let route = all_routes
+            .into_iter()
+            .find(|r| r.get_id() == Some(train_schedule.route_id()))
+            .ok_or_else(|| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    anyhow::anyhow!("Route not found for train schedule"),
+                ))
+            })?;
+
+        let stop = route
+            .stops()
+            .iter()
+            .find(|stop| stop.station_id() == station_id)
+            .ok_or_else(|| TrainScheduleServiceError::InvalidStationId(station_id.into()))?;
+
+        let base_date = train_schedule.date();
+
+        let origin_departure_seconds = train_schedule.origin_departure_time() as i64;
+
+        let station_arrival_offset = stop.arrival_time() as i64;
+
+        let base_datetime = chrono::NaiveDateTime::new(
+            base_date,
+            chrono::NaiveTime::from_num_seconds_from_midnight_opt(0, 0).unwrap(),
+        );
+
+        let arrival_datetime = base_datetime
+            + chrono::Duration::seconds(origin_departure_seconds)
+            + chrono::Duration::seconds(station_arrival_offset);
+
+        let arrival_time = arrival_datetime
+            .and_local_timezone(FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap())
+            .unwrap();
+
+        Ok(arrival_time)
     }
 }
