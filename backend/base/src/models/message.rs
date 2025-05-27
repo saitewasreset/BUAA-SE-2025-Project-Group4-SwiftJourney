@@ -7,8 +7,10 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub user_id: i64,
-    pub time: DateTime,
+    pub user_id: i32,
+    pub message_type: String,
+    pub time: DateTimeWithTimeZone,
+    pub title: String,
     pub content: Json,
 }
 

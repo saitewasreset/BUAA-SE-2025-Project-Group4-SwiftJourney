@@ -40,6 +40,8 @@ tokio-stream = "0.1"
 
 aws-sdk-s3 = "1.85.0"
 
+actix-ws = "0.3"
+
 [dev-dependencies]
 
 claims = "0.8"

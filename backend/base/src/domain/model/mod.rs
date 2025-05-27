@@ -1,6 +1,7 @@
 pub mod city;
 pub mod dish;
 pub mod hotel;
+pub mod message;
 pub mod order;
 pub mod password;
 pub mod personal_info;

@@ -24,6 +24,7 @@ use crate::{Unverified, Verified};
 use chrono::NaiveDate;
 use id_macro::define_id_type;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 define_id_type!(TrainSchedule);
@@ -404,6 +405,27 @@ impl OccupiedSeat {
 pub enum SeatStatus {
     Available,
     Occupied,
+}
+
+impl Display for SeatStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SeatStatus::Available => write!(f, "available"),
+            SeatStatus::Occupied => write!(f, "occupied"),
+        }
+    }
+}
+
+impl TryFrom<&str> for SeatStatus {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "available" => Ok(SeatStatus::Available),
+            "occupied" => Ok(SeatStatus::Occupied),
+            _ => Err(format!("Invalid SeatStatus: {}", value)),
+        }
+    }
 }
 
 define_id_type!(Seat);

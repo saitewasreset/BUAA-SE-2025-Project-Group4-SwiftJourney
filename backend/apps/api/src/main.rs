@@ -32,9 +32,11 @@
  */
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
+use base::MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER;
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
+use base::application::service::message::MessageApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
 use base::application::service::train_query::TrainQueryService;
@@ -44,6 +46,7 @@ use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
+use base::domain::service::message::MessageListenerService;
 use base::domain::service::object_storage::ObjectStorageService;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
@@ -52,6 +55,7 @@ use base::domain::service::user::UserService;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
+use base::infrastructure::application::service::message::MessageApplicationServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
@@ -59,12 +63,14 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
-    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
+    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer,
+    TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
+use base::infrastructure::repository::notify::NotifyRepositoryImpl;
 use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
@@ -81,6 +87,7 @@ use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
 use base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
+use base::infrastructure::service::message::{MessageListenerServiceImpl, MessageServiceImpl};
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
@@ -113,6 +120,8 @@ async fn main() -> std::io::Result<()> {
     // env_logger::init_from_env(Env::default().default_filter_or("info"));
     let _ = dotenvy::dotenv();
     tracing_subscriber::fmt::init();
+
+    let server_name = read_file_env("SERVER_NAME").expect("cannot get server name");
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
@@ -149,7 +158,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
-    let app_config = AppConfig { debug: debug_mode };
+    let app_config = AppConfig {
+        debug: debug_mode,
+        server_name,
+    };
 
     let session_manager_service_impl =
         Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
@@ -174,6 +186,7 @@ async fn main() -> std::io::Result<()> {
     let train_schedule_repository_impl = Arc::new(TrainScheduleRepositoryImpl::new(conn.clone()));
     let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
     let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
+    let notify_repository_impl = Arc::new(NotifyRepositoryImpl::new(conn.clone()));
     let occupied_room_repository_impl = Arc::new(OccupiedRoomRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
@@ -320,6 +333,21 @@ async fn main() -> std::io::Result<()> {
         &order_repository_impl,
     )));
 
+    let message_listener_service_impl = Arc::new(MessageListenerServiceImpl::new(
+        MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER,
+    ));
+
+    let message_service_impl = Arc::new(MessageServiceImpl::new(
+        Arc::clone(&message_listener_service_impl),
+        Arc::clone(&notify_repository_impl),
+        Arc::clone(&order_service_impl),
+    ));
+
+    let message_application_service_impl = Arc::new(MessageApplicationServiceImpl::new(
+        Arc::clone(&message_service_impl),
+        Arc::clone(&session_manager_service_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -364,6 +392,9 @@ async fn main() -> std::io::Result<()> {
 
     let hotel_service: web::Data<dyn HotelService> =
         web::Data::from(hotel_service_impl as Arc<dyn HotelService>);
+
+    let message_application_service: web::Data<dyn MessageApplicationService> =
+        web::Data::from(message_application_service_impl as Arc<dyn MessageApplicationService>);
 
     let app_config_data = web::Data::new(app_config);
 
@@ -412,6 +443,9 @@ async fn main() -> std::io::Result<()> {
     let train_query_service: web::Data<dyn TrainQueryService> =
         web::Data::from(train_query_service_impl as Arc<dyn TrainQueryService>);
 
+    let message_listener_service: web::Data<dyn MessageListenerService> =
+        web::Data::from(message_listener_service_impl as Arc<dyn MessageListenerService>);
+
     HttpServer::new(move || {
         App::new()
             .app_data(session_manager_service.clone())
@@ -428,6 +462,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(route_service.clone())
             .app_data(train_type_service.clone())
             .app_data(hotel_service.clone())
+            .app_data(message_listener_service.clone())
+            .app_data(message_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
@@ -444,6 +480,7 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/data").configure(api::data::scoped_config))
                     .service(web::scope("/payment").configure(api::payment::scoped_config))
                     .service(web::scope("/order").configure(api::order::scoped_config))
+                    .service(web::scope("/notify").configure(api::notify::scoped_config))
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
                     .service(web::scope("/train").configure(api::train::scoped_config))

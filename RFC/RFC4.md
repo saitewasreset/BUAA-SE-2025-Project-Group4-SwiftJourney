@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 12 (2025-05-24 15:07:00)
+Version: 13 (2025-05-26 16:18:00)
 
 最近变更：
 
+- Version 13
+  - 获取 WebSocket 端点：使用的具体协议需由前端判断
 - Version 12
   - 修复“城市信息”API 的错误描述
   - “酒店查询”返回新增酒店 info
@@ -408,7 +410,7 @@ interface PersonalInfo {
 请求：
 
 ```typescript
-type Request = type Request = UpdatePersonalInfo;
+type Request = UpdatePersonalInfo;
 
 interface UpdatePersonalInfo {
   // 姓名
@@ -1686,7 +1688,8 @@ interface Message<T> {
 
 ```typescript
 type ResponseData = string;
-// string 中为 WebSocket 端点，格式：`ws://xxx.xxx/xxx/xxx`
+// string 中为 WebSocket 端点，格式：`xxx.xxx/xxx/xxx`
+// 注意：前端需要根据实际情况，选择使用ws还是wss协议
 ```
 
 设置 Cookie：

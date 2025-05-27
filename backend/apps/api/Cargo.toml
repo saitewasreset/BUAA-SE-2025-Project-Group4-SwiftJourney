@@ -28,4 +28,8 @@ tracing-actix-web = "0.7"
 uuid = { version = "1.16.0", features = ["v4"] }
 chrono = "0.4.41"
 
+actix-ws = "0.3"
+
 dotenvy = { version = "0.15" }
+
+tokio-stream = "0.1"

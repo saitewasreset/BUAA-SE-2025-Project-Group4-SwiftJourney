@@ -64,6 +64,7 @@ services:
       MINIO_ACCESS_KEY: SVeGmJodT2ZhGUMmCkZH
       MINIO_SECRET_KEY: TjbyipoXxy9bflZAewwHdpVUCUKcIoqATzndPJZn
       DATA_PATH: /init_data
+      SERVER_NAME: 127.0.0.1:8080
     restart: unless-stopped
     depends_on:
       db:
