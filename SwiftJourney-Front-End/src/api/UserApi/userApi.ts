@@ -6,6 +6,12 @@ export const userApi = {
     userLogin: (params: Object) => {
         return postRequest('/api/user/login', params);
     },
+    setUserInfo: (params: Object) => {
+        return postRequest('/api/user/user_info', params);
+    },
+    updatePassword: (params: Object) => {
+        return postRequest('/api/user/update_password', params);
+    },
     getUserInfo: () => {
         return getRequest('/api/user/user_info');
     },
@@ -14,5 +20,8 @@ export const userApi = {
     },
     userLogout: () => {
         return postRequest('/api/user/logout');
-    }
+    },
+    queryUserBalance: () => {
+        return getRequest('/api/payment/balance');
+    },
 };
