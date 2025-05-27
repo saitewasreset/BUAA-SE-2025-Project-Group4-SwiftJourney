@@ -1,6 +1,6 @@
-use crate::{ApiResponse, ApplicationErrorBox, parse_request_body};
+use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::Bytes;
-use actix_web::{post, web};
+use actix_web::{HttpRequest, post, web};
 use base::application::GeneralError;
 use base::application::commands::train_query::{
     DirectTrainQueryCommand, TransferTrainQueryCommand,
@@ -15,8 +15,6 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TrainScheduleQuery {
-    /// 会话ID
-    pub session_id: String,
     /// 出发站点
     pub departure_station: Option<String>,
     /// 到达站点
@@ -46,13 +44,16 @@ struct TrainScheduleQuery {
 // To `api/train/schedule/mod.rs` for following exercise
 #[post("/query_direct")]
 async fn query_direct(
+    request: HttpRequest,
     body: Bytes,
     train_query_service: web::Data<dyn TrainQueryService>,
 ) -> Result<ApiResponse<DirectTrainQueryDTO>, ApplicationErrorBox> {
+    let session_id = get_session_id(&request)?;
+
     let query_dto: TrainScheduleQuery = parse_request_body(body)?;
 
     let command = DirectTrainQueryCommand {
-        session_id: query_dto.session_id,
+        session_id,
         departure_station: query_dto.departure_station,
         arrival_station: query_dto.arrival_station,
         departure_city: query_dto.departure_city,
@@ -70,13 +71,16 @@ async fn query_direct(
 
 #[post("/query_indirect")]
 async fn query_indirect(
+    request: HttpRequest,
     body: Bytes,
     train_query_service: web::Data<dyn TrainQueryService>,
 ) -> Result<ApiResponse<TransferTrainQueryDTO>, ApplicationErrorBox> {
+    let session_id = get_session_id(&request)?;
+
     let query_dto: TrainScheduleQuery = parse_request_body(body)?;
 
     let command = TransferTrainQueryCommand {
-        session_id: query_dto.session_id,
+        session_id,
         departure_station: query_dto.departure_station,
         arrival_station: query_dto.arrival_station,
         departure_city: query_dto.departure_city,
