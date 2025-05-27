@@ -28,18 +28,24 @@ pub trait TrainScheduleService {
         date: NaiveDate,
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 
-    async fn find_schedules(
-        &self,
-        date: NaiveDate,
-        from_station: StationId,
-        to_station: StationId,
-    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+    // async fn find_schedules(
+    //     &self,
+    //     date: NaiveDate,
+    //     from_station: StationId,
+    //     to_station: StationId,
+    // ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 
     async fn direct_schedules(
         &self,
         date: chrono::NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+
+    async fn transfer_schedules(
+        &self,
+        date: chrono::NaiveDate,
+        pairs: &[(StationId, StationId)],
+    ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError>;
 
     async fn get_station_arrival_time(
         &self,

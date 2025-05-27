@@ -24,44 +24,87 @@ pub struct DirectTrainQueryCommand {
 /// 中转车次查询（US3.1.1）——Query
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferTrainQueryCommand {
+    /// 客户端会话，用于校验登录状态
     pub session_id: String,
+    /// 始发站
+    pub departure_station: Option<String>,
+    /// 终到站
+    pub arrival_station: Option<String>,
     /// 始发城市
-    pub from_city: String,
+    pub departure_city: Option<String>,
     /// 终到城市
-    pub to_city: String,
+    pub arrival_city: Option<String>,
+    /// 乘车时间
     pub departure_time: NaiveDate,
 }
 
-impl DirectTrainQueryCommand {
-    /// 若格式错误返回 `TrainQueryServiceError`
-    pub fn validate(&self) -> Result<(), TrainQueryServiceError> {
-        let has_dep_station = self
-            .departure_station
+pub trait TrainQueryValidate {
+    fn dep_station(&self) -> &Option<String>;
+    fn dep_city(&self) -> &Option<String>;
+    fn arr_station(&self) -> &Option<String>;
+    fn arr_city(&self) -> &Option<String>;
+
+    fn validate(&self) -> Result<(), TrainQueryServiceError> {
+        // —— 始发端 ——
+        let dep_station = self
+            .dep_station()
             .as_ref()
             .map(|s| !s.trim().is_empty())
             .unwrap_or(false);
-        let has_dep_city = self
-            .departure_city
+        let dep_city = self
+            .dep_city()
             .as_ref()
             .map(|s| !s.trim().is_empty())
             .unwrap_or(false);
-        if has_dep_station == has_dep_city {
+        if dep_station == dep_city {
             return Err(TrainQueryServiceError::InconsistentQuery);
         }
 
-        let has_arr_station = self
-            .arrival_station
+        // —— 到达端 ——
+        let arr_station = self
+            .arr_station()
             .as_ref()
             .map(|s| !s.trim().is_empty())
             .unwrap_or(false);
-        let has_arr_city = self
-            .arrival_city
+        let arr_city = self
+            .arr_city()
             .as_ref()
             .map(|s| !s.trim().is_empty())
             .unwrap_or(false);
-        if has_arr_station == has_arr_city {
+        if arr_station == arr_city {
             return Err(TrainQueryServiceError::InconsistentQuery);
         }
+
         Ok(())
+    }
+}
+
+impl TrainQueryValidate for DirectTrainQueryCommand {
+    fn dep_station(&self) -> &Option<String> {
+        &self.departure_station
+    }
+    fn dep_city(&self) -> &Option<String> {
+        &self.departure_city
+    }
+    fn arr_station(&self) -> &Option<String> {
+        &self.arrival_station
+    }
+    fn arr_city(&self) -> &Option<String> {
+        &self.arrival_city
+    }
+}
+
+impl TrainQueryValidate for TransferTrainQueryCommand {
+    fn dep_station(&self) -> &Option<String> {
+        &self.departure_station
+    }
+    fn dep_city(&self) -> &Option<String> {
+        &self.departure_city
+    }
+    fn arr_station(&self) -> &Option<String> {
+        &self.arrival_station
+    }
+    fn arr_city(&self) -> &Option<String> {
+        &self.arrival_city
     }
 }
