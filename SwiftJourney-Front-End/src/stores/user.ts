@@ -1,10 +1,9 @@
-import { ref, computed } from 'vue'
-import { defineStore } from 'pinia'
+import { defineStore } from 'pinia';
 import { NormalConstants } from '@/constant/NormalConstant';
 import { userApi } from '@/api/UserApi/userApi';
-import { useRouter, type Router } from 'vue-router';
+import { type Router } from 'vue-router';
 import { message } from 'ant-design-vue';
-import type { UserApiResponseData, UserInfo } from '@/interface/userInterface';
+import type { UserApiBalanceData, UserApiResponseData, UserInfo } from '@/interface/userInterface';
 
 export const useUserStore = defineStore('user', {
     state: () => ({
@@ -37,6 +36,9 @@ export const useUserStore = defineStore('user', {
             this.identityCardId = userInfo.identityCardId;
             localStorage.setItem('isLogin', 'true');
         },
+        setUserBalance(balance: number) {
+            this.remainingMoney = NormalConstants.RMB_SIGNAL + balance.toString();
+        },
         clearUserInfo() {
             this.username = '';
             this.name = '';
@@ -51,17 +53,35 @@ export const useUserStore = defineStore('user', {
             localStorage.removeItem('isLogin');
         },
         async restoreUserFromCookie(router: Router) {
-            const res: UserApiResponseData = (await userApi.getUserInfo()).data;
-            if(res.code === 200) {
-                const userInfo: UserInfo = res.data as UserInfo;
-                this.setUserInfo(userInfo);
-            } else {
-                if(!this.isLogin) {
-                    return;
+            try {
+                const res: UserApiResponseData = (await userApi.getUserInfo()).data;
+                if(res.code === 200) {
+                    const userInfo: UserInfo = res.data as UserInfo;
+                    this.setUserInfo(userInfo);
+                    
                 }
-                this.clearUserInfo();
-                message.error('登录信息过期，请重新登录');
-                router.push('/login');
+                else
+                    throw new Error('invalid session id');
+                const balRes: UserApiBalanceData = (await userApi.queryUserBalance()).data;
+                if(balRes.code === 200) {
+                    const balance: number = balRes.data.balance;
+                    this.setUserBalance(balance);
+                }
+                else
+                    throw new Error('invalid session id');
+            } catch(e: any) {
+                if(e.message === 'invalid session id') {
+                    if(!this.isLogin) {
+                        return;
+                    }
+                    this.clearUserInfo();
+                    message.error('登录信息过期，请重新登录');
+                    router.push('/login');
+                }
+                else {
+                    message.error('系统出现其他错误');
+                    console.log(e);
+                }
             }
         },
         async logout(router: Router) {

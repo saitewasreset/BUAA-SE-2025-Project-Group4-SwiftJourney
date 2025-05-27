@@ -96,6 +96,7 @@ export interface OrderInform {
     type: string, //订单类型
     money: string, //订单金额
     canCanceled: boolean, //是否可以被取消
+    reason?: string,
 }
 
 export interface TransactionDetail {
