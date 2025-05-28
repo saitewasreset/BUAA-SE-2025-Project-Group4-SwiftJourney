@@ -309,6 +309,8 @@ async fn main() -> std::io::Result<()> {
     let hotel_service_impl = Arc::new(HotelServiceImpl::new(
         Arc::clone(&hotel_rating_service_impl),
         Arc::clone(&hotel_query_service_impl),
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&user_repository_impl),
         Arc::clone(&session_manager_service_impl),
     ));
 
