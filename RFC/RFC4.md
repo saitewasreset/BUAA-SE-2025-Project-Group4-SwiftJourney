@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 14 (2025-05-28 16:00:00)
+Version: 15 (2025-05-28 20:35:00)
 
 最近变更：
 
+- Version 15
+  - 修复`lunch`拼写错误
 - Version 14
   - “酒店查询”详情信息新增酒店 info
 - Version 13
@@ -1458,7 +1460,7 @@ type ResponseData = TrainDishInfo;
 
 interface DishInfo {
   // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
+  availableTime: Array<"lunch" | "dinner">;
   // 火车餐名称
   name: string;
   // 火车餐类别，例如：主食、饮料、零食
@@ -1600,7 +1602,7 @@ interface DishOrder {
   // 份数
   amount: number;
   // 用餐时间
-  dishTime: "launch" | "dinner";
+  dishTime: "lunch" | "dinner";
 }
 
 interface TakeawayOrder {
