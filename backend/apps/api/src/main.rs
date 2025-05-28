@@ -85,6 +85,7 @@ use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
 use base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use base::infrastructure::service::message::{MessageListenerServiceImpl, MessageServiceImpl};
@@ -279,7 +280,6 @@ async fn main() -> std::io::Result<()> {
     ));
 
     let route_service_impl = Arc::new(RouteServiceImpl::new(
-        Arc::clone(&train_type_service_impl),
         Arc::clone(&station_service_impl),
     ));
 
@@ -298,6 +298,12 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&order_repository_impl),
     ));
 
+    let hotel_booking_service_impl = Arc::new(HotelBookingServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&order_repository_impl),
+        Arc::clone(&occupied_room_repository_impl),
+    ));
+
     let hotel_query_service_impl = Arc::new(HotelQueryServiceImpl::new(
         Arc::clone(&hotel_repository_impl),
         Arc::clone(&hotel_rating_repository_impl),
@@ -309,6 +315,9 @@ async fn main() -> std::io::Result<()> {
     let hotel_service_impl = Arc::new(HotelServiceImpl::new(
         Arc::clone(&hotel_rating_service_impl),
         Arc::clone(&hotel_query_service_impl),
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&user_repository_impl),
         Arc::clone(&session_manager_service_impl),
     ));
 

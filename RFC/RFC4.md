@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 13 (2025-05-26 16:18:00)
+Version: 14 (2025-05-28 16:00:00)
 
 最近变更：
 
+- Version 14
+  - “酒店查询”详情信息新增酒店 info
 - Version 13
   - 获取 WebSocket 端点：使用的具体协议需由前端判断
 - Version 12
@@ -1213,6 +1215,8 @@ interface HotelDetailInfo {
   address: string;
   // 联系电话
   phone: string[];
+  // 酒店信息
+  info: string;
 
   // 酒店图片列表，URL
   picture?: string[];
