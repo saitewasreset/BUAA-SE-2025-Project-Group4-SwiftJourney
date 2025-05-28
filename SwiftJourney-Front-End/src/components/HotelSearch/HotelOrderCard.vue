@@ -23,7 +23,8 @@
                 {{ '您还没有选择任何酒店房型' }}
             </div>
         </el-scrollbar>
-        <el-button class="OrderOkButton" type="success" :disabled="hotelOrderStore.hotelOrderInfoList.length == 0">生成订单</el-button>
+        <el-button class="OrderOkButton" type="success" :disabled="hotelOrderStore.hotelOrderInfoList.length == 0"
+        @click="createTransaction">生成订单</el-button>
     </el-card>
 </template>
 
@@ -88,6 +89,67 @@ function deleteRoomFromOrder(hotelId: string,hotelName: string, roomType: string
         ElMessage.success('成功取消选择' + hotelName + '的' + roomType);
     })
 }
+
+//---------------------------------生成订单-----------------------------------
+import type { HotelOrderRequest } from '@/interface/hotelInterface';
+import type { TransactionInfo } from '@/interface/interface';
+import { hotelApi } from '@/api/HotelApi/hotelApi';
+
+function createTransaction() {
+    ElMessageBox.confirm(
+        '您选择的房型总价为 SC' + totalMoney.value + '，核对无误后请点击确定',
+        '确认生成订单',
+        {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        }
+    )
+    .then(() => {
+        confirmCreateTransaction();
+    })
+}
+
+async function confirmCreateTransaction() {
+    let hotelOrderRequestList: HotelOrderRequest[] = [];
+    hotelOrderStore.hotelOrderInfoList.forEach((key) => {
+        let hotelOrderRequest: HotelOrderRequest = {
+            hotelId: key.hotelId,
+            roomType: key.roomType,
+            beginDate: key.beginDate,
+            endDate: key.endDate,
+            personalId: key.personalId,
+            amount: key.amount,
+        };
+        hotelOrderRequestList.push(hotelOrderRequest);
+    })
+    await hotelApi.hotelOrder(hotelOrderRequestList)
+    .then((res) => {
+        if(res.status == 200) {
+            successCreateTransaction(res.data as TransactionInfo)
+        } else {
+            throw new Error(res.statusText);
+        }
+    }) .catch ((error) => {
+        ElMessage.error('生成订单失败 ' + error);
+    })
+}
+
+function successCreateTransaction(transactionInfo: TransactionInfo) {
+    hotelOrderStore.deleteAll();
+    ElMessageBox.confirm(
+        '您的订单号为 ' + transactionInfo.transactionId + ' ,总价 SC' + transactionInfo.amount + '，可在订单系统中查看具体信息，是否立即支付',
+        '生成订单成功',
+        {
+            confirmButtonText: '立即支付',
+            cancelButtonText: '稍后支付',
+            type: 'success',
+        }
+    ) .then(() =>{
+        //处理支付逻辑
+    })
+}
+
 </script>
 
 <style scoped>
