@@ -113,3 +113,19 @@ export interface HotelOrderInfo extends HotelOrderRequest {
   maxCount: number,
   price: number,
 }
+
+export interface HotelCommentQuota {
+  // 用户可为该酒店撰写评价数量配额（该酒店的已完成订单数量）
+  quota: number;
+  // 已使用配额
+  used: number;
+}
+
+export interface NewHotelComment {
+  // 欲评价酒店的 UUID
+  hotelId: string;
+  // 评分
+  rating: number;
+  // 留言内容
+  comment: string;
+}
