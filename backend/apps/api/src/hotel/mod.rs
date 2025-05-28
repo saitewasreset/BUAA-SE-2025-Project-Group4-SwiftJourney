@@ -1,12 +1,15 @@
+use std::collections::HashMap;
+
 use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, get, post, web};
 use base::application::GeneralError;
 use base::application::commands::hotel::{
-    HotelInfoQuery, HotelQuery, NewCommentCommand, QuotaQuery, TargetType,
+    HotelInfoQuery, HotelOrderInfoQuery, HotelQuery, NewCommentCommand, QuotaQuery, TargetType,
 };
 use base::application::service::hotel::{
-    HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO, HotelService, NewHotelCommentDTO,
+    HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO, HotelRoomDetailInfoDTO,
+    HotelService, NewHotelCommentDTO,
 };
 use chrono::NaiveDate;
 use serde::Deserialize;
@@ -146,9 +149,68 @@ async fn query_hotels(
     ApiResponse::ok(result)
 }
 
+/// 酒店预订信息查询请求体DTO
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HotelOrderInfoDTO {
+    /// 欲查询酒店的 UUID
+    pub hotel_id: Uuid,
+
+    /// 入住日期（可选）
+    pub begin_date: Option<String>,
+
+    /// 离开日期（可选）
+    pub end_date: Option<String>,
+}
+
+#[post("/order_info")]
+async fn get_hotel_order_info(
+    requests: HttpRequest,
+    body: Bytes,
+    hotel_service: web::Data<dyn HotelService>,
+) -> Result<ApiResponse<HashMap<String, HotelRoomDetailInfoDTO>>, ApplicationErrorBox> {
+    let session_id = get_session_id(&requests)?;
+
+    let query_dto: HotelOrderInfoDTO = parse_request_body(body)?;
+
+    let begin_date = if let Some(date_str) = query_dto.begin_date {
+        Some(
+            NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
+                Box::new(GeneralError::BadRequest("Invalid begin date format".into()))
+                    as Box<dyn base::application::ApplicationError>
+            })?,
+        )
+    } else {
+        None
+    };
+
+    let end_date = if let Some(date_str) = query_dto.end_date {
+        Some(
+            NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
+                Box::new(GeneralError::BadRequest("Invalid end date format".into()))
+                    as Box<dyn base::application::ApplicationError>
+            })?,
+        )
+    } else {
+        None
+    };
+
+    let query = HotelOrderInfoQuery {
+        session_id,
+        hotel_id: query_dto.hotel_id,
+        begin_date,
+        end_date,
+    };
+
+    let result = hotel_service.query_hotel_order_info(query).await?;
+
+    ApiResponse::ok(result)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_quota)
         .service(get_hotel_info)
         .service(add_comment)
-        .service(query_hotels);
+        .service(query_hotels)
+        .service(get_hotel_order_info);
 }

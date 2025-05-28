@@ -36,3 +36,11 @@ pub struct HotelInfoQuery {
     pub session_id: String,
     pub hotel_id: Uuid,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HotelOrderInfoQuery {
+    pub session_id: String,
+    pub hotel_id: Uuid,
+    pub begin_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
+}
