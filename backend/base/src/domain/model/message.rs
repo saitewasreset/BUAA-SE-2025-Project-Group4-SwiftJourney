@@ -156,6 +156,7 @@ pub struct TripNotify {
 }
 
 impl TripNotify {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         notify_id: Option<NotifyId>,
         user_id: UserId,
