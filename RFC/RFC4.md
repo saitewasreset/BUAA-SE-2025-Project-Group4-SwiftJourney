@@ -1,6 +1,6 @@
 # Request For Comments 4: API 文档
 
-Version: 13 (2025-05-26 16:18:00)
+Version: 14 (2025-05-28 16:00:00)
 
 最近变更：
 
