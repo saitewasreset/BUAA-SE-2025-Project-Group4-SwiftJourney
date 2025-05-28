@@ -82,7 +82,35 @@
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane label="评论" name="comment">
-                    <div>1111</div>
+                    <div class="CommentContainer">
+                        <el-scrollbar height="280px">
+                            <el-card class="CommentCard" v-for="(comment, index) in hotelDetailInfo?.comments" :key="index">
+                                <el-avatar shape="square" :size="50" style="position: absolute; top: 20px; left: 20px;" 
+                                src="https://cube.elemecdn.com/9/c2/f0ee8a3c7c9638a54940382568c9dpng.png" />
+                                <div class="Info1">
+                                    <div style="display: flex; justify-content: flex-start; align-items: baseline; gap: 10px">
+                                        <p style="font-size: 18px; margin-bottom: 0;">{{ comment.username }}</p>
+                                        <p style="font-size: 14px; margin-bottom: 0;">{{ comment.commentTime }}</p>
+                                    </div>
+                                    <p style="max-width: 500px; word-wrap: break-word; margin-bottom: 0;">{{ comment.comment }}</p>
+                                </div>
+                                <div class="Info2">
+                                    <el-rate v-model="comment.rating" disabled show-score 
+                                    text-color="#ff9900" size="large" score-template="{value}"/>
+                                </div>
+                            </el-card>
+                            <p class="bottom-text">----已经到底了----</p>
+                        </el-scrollbar>
+                    </div>
+                    <el-card class="CommentSendCard">
+                        <textarea v-model="commentTextarea" class="CommentInput" placeholder="快评论一下吧！"></textarea>
+                        <div class="CommentRateContainer">
+                            <el-rate v-model="commentRate" allow-half style="margin-left: 3px;"/>
+                            <el-input-number v-model="commentRate" :precision="1" :step="0.1" :max="5" :min="0" style="width: 120px; margin-top: 5px;" />
+                        </div>
+                        <el-button class="CommentSendButton" type="success"
+                        @click="sendComment">发送</el-button>
+                    </el-card>
                 </el-tab-pane>
             </el-tabs>
             <HotelOrderCard />
@@ -142,6 +170,7 @@ async function getHotelDetailInfo() {
     .then((res) => {
         if(res.status == 200) {
             hotelDetailInfo.value = res.data;
+            sortCommentByDate();
         } else {
             throw new Error(res.statusText);
         }
@@ -197,6 +226,13 @@ async function getHotelOrderInfo() {
     })
 }
 
+//对评论按照时间降序排列
+function sortCommentByDate() {
+    return hotelDetailInfo.value?.comments.sort((a, b) => {
+        return b.commentTime.localeCompare(a.commentTime);
+    })
+}
+
 //-----------------------------room---------------------------------------
 const tabActiveName = ref<string>('room');
 function goToRoom() {
@@ -241,9 +277,72 @@ const orderRoom = (room: HotelRoomInfo) => {
 
 //-----------------------------返回上一个页面------------------------------
 
+//-----------------------------评价---------------------------------------
+const commentRate = ref<number>(0);
+const commentTextarea = ref<string>('');
+const hotelCommentQuota = ref<HotelCommentQuota | undefined>();
+
+import type { HotelCommentQuota, NewHotelComment } from '@/interface/hotelInterface';
+
+async function sendComment() {
+    if(!checkComment()) {
+        return;
+    }
+    if(hotelCommentQuota.value == undefined) {
+        await hotelApi.hotelQuota(hotelId)
+        .then((res) => {
+            if(res.status == 200) {
+                hotelCommentQuota.value =  res.data as HotelCommentQuota;
+            } else {
+                throw new Error(res.statusText);
+            }
+        }) .catch((err) => {
+            ElMessage.error(err);
+        })
+    }
+    if(hotelCommentQuota.value == undefined) {
+        return;
+    }
+    if(hotelCommentQuota.value.quota - hotelCommentQuota.value.used > 0) {
+        realySendComment();
+    } else {
+        ElMessage.error('您暂无评价次数，请先预订酒店吧！')
+    }
+}
+
+async function realySendComment() {
+    let newComment: NewHotelComment = {
+        hotelId: hotelId,
+        rating: commentRate.value,
+        comment: commentTextarea.value,
+    }
+    await hotelApi.hotelComment(newComment)
+    .then((res)=> {
+        if(res.status == 200){
+            getHotelDetailInfo(); //重新获取，以更新评论
+        } else {
+            throw new Error(res.statusText);
+        }
+    }).catch((err) => {
+        ElMessage.error(err);
+    })
+}
+
+function checkComment() {
+    if(commentTextarea.value.trim() == '') {
+        ElMessage.error('请输入您的评论');
+        return false;
+    } else if (commentRate.value == 0) {
+        ElMessage.error('请输入您的评分');
+        return false;
+    }
+    return true;
+}
+
 //-----------------------------debugInfo-----------------------------------
 import debugHotelImage1 from '../../assets/hotel.jpg';
 import debugHotelImage2 from '../../assets/hotel2.jpg';
+import { fa } from 'element-plus/es/locales.mjs';
 
 const debugComments = [
     {
@@ -262,7 +361,7 @@ const debugComments = [
         username: '王五',
         commentTime: "2025-02-05 10:00:28",
         rating: 4.5,
-        comment: "房间干净整洁，下次还会来。"
+        comment: "房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。房间干净整洁，下次还会来。"
     } as HotelComment,
 ] as HotelComment [];
 const debugHotelDetailInfo: HotelDetailInfo = {
@@ -339,6 +438,7 @@ function getdebugInfo() {
             return 0;
         }
     });
+    sortCommentByDate();
 }
 </script>
 
@@ -438,7 +538,7 @@ function getdebugInfo() {
     flex-direction: column;
     align-items: flex-end;
 }
-::v-deep(.el-rate) {
+::v-deep(.HotelRate) {
     --el-rate-font-size: 1.75rem;
     --el-rate-icon-size: 1.75rem;
 }
@@ -604,5 +704,63 @@ function getdebugInfo() {
 .FixedButton {
     width: 50px;
     height: 50px;
+}
+
+
+
+.CommentContainer {
+    width: 700px;
+    height: 290px;
+    padding-right: 20px;
+    padding-left: 20px;
+    padding-bottom: 10px;
+}
+.CommentCard {
+    width: 640px;
+    margin-bottom: 10px;
+    position: relative;
+}
+.CommentCard .Info1 {
+    margin-left: 70px;
+}
+.CommentCard .Info2 {
+    position: absolute;
+    top: 15px;
+    right: 25px;
+}
+.bottom-text {
+    margin-right: 20px;
+    color: rgb(160, 160, 160);
+    text-align: center;
+    margin-bottom: 0;
+}
+
+.CommentSendCard {
+    width: 700px;
+    height: 95px;
+    position: relative;
+    margin-top: 10px;
+}
+.CommentInput {
+    position: absolute; 
+    left: 10px; 
+    top: 10px; 
+    width: 450px; 
+    height: 75px; 
+    border: none; 
+    resize: none; 
+    outline: none;
+}
+.CommentRateContainer {
+    position: absolute; 
+    top: 15px; 
+    left: 485px; 
+    display: flex; 
+    flex-direction: column;
+}
+.CommentSendButton {
+    position: absolute; 
+    right: 10px; 
+    bottom: 10px;
 }
 </style>

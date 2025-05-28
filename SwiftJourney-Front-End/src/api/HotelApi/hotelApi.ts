@@ -12,5 +12,11 @@ export const hotelApi = {
     },
     hotelOrder: (params: Object) => {
         return postRequest('api/hotel/order', params);
+    },
+    hotelQuota: (hotel_id: string) => {
+        return getRequest('api/hotel/quota/' + hotel_id);
+    },
+    hotelComment: (params: Object) => {
+        return postRequest('/api/hotel/comment', params);
     }
 };
