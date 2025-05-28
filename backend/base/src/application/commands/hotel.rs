@@ -30,3 +30,9 @@ pub struct NewCommentCommand {
     pub rating: f64,
     pub comment: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HotelInfoQuery {
+    pub session_id: String,
+    pub hotel_id: Uuid,
+}

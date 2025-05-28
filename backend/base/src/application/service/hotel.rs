@@ -1,5 +1,5 @@
 use crate::application::ApplicationError;
-use crate::application::commands::hotel::{HotelQuery, NewCommentCommand, QuotaQuery};
+use crate::application::commands::hotel::{HotelQuery, HotelInfoQuery, NewCommentCommand, QuotaQuery};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -68,6 +68,31 @@ pub struct HotelGeneralInfoDTO {
     pub info: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HotelCommentDTO {
+    pub user_name: String,
+    pub comment_time: String,
+    pub rating: f64,
+    pub comment: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HotelDetailInfoDTO {
+    pub hotel_id: String,
+    pub name: String,
+    pub address: String,
+    pub phone: Vec<String>,
+    pub info: String,
+
+    pub picture: Option<Vec<String>>,
+    pub rating: f64,
+    pub rating_count: i32,
+    pub total_bookings: i32,
+    pub comments: Vec<HotelCommentDTO>,
+}
+
 #[async_trait]
 pub trait HotelService: 'static + Send + Sync {
     async fn get_quota(
@@ -84,4 +109,9 @@ pub trait HotelService: 'static + Send + Sync {
         &self,
         query: HotelQuery,
     ) -> Result<Vec<HotelGeneralInfoDTO>, Box<dyn ApplicationError>>;
+
+    async fn query_hotel_info(
+        &self,
+        query: HotelInfoQuery,
+    ) -> Result<HotelDetailInfoDTO, Box<dyn ApplicationError>>;
 }
