@@ -1,9 +1,9 @@
 <template>
-    <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-        <TicketSearch style="" />
-    </div>
-    <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-        <TravelInfo />
+    <div style="width: 100%;">
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <TicketSearch />
+            <TravelInfo />
+        </div>
     </div>
 </template>
 
