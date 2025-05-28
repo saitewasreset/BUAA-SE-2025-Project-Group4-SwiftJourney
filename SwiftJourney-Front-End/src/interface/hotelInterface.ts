@@ -86,7 +86,7 @@ export interface HotelGInfoWRoom extends HotelGeneralInfo {
   roomTypeMap: Map<string, HotelRoomDetailInfo>,
 }
 
-interface HotelOrderRequest {
+export interface HotelOrderRequest {
   // 欲预订酒店的 UUID
   hotelId: string;
 

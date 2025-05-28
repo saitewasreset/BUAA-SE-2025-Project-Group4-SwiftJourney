@@ -43,5 +43,9 @@ export const useHotelOrderStore = defineStore('hotelOrder', {
                 this.hotelOrderInfoList = JSON.parse(storedList) as HotelOrderInfo[];
             }
         },
+        deleteAll() {
+            this.hotelOrderInfoList = [];
+            this.syncToLocalStorage();
+        }
     },
 })
