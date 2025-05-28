@@ -2,9 +2,11 @@ use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, get, post, web};
 use base::application::GeneralError;
-use base::application::commands::hotel::{HotelQuery, NewCommentCommand, QuotaQuery, TargetType};
+use base::application::commands::hotel::{
+    HotelInfoQuery, HotelQuery, NewCommentCommand, QuotaQuery, TargetType,
+};
 use base::application::service::hotel::{
-    HotelCommentQuotaDTO, HotelGeneralInfoDTO, HotelService, NewHotelCommentDTO,
+    HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO, HotelService, NewHotelCommentDTO,
 };
 use chrono::NaiveDate;
 use serde::Deserialize;
@@ -24,6 +26,24 @@ async fn get_quota(
     };
 
     let result = hotel_service.get_quota(query).await?;
+
+    ApiResponse::ok(result)
+}
+
+#[get("/info/{hotel_id}")]
+async fn get_hotel_info(
+    hotel_id: web::Path<Uuid>,
+    requests: HttpRequest,
+    hotel_service: web::Data<dyn HotelService>,
+) -> Result<ApiResponse<HotelDetailInfoDTO>, ApplicationErrorBox> {
+    let session_id = get_session_id(&requests)?;
+
+    let query = HotelInfoQuery {
+        session_id,
+        hotel_id: *hotel_id,
+    };
+
+    let result = hotel_service.query_hotel_info(query).await?;
 
     ApiResponse::ok(result)
 }
@@ -128,6 +148,7 @@ async fn query_hotels(
 
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_quota)
+        .service(get_hotel_info)
         .service(add_comment)
         .service(query_hotels);
 }
