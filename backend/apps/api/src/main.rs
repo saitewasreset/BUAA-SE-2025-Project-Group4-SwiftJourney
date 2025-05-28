@@ -63,8 +63,8 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
-    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer,
-    TrainOrderStatusConsumer,
+    DishOrderStatusConsumer, HotelOrderStatusConsumer, RabbitMQOrderStatusConsumer,
+    TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
@@ -279,9 +279,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&personal_info_repository_impl),
     ));
 
-    let route_service_impl = Arc::new(RouteServiceImpl::new(
-        Arc::clone(&station_service_impl),
-    ));
+    let route_service_impl = Arc::new(RouteServiceImpl::new(Arc::clone(&station_service_impl)));
 
     let hotel_data_service_impl = Arc::new(HotelDataServiceImpl::new(
         app_config.debug,
@@ -422,10 +420,16 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&transaction_service_impl),
     ));
 
+    let hotel_order_status_consumer = Box::new(HotelOrderStatusConsumer::new(
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
     let order_status_consumer = vec![
         train_order_status_consumer,
         dish_order_status_consumer,
         takeaway_order_status_consumer,
+        hotel_order_status_consumer,
     ];
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
