@@ -11,34 +11,29 @@ use async_trait::async_trait;
 
 // Step 1: Define generics parameter over `TrainTypeConfigurationService` service
 // Exercise 1.2.1D - 2: Your code here. (1 / 4)
-pub struct RouteServiceImpl<T, S>
+pub struct RouteServiceImpl<S>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
 {
     // Step 2: Add struct filed to store an implementation of `TrainTypeConfigurationService` service
     // Exercise 1.2.1D - 2: Your code here. (2 / 4)
-    train_type_configuration_service: Arc<T>,
     station_service: Arc<S>,
 }
 
-impl<T, S> RouteServiceImpl<T, S>
+impl<S> RouteServiceImpl<S>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
 {
-    pub fn new(train_type_configuration_service: Arc<T>, station_service: Arc<S>) -> Self {
+    pub fn new(station_service: Arc<S>) -> Self {
         Self {
-            train_type_configuration_service,
             station_service,
         }
     }
 }
 
 #[async_trait]
-impl<T, S> RouteService for RouteServiceImpl<T, S>
+impl<S> RouteService for RouteServiceImpl<S>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
 {
     async fn get_route_map(&self) -> Result<RouteGraph, RouteServiceError> {

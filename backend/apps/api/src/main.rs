@@ -280,7 +280,6 @@ async fn main() -> std::io::Result<()> {
     ));
 
     let route_service_impl = Arc::new(RouteServiceImpl::new(
-        Arc::clone(&train_type_service_impl),
         Arc::clone(&station_service_impl),
     ));
 
