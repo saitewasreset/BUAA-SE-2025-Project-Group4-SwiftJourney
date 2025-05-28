@@ -138,3 +138,9 @@ export interface FoodOrderDetail extends OrderDetail {
     date: string, //日期
     time: string, //送餐时间
 }
+
+export interface TransactionInfo {
+  transactionId: string;
+  amount: number;
+  status: "unpaid" | "paid";
+}
