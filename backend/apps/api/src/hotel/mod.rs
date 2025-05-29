@@ -12,8 +12,11 @@ use base::application::service::hotel::{
     HotelService, NewHotelCommentDTO,
 };
 use chrono::NaiveDate;
+use order::create_hotel_order;
 use serde::Deserialize;
 use uuid::Uuid;
+
+mod order;
 
 #[get("/quota/{hotel_id}")]
 async fn get_quota(
@@ -212,5 +215,6 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
         .service(get_hotel_info)
         .service(add_comment)
         .service(query_hotels)
-        .service(get_hotel_order_info);
+        .service(get_hotel_order_info)
+        .service(create_hotel_order);
 }
