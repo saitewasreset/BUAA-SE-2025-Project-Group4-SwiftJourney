@@ -69,6 +69,13 @@ interface UpdatePersonalInfo {
   default?: boolean;
 }
 
+interface UpdatePassword {
+  // 原密码
+  originPassword: string;
+  // 新密码
+  newPassword: string;
+}
+
 interface RechargeInfo {
   amount: number;
   // 由于无需访问外部支付系统，故`externalPaymentId`设置为`null`即可。
@@ -88,21 +95,21 @@ interface TransactionInfo {
 interface PaymentPasswordInfo {
   // 修改支付密码时，需要传入用户密码进行验证
   userPassword: string;
-  paymentPassword: number;
+  paymentPassword: string;
 }
 
 interface PaymentConfirmation {
   userPassword?: string;
-  paymentPassword?: number;
+  paymentPassword?: string;
 }
 
 interface TrainScheduleQuery {
-  depatureStation?: string;
+  departureStation?: string;
   arrivalStation?: string;
-  depatureCity?: string;
+  departureCity?: string;
   arrivalCity?: string;
-  // deparuteDate：YYYY-MM-DD
-  deparuteDate: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
 }
 
 // 站点停靠信息
@@ -111,7 +118,7 @@ interface StoppingStationInfo {
   // 到达该站点的日期时间，若为始发站，不包含该属性
   arrivalTime?: string;
   // 离开该站点的日期时间，若为终到站，不包含该属性
-  depatureTime?: string;
+  departureTime?: string;
 }
 
 interface SeatTypeInfo {
@@ -128,15 +135,15 @@ interface TransactionGenerateRequest {
 }
 
 interface TrainScheduleInfo {
-  depatureStation: string;
+  departureStation: string;
   // 离开“起始站”的日期时间
-  depatureTime: string;
+  departureTime: string;
   arrivalStation: string;
   // 到达“到达站”的日期时间
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -170,10 +177,10 @@ interface TrainOrderRequest {
   // 车次号，例如：“G53”
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
 
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
 
@@ -183,16 +190,29 @@ interface TrainOrderRequest {
   seatType: string;
 }
 
+interface TransactionData {
+  // 交易的 UUID
+  transactionId: string;
+  // 交易状态
+  status: "unpaid" | "paid";
+  // 交易创建日期时间
+  createTime: string;
+  // 支付日期时间
+  payTime?: string;
+  // 该交易对应的订单列表
+  orders: OrderInfo[];
+  // 该交易的金额（所有订单金额之和）
+  amount: number;
+}
+
 interface OrderInfo {
   // 订单的 UUID
   orderId: string;
-  // 订单对应的交易的 UUID
-  transactionId: string;
   // 订单状态：详见 RFC3“关于订单状态的约定”
-  status: "Unpaid" | "Paid" | "Ongoing" | "Active" | "Completed" | "Failed" | "Canceled";
-  // 支付日期时间
-  payTime?: string;
-  // 订单金额
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
+  // 订单单价
+  unitPrice: number;
+  // 订单数量
   amount: number;
   // 订单类型
   orderType: "train" | "hotel" | "dish" | "takeaway";
@@ -216,8 +236,14 @@ interface SeatLocationInfo {
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
-  // 离开起始站日期时间
-  depatureTime: string;
+  // 始发站
+  departureStation: string;
+  // 终到站
+  terminalStation: string;
+  // 离开始发站日期时间
+  departureTime: string;
+  // 到达终到站的日期时间
+  terminalTime: string;
   // 乘车人姓名
   name: string;
   // 人类可读的座位号
@@ -229,7 +255,7 @@ interface HotelOrderInfo extends OrderInfo {
   hotelName: string;
   // 酒店 UUID
   hotelId: string;
-  // 旅客姓名
+  // 订房人姓名
   name: string;
   // 人类可读的房间类型，例如：“大床房”
   roomType: string;
@@ -243,7 +269,7 @@ interface DishOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 用餐“时间”
   dishTime: "lunch" | "dinner";
   // 用餐人姓名
@@ -256,9 +282,11 @@ interface TakeawayOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 车站
   station: string;
+  // 用餐时间（到达车站的时间）
+  dishTime: string;
   // 店铺名称
   shopName: string;
   // 用餐人姓名
@@ -298,7 +326,10 @@ interface HotelGeneralInfo {
   ratingCount: number;
   // 累计预订人次
   totalBookings: number;
+  // 在住宿时间beginDate、endDate内，可用的房间的价格的最小值
   price: number;
+  // 酒店信息
+  info: string;
 }
 
 // 用户评价
@@ -367,8 +398,10 @@ interface HotelOrderRequest {
   // 离开日期
   endDate?: string;
 
-  // 旅客 UUID（见`PersonalInfo`）
+  // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
+  // 预订数量
+  amount: number;
 }
 
 interface HotelCommentQuota {
@@ -391,7 +424,7 @@ interface DishQuery {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
 }
 
 interface DishInfo {
@@ -409,7 +442,7 @@ interface TrainDishInfo {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
 
@@ -426,7 +459,7 @@ interface TrainDishInfo {
 
 interface DishStationQuery {
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
   // 查询日期
@@ -466,15 +499,15 @@ interface FullTrainDishInfo {
   // 车次
   trainNumber: string;
 
-  depatureStation: string;
+  departureStation: string;
   // 离开“起始站”的日期时间
-  depatureTime: string;
+  departureTime: string;
   arrivalStation: string;
   // 到达“到达站”的日期时间
   arrivalTime: string;
   originStation: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
   terminalStation: string;
   // 到达“终到站”的日期时间
   terminalArrivalTime: string;
@@ -517,7 +550,7 @@ interface TrainDishOrderRequest {
   // 车次
   trainNumber: string;
   // 离开“始发站”的日期时间
-  originDepatureTime: string;
+  originDepartureTime: string;
 
   // 要预订的火车餐列表
   dishes: DishOrder[];
@@ -549,9 +582,9 @@ interface TripNotify extends Notify {
   // 车次，例如：“G53”
   trainNumber: string;
   // 离开起始站日期时间
-  depatureTime: string;
+  departureTime: string;
   // 起始站
-  depatureStation: string;
+  departureStation: string;
   // 到达站
   arrivalStation: string;
 }

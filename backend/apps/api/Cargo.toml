@@ -1,0 +1,31 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+base = { path = "../../base" }
+shared = { path = "../../shared" }
+migration = { path = "../../migration" }
+
+thiserror = "2.0"
+dyn-fmt = "0.4"
+
+sea-orm = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+
+actix-web = { version = "4.9", features = ["cookies"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-actix-web = "0.7"
+uuid = { version = "1.16.0", features = ["v4"] }
+chrono = "0.4.41"
+
+dotenvy = { version = "0.15" }

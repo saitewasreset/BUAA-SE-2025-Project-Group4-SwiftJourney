@@ -1,0 +1,9 @@
+[package]
+name = "shared"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+regex = "1.11"
+phf = { version = "0.11", features = ["macros"] }
+serde = { version = "1.0.219", features = ["derive"] }

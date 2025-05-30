@@ -1,23 +1,15 @@
+import type { DefineComponent } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { useUserStore } from '@/stores/user'
+import { message } from 'ant-design-vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      // name: 'home',
-      // component: HomeView,
       redirect: '/homepage',
     },
-    // {
-    //   path: '/about',
-    //   name: 'about',
-    //   // route level code-splitting
-    //   // this generates a separate chunk (About.[hash].js) for this route
-    //   // which is lazy-loaded when the route is visited.
-    //   component: () => import('../views/AboutView.vue'),
-    // },
     {
       path: '/homepage',
       name: 'homepage',
@@ -29,6 +21,17 @@ const router = createRouter({
       component: () => import('../views/TrainTicket/TrainTicketView.vue'),
     },
     {
+      path: '/hotel',
+      name: 'hotel',
+      component: () => import('../views/Hotel/HotelPageView.vue'),
+    },
+    {
+      path: '/hotel/:id',
+      name: 'hotelDetail',
+      component: () => import('../views/Hotel/HotelDetailPageView.vue'),
+      props: true,
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginPage/LoginPageView.vue'),
@@ -38,7 +41,34 @@ const router = createRouter({
       name: 'register',
       component: () => import('../views/RegisterPage/RegisterPageView.vue'),
     },
+    {
+      path: '/personalhomepage/:activeIndex',
+      name: 'personalhomepage',
+      component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
+      props: true
+    },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
+  //const isLogin: Boolean = true;
+  if (!isLogin) {
+    // 未登录，跳转到登录页
+    if (to.path !== '/login' && to.path !== '/register') {
+      message.warning('请先登录');
+      next({ path: '/login', query: { redirect: to.fullPath } });
+    } else {
+      next();
+    }
+  } else {
+    if (to.path === '/login' || to.path === '/register') {
+      message.info('您已登录');
+      next({ path: '/homepage' });
+    } else {
+      next();
+    }
+  }
 })
 
 export default router
