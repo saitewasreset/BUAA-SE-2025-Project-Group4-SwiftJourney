@@ -47,7 +47,7 @@ const userPassword = ref<string>('');
 const digits = ref(new Array(6).fill(''));
 const payPassword = ref<string>('');
 
-const successPay = ref<boolean>(true);
+const successPay = ref<boolean>(false);
 
 function onInput(index: number) {
     if (index < digits.value.length - 1 && digits.value[index].length === 1) {
