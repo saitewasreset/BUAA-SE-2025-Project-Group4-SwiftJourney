@@ -1,3 +1,4 @@
+pub mod dish_query;
 pub mod geo;
 pub mod hotel;
 pub mod hotel_data;
