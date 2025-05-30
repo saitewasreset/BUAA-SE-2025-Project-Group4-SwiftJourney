@@ -148,13 +148,13 @@ function successCreateTransaction(transactionInfo: TransactionInfo) {
         }
     ) .then(() =>{
         //处理支付逻辑
-        goToPay(transactionInfo.transactionId, transactionInfo.amount);
+        goToPay(transactionInfo.transactionId, 'SC ' + transactionInfo.amount);
     })
 }
 
 const router = useRouter();
 
-function goToPay(transactionaId: string, money: number) {
+function goToPay(transactionaId: string, money: string) {
     const routeUrl = router.resolve({
         name: 'paypage',
         params: { transactionId: transactionaId },
