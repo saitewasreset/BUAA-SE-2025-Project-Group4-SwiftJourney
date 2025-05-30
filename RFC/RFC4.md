@@ -1,9 +1,12 @@
 # Request For Comments 4: API 文档
 
-Version: 15 (2025-05-28 20:35:00)
+Version: 16 (2025-05-30 10:45:00)
 
 最近变更：
 
+- Version 16
+  - 新增车次信息查询
+  - 修改火车餐接口设计，删除冗余接口
 - Version 15
   - 修复`lunch`拼写错误
 - Version 14
@@ -720,6 +723,64 @@ type ResponseData = TransactionInfo;
 
 ## 车次查询系统（FE1.2 FE3.1）
 
+### 车次信息查询
+
+`POST /api/train/schedule`
+
+需要 Cookie：
+
+- session_id
+
+请求：
+
+```typescript
+type Request = TrainInfoQuery;
+
+interface TrainInfoQuery {
+  // 车次号，例如：“G53”
+  trainNumber: string;
+  // 离开“始发站”的日期
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+}
+```
+
+响应代码表：
+
+| 代码 | 可能的响应消息                                                               | 含义                                               |
+| ---- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
+| 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
+| 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {departure_date}` | 查询的车次号或离开“始发站”的日期不存在/不合法 |
+
+响应**数据**：
+
+```typescript
+type ResponseData = TrainScheduleInfo;
+
+// 站点停靠信息
+interface StoppingStationInfo {
+  stationName: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  departureTime?: string;
+}
+
+interface TrainScheduleInfo {
+  originStation: string;
+  terminalStation: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+  // 车次经停车站信息
+  route: StoppingStationInfo[];
+}
+```
+
+设置 Cookie：
+
+- 无
+
 ### 直达车次查询（US1.2.1）
 
 `POST /api/train/schedule/query_direct`
@@ -1424,9 +1485,9 @@ type ResponseData = null;
 
 ## 火车餐服务（FE2.2）
 
-### 火车餐查询（按车次）（US2.2.1）
+### 火车餐查询（US2.2.1）
 
-`POST /api/dish/query_by_train_number`
+`POST /api/dish/query`
 
 需要 Cookie：
 
@@ -1497,74 +1558,6 @@ interface TrainDishInfo {
 
   dishes: DishInfo[];
 
-  // 车站名称 -> 可点的外卖列表
-  takeaway: Map<string, Takeaway[]>;
-
-  // 能否预订
-  canBooking: boolean;
-  // 不能预订原因
-  reason?: string;
-}
-```
-
-设置 Cookie：
-
-- 无
-
-### 火车餐查询（按起始到达站）（US2.2.1）
-
-`POST /api/dish/query_by_station`
-
-需要 Cookie：
-
-- session_id
-
-请求：
-
-```typescript
-type Request = DishStationQuery;
-
-interface DishStationQuery {
-  // 起始站
-  departureStation: string;
-  // 到达站
-  arrivalStation: string;
-  // 查询日期
-  targetDate: string;
-}
-```
-
-响应代码表：
-
-| 代码 | 可能的响应消息                                                               | 含义                             |
-| ---- | ---------------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                         |
-| 404  | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的起始/到达站不存在          |
-
-响应**数据**：
-
-```typescript
-type ResponseData = FullTrainDishInfo[];
-
-interface FullTrainDishInfo {
-  // 车次
-  trainNumber: string;
-
-  departureStation: string;
-  // 离开“起始站”的日期时间
-  departureTime: string;
-  arrivalStation: string;
-  // 到达“到达站”的日期时间
-  arrivalTime: string;
-  originStation: string;
-  // 离开“始发站”的日期时间
-  originDepartureTime: string;
-  terminalStation: string;
-  // 到达“终到站”的日期时间
-  terminalArrivalTime: string;
-
-  dishes: DishInfo[];
   // 车站名称 -> 可点的外卖列表
   takeaway: Map<string, Takeaway[]>;
 
