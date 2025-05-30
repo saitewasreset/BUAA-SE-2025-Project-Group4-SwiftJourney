@@ -47,7 +47,7 @@ pub struct TrainDishInfoDTO {
 }
 
 #[async_trait]
-pub trait DishQueryService {
+pub trait DishQueryService: 'static + Send + Sync {
     async fn query_dish(
         &self,
         query: DishQueryDTO,
