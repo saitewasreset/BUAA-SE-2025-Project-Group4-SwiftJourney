@@ -79,6 +79,33 @@ where
     SR: StationRepository,
     TXR: TransactionRepository,
 {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        train_type_configuration_service: Arc<TTCS>,
+        dish_repository: Arc<DR>,
+        takeaway_shop_repository: Arc<TR>,
+        train_schedule_repository: Arc<TSR>,
+        train_repository: Arc<T>,
+        personal_info_repository: Arc<PIR>,
+        session_manager_service: Arc<SMS>,
+        station_repository: Arc<SR>,
+        transaction_repository: Arc<TXR>,
+        tz_offset_hour: u32,
+    ) -> Self {
+        Self {
+            train_type_configuration_service,
+            dish_repository,
+            takeaway_shop_repository,
+            train_schedule_repository,
+            train_repository,
+            personal_info_repository,
+            session_manager_service,
+            station_repository,
+            transaction_repository,
+            tz_offset_hour,
+        }
+    }
+
     async fn verify_dish_order_request(
         &self,
         train_number: TrainNumber<Verified>,
