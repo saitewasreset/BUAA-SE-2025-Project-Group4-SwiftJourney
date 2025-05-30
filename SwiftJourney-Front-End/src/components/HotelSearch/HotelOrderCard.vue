@@ -32,6 +32,7 @@
 import { ref, computed, onBeforeMount, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useHotelOrderStore } from '@/stores/hotelOrder';
+import { useRouter } from 'vue-router';
 const hotelOrderStore = useHotelOrderStore();
 
 onBeforeMount(() => {
@@ -147,7 +148,21 @@ function successCreateTransaction(transactionInfo: TransactionInfo) {
         }
     ) .then(() =>{
         //处理支付逻辑
+        goToPay(transactionInfo.transactionId, transactionInfo.amount);
     })
+}
+
+const router = useRouter();
+
+function goToPay(transactionaId: string, money: number) {
+    const routeUrl = router.resolve({
+        name: 'paypage',
+        params: { transactionId: transactionaId },
+        query: {
+          money: money,
+        }
+      });
+    window.open(routeUrl.href, '_blank');
 }
 
 </script>
