@@ -11,7 +11,7 @@ use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
-use chrono::{FixedOffset, NaiveDate};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
@@ -507,17 +507,14 @@ where
         train_number: &str,
         origin_departure_time: &str,
     ) -> Result<Option<String>, TrainScheduleServiceError> {
-        let date_str = origin_departure_time.split(' ').next().ok_or_else(|| {
-            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                anyhow::anyhow!("Invalid origin departure time format"),
-            ))
-        })?;
+        let origin_departure_time =
+            DateTime::parse_from_rfc3339(origin_departure_time).map_err(|_| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    anyhow::anyhow!("Invalid origin departure time format"),
+                ))
+            })?;
 
-        let date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| {
-            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                anyhow::anyhow!("Invalid date format"),
-            ))
-        })?;
+        let date = origin_departure_time.date_naive();
 
         let schedules = self.get_schedules(date).await?;
 
