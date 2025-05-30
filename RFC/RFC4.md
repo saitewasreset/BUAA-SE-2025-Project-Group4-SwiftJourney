@@ -725,7 +725,7 @@ type ResponseData = TransactionInfo;
 
 ### 车次信息查询
 
-`GET /api/train/schedule`
+`POST /api/train/schedule`
 
 需要 Cookie：
 
