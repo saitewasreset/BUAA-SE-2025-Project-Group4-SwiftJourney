@@ -33,6 +33,7 @@
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
 use base::MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER;
+use base::application::service::dish_query::DishQueryService;
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
@@ -52,6 +53,7 @@ use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
+use base::infrastructure::application::service::dish_query::DishQueryServiceImpl;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
@@ -355,6 +357,25 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
     ));
 
+    let train_type_configuration_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(
+        Arc::clone(&train_repository_impl),
+    ));
+
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
+        Arc::clone(&route_service_impl),
+        Arc::clone(&train_repository_impl),
+        tz_offset_hour,
+    ));
+
+    let dish_query_service_impl = Arc::new(DishQueryServiceImpl::new(
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_repository_impl),
+        Arc::clone(&train_repository_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&train_type_configuration_service_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -432,6 +453,9 @@ async fn main() -> std::io::Result<()> {
         hotel_order_status_consumer,
     ];
 
+    let dish_query_service: web::Data<dyn DishQueryService> =
+        web::Data::from(dish_query_service_impl as Arc<dyn DishQueryService>);
+
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
         .expect("Failed to start order status consumer service");
@@ -481,6 +505,7 @@ async fn main() -> std::io::Result<()> {
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
+            .app_data(dish_query_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())

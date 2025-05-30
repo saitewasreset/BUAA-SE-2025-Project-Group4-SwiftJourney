@@ -16,7 +16,7 @@ pub enum TrainScheduleServiceError {
 }
 
 #[async_trait]
-pub trait TrainScheduleService {
+pub trait TrainScheduleService: 'static + Send + Sync {
     async fn add_schedule(
         &self,
         train_id: TrainId,
@@ -56,6 +56,6 @@ pub trait TrainScheduleService {
     async fn get_terminal_arrival_time(
         &self,
         train_number: &str,
-        origin_departure_time: &str
+        origin_departure_time: &str,
     ) -> Result<Option<String>, TrainScheduleServiceError>;
 }

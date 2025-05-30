@@ -11,7 +11,7 @@ use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
@@ -533,7 +533,8 @@ where
             train_id_to_number
                 .get(&s.train_id())
                 .is_some_and(|num| num == train_number)
-                && format!("{}", s.origin_departure_time()).starts_with(origin_departure_time)
+                && s.origin_departure_time()
+                    == origin_departure_time.time().num_seconds_from_midnight() as i32
         }) {
             Some(s) => s,
             None => return Ok(None),

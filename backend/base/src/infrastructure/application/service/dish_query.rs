@@ -3,6 +3,9 @@ use std::sync::Arc;
 use tracing::{error, instrument};
 use uuid::Uuid;
 
+use crate::domain::service::train_type::{
+    TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
+};
 use crate::{
     application::{
         ApplicationError, GeneralError,
@@ -22,21 +25,31 @@ use crate::{
 use rust_decimal::prelude::ToPrimitive;
 use std::collections::HashMap;
 
-pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS> {
-    dish_repository: Arc<DR>,
-    takeaway_shop_repository: Arc<TSR>,
-    train_repository: Arc<TR>,
-    session_manager: Arc<SMS>,
-    train_schedule_service: Arc<TSS>,
-}
-
-impl<DR, TSR, TR, SMS, TSS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS>
+pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
     TR: TrainRepository,
     SMS: SessionManagerService,
     TSS: TrainScheduleService,
+    TTCS: TrainTypeConfigurationService,
+{
+    dish_repository: Arc<DR>,
+    takeaway_shop_repository: Arc<TSR>,
+    train_repository: Arc<TR>,
+    session_manager: Arc<SMS>,
+    train_schedule_service: Arc<TSS>,
+    train_type_configuration_service: Arc<TTCS>,
+}
+
+impl<DR, TSR, TR, SMS, TSS, TTCS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
+where
+    DR: DishRepository,
+    TSR: TakeawayShopRepository,
+    TR: TrainRepository,
+    SMS: SessionManagerService,
+    TSS: TrainScheduleService,
+    TTCS: TrainTypeConfigurationService,
 {
     pub fn new(
         dish_repository: Arc<DR>,
@@ -44,6 +57,7 @@ where
         train_repository: Arc<TR>,
         session_manager: Arc<SMS>,
         train_schedule_service: Arc<TSS>,
+        train_type_configuration_service: Arc<TTCS>,
     ) -> Self {
         DishQueryServiceImpl {
             dish_repository,
@@ -51,18 +65,21 @@ where
             train_repository,
             session_manager,
             train_schedule_service,
+            train_type_configuration_service,
         }
     }
 }
 
 #[async_trait]
-impl<DR, TSR, TR, SMS, TSS> DishQueryService for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS>
+impl<DR, TSR, TR, SMS, TSS, TTCS> DishQueryService
+    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
 where
-    DR: DishRepository + Send + Sync,
-    TSR: TakeawayShopRepository + Send + Sync,
-    TR: TrainRepository + Send + Sync,
-    SMS: SessionManagerService + Send + Sync,
-    TSS: TrainScheduleService + Send + Sync,
+    DR: DishRepository,
+    TSR: TakeawayShopRepository,
+    TR: TrainRepository,
+    SMS: SessionManagerService,
+    TSS: TrainScheduleService,
+    TTCS: TrainTypeConfigurationService,
 {
     #[instrument(skip(self))]
     async fn query_dish(
@@ -83,21 +100,20 @@ where
             .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
         // 先假设车次经过了验证，然后查询是否存在，若不存在，则直接返回错误
-        let train_number = TrainNumber::from_unchecked(query.train_number.clone());
 
-        let verified_train_numbers = self
-            .train_repository
-            .get_verified_train_number()
+        let train_number = self
+            .train_type_configuration_service
+            .verify_train_number(TrainNumber::from(query.train_number.clone()))
             .await
-            .map_err(|e| {
-                error!("Failed to get verified train numbers: {:?}", e);
-                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            .map_err(|e| match e {
+                TrainTypeConfigurationServiceError::InfrastructureError(e) => {
+                    error!("Infrastructure error while verifying train number: {:?}", e);
+                    GeneralError::InternalServerError
+                }
+                _ => {
+                    GeneralError::BadRequest(format!("invalid trainNumber: {}", query.train_number))
+                }
             })?;
-
-        if !verified_train_numbers.contains(&query.train_number) {
-            error!("Train not found: {}", query.train_number);
-            return Err(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>);
-        }
 
         let terminal_arrival_time = self
             .train_schedule_service
