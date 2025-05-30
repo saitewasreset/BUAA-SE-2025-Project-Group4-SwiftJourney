@@ -1,0 +1,17 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "words": [
+        "actix",
+        "chrono",
+        "codegen",
+        "dotenv",
+        "dotenvy",
+        "dtos",
+        "mockall",
+        "petgraph",
+        "rabbitmq",
+        "Saite",
+        "thiserror"
+    ]
+}

@@ -1,0 +1,16 @@
+pub mod city;
+pub mod dish;
+pub mod hotel;
+pub mod hotel_rating;
+pub mod occupied_room;
+pub mod order;
+pub mod personal_info;
+pub mod route;
+pub mod seat_availability;
+pub mod session;
+pub mod station;
+pub mod takeaway;
+pub mod train;
+pub mod train_schedule;
+pub mod transaction;
+pub mod user;

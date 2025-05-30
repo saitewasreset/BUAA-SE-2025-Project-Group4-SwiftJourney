@@ -2,15 +2,16 @@
   <div class="root">
     <TitleBar v-if="shouldTitleBarDisplay" class="title-bar" />
     <div :class="{ 'router-view-container': true, 'container-margin': shouldTitleBarDisplay }">
-      <RouterView />
+      <RouterView style="width: 100%;" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute } from 'vue-router'
 import TitleBar from './components/TitleBar/TitleBar.vue'
-import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue';
+import { useUserStore } from './stores/user';
 
 const route = useRoute()
 
@@ -21,6 +22,11 @@ const shouldTitleBarDisplay = computed(() => {
     return false
   }
   return true
+})
+
+onMounted(async () => {
+  const nowUser = useUserStore();
+  await nowUser.restoreUserFromCookie(useRouter());
 })
 </script>
 
