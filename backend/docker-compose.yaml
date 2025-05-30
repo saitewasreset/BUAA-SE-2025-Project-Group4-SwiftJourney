@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: swiftjourney
+      POSTGRES_PASSWORD: swiftjourney
+      POSTGRES_DB: swiftjourney
+      TZ: Asia/Shanghai
+      LANG: zh_CN.utf-8
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=zh-CN --encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swiftjourney -d $$POSTGRES_DB"]
+      start_period: 1m
+      start_interval: 5s
+      interval: 10m
+      timeout: 30s
+      retries: 3
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      start_period: 1m
+      start_interval: 5s
+      interval: 10m
+      timeout: 30s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: swiftjourney
+      RABBITMQ_DEFAULT_PASS: swiftjourney
+
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ROOT_USER: swiftjourney
+      MINIO_ROOT_PASSWORD: swiftjourney
+    ports:
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  backend:
+    build: .
+    volumes:
+      - backend_data:/instance
+      - ../data:/init_data
+    environment:
+      DEBUG: 1
+      RUST_LOG: info
+      DATABASE_URL: postgres://swiftjourney:swiftjourney@db/swiftjourney
+      RABBITMQ_URL: amqp://swiftjourney:swiftjourney@rabbitmq/%2f
+      TZ_OFFSET_HOUR: 8
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: SVeGmJodT2ZhGUMmCkZH
+      MINIO_SECRET_KEY: TjbyipoXxy9bflZAewwHdpVUCUKcIoqATzndPJZn
+      DATA_PATH: /init_data
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
+  backend_data:
+  redis_data:
+  minio_data:
