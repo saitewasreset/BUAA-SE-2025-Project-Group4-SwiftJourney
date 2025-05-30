@@ -6,7 +6,6 @@ use crate::domain::model::route::{Route, RouteId, Stop};
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService, RouteServiceError};
 use crate::domain::service::station::StationService;
-use crate::domain::service::train_type::TrainTypeConfigurationService;
 use async_trait::async_trait;
 
 // Step 1: Define generics parameter over `TrainTypeConfigurationService` service
@@ -25,9 +24,7 @@ where
     S: StationService + 'static + Send + Sync,
 {
     pub fn new(station_service: Arc<S>) -> Self {
-        Self {
-            station_service,
-        }
+        Self { station_service }
     }
 }
 
