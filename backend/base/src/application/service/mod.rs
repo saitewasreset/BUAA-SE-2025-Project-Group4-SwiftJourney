@@ -1,6 +1,7 @@
 pub mod personal_info;
 pub mod user_profile;
 
+pub mod dish_query;
 pub mod geo;
 pub mod hotel;
 pub mod hotel_data;
