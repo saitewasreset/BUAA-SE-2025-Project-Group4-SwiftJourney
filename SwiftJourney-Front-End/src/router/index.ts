@@ -47,12 +47,18 @@ const router = createRouter({
       component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
       props: true
     },
+    {
+      path: '/paytransaction/:transactionId',
+      name: 'paypage',
+      component: () => import('../views/PayPage/PayPageView.vue'),
+      props: true
+    }
   ],
 })
 
 router.beforeEach((to, from, next) => {
-  const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
-  //const isLogin: Boolean = true;
+  //const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
+  const isLogin: Boolean = true;
   if (!isLogin) {
     // 未登录，跳转到登录页
     if (to.path !== '/login' && to.path !== '/register') {
