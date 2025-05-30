@@ -52,4 +52,10 @@ pub trait TrainScheduleService {
         train_schedule_id: TrainScheduleId,
         station_id: StationId,
     ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError>;
+
+    async fn get_terminal_arrival_time(
+        &self,
+        train_number: &str,
+        origin_departure_time: &str
+    ) -> Result<Option<String>, TrainScheduleServiceError>;
 }

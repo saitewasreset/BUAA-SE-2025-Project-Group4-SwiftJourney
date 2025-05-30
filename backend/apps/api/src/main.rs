@@ -443,6 +443,7 @@ async fn main() -> std::io::Result<()> {
     // Exercise 1.2.1D - 6: Your code here. (1 / 2)
     let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
         Arc::clone(&route_service_impl),
+        Arc::clone(&train_repository_impl),
         tz_offset_hour,
     ));
 
