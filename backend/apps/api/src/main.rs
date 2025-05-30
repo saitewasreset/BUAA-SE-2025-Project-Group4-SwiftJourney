@@ -40,6 +40,7 @@ use base::application::service::hotel_data::HotelDataService;
 use base::application::service::message::MessageApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
+use base::application::service::train_dish::TrainDishApplicationService;
 use base::application::service::train_query::TrainQueryService;
 use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
@@ -376,6 +377,20 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&train_type_configuration_service_impl),
     ));
 
+    let train_dish_application_service_impl =
+        Arc::new(base::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl::new(
+            Arc::clone(&train_type_configuration_service_impl),
+            Arc::clone(&dish_repository_impl),
+            Arc::clone(&takeaway_repository_impl),
+            Arc::clone(&train_schedule_repository_impl),
+            Arc::clone(&train_repository_impl),
+            Arc::clone(&personal_info_repository_impl),
+            Arc::clone(&session_manager_service_impl),
+            Arc::clone(&station_repository_impl),
+            Arc::clone(&transaction_repository_impl),
+            tz_offset_hour as u32,
+        ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -456,6 +471,11 @@ async fn main() -> std::io::Result<()> {
     let dish_query_service: web::Data<dyn DishQueryService> =
         web::Data::from(dish_query_service_impl as Arc<dyn DishQueryService>);
 
+    let train_dish_application_service: web::Data<dyn TrainDishApplicationService> =
+        web::Data::from(
+            train_dish_application_service_impl as Arc<dyn TrainDishApplicationService>,
+        );
+
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
         .expect("Failed to start order status consumer service");
@@ -506,6 +526,7 @@ async fn main() -> std::io::Result<()> {
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
             .app_data(dish_query_service.clone())
+            .app_data(train_dish_application_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
@@ -523,7 +544,8 @@ async fn main() -> std::io::Result<()> {
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
                     .service(web::scope("/train").configure(api::train::scoped_config))
-                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)), // Congratulations! You have finished Task 1.2.1D!
+                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)) // Congratulations! You have finished Task 1.2.1D!
+                    .service(web::scope("/dish").configure(api::dish::scoped_config)),
             )
     })
     .bind(("0.0.0.0", 8080))?
