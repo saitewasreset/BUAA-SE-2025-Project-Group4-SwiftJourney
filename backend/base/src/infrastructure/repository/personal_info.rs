@@ -102,12 +102,25 @@ impl PersonalInfoRepositoryImpl {
         let detect_changes_fn = |diff: DiffInfo<PersonalInfo>| {
             let mut result = MultiEntityDiff::new();
 
-            let diff_type = DiffType::from(&diff);
-
             let old = diff.old;
             let new = diff.new;
 
-            result.add_change(TypedDiff::new(diff_type, old, new));
+            match (old, new) {
+                (Some(old), Some(new)) => {
+                    if !(old == new) {
+                        result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+                    }
+                }
+                (Some(old), None) => {
+                    result.add_change(TypedDiff::new(DiffType::Removed, Some(old.clone()), None));
+                }
+                (None, Some(new)) => {
+                    // 聚合管理器里没有旧状态，并非说明聚合根不存在，而是说明聚合根里没有旧状态的缓存（例如，服务重启）
+                    // 此时默认状态已经变更
+                    result.add_change(TypedDiff::new(DiffType::Modified, None, Some(new.clone())));
+                }
+                (None, None) => {}
+            }
 
             result
         };
