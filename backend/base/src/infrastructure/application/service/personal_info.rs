@@ -31,7 +31,7 @@ use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 /// 个人信息服务实现
 ///
@@ -209,7 +209,8 @@ where
             let preferred_seat_location = match command.preferred_seat_location {
                 Some(ref location) if !location.is_empty() => Some(
                     PreferredSeatLocation::try_from(location.chars().next().unwrap()).map_err(
-                        |_| {
+                        |e| {
+                            error!("Invalid preferred seat location: {:?}", e);
                             Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
                                 as Box<dyn ApplicationError>
                         },

@@ -10,7 +10,7 @@ pub struct Model {
     pub uuid: Uuid,
     pub name: String,
     pub identity_card: String,
-    pub preferred_seat_location: String,
+    pub preferred_seat_location: Option<String>,
     pub user_id: i32,
     pub is_default: bool,
 }

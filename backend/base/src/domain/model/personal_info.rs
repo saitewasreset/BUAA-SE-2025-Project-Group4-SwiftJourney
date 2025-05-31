@@ -15,7 +15,7 @@ pub enum PreferredSeatLocation {
 }
 
 impl TryFrom<char> for PreferredSeatLocation {
-    type Error = &'static str;
+    type Error = String;
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
@@ -24,7 +24,7 @@ impl TryFrom<char> for PreferredSeatLocation {
             'C' => Ok(PreferredSeatLocation::C),
             'D' => Ok(PreferredSeatLocation::D),
             'F' => Ok(PreferredSeatLocation::F),
-            _ => Err("Invalid preferred seat location"),
+            _ => Err(format!("Invalid preferred seat location: {}", value)),
         }
     }
 }

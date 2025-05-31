@@ -28,7 +28,11 @@ impl MigrationTrait for Migration {
                     .col(uuid(PersonInfo::Uuid))
                     .col(string(PersonInfo::Name).not_null())
                     .col(string(PersonInfo::IdentityCard).not_null())
-                    .col(char(PersonInfo::PreferredSeatLocation))
+                    .col(
+                        ColumnDef::new(PersonInfo::PreferredSeatLocation)
+                            .string()
+                            .null(),
+                    )
                     .col(integer(PersonInfo::UserId).not_null())
                     .col(boolean(PersonInfo::IsDefault).not_null())
                     .index(
