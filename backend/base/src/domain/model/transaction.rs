@@ -219,7 +219,7 @@ impl Transaction {
     ///
     /// Returns:
     /// - 当前系统时间，带有时区。
-    fn now() -> DateTimeWithTimeZone {
+    pub fn now() -> DateTimeWithTimeZone {
         let local_now = Local::now();
         let offset = *local_now.offset(); // 获取系统当前时区偏移
         local_now.with_timezone(&offset)

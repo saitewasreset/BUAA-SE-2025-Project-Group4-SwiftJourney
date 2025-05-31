@@ -27,12 +27,13 @@ use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use anyhow::Context;
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 use sea_orm::ColumnTrait;
 use sea_orm::{ActiveValue, DatabaseConnection};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
 use std::collections::HashMap;
+use tracing::{error, instrument};
 
 impl_db_id_from_u64!(TrainScheduleId, i32, "train schedule");
 impl_db_id_from_u64!(SeatId, i64, "seat id");
@@ -266,15 +267,20 @@ impl Repository<TrainSchedule> for TrainScheduleRepositoryImpl {
 
 #[async_trait]
 impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
+    #[instrument(skip(self))]
     async fn find_by_date(&self, date: NaiveDate) -> Result<Vec<TrainSchedule>, RepositoryError> {
         Ok(self
             .query_train_schedule(|q| {
                 q.filter(crate::models::train_schedule::Column::DepartureDate.eq(date))
             })
             .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
             .context(format!("Failed to find train schedule with date: {}", date))?)
     }
 
+    #[instrument(skip(self))]
     async fn find_by_train_id(
         &self,
         train_id: TrainId,
@@ -284,9 +290,49 @@ impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
                 q.filter(crate::models::train_schedule::Column::TrainId.eq(train_id.to_db_value()))
             })
             .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
             .context(format!(
                 "Failed to find train schedule with train id: {}",
                 train_id.to_db_value()
             ))?)
+    }
+
+    #[instrument(skip(self))]
+    async fn find_by_train_id_and_origin_departure_time(
+        &self,
+        train_id: TrainId,
+        origin_departure_time: DateTime<FixedOffset>,
+    ) -> Result<Option<TrainSchedule>, RepositoryError> {
+        let departure_date = origin_departure_time.date_naive();
+
+        let origin_departure_time = origin_departure_time.time().num_seconds_from_midnight() as i32;
+
+        let result = self
+            .query_train_schedule(|q| {
+                q.filter(
+                    crate::models::train_schedule::Column::TrainId
+                        .eq(train_id.to_db_value())
+                        .and(
+                            crate::models::train_schedule::Column::DepartureDate.eq(departure_date),
+                        )
+                        .and(
+                            crate::models::train_schedule::Column::OriginDepartureTime
+                                .eq(origin_departure_time),
+                        ),
+                )
+            })
+            .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
+            .context(format!(
+                "Failed to find train schedule with train id: {} and origin departure time: {}",
+                train_id.to_db_value(),
+                origin_departure_time
+            ))?;
+
+        Ok(result.into_iter().next())
     }
 }
