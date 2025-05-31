@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 16 (2025-05-30 10:45:00)
+Version: 17 (2025-05-30 17:45:00)
 
 最近变更：
 
+- Version 17
+  - 火车餐预订：更新错误代码
 - Version 16
   - 新增车次信息查询
   - 修改火车餐接口设计，删除冗余接口
@@ -429,7 +431,6 @@ interface UpdatePersonalInfo {
   // 是否为默认个人资料，即，当前用户的身份
   default?: boolean;
 }
-
 ```
 
 若要新增/更新信息，至少设置`name`、`identityCardId`、`default`字段。
@@ -1628,17 +1629,18 @@ interface TrainDishOrderRequest {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                                      | 含义                                 |
-| ----- | ----------------------------------------------------------------------------------- | ------------------------------------ |
-| 200   | `For Super Earth!`                                                                  | 请求已被成功执行，可访问响应数据     |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`                | 会话无效                             |
-| 404   | `Sorry, but this was meant to be a private game: invalid trainNumber: {target}`     | 目标车次不存在                       |
-| 404   | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}` | 乘车人 Id 不存在，或未与当前用户绑定 |
-| 22001 | `Invalid dish name: {name}`                                                         | 火车餐不存在                         |
-| 22002 | `Invalid dish amount: {amount}`                                                     | 非法份数                             |
-| 22003 | `Invalid takeaway station: {station}`                                               | 非法车站名称                         |
-| 22004 | `Invalid takeaway shop name: {shop_name}`                                           | 非法店铺名称                         |
-| 22005 | `Invalid takeaway name: {name}`                                                     | 非法外卖名称                         |
+| 代码  | 可能的响应消息                                                                      | 含义                                                                        |
+| ----- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 200   | `For Super Earth!`                                                                  | 请求已被成功执行，可访问响应数据                                            |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`                | 会话无效                                                                    |
+| 404   | `Sorry, but this was meant to be a private game: invalid trainNumber: {target}`     | 目标车次不存在                                                              |
+| 404   | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}` | 乘车人 Id 不存在，或未与当前用户绑定                                        |
+| 22001 | `Invalid dish name: {name}`                                                         | 火车餐不存在                                                                |
+| 22002 | `Invalid dish amount: {amount}`                                                     | 非法份数                                                                    |
+| 22003 | `Invalid takeaway station: {station}`                                               | 非法车站名称                                                                |
+| 22004 | `Invalid takeaway shop name: {shop_name}`                                           | 非法店铺名称                                                                |
+| 22005 | `Invalid takeaway name: {name}`                                                     | 非法外卖名称                                                                |
+| 22006 | `No related train order found`                                                      | 没有对应的车次订单/对应的车次订单未支付/对应的车次订单已完成（失败/已取消） |
 
 响应**数据**：
 
