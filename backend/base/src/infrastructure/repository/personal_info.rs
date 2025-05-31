@@ -47,8 +47,7 @@ impl PersonalInfoDataConverter {
             preferred_seat_location: ActiveValue::Set(
                 personal_info
                     .preferred_seat_location()
-                    .map(|loc| loc.to_string())
-                    .unwrap_or_default(),
+                    .map(|x| x.to_string()),
             ),
             user_id: ActiveValue::Set(personal_info.user_id().to_db_value()),
             is_default: ActiveValue::Set(personal_info.is_default()),
@@ -69,16 +68,19 @@ impl PersonalInfoDataConverter {
         let name = RealName::try_from(user_do.name)?;
         let identity_card_id = IdentityCardId::try_from(user_do.identity_card)?;
 
-        let preferred_seat_location = PreferredSeatLocation::try_from(
-            user_do
-                .preferred_seat_location
-                .chars()
-                .next()
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Inconsistent: preferred seat location should not be null")
-                })?,
-        )
-        .map_err(|e| anyhow!("Failed to parse preferred seat location: {}", e))?;
+        let preferred_seat_location = user_do
+            .preferred_seat_location
+            .map(|preferred_seat_location| {
+                PreferredSeatLocation::try_from(
+                    preferred_seat_location
+                        .chars()
+                        .next()
+                        .ok_or("Inconsistent: preferred seat location should not be null")?,
+                )
+            })
+            .transpose()
+            .map_err(|e| anyhow!("Failed to parse preferred seat location: {}", e))?;
+
         let user_id = (user_do.user_id as u64).into();
 
         let mut personal_info = PersonalInfo::new(
@@ -86,7 +88,7 @@ impl PersonalInfoDataConverter {
             uuid,
             name,
             identity_card_id,
-            Some(preferred_seat_location),
+            preferred_seat_location,
             user_id,
         );
         personal_info.set_default(user_do.is_default);
@@ -100,12 +102,25 @@ impl PersonalInfoRepositoryImpl {
         let detect_changes_fn = |diff: DiffInfo<PersonalInfo>| {
             let mut result = MultiEntityDiff::new();
 
-            let diff_type = DiffType::from(&diff);
-
             let old = diff.old;
             let new = diff.new;
 
-            result.add_change(TypedDiff::new(diff_type, old, new));
+            match (old, new) {
+                (Some(old), Some(new)) => {
+                    if !(old == new) {
+                        result.add_change(TypedDiff::new(DiffType::Modified, Some(old), Some(new)));
+                    }
+                }
+                (Some(old), None) => {
+                    result.add_change(TypedDiff::new(DiffType::Removed, Some(old.clone()), None));
+                }
+                (None, Some(new)) => {
+                    // 聚合管理器里没有旧状态，并非说明聚合根不存在，而是说明聚合根里没有旧状态的缓存（例如，服务重启）
+                    // 此时默认状态已经变更
+                    result.add_change(TypedDiff::new(DiffType::Modified, None, Some(new.clone())));
+                }
+                (None, None) => {}
+            }
 
             result
         };

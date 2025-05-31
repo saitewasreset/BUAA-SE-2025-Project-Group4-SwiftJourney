@@ -24,13 +24,14 @@ use crate::application::service::personal_info::{
     PersonalInfoDTO, PersonalInfoError, PersonalInfoService,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::model::personal_info::PreferredSeatLocation;
+use crate::domain::model::personal_info::{PersonalInfo, PreferredSeatLocation};
 use crate::domain::model::session::SessionId;
 use crate::domain::model::user::{IdentityCardId, RealName};
 use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::{error, instrument};
 
 /// 个人信息服务实现
 ///
@@ -85,6 +86,7 @@ where
     /// # Errors
     /// - `GeneralError::InvalidSessionId`: 无效的会话ID
     /// - `GeneralError::InternalServerError`: 内部服务错误
+    #[instrument(skip(self))]
     async fn get_personal_info(
         &self,
         query: PersonalInfoQuery,
@@ -96,6 +98,9 @@ where
             .session_manager
             .get_user_id_by_session(session_id)
             .await
+            .inspect_err(|e| {
+                error!("Failed to get user ID by session: {:?} {}", session_id, e);
+            })
             .map_err(|_| Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?
             .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
@@ -103,6 +108,9 @@ where
             .personal_info_repository
             .find_by_user_id(user_id)
             .await
+            .inspect_err(|e| {
+                error!("Failed to find personal info for user {}: {:?}", user_id, e);
+            })
             .map_err(|_| {
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
@@ -128,6 +136,7 @@ where
     /// - `PersonalInfoError::InvalidIdentityCardId`: 身份证号对应的个人信息不存在
     /// - `PersonalInfoError::InvalidPreferredSeatLocation`: 无效的座位偏好
     /// - `GeneralError::InternalServerError`: 内部服务错误
+    #[instrument(skip(self))]
     async fn set_personal_info(
         &self,
         command: SetPersonalInfoCommand,
@@ -139,10 +148,12 @@ where
             .session_manager
             .get_user_id_by_session(session_id)
             .await
+            .inspect_err(|e| {
+                error!("Failed to get user ID by session: {:?} {}", session_id, e);
+            })
             .map_err(|_| Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?
             .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
-        // 解析身份证号
         let identity_card_id = match IdentityCardId::try_from(command.identity_card_id.clone()) {
             Ok(id) => id,
             Err(_) => {
@@ -151,16 +162,20 @@ where
             }
         };
 
-        // 查找现有个人信息
         let existing_info = self
             .personal_info_repository
             .find_by_user_id_and_identity_card(user_id, identity_card_id.clone())
             .await
+            .inspect_err(|e| {
+                error!(
+                    "Failed to find personal info for user {} with ID {}: {:?}",
+                    user_id, identity_card_id, e
+                );
+            })
             .map_err(|_| {
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
-        // 根据操作类型进行处理
         if command.is_delete_operation() {
             // 删除操作
             if let Some(info) = existing_info {
@@ -175,64 +190,79 @@ where
                     Box::new(PersonalInfoError::InvalidIdentityCardId) as Box<dyn ApplicationError>
                 );
             }
-        } else if command.is_update_operation() {
-            // 创建或更新操作
-            let name = match command.name {
-                Some(ref name_str) => match RealName::try_from(name_str.clone()) {
-                    Ok(name) => name,
-                    Err(_) => {
-                        return Err(Box::new(GeneralError::BadRequest("Invalid name".into())));
-                    }
-                },
-                None => {
-                    return Err(Box::new(GeneralError::BadRequest(
-                        "Name is required for update/create".into(),
-                    )));
+            return Ok(());
+        }
+
+        // 创建或更新操作
+        if command.is_update_operation() {
+            // SAFETY：`is_update_operation`确保了`name.is_some()`以及`default.is_some()`为真
+            let name = command.name.unwrap();
+            let is_default = command.default.unwrap();
+
+            let real_name = match RealName::try_from(name) {
+                Ok(name) => name,
+                Err(_) => {
+                    return Err(Box::new(GeneralError::BadRequest("Invalid name".into())));
                 }
             };
 
             let preferred_seat_location = match command.preferred_seat_location {
-                Some(ref location) => {
-                    if location.is_empty() {
-                        PreferredSeatLocation::A
-                    } else {
-                        PreferredSeatLocation::try_from(location.chars().next().unwrap()).map_err(
-                            |_| {
-                                Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
-                                    as Box<dyn ApplicationError>
-                            },
-                        )?
-                    }
-                }
-                None => PreferredSeatLocation::A,
+                Some(ref location) if !location.is_empty() => Some(
+                    PreferredSeatLocation::try_from(location.chars().next().unwrap()).map_err(
+                        |e| {
+                            error!("Invalid preferred seat location: {:?}", e);
+                            Box::new(PersonalInfoError::InvalidPreferredSeatLocation)
+                                as Box<dyn ApplicationError>
+                        },
+                    )?,
+                ),
+                _ => None,
             };
-
-            let is_default = command.default.unwrap_or(false);
 
             if let Some(mut info) = existing_info {
                 // 更新现有个人信息
-                info.set_name(name);
-                info.set_preferred_seat_location(Some(preferred_seat_location));
+                info.set_name(real_name);
+                info.set_preferred_seat_location(preferred_seat_location);
                 info.set_default(is_default);
 
                 self.personal_info_repository
                     .save(&mut info)
                     .await
+                    .inspect_err(|e| {
+                        error!("Failed to update personal info: {:?}", e);
+                    })
                     .map_err(|_| {
                         Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
                     })?;
             } else {
-                return Err(
-                    Box::new(PersonalInfoError::InvalidIdentityCardId) as Box<dyn ApplicationError>
+                // 创建新的个人信息
+                let mut new_info = PersonalInfo::new(
+                    None,
+                    uuid::Uuid::new_v4(),
+                    real_name,
+                    identity_card_id,
+                    preferred_seat_location,
+                    user_id,
                 );
+                new_info.set_default(is_default);
+
+                self.personal_info_repository
+                    .save(&mut new_info)
+                    .await
+                    .inspect_err(|e| {
+                        error!("Failed to save new personal info: {:?}", e);
+                    })
+                    .map_err(|_| {
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
             }
-        } else {
-            return Err(Box::new(GeneralError::BadRequest(
-                "Invalid operation parameters".into(),
-            )));
+            return Ok(());
         }
 
-        Ok(())
+        // 如果没有匹配的操作类型，返回错误
+        return Err(Box::new(GeneralError::BadRequest(
+            "Invalid operation parameters".into(),
+        )));
     }
 }
 
