@@ -31,7 +31,7 @@ use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, info, instrument};
+use tracing::{error, instrument};
 
 /// 个人信息服务实现
 ///
