@@ -5,7 +5,7 @@
 use crate::domain::RepositoryError;
 use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType};
-use crate::domain::model::train_schedule::SeatId;
+use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use crate::domain::service::ServiceError;
 use crate::{Unverified, Verified};
 use async_trait::async_trait;
@@ -111,7 +111,10 @@ pub trait TrainTypeConfigurationService: 'static + Send + Sync {
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
-    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, TrainTypeConfigurationServiceError>;
+    ) -> Result<
+        HashMap<SeatTypeName<Verified>, Vec<(SeatId, SeatLocationInfo)>>,
+        TrainTypeConfigurationServiceError,
+    >;
 
     /// 获取所有列车车次信息
     ///
