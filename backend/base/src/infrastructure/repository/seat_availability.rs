@@ -512,9 +512,13 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
 
                     let id = new.get_id();
 
+                    // 若后端重启，聚合根管理器中没有之前的状态
+                    // 此时更新数据，所有记录都会被认为是“增加”
+                    // 故使用on_conflict_do_nothing忽略已存在的记录
                     crate::models::seat_availability::Entity::insert(
                         SeatAvailabilityDataConverter::transform_to_do_availability_only(&new),
                     )
+                    .on_conflict_do_nothing()
                     .exec(&self.db)
                     .await
                     .context(format!("failed to add seat availability with id: {:?}", id))

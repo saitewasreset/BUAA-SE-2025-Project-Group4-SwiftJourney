@@ -1,24 +1,35 @@
 use crate::domain::model::route::Route;
-use crate::domain::model::train_schedule::{Seat, SeatAvailabilityId, SeatLocationInfo};
+use crate::domain::model::train::SeatTypeName;
+use crate::domain::model::train_schedule::{
+    Seat, SeatAvailabilityId, SeatLocationInfo, SeatStatus,
+};
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::seat_availability::{
     OccupiedSeatInfoMap, SeatAvailabilityRepository,
 };
+use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::train_seat::{TrainSeatService, TrainSeatServiceError};
+use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::{DbId, Identifiable, RepositoryError};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::sync::Arc;
+use tracing::{error, instrument};
 
-pub struct TrainSeatServiceImpl<SAR, RR>
+pub struct TrainSeatServiceImpl<SAR, RR, TTCS, TSR>
 where
     SAR: SeatAvailabilityRepository,
     RR: RouteRepository,
+    TTCS: TrainTypeConfigurationService,
+    TSR: TrainScheduleRepository,
 {
     seat_availability_repository: Arc<SAR>,
     route_repository: Arc<RR>,
+    train_type_configuration_service: Arc<TTCS>,
+    train_schedule_repository: Arc<TSR>,
 }
 
 fn calc_station_id_to_order_map(route: &Route) -> HashMap<i32, u32> {
@@ -117,24 +128,35 @@ fn calc_available_seat_count_map(
     result
 }
 
-impl<SAR, RR> TrainSeatServiceImpl<SAR, RR>
+impl<SAR, RR, TTCS, TSR> TrainSeatServiceImpl<SAR, RR, TTCS, TSR>
 where
     SAR: SeatAvailabilityRepository,
     RR: RouteRepository,
+    TTCS: TrainTypeConfigurationService,
+    TSR: TrainScheduleRepository,
 {
-    pub fn new(seat_availability_repository: Arc<SAR>, route_repository: Arc<RR>) -> Self {
+    pub fn new(
+        seat_availability_repository: Arc<SAR>,
+        route_repository: Arc<RR>,
+        train_type_configuration_service: Arc<TTCS>,
+        train_schedule_repository: Arc<TSR>,
+    ) -> Self {
         Self {
             seat_availability_repository,
             route_repository,
+            train_type_configuration_service,
+            train_schedule_repository,
         }
     }
 }
 
 #[async_trait]
-impl<SAR, RR> TrainSeatService for TrainSeatServiceImpl<SAR, RR>
+impl<SAR, RR, TTCS, TSR> TrainSeatService for TrainSeatServiceImpl<SAR, RR, TTCS, TSR>
 where
     SAR: SeatAvailabilityRepository,
     RR: RouteRepository,
+    TTCS: TrainTypeConfigurationService,
+    TSR: TrainScheduleRepository,
 {
     async fn available_seats_count(
         &self,
@@ -226,12 +248,131 @@ where
             .unwrap_or_default())
     }
 
+    #[instrument(skip(self))]
     async fn reserve_seat(
         &self,
         seat_availability_id: SeatAvailabilityId,
         seat_location_info: SeatLocationInfo,
     ) -> Result<Seat, TrainSeatServiceError> {
-        todo!()
+        let mut seat_availability = self
+            .seat_availability_repository
+            .find(seat_availability_id)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to find seat availability for id {}: {}",
+                    seat_availability_id, e
+                )
+            })
+            .context(format!(
+                "failed to find seat availability for id: {}",
+                seat_availability_id
+            ))
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e.into()))
+            })?
+            .ok_or(TrainSeatServiceError::InvalidSeatAvailability(
+                seat_availability_id,
+            ))?;
+
+        let train_schedule = self
+            .train_schedule_repository
+            .find(seat_availability.train_schedule_id())
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to find train schedule for id {}: {}",
+                    seat_availability.train_schedule_id(),
+                    e
+                )
+            })
+            .context(format!(
+                "failed to find train schedule for id: {}",
+                seat_availability.train_schedule_id()
+            ))
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e.into()))
+            })?
+            .ok_or(TrainSeatServiceError::InfrastructureError(
+                ServiceError::RepositoryError(RepositoryError::InconsistentState(anyhow!(
+                    "no train schedule find for train schedule id: {}",
+                    seat_availability.train_schedule_id()
+                ))),
+            ))?;
+
+        let seat_type_mapping = self
+            .train_type_configuration_service
+            .get_seat_id_map(train_schedule.train_id())
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to get seat id map for train id {}: {}",
+                    train_schedule.train_id(),
+                    e
+                )
+            })
+            .context(format!(
+                "failed to get seat id map for train id: {}",
+                train_schedule.train_id()
+            ))
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e.into()))
+            })?;
+
+        // SAFETY: seat_type_name 来自数据库中已验证的实体
+        let seat_type_name =
+            SeatTypeName::from_unchecked(seat_availability.seat_type().name().to_string());
+
+        let seat_list = seat_type_mapping.get(&seat_type_name).ok_or(
+            TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(
+                RepositoryError::InconsistentState(anyhow!(
+                    "seat type {} not found in seat id map for train id {}",
+                    seat_type_name.deref(),
+                    train_schedule.train_id()
+                )),
+            )),
+        )?;
+
+        let occupied_seat_id_set = seat_availability
+            .occupied_seat()
+            .keys()
+            .copied()
+            .collect::<HashSet<_>>();
+
+        let preferred_location = seat_location_info.location;
+
+        let mut allocated_seat = None;
+
+        for (seat_id, seat_location_info) in seat_list {
+            if !occupied_seat_id_set.contains(seat_id)
+                && seat_location_info.location == preferred_location
+            {
+                let seat = Seat::new(
+                    *seat_id,
+                    seat_availability.seat_type().clone(),
+                    *seat_location_info,
+                    SeatStatus::Occupied,
+                );
+
+                allocated_seat = Some(seat);
+                break;
+            }
+        }
+
+        self.seat_availability_repository
+            .save(&mut seat_availability)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to save seat availability with id: {} {}",
+                    seat_availability_id, e
+                )
+            })
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        allocated_seat.ok_or(TrainSeatServiceError::NoAvailableSeat)
     }
 
     async fn free_seat(
@@ -239,6 +380,42 @@ where
         seat_availability_id: SeatAvailabilityId,
         seat: Seat,
     ) -> Result<(), TrainSeatServiceError> {
-        todo!()
+        let mut seat_availability = self
+            .seat_availability_repository
+            .find(seat_availability_id)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to find seat availability for id {}: {}",
+                    seat_availability_id, e
+                )
+            })
+            .context(format!(
+                "failed to find seat availability for id: {}",
+                seat_availability_id
+            ))
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e.into()))
+            })?
+            .ok_or(TrainSeatServiceError::InvalidSeatAvailability(
+                seat_availability_id,
+            ))?;
+
+        seat_availability.remove_occupied_seat(seat);
+
+        self.seat_availability_repository
+            .save(&mut seat_availability)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "failed to save seat availability with id: {} {}",
+                    seat_availability_id, e
+                )
+            })
+            .map_err(|e| {
+                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        Ok(())
     }
 }
