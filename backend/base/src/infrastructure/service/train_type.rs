@@ -10,7 +10,7 @@
 use crate::domain::Identifiable;
 use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType};
-use crate::domain::model::train_schedule::SeatId;
+use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
@@ -156,8 +156,10 @@ where
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
-    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, TrainTypeConfigurationServiceError>
-    {
+    ) -> Result<
+        HashMap<SeatTypeName<Verified>, Vec<(SeatId, SeatLocationInfo)>>,
+        TrainTypeConfigurationServiceError,
+    > {
         if self.train_repository.find(train_id).await?.is_some() {
             let result = self.train_repository.get_seat_id_map(train_id).await?;
 
