@@ -293,7 +293,10 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&personal_info_repository_impl),
     ));
 
-    let route_service_impl = Arc::new(RouteServiceImpl::new(Arc::clone(&station_service_impl)));
+    let route_service_impl = Arc::new(RouteServiceImpl::new(
+        Arc::clone(&station_service_impl),
+        Arc::clone(&route_repository_impl),
+    ));
 
     let hotel_data_service_impl = Arc::new(HotelDataServiceImpl::new(
         app_config.debug,
