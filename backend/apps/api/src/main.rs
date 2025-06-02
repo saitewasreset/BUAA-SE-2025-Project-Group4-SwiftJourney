@@ -52,6 +52,7 @@ use base::domain::service::message::MessageListenerService;
 use base::domain::service::object_storage::ObjectStorageService;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
+use base::domain::service::train_schedule::TrainScheduleService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
 use base::infrastructure::application::service::dish_query::DishQueryServiceImpl;
@@ -130,6 +131,9 @@ async fn main() -> std::io::Result<()> {
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+
+    let auto_schedule_days_str = read_file_env("AUTO_SCHEDULE_DAYS");
+
     let mini_io_endpoint = read_file_env("MINIO_ENDPOINT").expect("cannot get minio endpoint");
     let mini_io_access_key =
         read_file_env("MINIO_ACCESS_KEY").expect("cannot get minio access key");
@@ -146,6 +150,13 @@ async fn main() -> std::io::Result<()> {
             .expect("cannot parse tz offset hour"),
         // UTC+8: China Standard Time
         None => 8,
+    };
+
+    let auto_schedule_days = match auto_schedule_days_str {
+        Some(days_str) => days_str
+            .parse::<i32>()
+            .expect("cannot parse auto schedule days"),
+        None => 14,
     };
 
     let debug_mode = match env::var("DEBUG") {
@@ -367,6 +378,7 @@ async fn main() -> std::io::Result<()> {
     let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
         Arc::clone(&route_service_impl),
         Arc::clone(&train_repository_impl),
+        Arc::clone(&train_schedule_repository_impl),
         tz_offset_hour,
     ));
 
@@ -482,23 +494,22 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to start order status consumer service");
 
-    // Step 2: Create instance of your application service,
-    // and wrap it with `web::Data::new`
-    // HINT: You can borrow web::Data<T> as &Arc<T>
-    // that means you can pass a &web::Data<T> to `Arc::clone`
-    // Exercise 1.2.1D - 6: Your code here. (1 / 2)
-    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
-        Arc::clone(&route_service_impl),
-        Arc::clone(&train_repository_impl),
-        tz_offset_hour,
-    ));
-
     let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
         Arc::clone(&train_schedule_service_impl),
         Arc::clone(&station_service_impl),
         Arc::clone(&train_type_service_impl),
         Arc::clone(&route_service_impl),
     ));
+
+    {
+        let train_schedule_service_impl = Arc::clone(&train_schedule_service_impl);
+
+        actix_web::rt::spawn(async move {
+            train_schedule_service_impl
+                .auto_plan_schedule_daemon(auto_schedule_days)
+                .await;
+        });
+    }
 
     let train_query_service: web::Data<dyn TrainQueryService> =
         web::Data::from(train_query_service_impl as Arc<dyn TrainQueryService>);
