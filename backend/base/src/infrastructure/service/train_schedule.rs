@@ -7,35 +7,46 @@ use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainId;
 use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::repository::train::TrainRepository;
+use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
+use tracing::{error, info, instrument};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
-pub struct TrainScheduleServiceImpl<RS, TR>
+pub struct TrainScheduleServiceImpl<RS, TR, TSR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
+    TSR: TrainScheduleRepository,
 {
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
     route_service: Arc<RS>,
     train_repository: Arc<TR>,
+    train_schedule_repository: Arc<TSR>,
     tz_offset_hour: i32,
 }
 
-impl<RS, TR> TrainScheduleServiceImpl<RS, TR>
+impl<RS, TR, TSR> TrainScheduleServiceImpl<RS, TR, TSR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
+    TSR: TrainScheduleRepository,
 {
-    pub fn new(route_service: Arc<RS>, train_repository: Arc<TR>, tz_offset_hour: i32) -> Self {
+    pub fn new(
+        route_service: Arc<RS>,
+        train_repository: Arc<TR>,
+        train_schedule_repository: Arc<TSR>,
+        tz_offset_hour: i32,
+    ) -> Self {
         Self {
             route_service,
             train_repository,
+            train_schedule_repository,
             tz_offset_hour,
         }
     }
@@ -213,10 +224,11 @@ fn backtrack_transfer(
     (ids, mid_station)
 }
 
-impl<RS, TR> TrainScheduleServiceImpl<RS, TR>
+impl<RS, TR, TSR> TrainScheduleServiceImpl<RS, TR, TSR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
+    TSR: TrainScheduleRepository,
 {
     async fn load_daily_context(
         &self,
@@ -257,24 +269,169 @@ where
 }
 
 #[async_trait]
-impl<RS, TR> TrainScheduleService for TrainScheduleServiceImpl<RS, TR>
+impl<RS, TR, TSR> TrainScheduleService for TrainScheduleServiceImpl<RS, TR, TSR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
+    TSR: TrainScheduleRepository,
 {
+    #[instrument(skip(self))]
     async fn add_schedule(
         &self,
         train_id: TrainId,
         date: NaiveDate,
     ) -> Result<(), TrainScheduleServiceError> {
-        todo!()
+        let train = self
+            .train_repository
+            .find(train_id)
+            .await
+            .inspect_err(|e| error!("Failed to load train for id {}: {}", train_id, e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?
+            .ok_or(TrainScheduleServiceError::InvalidTrainId(train_id))?;
+
+        let mut train_schedule = TrainSchedule::new(
+            None,
+            train_id,
+            date,
+            train.default_origin_departure_time(),
+            train.default_route_id(),
+        );
+
+        self.train_schedule_repository
+            .save(&mut train_schedule)
+            .await
+            .inspect_err(|e| error!("Failed to save train schedule: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn get_schedules(
         &self,
         date: NaiveDate,
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-        todo!()
+        self.train_schedule_repository
+            .find_by_date(date)
+            .await
+            .inspect_err(|e| error!("Failed to load train schedule for date {}: {}", date, e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })
+    }
+
+    #[instrument(skip(self))]
+    async fn auto_plan_schedule(
+        &self,
+        begin_date: NaiveDate,
+        days: i32,
+    ) -> Result<(), TrainScheduleServiceError> {
+        info!("Auto plan schedule begin");
+
+        let latest_date = self
+            .train_schedule_repository
+            .get_latest_schedule_date()
+            .await
+            .inspect_err(|e| error!("Failed to get latest schedule: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        let latest_date = if let Some(latest_date) = latest_date {
+            if latest_date > begin_date {
+                latest_date
+            } else {
+                begin_date
+            }
+        } else {
+            begin_date
+        };
+
+        info!("current latest schedule date: {}", latest_date);
+
+        let days = days - ((latest_date - begin_date).num_days() as i32);
+
+        info!("days to update: {}", days);
+
+        if days <= 0 {
+            info!("No new schedules to add, exiting auto plan.");
+            return Ok(());
+        }
+
+        let trains = self
+            .train_repository
+            .get_trains()
+            .await
+            .inspect_err(|e| error!("Failed to load trains: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        info!("trains to schedule: {}", trains.len());
+
+        let mut schedule_list = Vec::with_capacity(trains.len() * (days as usize));
+
+        for day in 0..days {
+            let current_date = latest_date + chrono::Duration::days(day as i64);
+
+            for train in &trains {
+                let train_schedule = TrainSchedule::new(
+                    None,
+                    train.get_id().expect("train should have id"),
+                    current_date,
+                    train.default_origin_departure_time(),
+                    train.default_route_id(),
+                );
+
+                schedule_list.push(train_schedule);
+            }
+        }
+
+        info!("total schedules to save: {}", schedule_list.len());
+
+        self.train_schedule_repository
+            .save_many_no_conflict(schedule_list)
+            .await
+            .inspect_err(|e| error!("Failed to save train schedules: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?;
+
+        info!("schedules saved");
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn auto_plan_schedule_daemon(&self, days: i32) {
+        let now = chrono::Local::now();
+
+        let now_date = now.naive_local().date();
+
+        info!("now date: {}, auto plan for days: {}", now_date, days);
+
+        if let Err(e) = self.auto_plan_schedule(now_date, days).await {
+            error!("Auto plan schedule failed: {}", e);
+        }
+
+        let mut interval = tokio::time::interval(chrono::Duration::days(1).to_std().unwrap());
+
+        interval.tick().await; // 第一次tick将立即返回
+
+        loop {
+            interval.tick().await;
+
+            let now_date = now.naive_local().date();
+
+            info!("now date: {}, auto plan for days: 1", now_date);
+
+            if let Err(e) = self.auto_plan_schedule(now_date, 1).await {
+                error!("Auto plan schedule failed: {}", e);
+            }
+        }
     }
 
     // async fn find_schedules(
