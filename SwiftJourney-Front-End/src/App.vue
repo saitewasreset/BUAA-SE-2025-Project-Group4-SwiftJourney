@@ -1,7 +1,12 @@
 <template>
-  <div style="width: 100%; height: 100%;">
-    <TitleBar v-if="shouldTitleBarDisplay" />
-    <RouterView style="width: 100%;" />
+  <div style="width: 100%; height: 100%; align-items: center; justify-content: center; display: flex;">
+    <div v-if="shouldTitleBarDisplay">
+      <TitleBar v-if="shouldTitleBarDisplay" />
+      <RouterView />
+    </div>
+    <div v-else>
+      <RouterView />
+    </div>
   </div>
 </template>
 

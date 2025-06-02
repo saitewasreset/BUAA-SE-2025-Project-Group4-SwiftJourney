@@ -6,9 +6,9 @@
     </div>
     <a-card class="card">
       <div class="card-title">
-        <a-tooltip title="返回首页">
+        <!-- <a-tooltip title="返回首页">
           <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
-        </a-tooltip>
+        </a-tooltip> -->
         <p class="card-title text">注册</p>
       </div>
       <div>
@@ -474,7 +474,7 @@ body {
 /* 左侧元素样式 */
 .left-area {
   align-self: center;
-  margin-left: 40%;
+  /* margin-left: 40%; */
 }
 
 .logo {
