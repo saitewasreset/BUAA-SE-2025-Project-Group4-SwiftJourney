@@ -12,10 +12,10 @@
                 <p style="font-size: larger">风行旅途</p>
             </div>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
-            <el-menu-item index="/homepage">首页</el-menu-item>
-            <el-menu-item index="/trainTicket">车票</el-menu-item>
-            <el-menu-item index="/hotel">酒店</el-menu-item>
-            <el-menu-item index="/trainmeal">火车餐</el-menu-item>
+            <el-menu-item index="homepage">首页</el-menu-item>
+            <el-menu-item index="trainTicket">车票</el-menu-item>
+            <el-menu-item index="hotel">酒店</el-menu-item>
+            <el-menu-item index="trainmeal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
             <div v-if="!user.isLogin">
@@ -99,20 +99,23 @@
   
 <script lang="ts" setup>
     import { paymentApi } from '@/api/PaymentApi/paymentApi';
-import type { PaymentApiResponseData, RechargeRequest } from '@/interface/paymentInterface';
-import { useUserStore } from '@/stores/user';
+    import type { PaymentApiResponseData, RechargeRequest } from '@/interface/paymentInterface';
+    import { useUserStore } from '@/stores/user';
     import { message, Modal } from 'ant-design-vue';
-    import { ref } from 'vue';
+    import { computed, ref } from 'vue';
     import { RouterLink, RouterView } from 'vue-router';
-    import { useRouter } from 'vue-router';
+    import { useRouter, useRoute } from 'vue-router';
 
     const user = useUserStore();
     //import { useDebugUserStore } from '@/stores/user';
     //const user = useDebugUserStore();
 
     const router = useRouter();
+    const route = useRoute();
 
-    const activeIndex = ref('homepage');
+    const activeIndex = computed(() => {
+        return route.name;
+    });
 
     function goToLoginPage() {
         router.push({ name: 'login' });
