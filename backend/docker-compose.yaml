@@ -12,7 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swiftjourney -d $$POSTGRES_DB"]
+      test: [ "CMD-SHELL", "pg_isready -U swiftjourney -d $$POSTGRES_DB" ]
       start_period: 1m
       start_interval: 5s
       interval: 10m
@@ -25,7 +25,7 @@ services:
       - redis_data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping"]
+      test: [ "CMD-SHELL", "redis-cli ping" ]
       start_period: 1m
       start_interval: 5s
       interval: 10m
@@ -65,6 +65,7 @@ services:
       MINIO_SECRET_KEY: WorkersOfTheWorld,Unite!
       DATA_PATH: /init_data
       SERVER_NAME: 127.0.0.1:8080
+      AUTO_SCHEDULE_DAYS: 14
     restart: unless-stopped
     depends_on:
       db:
