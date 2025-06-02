@@ -174,6 +174,10 @@
             message.warning('充值金额不能为0');
             return;
         }
+        else if(rechargeAmount.value === null) {
+            message.warning('充值金额不能为空');
+            return;
+        }
         try {
             const params: RechargeRequest = {
                 amount: rechargeAmount.value,
@@ -279,7 +283,7 @@
 
 .LogoutButton {
     margin-left: 20px;
-    margin-right: 20px;
+    margin-right: 30px;
 }
 
 </style>
