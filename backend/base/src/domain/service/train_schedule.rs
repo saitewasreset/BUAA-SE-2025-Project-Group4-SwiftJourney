@@ -15,6 +15,8 @@ pub enum TrainScheduleServiceError {
     InvalidStationId(u64),
     #[error("invalid train id: {0}")]
     InvalidTrainId(TrainId),
+    #[error("invalid train number: {0}")]
+    InvalidTrainNumber(String),
 }
 
 #[async_trait]
@@ -29,6 +31,12 @@ pub trait TrainScheduleService: 'static + Send + Sync {
         &self,
         date: NaiveDate,
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+
+    async fn get_schedule_by_train_number_and_date(
+        &self,
+        train_number: String,
+        departure_date: NaiveDate,
+    ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError>;
 
     async fn auto_plan_schedule(
         &self,
