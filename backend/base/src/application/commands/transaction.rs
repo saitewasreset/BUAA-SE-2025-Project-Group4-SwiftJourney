@@ -46,3 +46,9 @@ pub struct GenerateDebugTransactionCommand {
     pub session_id: String,
     pub amount: f64,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CancelOrderCommand {
+    pub session_id: String,
+    pub order_id: Uuid,
+}
