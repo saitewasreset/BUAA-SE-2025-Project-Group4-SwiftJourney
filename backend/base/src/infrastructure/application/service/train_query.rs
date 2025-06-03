@@ -40,13 +40,14 @@ use crate::application::commands::train_query::{
     TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
-    DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryService,
-    TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
+    DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryResponseDTO,
+    TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainNumber;
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
@@ -59,13 +60,14 @@ use tracing::{error, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, V, W, SMS>
+pub struct TrainQueryServiceImpl<T, U, V, W, SMS, RR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
+    RR: RouteRepository,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
@@ -75,18 +77,20 @@ where
     train_type_service: Arc<V>,
     route_service: Arc<W>,
     session_manager_service: Arc<SMS>,
+    route_repository: Arc<RR>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, V, W, SMS> TrainQueryServiceImpl<T, U, V, W, SMS>
+impl<T, U, V, W, SMS, RR> TrainQueryServiceImpl<T, U, V, W, SMS, RR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
+    RR: RouteRepository,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
@@ -94,6 +98,7 @@ where
         train_type_service: Arc<V>,
         route_service: Arc<W>,
         session_manager_service: Arc<SMS>,
+        route_repository: Arc<RR>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
@@ -101,6 +106,7 @@ where
             train_type_service,
             route_service,
             session_manager_service,
+            route_repository,
         }
     }
 
@@ -164,21 +170,169 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, V, W, SMS> TrainQueryService for TrainQueryServiceImpl<T, U, V, W, SMS>
+impl<T, U, V, W, SMS, RR> TrainQueryService for TrainQueryServiceImpl<T, U, V, W, SMS, RR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
+    RR: RouteRepository,
 {
     #[instrument(skip(self))]
     async fn query_train(
         &self,
         cmd: TrainScheduleQueryCommand,
-    ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>> {
+    ) -> Result<TrainQueryResponseDTO, Box<dyn ApplicationError>> {
         self.verify_session(cmd.session_id.as_str()).await?;
-        todo!()
+
+        let departure_date =
+            NaiveDate::parse_from_str(&cmd.departure_date, "%Y-%m-%d").map_err(|_| {
+                GeneralError::BadRequest(format!("Invalid date: {}", cmd.departure_date))
+            })?;
+
+        let schedule = self
+            .train_schedule_service
+            .get_schedule_by_train_number_and_date(cmd.train_number.clone(), departure_date)
+            .await
+            .inspect_err(|e| error!("Failed to get schedule by train number and date: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::BadRequest(format!(
+                "invalid train: {} {}",
+                cmd.train_number, cmd.departure_date
+            )))?;
+
+        let route = self
+            .route_repository
+            .get_by_train_schedule(schedule.get_id().expect("Train schedule should have id"))
+            .await
+            .inspect_err(|e| error!("Failed to get route by train schedule id: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or_else(|| {
+                error!(
+                    "Inconsistent: No route found for train schedule id: {:?}",
+                    schedule.get_id()
+                );
+                GeneralError::InternalServerError
+            })?;
+
+        let station = self
+            .station_service
+            .get_stations()
+            .await
+            .inspect_err(|e| error!("Failed to get stations: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+
+        let station_id_to_name = station
+            .into_iter()
+            .map(|s| {
+                (
+                    s.get_id().expect("Station should have id"),
+                    s.name().to_string(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        let mut stopping_station_list = Vec::with_capacity(route.stops().len());
+
+        let mut origin_station = None;
+        let mut origin_departure_time = None;
+        let mut origin_departure_date = None;
+        let mut terminal_station = None;
+        let mut terminal_arrival_time = None;
+
+        for stop in route.stops() {
+            let station_name = station_id_to_name
+                .get(&stop.station_id())
+                .ok_or_else(|| {
+                    error!(
+                        "Inconsistent: No station found for id: {}",
+                        stop.station_id()
+                    );
+
+                    GeneralError::InternalServerError
+                })?
+                .clone();
+
+            let arrival_time_secs = stop.arrival_time() + schedule.origin_departure_time() as u32;
+            let departure_time_secs =
+                stop.departure_time() + schedule.origin_departure_time() as u32;
+
+            if stop.order() == 0 {
+                origin_station = Some(station_name.clone());
+
+                let departure_datetime = departure_date
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                    .unwrap();
+
+                origin_departure_time = Some(departure_datetime.to_string());
+
+                origin_departure_date = Some(departure_datetime.date().to_string());
+            } else if stop.order() == (route.stops().len() - 1) as u32 {
+                terminal_station = Some(station_name.clone());
+
+                terminal_arrival_time = Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                );
+            }
+
+            let arrival_time_opt = if stop.order() == 0 {
+                None
+            } else {
+                Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            let departure_time_opt = if stop.order() == (route.stops().len() - 1) as u32 {
+                None
+            } else {
+                Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(departure_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            stopping_station_list.push(StoppingStationInfo {
+                station_name,
+                arrival_time: arrival_time_opt,
+                departure_time: departure_time_opt,
+            });
+        }
+
+        let origin_station = origin_station.expect("should have origin station");
+        let origin_departure_time =
+            origin_departure_time.expect("should have origin departure time");
+        let origin_departure_date =
+            origin_departure_date.expect("should have origin departure date");
+        let terminal_station = terminal_station.expect("should have terminal station");
+        let terminal_arrival_time =
+            terminal_arrival_time.expect("should have terminal arrival time");
+
+        Ok(TrainQueryResponseDTO {
+            origin_station,
+            origin_departure_time,
+            departure_date: origin_departure_date,
+            terminal_station,
+            terminal_arrival_time,
+            route: stopping_station_list,
+        })
     }
     #[instrument(skip(self))]
     async fn query_direct_trains(
@@ -298,14 +452,22 @@ where
                     .route
                     .iter()
                     .find(|stop| stop.station_name == station_name)
-                    .map(|stop| stop.arrival_time.clone())
-                    .unwrap_or_else(|| train_infos[0].terminal_arrival_time.clone());
+                    .map(|stop| {
+                        stop.arrival_time
+                            .clone()
+                            .expect("arrival time should exist for non-origin stops")
+                    })
+                    .unwrap_or(train_infos[0].terminal_arrival_time.clone());
 
                 let second_train_departure_time = train_infos[1]
                     .route
                     .iter()
                     .find(|stop| stop.station_name == station_name)
-                    .map(|stop| stop.departure_time.clone())
+                    .map(|stop| {
+                        stop.departure_time
+                            .clone()
+                            .expect("departure time should exist for non-terminal stops")
+                    })
                     .unwrap_or_else(|| train_infos[1].origin_departure_time.clone());
 
                 let first_dt =
@@ -335,13 +497,14 @@ where
     }
 }
 
-impl<T, U, V, W, SMS> TrainQueryServiceImpl<T, U, V, W, SMS>
+impl<T, U, V, W, SMS, RR> TrainQueryServiceImpl<T, U, V, W, SMS, RR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
+    RR: RouteRepository,
 {
     #[instrument(skip(self, routes))]
     async fn build_dto(
@@ -355,21 +518,27 @@ where
             .iter()
             .find(|r| r.get_id() == Some(sch.route_id()))
             .ok_or(TrainQueryServiceError::InvalidStationId)?;
+
+        let station_list = self.station_service.get_stations().await.map_err(|e| {
+            error!("Failed to get stations: {:?}", e);
+
+            GeneralError::InternalServerError
+        })?;
+
+        let station_id_to_name = station_list
+            .into_iter()
+            .map(|s| {
+                (
+                    s.get_id().expect("Station should have id"),
+                    s.name().to_string(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
         let mut stopping = Vec::<StoppingStationInfo>::new();
         for stop in route.stops() {
-            let base = date.and_hms_opt(0, 0, 0).unwrap();
-            let arr = (base + Duration::seconds(stop.arrival_time() as i64)).to_string();
-            let dep = (base + Duration::seconds(stop.departure_time() as i64)).to_string();
-            let name = self
-                .station_service
-                .get_station_by_name(stop.station_id().to_string())
-                .await
-                .map_err(|e| {
-                    error!("Failed to get station by name: {:?}", e);
-
-                    GeneralError::InternalServerError
-                })?
-                .map(|s| s.name().to_string())
+            let name = station_id_to_name
+                .get(&stop.station_id())
                 .ok_or_else(|| {
                     error!(
                         "Inconsistent: no station found for id {}",
@@ -377,11 +546,40 @@ where
                     );
 
                     GeneralError::InternalServerError
-                })?;
+                })?
+                .clone();
+
+            let arrival_time_secs = stop.arrival_time() + sch.origin_departure_time() as u32;
+            let departure_time_secs = stop.departure_time() + sch.origin_departure_time() as u32;
+
+            let arrival_time_opt = if stop.order() == 0 {
+                None
+            } else {
+                Some(
+                    date.and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            let departure_time_opt = if stop.order() == (route.stops().len() - 1) as u32 {
+                None
+            } else {
+                Some(
+                    date.and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(departure_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
             stopping.push(StoppingStationInfo {
                 station_name: name,
-                arrival_time: arr,
-                departure_time: dep,
+                arrival_time: arrival_time_opt,
+                departure_time: departure_time_opt,
             });
         }
 
@@ -408,8 +606,18 @@ where
         }
 
         // ——— 其余字段 ———
-        let dep_time = &stopping.first().unwrap().departure_time;
-        let arr_time = &stopping.last().unwrap().arrival_time;
+        let dep_time = stopping
+            .first()
+            .unwrap()
+            .departure_time
+            .as_ref()
+            .expect("departure time should exist for non-terminal stops");
+        let arr_time = stopping
+            .last()
+            .unwrap()
+            .arrival_time
+            .as_ref()
+            .expect("arrival time should exist for non-origin stops");
         let dep_dt = NaiveDateTime::parse_from_str(dep_time, "%Y-%m-%d %H:%M:%S")
             .unwrap_or_else(|_| date.and_hms_opt(0, 0, 0).unwrap());
         let arr_dt = NaiveDateTime::parse_from_str(arr_time, "%Y-%m-%d %H:%M:%S")
@@ -421,9 +629,19 @@ where
             arrival_station: stopping.last().unwrap().station_name.clone(),
             arrival_time: arr_time.clone(),
             origin_station: stopping.first().unwrap().station_name.clone(),
-            origin_departure_time: stopping.first().unwrap().departure_time.clone(),
+            origin_departure_time: stopping
+                .first()
+                .unwrap()
+                .departure_time
+                .clone()
+                .expect("departure time should exist for origin stop"),
             terminal_station: stopping.last().unwrap().station_name.clone(),
-            terminal_arrival_time: stopping.last().unwrap().arrival_time.clone(),
+            terminal_arrival_time: stopping
+                .last()
+                .unwrap()
+                .arrival_time
+                .clone()
+                .expect("arrival time should exist for terminal stop"),
             train_number: train.number().to_string(),
             travel_time: (arr_dt - dep_dt).num_seconds() as u32,
             price: seat_info.values().map(|i| i.price).min().unwrap_or(0),
