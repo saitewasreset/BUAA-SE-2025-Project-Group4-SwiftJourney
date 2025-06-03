@@ -3,10 +3,10 @@ use actix_web::web::Bytes;
 use actix_web::{HttpRequest, post, web};
 use base::application::GeneralError;
 use base::application::commands::train_query::{
-    DirectTrainQueryCommand, TransferTrainQueryCommand,
+    DirectTrainQueryCommand, TrainScheduleQueryCommand, TransferTrainQueryCommand,
 };
 use base::application::service::train_query::{
-    DirectTrainQueryDTO, TrainQueryService, TransferTrainQueryDTO,
+    DirectTrainQueryDTO, TrainQueryResponseDTO, TrainQueryService, TransferTrainQueryDTO,
 };
 use chrono::NaiveDate;
 use serde::Deserialize;
@@ -24,6 +24,13 @@ struct TrainScheduleQuery {
     /// 到达城市
     pub arrival_city: Option<String>,
     /// 出发日期，格式：YYYY-MM-DD
+    pub departure_date: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TrainScheduleInfoQuery {
+    pub train_number: String,
     pub departure_date: String,
 }
 
@@ -94,6 +101,26 @@ async fn query_indirect(
     };
 
     ApiResponse::ok(train_query_service.query_transfer_trains(command).await?)
+}
+
+#[post("/")]
+
+async fn query_train(
+    request: HttpRequest,
+    body: Bytes,
+    train_query_service: web::Data<dyn TrainQueryService>,
+) -> Result<ApiResponse<TrainQueryResponseDTO>, ApplicationErrorBox> {
+    let session_id = get_session_id(&request)?;
+
+    let query_dto: TrainScheduleInfoQuery = parse_request_body(body)?;
+
+    let command = TrainScheduleQueryCommand {
+        session_id,
+        train_number: query_dto.train_number,
+        departure_date: query_dto.departure_date,
+    };
+
+    ApiResponse::ok(train_query_service.query_train(command).await?)
 }
 
 #[cfg(test)]
