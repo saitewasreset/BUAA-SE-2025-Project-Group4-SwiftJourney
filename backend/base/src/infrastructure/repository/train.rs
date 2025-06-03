@@ -23,7 +23,7 @@ use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{
     SeatType, SeatTypeId, SeatTypeName, Train, TrainId, TrainNumber, TrainType,
 };
-use crate::domain::model::train_schedule::SeatId;
+use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
@@ -740,7 +740,8 @@ impl TrainRepository for TrainRepositoryImpl {
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
-    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, RepositoryError> {
+    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<(SeatId, SeatLocationInfo)>>, RepositoryError>
+    {
         if let Some(train) = crate::models::train::Entity::find_by_id(train_id.to_db_value())
             .one(&self.db)
             .await
@@ -783,7 +784,8 @@ impl TrainRepository for TrainRepositoryImpl {
                 .map(|x| (x.id, x.type_name))
                 .collect::<HashMap<_, _>>();
 
-            let mut result: HashMap<SeatTypeName<Verified>, Vec<SeatId>> = HashMap::new();
+            let mut result: HashMap<SeatTypeName<Verified>, Vec<(SeatId, SeatLocationInfo)>> =
+                HashMap::new();
 
             for seat_type in seat_type_mapping {
                 let seat_type_name = SeatTypeName::from_unchecked(
@@ -803,14 +805,26 @@ impl TrainRepository for TrainRepositoryImpl {
                         })?,
                 );
 
-                result.entry(seat_type_name).or_default().push(
+                let seat_location_info = SeatLocationInfo {
+                    carriage: seat_type.carriage,
+                    row: seat_type.row,
+                    location: seat_type.location.chars().next().ok_or(
+                        RepositoryError::ValidationError(anyhow!(
+                            "inconsistent: seat location for seat_id: {} is empty",
+                            seat_type.seat_id
+                        )),
+                    )?,
+                };
+
+                result.entry(seat_type_name).or_default().push((
                     SeatId::try_from(seat_type.seat_id)
                         .map_err(|e| RepositoryError::ValidationError(e.into()))
                         .map_err(|e| {
                             error!("failed to convert seat id: {}: {}", seat_type.seat_id, e);
                             e
                         })?,
-                );
+                    seat_location_info,
+                ));
             }
 
             Ok(result)

@@ -5,6 +5,7 @@ use sea_orm_migration::{prelude::*, schema::*};
 pub struct Migration;
 
 #[derive(DeriveIden)]
+#[allow(clippy::enum_variant_names)]
 pub enum Message {
     Table,
     Id,

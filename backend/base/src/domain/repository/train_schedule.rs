@@ -17,4 +17,11 @@ pub trait TrainScheduleRepository: Repository<TrainSchedule> {
         train_id: TrainId,
         origin_departure_time: DateTime<FixedOffset>,
     ) -> Result<Option<TrainSchedule>, RepositoryError>;
+
+    async fn save_many_no_conflict(
+        &self,
+        schedules: Vec<TrainSchedule>,
+    ) -> Result<(), RepositoryError>;
+
+    async fn get_latest_schedule_date(&self) -> Result<Option<NaiveDate>, RepositoryError>;
 }

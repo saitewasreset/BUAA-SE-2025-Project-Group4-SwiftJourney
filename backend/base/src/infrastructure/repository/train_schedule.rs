@@ -23,13 +23,14 @@ use crate::domain::model::train_schedule::{
     SeatAvailabilityId, SeatId, StationRange, TrainSchedule, TrainScheduleId,
 };
 
+use crate::DB_CHUNK_SIZE;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use anyhow::Context;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
-use sea_orm::ColumnTrait;
 use sea_orm::{ActiveValue, DatabaseConnection};
+use sea_orm::{ColumnTrait, QueryOrder};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
 use std::collections::HashMap;
@@ -334,5 +335,50 @@ impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
             ))?;
 
         Ok(result.into_iter().next())
+    }
+
+    #[instrument(skip_all)]
+    async fn save_many_no_conflict(
+        &self,
+        schedules: Vec<TrainSchedule>,
+    ) -> Result<(), RepositoryError> {
+        let transaction = self
+            .db
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
+
+        let train_schedule_to_list = schedules
+            .into_iter()
+            .map(TrainScheduleDataConverter::transform_to_do)
+            .collect::<Vec<_>>();
+
+        for chunk in train_schedule_to_list.chunks(DB_CHUNK_SIZE) {
+            crate::models::train_schedule::Entity::insert_many(chunk.to_vec())
+                .on_conflict_do_nothing()
+                .exec(&transaction)
+                .await
+                .inspect_err(|e| error!("Failed to insert train schedules: {}", e))
+                .context("Failed to insert train schedules")?;
+        }
+
+        transaction
+            .commit()
+            .await
+            .context("Failed to commit transaction")?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn get_latest_schedule_date(&self) -> Result<Option<NaiveDate>, RepositoryError> {
+        let latest_do = crate::models::train_schedule::Entity::find()
+            .order_by_desc(crate::models::train_schedule::Column::DepartureDate)
+            .one(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to get latest schedule from db: {}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(latest_do.map(|latest_do| latest_do.departure_date))
     }
 }
