@@ -282,6 +282,35 @@ impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
     }
 
     #[instrument(skip(self))]
+    async fn find_by_id_and_date(
+        &self,
+        train_id: TrainId,
+        date: NaiveDate,
+    ) -> Result<Option<TrainSchedule>, RepositoryError> {
+        Ok(self
+            .query_train_schedule(|q| {
+                q.filter(
+                    crate::models::train_schedule::Column::DepartureDate
+                        .eq(date)
+                        .and(
+                            crate::models::train_schedule::Column::TrainId
+                                .eq(train_id.to_db_value()),
+                        ),
+                )
+            })
+            .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
+            .context(format!(
+                "Failed to find train schedule with date: {} and train id {}",
+                date, train_id
+            ))?
+            .into_iter()
+            .next())
+    }
+
+    #[instrument(skip(self))]
     async fn find_by_train_id(
         &self,
         train_id: TrainId,

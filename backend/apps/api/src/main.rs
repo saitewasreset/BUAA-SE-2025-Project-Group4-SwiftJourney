@@ -408,6 +408,15 @@ async fn main() -> std::io::Result<()> {
             tz_offset_hour as u32,
         ));
 
+    let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
+        Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&station_service_impl),
+        Arc::clone(&route_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&route_repository_impl),
+        Arc::clone(&train_repository_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -496,13 +505,6 @@ async fn main() -> std::io::Result<()> {
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
         .expect("Failed to start order status consumer service");
-
-    let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
-        Arc::clone(&train_schedule_service_impl),
-        Arc::clone(&station_service_impl),
-        Arc::clone(&train_type_service_impl),
-        Arc::clone(&route_service_impl),
-    ));
 
     {
         let train_schedule_service_impl = Arc::clone(&train_schedule_service_impl);
