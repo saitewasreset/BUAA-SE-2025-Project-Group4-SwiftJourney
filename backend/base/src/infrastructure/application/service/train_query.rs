@@ -46,13 +46,12 @@ use crate::application::service::train_query::{
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
-use crate::domain::model::train::TrainNumber;
 use crate::domain::repository::route::RouteRepository;
+use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
-use crate::domain::service::train_type::TrainTypeConfigurationService;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use std::collections::HashMap;
@@ -60,53 +59,53 @@ use tracing::{error, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, V, W, SMS, RR>
+pub struct TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
     RR: RouteRepository,
+    TR: TrainRepository,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
     // Exercise 1.2.1D - 5: Your code here. (2 / 6)
     train_schedule_service: Arc<T>,
     station_service: Arc<U>,
-    train_type_service: Arc<V>,
     route_service: Arc<W>,
     session_manager_service: Arc<SMS>,
     route_repository: Arc<RR>,
+    train_repository: Arc<TR>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, V, W, SMS, RR> TrainQueryServiceImpl<T, U, V, W, SMS, RR>
+impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
     RR: RouteRepository,
+    TR: TrainRepository,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
-        train_type_service: Arc<V>,
         route_service: Arc<W>,
         session_manager_service: Arc<SMS>,
         route_repository: Arc<RR>,
+        train_repository: Arc<TR>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
             station_service,
-            train_type_service,
             route_service,
             session_manager_service,
             route_repository,
+            train_repository,
         }
     }
 
@@ -170,14 +169,14 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, V, W, SMS, RR> TrainQueryService for TrainQueryServiceImpl<T, U, V, W, SMS, RR>
+impl<T, U, W, SMS, RR, TR> TrainQueryService for TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
     RR: RouteRepository,
+    TR: TrainRepository,
 {
     #[instrument(skip(self))]
     async fn query_train(
@@ -497,14 +496,14 @@ where
     }
 }
 
-impl<T, U, V, W, SMS, RR> TrainQueryServiceImpl<T, U, V, W, SMS, RR>
+impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     SMS: SessionManagerService,
     RR: RouteRepository,
+    TR: TrainRepository,
 {
     #[instrument(skip(self, routes))]
     async fn build_dto(
@@ -585,11 +584,16 @@ where
 
         // ——— 列车 / 座位 ———
         let train = self
-            .train_type_service
-            .get_train_by_number(TrainNumber::from_unchecked(sch.train_id().to_string()))
+            .train_repository
+            .find(sch.train_id())
             .await
             .map_err(|e| {
                 error!("Failed to get train by number: {:?}", e);
+
+                GeneralError::InternalServerError
+            })?
+            .ok_or_else(|| {
+                error!("Inconsistent: No train found for id: {}", sch.train_id());
 
                 GeneralError::InternalServerError
             })?;
