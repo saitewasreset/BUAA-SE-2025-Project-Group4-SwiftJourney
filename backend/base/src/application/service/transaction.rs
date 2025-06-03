@@ -1,6 +1,6 @@
 use crate::application::commands::transaction::{
-    BalanceQuery, GenerateDebugTransactionCommand, PayTransactionCommand, RechargeCommand,
-    SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
+    BalanceQuery, CancelOrderCommand, GenerateDebugTransactionCommand, PayTransactionCommand,
+    RechargeCommand, SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::transaction::Transaction;
@@ -36,20 +36,29 @@ pub struct PaymentPasswordInfoDTO {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionGenerateDTO {
     pub amount: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct BalanceInfoDTO {
     pub balance: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionInfoDTO {
     pub transaction_id: Uuid,
     pub amount: f64,
     pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelOrderDTO {
+    pub order_id: Uuid,
 }
 
 impl From<Transaction> for TransactionInfoDTO {
@@ -160,4 +169,9 @@ pub trait TransactionApplicationService: 'static + Send + Sync {
         &self,
         query: TransactionDetailQuery,
     ) -> Result<Vec<TransactionDataDto>, Box<dyn ApplicationError>>;
+
+    async fn cancel_order(
+        &self,
+        command: CancelOrderCommand,
+    ) -> Result<(), Box<dyn ApplicationError>>;
 }
