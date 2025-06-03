@@ -104,7 +104,7 @@ where
         orders: Vec<Box<dyn Order>>,
         atomic: bool,
     ) -> Result<Uuid, TransactionServiceError> {
-        for order in &orders {
+        for order in &*orders {
             if order.order_status() != OrderStatus::Unpaid {
                 return Err(TransactionServiceError::InvalidOrderStatus {
                     op: "new",
