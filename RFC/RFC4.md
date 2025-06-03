@@ -726,7 +726,9 @@ type ResponseData = TransactionInfo;
 
 ### 车次信息查询
 
-`POST /api/train/schedule`
+`POST /api/train/schedule/`
+
+**注意：不要遗漏最后的斜杠！**
 
 需要 Cookie：
 
@@ -748,10 +750,10 @@ interface TrainInfoQuery {
 
 响应代码表：
 
-| 代码 | 可能的响应消息                                                               | 含义                                               |
-| ---- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
-| 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据                   |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                                           |
+| 代码 | 可能的响应消息                                                                                   | 含义                                          |
+| ---- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| 200  | `For Super Earth!`                                                                               | 请求已被成功执行，可访问响应数据              |
+| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                             | 会话无效                                      |
 | 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {departure_date}` | 查询的车次号或离开“始发站”的日期不存在/不合法 |
 
 响应**数据**：
