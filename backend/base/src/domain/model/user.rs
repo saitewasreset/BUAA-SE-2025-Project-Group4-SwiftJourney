@@ -789,6 +789,10 @@ impl User {
         &self.username
     }
 
+    pub fn set_username(&mut self, username: Username) {
+        self.username = username;
+    }
+
     /// 获取哈希后的登录密码
     pub fn hashed_password(&self) -> &HashedPassword {
         &self.hashed_password
