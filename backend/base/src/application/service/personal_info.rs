@@ -9,7 +9,6 @@
 
 use crate::application::ApplicationError;
 use crate::application::commands::personal_info::{PersonalInfoQuery, SetPersonalInfoCommand};
-use crate::domain::Identifiable;
 use crate::domain::model::personal_info::PersonalInfo;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
