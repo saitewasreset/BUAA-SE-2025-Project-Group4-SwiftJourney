@@ -125,3 +125,5 @@ curl -X POST -H "Content-Type: application/json" -d @hotels.json http://127.0.0.
 curl -X POST -H "Content-Type: application/json" -d @dish_takeaway.json http://127.0.0.1:8080/api/data/dish_takeaway
 rm dish_takeaway.json
 ```
+
+加载数据后，**请重启一次后端**，以便自动根据加载的车次生成车次调度信息。
