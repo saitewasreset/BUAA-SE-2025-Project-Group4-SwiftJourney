@@ -411,10 +411,10 @@ async fn main() -> std::io::Result<()> {
     let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
         Arc::clone(&train_schedule_service_impl),
         Arc::clone(&station_service_impl),
-        Arc::clone(&train_type_service_impl),
         Arc::clone(&route_service_impl),
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&route_repository_impl),
+        Arc::clone(&train_repository_impl),
     ));
 
     let user_repository: web::Data<dyn UserRepository> =
