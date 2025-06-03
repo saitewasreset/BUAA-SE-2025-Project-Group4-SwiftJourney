@@ -301,6 +301,7 @@ where
         Ok(tx.into())
     }
 
+    #[instrument(skip(self))]
     async fn query_transaction_details(
         &self,
         query: TransactionDetailQuery,
@@ -311,6 +312,7 @@ where
             .transaction_repository
             .find_by_user_id(user_id)
             .await
+            .inspect_err(|e| error!("failed to find transactions for user_id {}: {}", user_id, e))
             .map_err(|e| {
                 error!("failed to query transaction for user_id {}: {}", user_id, e);
 
@@ -325,6 +327,9 @@ where
                 self.transaction_service
                     .convert_transaction_to_dto(transaction)
                     .await
+                    .inspect_err(|e| {
+                        error!("failed to convert transaction {:?} to dto: {}", txid, e);
+                    })
                     .map_err(|e| {
                         error!("failed to convert transaction {:?} to dto {}", txid, e);
 

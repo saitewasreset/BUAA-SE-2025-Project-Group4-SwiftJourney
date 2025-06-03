@@ -251,11 +251,11 @@ impl OrderDataConverter {
         }
 
         if let Some(id) = train_order.payment_info().pay_transaction_id() {
-            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         if let Some(id) = train_order.payment_info().refund_transaction_id() {
-            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         model
@@ -345,12 +345,12 @@ impl OrderDataConverter {
             price: ActiveValue::Set(hotel_order.unit_price()),
             pay_transaction_id: ActiveValue::NotSet,
             refund_transaction_id: ActiveValue::NotSet,
-            person_info_id: ActiveValue::Set(hotel_order.personal_info_id().to_db_value() as i64),
+            person_info_id: ActiveValue::Set(hotel_order.personal_info_id().to_db_value()),
 
-            hotel_id: ActiveValue::Set(hotel_order.hotel_id().to_db_value() as i64),
+            hotel_id: ActiveValue::Set(hotel_order.hotel_id().to_db_value()),
             begin_date: ActiveValue::Set(hotel_order.booking_date_range().begin_date()),
             end_date: ActiveValue::Set(hotel_order.booking_date_range().end_date()),
-            hotel_room_type_id: ActiveValue::Set(hotel_order.room_id().to_db_value() as i64),
+            hotel_room_type_id: ActiveValue::Set(hotel_order.room_id().to_db_value()),
         };
 
         if let Some(id) = hotel_order.get_id() {
@@ -358,11 +358,11 @@ impl OrderDataConverter {
         }
 
         if let Some(id) = hotel_order.payment_info().pay_transaction_id() {
-            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         if let Some(id) = hotel_order.payment_info().refund_transaction_id() {
-            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         model
@@ -415,9 +415,9 @@ impl OrderDataConverter {
             personal_info_id,
         );
 
-        let train_order_id = OrderId::from_db_value(dish_order_do.train_order_id as i32)?;
+        let train_order_id = OrderId::from_db_value(dish_order_do.train_order_id)?;
 
-        let dish_id = DishId::from_db_value(dish_order_do.dish_id as i32)?;
+        let dish_id = DishId::from_db_value(dish_order_do.dish_id)?;
 
         Ok(DishOrder::new(
             base,
@@ -448,10 +448,10 @@ impl OrderDataConverter {
             price: ActiveValue::Set(dish_order.unit_price()),
             pay_transaction_id: ActiveValue::NotSet,
             refund_transaction_id: ActiveValue::NotSet,
-            person_info_id: ActiveValue::Set(dish_order.personal_info_id().to_db_value() as i64),
+            person_info_id: ActiveValue::Set(dish_order.personal_info_id().to_db_value()),
 
-            train_order_id: ActiveValue::Set(dish_order.train_order_id().to_db_value() as i64),
-            dish_id: ActiveValue::Set(dish_order.dish_id().to_db_value() as i64),
+            train_order_id: ActiveValue::Set(dish_order.train_order_id().to_db_value()),
+            dish_id: ActiveValue::Set(dish_order.dish_id().to_db_value()),
             amount: ActiveValue::Set(dish_order.amount().to_i32().unwrap()),
         };
 
@@ -460,11 +460,11 @@ impl OrderDataConverter {
         }
 
         if let Some(id) = dish_order.payment_info().pay_transaction_id() {
-            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         if let Some(id) = dish_order.payment_info().refund_transaction_id() {
-            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         model
@@ -504,8 +504,7 @@ impl OrderDataConverter {
                 .map(TransactionId::try_from)
                 .transpose()?,
         );
-        let personal_info_id =
-            PersonalInfoId::from_db_value(takeaway_order_do.person_info_id as i32)?;
+        let personal_info_id = PersonalInfoId::from_db_value(takeaway_order_do.person_info_id)?;
 
         let base = BaseOrder::new(
             Some(order_id),
@@ -518,10 +517,9 @@ impl OrderDataConverter {
             personal_info_id,
         );
 
-        let train_order_id = OrderId::from_db_value(takeaway_order_do.train_order_id as i32)?;
+        let train_order_id = OrderId::from_db_value(takeaway_order_do.train_order_id)?;
 
-        let takeaway_dish_id =
-            TakeawayDishId::from_db_value(takeaway_order_do.takeaway_dish_id as i32)?;
+        let takeaway_dish_id = TakeawayDishId::from_db_value(takeaway_order_do.takeaway_dish_id)?;
 
         Ok(TakeawayOrder::new(
             base,
@@ -554,12 +552,10 @@ impl OrderDataConverter {
             price: ActiveValue::Set(takeaway_order.unit_price()),
             pay_transaction_id: ActiveValue::NotSet,
             refund_transaction_id: ActiveValue::NotSet,
-            person_info_id: ActiveValue::Set(takeaway_order.personal_info_id().to_db_value() as i64),
+            person_info_id: ActiveValue::Set(takeaway_order.personal_info_id().to_db_value()),
 
-            train_order_id: ActiveValue::Set(takeaway_order.train_order_id().to_db_value() as i64),
-            takeaway_dish_id: ActiveValue::Set(
-                takeaway_order.takeaway_dish_id().to_db_value() as i64
-            ),
+            train_order_id: ActiveValue::Set(takeaway_order.train_order_id().to_db_value()),
+            takeaway_dish_id: ActiveValue::Set(takeaway_order.takeaway_dish_id().to_db_value()),
             amount: ActiveValue::Set(takeaway_order.amount().to_i32().unwrap()),
         };
 
@@ -568,11 +564,11 @@ impl OrderDataConverter {
         }
 
         if let Some(id) = takeaway_order.payment_info().pay_transaction_id() {
-            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.pay_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         if let Some(id) = takeaway_order.payment_info().refund_transaction_id() {
-            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value() as i64));
+            model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
         }
 
         model
@@ -1003,7 +999,7 @@ impl TransactionDataConverter {
             status: ActiveValue::Set(
                 <TransactionStatus as Into<&str>>::into(transaction.status()).to_string(),
             ),
-            user_id: ActiveValue::Set(transaction.user_id().to_db_value() as i64),
+            user_id: ActiveValue::Set(transaction.user_id().to_db_value()),
             atomic: ActiveValue::Set(transaction.atomic()),
         };
 

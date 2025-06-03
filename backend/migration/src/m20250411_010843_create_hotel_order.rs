@@ -36,15 +36,15 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(HotelOrder::Id))
                     .col(uuid(HotelOrder::Uuid).not_null())
-                    .col(big_integer(HotelOrder::HotelId).not_null())
+                    .col(integer(HotelOrder::HotelId).not_null())
                     .col(date(HotelOrder::BeginDate).not_null())
                     .col(date(HotelOrder::EndDate).not_null().check(
                         Expr::col(HotelOrder::EndDate).gte(Expr::col(HotelOrder::BeginDate)),
                     ))
-                    .col(big_integer(HotelOrder::HotelRoomTypeId).not_null())
-                    .col(big_integer(HotelOrder::PersonInfoId).not_null())
-                    .col(big_integer(HotelOrder::PayTransactionId))
-                    .col(big_integer(HotelOrder::RefundTransactionId))
+                    .col(integer(HotelOrder::HotelRoomTypeId).not_null())
+                    .col(integer(HotelOrder::PersonInfoId).not_null())
+                    .col(integer(HotelOrder::PayTransactionId))
+                    .col(integer(HotelOrder::RefundTransactionId))
                     .col(
                         decimal_len(HotelOrder::Price, 10, 2)
                             .not_null()
