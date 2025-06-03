@@ -100,9 +100,26 @@ pub struct StoppingStationInfo {
     /// 停车站名称
     pub station_name: String,
     /// 到达时间
-    pub arrival_time: String,
+    pub arrival_time: Option<String>,
     /// 离开时间
-    pub departure_time: String,
+    pub departure_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainQueryResponseDTO {
+    pub origin_station: String,
+    // 离开“始发站”的日期时间
+    pub origin_departure_time: String,
+
+    pub departure_date: String,
+
+    pub terminal_station: String,
+    // 到达“终到站”的日期时间
+    pub terminal_arrival_time: String,
+
+    // 车次经停车站信息
+    pub route: Vec<StoppingStationInfo>,
 }
 
 /// 单趟车次（一次发车）信息
@@ -161,7 +178,7 @@ pub trait TrainQueryService: 'static + Send + Sync {
     async fn query_train(
         &self,
         cmd: TrainScheduleQueryCommand,
-    ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>>;
+    ) -> Result<TrainQueryResponseDTO, Box<dyn ApplicationError>>;
 
     // Step 5: Define service using `async fn xxx(&self, command: XXXCommand)
     //     -> Result<DTO, Box<dyn ApplicationError>>;`

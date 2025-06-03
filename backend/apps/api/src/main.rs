@@ -414,6 +414,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&train_type_service_impl),
         Arc::clone(&route_service_impl),
         Arc::clone(&session_manager_service_impl),
+        Arc::clone(&route_repository_impl),
     ));
 
     let user_repository: web::Data<dyn UserRepository> =
