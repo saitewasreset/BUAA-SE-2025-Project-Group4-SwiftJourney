@@ -29,7 +29,7 @@ impl MigrationTrait for Migration {
                     .col(timestamp_with_time_zone(Transaction::FinishTime))
                     .col(decimal_len(Transaction::Amount, 10, 2).not_null())
                     .col(string(Transaction::Status).not_null())
-                    .col(big_integer(Transaction::UserId).not_null())
+                    .col(integer(Transaction::UserId).not_null())
                     .col(boolean(Transaction::Atomic).default(false))
                     .foreign_key(
                         ForeignKey::create()
