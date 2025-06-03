@@ -1,16 +1,16 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId};
 use crate::domain::model::station::StationId;
-use crate::domain::model::train::TrainId;
+use crate::domain::model::train::{TrainId, TrainNumber};
 use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
+use crate::domain::{Identifiable, RepositoryError};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 use tracing::{error, info, instrument};
@@ -319,6 +319,38 @@ where
             .find_by_date(date)
             .await
             .inspect_err(|e| error!("Failed to load train schedule for date {}: {}", date, e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })
+    }
+
+    #[instrument(skip(self))]
+    async fn get_schedule_by_train_number_and_date(
+        &self,
+        train_number: String,
+        departure_date: NaiveDate,
+    ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+        let train = self
+            .train_repository
+            .find_by_train_number(TrainNumber::from_unchecked(train_number.clone()))
+            .await
+            .inspect_err(|e| error!("Failed to get train: {}", e))
+            .map_err(|e| match e {
+                RepositoryError::InconsistentState(_) => {
+                    TrainScheduleServiceError::InvalidTrainNumber(train_number)
+                }
+                x => {
+                    TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(x))
+                }
+            })?;
+
+        self.train_schedule_repository
+            .find_by_id_and_date(
+                train.get_id().expect("train should have id"),
+                departure_date,
+            )
+            .await
+            .inspect_err(|e| error!("Failed to get train schedule: {}", e))
             .map_err(|e| {
                 TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
             })

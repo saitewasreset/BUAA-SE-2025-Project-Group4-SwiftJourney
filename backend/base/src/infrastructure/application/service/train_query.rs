@@ -36,10 +36,8 @@
 use std::sync::Arc;
 
 use crate::application::commands::train_query::{
-    DirectTrainQueryCommand,
-    TrainQueryValidate,
+    DirectTrainQueryCommand, TrainQueryValidate, TrainScheduleQueryCommand,
     TransferTrainQueryCommand,
-    // TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
     DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryService,
@@ -50,6 +48,7 @@ use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::TrainNumber;
 use crate::domain::service::route::RouteService;
+use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::train_type::TrainTypeConfigurationService;
@@ -60,12 +59,13 @@ use tracing::{error, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, V, W>
+pub struct TrainQueryServiceImpl<T, U, V, W, SMS>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
@@ -74,29 +74,33 @@ where
     station_service: Arc<U>,
     train_type_service: Arc<V>,
     route_service: Arc<W>,
+    session_manager_service: Arc<SMS>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, V, W> TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, V, W, SMS> TrainQueryServiceImpl<T, U, V, W, SMS>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
         train_type_service: Arc<V>,
         route_service: Arc<W>,
+        session_manager_service: Arc<SMS>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
             station_service,
             train_type_service,
             route_service,
+            session_manager_service,
         }
     }
 
@@ -135,6 +139,20 @@ where
             _ => Err(Box::new(TrainQueryServiceError::InconsistentQuery)),
         }
     }
+
+    async fn verify_session(&self, session_id: &str) -> Result<(), Box<dyn ApplicationError>> {
+        if self
+            .session_manager_service
+            .verify_session_id(session_id)
+            .await
+            .inspect_err(|e| error!("Failed to verify session ID: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+        {
+            return Err(Box::new(GeneralError::InvalidSessionId));
+        }
+
+        Ok(())
+    }
 }
 
 // Step 5: Implement `TrainQueryService` trait for `TrainQueryServiceImpl`
@@ -146,18 +164,29 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, V, W> TrainQueryService for TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, V, W, SMS> TrainQueryService for TrainQueryServiceImpl<T, U, V, W, SMS>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
 {
+    #[instrument(skip(self))]
+    async fn query_train(
+        &self,
+        cmd: TrainScheduleQueryCommand,
+    ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
+        todo!()
+    }
     #[instrument(skip(self))]
     async fn query_direct_trains(
         &self,
         cmd: DirectTrainQueryCommand,
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
+
         cmd.validate()?;
 
         let from_ids = self
@@ -200,6 +229,7 @@ where
         &self,
         cmd: TransferTrainQueryCommand,
     ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
         cmd.validate()?;
 
         let from_ids = self
@@ -305,12 +335,13 @@ where
     }
 }
 
-impl<T, U, V, W> TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, V, W, SMS> TrainQueryServiceImpl<T, U, V, W, SMS>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
     V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
 {
     #[instrument(skip(self, routes))]
     async fn build_dto(

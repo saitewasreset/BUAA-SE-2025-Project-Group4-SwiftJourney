@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::application::ApplicationError;
-use crate::application::commands::train_query::{DirectTrainQueryCommand, TransferTrainQueryCommand};
+use crate::application::commands::train_query::{
+    DirectTrainQueryCommand, TrainScheduleQueryCommand, TransferTrainQueryCommand,
+};
 
 // Step 2: Define `TrainQueryServiceError` for possible errors
 // HINT: You may refer to RFC4 "直达车次查询（US1.2.1）" and "中转车次查询（US3.1.1）" for possible errors
@@ -156,6 +158,11 @@ pub struct TransferTrainQueryDTO {
 // Step 1: Define `TrainQueryService` application service
 // Thinking 1.2.1D - 1：你认为`async_trait`宏的作用是什么？为什么需要使用它？
 pub trait TrainQueryService: 'static + Send + Sync {
+    async fn query_train(
+        &self,
+        cmd: TrainScheduleQueryCommand,
+    ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>>;
+
     // Step 5: Define service using `async fn xxx(&self, command: XXXCommand)
     //     -> Result<DTO, Box<dyn ApplicationError>>;`
     // HINT: You may refer to `UserManagerService` for example

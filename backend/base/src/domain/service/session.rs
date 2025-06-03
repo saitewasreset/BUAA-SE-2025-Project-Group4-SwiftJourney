@@ -78,4 +78,6 @@ pub trait SessionManagerService: 'static + Send + Sync {
         &self,
         session_id: SessionId,
     ) -> Result<Option<UserId>, RepositoryError>;
+
+    async fn verify_session_id(&self, session_id_str: &str) -> Result<bool, RepositoryError>;
 }
