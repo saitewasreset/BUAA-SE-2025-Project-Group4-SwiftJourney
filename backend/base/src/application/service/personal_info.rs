@@ -9,8 +9,8 @@
 
 use crate::application::ApplicationError;
 use crate::application::commands::personal_info::{PersonalInfoQuery, SetPersonalInfoCommand};
-use crate::domain::model::personal_info::PersonalInfo;
 use crate::domain::Identifiable;
+use crate::domain::model::personal_info::PersonalInfo;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -64,9 +64,7 @@ pub struct SetPersonalInfoDTO {
 impl From<PersonalInfo> for PersonalInfoDTO {
     fn from(value: PersonalInfo) -> Self {
         PersonalInfoDTO {
-            personal_id: value
-                .get_id()
-                .map_or_else(|| "".to_string(), |id| id.to_string()),
+            personal_id: value.uuid().to_string(),
             name: value.name().to_string(),
             identity_card_id: value.identity_card_id().to_string(),
             preferred_seat_location: value.preferred_seat_location().map(|seat| seat.to_string()),
