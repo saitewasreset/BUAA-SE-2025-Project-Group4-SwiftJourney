@@ -1,12 +1,13 @@
 # Request For Comments 4: API 文档
 
-Version: 18 (2025-06-03 19:45:00)
+Version: 18 (2025-06-03 20:00:00)
 
 最近变更：
 
 - Version 18
   - 取消订单：对于不满足取消条件的订单，现在统一返回 11005 错误
   - 酒店查询：修改拼写错误
+  - 酒店预订：`beginDate`和`endDate`应当为必填项
 - Version 17
   - 火车餐预订：更新错误代码
 - Version 16
@@ -1379,9 +1380,9 @@ interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
