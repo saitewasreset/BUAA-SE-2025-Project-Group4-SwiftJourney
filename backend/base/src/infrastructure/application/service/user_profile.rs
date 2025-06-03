@@ -24,13 +24,14 @@ use crate::application::service::user_profile::{
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
-use crate::domain::model::user::{Age, Gender, User};
+use crate::domain::model::user::{Age, Gender, User, Username};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
 use email_address::EmailAddress;
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::warn;
 
 /// 用户资料服务实现
 ///
@@ -166,6 +167,12 @@ where
             .get_user_entity_by_session_id(&command.session_id)
             .await?;
 
+        let username = Username::try_from(command.username.clone()).map_err(|e| {
+            warn!("invalid username: {} {}", command.username, e);
+
+            GeneralError::BadRequest(e.to_string())
+        })?;
+
         let gender = command
             .gender
             .map(|gender| Gender::try_from(gender.as_str()))
@@ -181,6 +188,7 @@ where
         let email = EmailAddress::from_str(command.email.as_str())
             .map_err(|_for_super_earth| UserProfileError::InvalidEmail)?;
 
+        user.set_username(username);
         user.user_info_mut().gender = gender;
         user.user_info_mut().age = age;
         user.user_info_mut().email = Some(email);
