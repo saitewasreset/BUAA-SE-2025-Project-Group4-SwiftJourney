@@ -14,6 +14,7 @@
 use crate::application::commands::user_manager::{
     UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
+use crate::application::service::transaction::TransactionApplicationServiceError;
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
 use crate::domain::service::user::UserServiceError;
@@ -133,7 +134,9 @@ impl From<UserServiceError> for Box<dyn ApplicationError> {
                 UserManagerError::InvalidPhoneNumberOrPassword.into()
             }
             UserServiceError::UserExists(s, _) => UserManagerError::UserAlreadyExists(s).into(),
-            UserServiceError::PaymentPasswordMaxAttemptsExceed(_) => todo!("应在交易模块实现"),
+            UserServiceError::PaymentPasswordMaxAttemptsExceed(_) => {
+                TransactionApplicationServiceError::TooManyPaymentPasswordAttempts.into()
+            }
         }
     }
 }
