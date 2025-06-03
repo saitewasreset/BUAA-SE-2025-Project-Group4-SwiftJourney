@@ -3,6 +3,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::application::service::train_query::TrainQueryServiceError;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainScheduleQueryCommand {
+    pub session_id: String,
+    pub train_number: String,
+    pub departure_date: String,
+}
+
 /// 直达车次查询（US1.2.1）——Query
 /// 跨层传输时使用 `Serialize / Deserialize` 方便直接反序列化 JSON。
 #[derive(Debug, Clone, Serialize, Deserialize)]

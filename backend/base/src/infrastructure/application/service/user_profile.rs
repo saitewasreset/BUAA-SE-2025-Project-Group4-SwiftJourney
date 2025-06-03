@@ -226,6 +226,7 @@ mod tests {
             async fn delete_session(&self, session: Session) -> Result<(), RepositoryError>;
             async fn get_session(&self, session_id: SessionId) -> Result<Option<Session>, RepositoryError>;
             async fn get_user_id_by_session(&self, session_id: SessionId) -> Result<Option<UserId>, RepositoryError>;
+            async fn verify_session_id(&self, session_id_str: &str) -> Result<bool, RepositoryError>;
         }
     }
 
