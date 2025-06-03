@@ -147,7 +147,7 @@ where
     }
 
     async fn verify_session(&self, session_id: &str) -> Result<(), Box<dyn ApplicationError>> {
-        if self
+        if !self
             .session_manager_service
             .verify_session_id(session_id)
             .await
