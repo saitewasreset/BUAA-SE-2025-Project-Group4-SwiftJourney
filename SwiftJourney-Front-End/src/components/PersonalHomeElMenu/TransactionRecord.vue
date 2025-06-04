@@ -127,6 +127,10 @@
                             </el-table-column>
                         </el-table>
                     </div>
+                    <div class="PayButtonContainer">
+                        <el-button v-if="transactionDetail.status === '未支付'" class="PayButton" type="success"
+                        @click="goToPay(transactionDetail.id, transactionDetail.money)">去支付</el-button>
+                    </div>
                 </el-card>
             </div>
         </div>
@@ -137,12 +141,10 @@
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import { orderApi } from "@/api/orderApi/orderApi";
-import type { ResponseData, TransactionData, OrderInfo, SeatLocationInfo, TrainOrderInfo, HotelOrderInfo, DishOrderInfo, TakeawayOrderInfo,
+import type { ResponseData, TransactionData, SeatLocationInfo, TrainOrderInfo, HotelOrderInfo, DishOrderInfo, TakeawayOrderInfo,
     OrderInform, TransactionDetail, OrderDetail, TrainOrderDetail, HotelOrderDetail, FoodOrderDetail } from '@/interface/interface';
-import { id } from 'element-plus/es/locales.mjs';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Warning } from '@element-plus/icons-vue';
-import type { IndexInfo } from 'typescript';
+import { useRouter } from 'vue-router';
 dayjs.locale('zh-cn');
 
 const statusChangeTab = {
@@ -178,6 +180,7 @@ export default {
             transactionList: [] as string[],
             orderMap: new Map<string, OrderDetail>(),
             transactionDetailList: [] as TransactionDetail [],
+            router: useRouter(),
         }
     },
     created: function() {
@@ -434,6 +437,18 @@ export default {
 
         getSeat(seat: SeatLocationInfo): string {
             return (seat.carriage < 10 ? `0${seat.carriage}` : `${seat.carriage}`) + "车" + seat.row + seat.location + " " + seat.type;
+        },
+
+        //----------------------------支付----------------------------------
+        goToPay(transactionaId: string, money: string) {
+            const routeUrl = this.router.resolve({
+            name: 'paypage',
+            params: { transactionId: transactionaId },
+            query: {
+                money: money,
+            }
+            });
+            window.open(routeUrl.href, '_blank');
         },
 
         //测试数据
@@ -763,4 +778,11 @@ export default {
     font-size: 16px;
 }
 
+
+.PayButtonContainer {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 10px;
+}
 </style>

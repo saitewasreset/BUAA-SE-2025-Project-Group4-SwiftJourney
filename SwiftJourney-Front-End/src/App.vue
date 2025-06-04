@@ -1,8 +1,11 @@
 <template>
-  <div class="root">
-    <TitleBar v-if="shouldTitleBarDisplay" class="title-bar" />
-    <div :class="{ 'router-view-container': true, 'container-margin': shouldTitleBarDisplay }">
-      <RouterView style="width: 100%;" />
+  <div style="width: 100%; height: 100%; align-items: center; justify-content: center; display: flex;">
+    <div v-if="shouldTitleBarDisplay">
+      <TitleBar v-if="shouldTitleBarDisplay" />
+      <RouterView />
+    </div>
+    <div v-else>
+      <RouterView />
     </div>
   </div>
 </template>

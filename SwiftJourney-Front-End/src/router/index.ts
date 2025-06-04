@@ -47,6 +47,12 @@ const router = createRouter({
       component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
       props: true
     },
+    {
+      path: '/paytransaction/:transactionId',
+      name: 'paypage',
+      component: () => import('../views/PayPage/PayPageView.vue'),
+      props: true
+    }
   ],
 })
 
