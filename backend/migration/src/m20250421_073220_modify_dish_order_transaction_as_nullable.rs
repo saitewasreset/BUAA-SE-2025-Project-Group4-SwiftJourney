@@ -11,11 +11,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(DishOrder::Table)
-                    .modify_column(
-                        ColumnDef::new(DishOrder::PayTransactionId)
-                            .big_integer()
-                            .null(),
-                    )
+                    .modify_column(ColumnDef::new(DishOrder::PayTransactionId).integer().null())
                     .to_owned(),
             )
             .await?;
@@ -26,7 +22,7 @@ impl MigrationTrait for Migration {
                     .table(DishOrder::Table)
                     .modify_column(
                         ColumnDef::new(DishOrder::RefundTransactionId)
-                            .big_integer()
+                            .integer()
                             .null(),
                     )
                     .to_owned(),
@@ -43,7 +39,7 @@ impl MigrationTrait for Migration {
                     .table(DishOrder::Table)
                     .modify_column(
                         ColumnDef::new(DishOrder::PayTransactionId)
-                            .big_integer()
+                            .integer()
                             .not_null(),
                     )
                     .to_owned(),
@@ -56,7 +52,7 @@ impl MigrationTrait for Migration {
                     .table(DishOrder::Table)
                     .modify_column(
                         ColumnDef::new(DishOrder::RefundTransactionId)
-                            .big_integer()
+                            .integer()
                             .not_null(),
                     )
                     .to_owned(),

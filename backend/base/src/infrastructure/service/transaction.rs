@@ -104,7 +104,7 @@ where
         orders: Vec<Box<dyn Order>>,
         atomic: bool,
     ) -> Result<Uuid, TransactionServiceError> {
-        for order in &orders {
+        for order in &*orders {
             if order.order_status() != OrderStatus::Unpaid {
                 return Err(TransactionServiceError::InvalidOrderStatus {
                     op: "new",
@@ -175,6 +175,10 @@ where
 
         debug!("saving paid transaction: {:?}", tx);
 
+        for order in tx.orders_mut() {
+            order.set_status(OrderStatus::Paid);
+        }
+
         self.transaction_repository
             .save(&mut tx)
             .await
@@ -212,7 +216,21 @@ where
                 transaction_id,
             ))?;
 
-        let refund_tx = tx.refund_transaction_partial(to_refund_orders)?;
+        let mut refund_tx = tx.refund_transaction_partial(to_refund_orders)?;
+
+        let refund_tx_id = self
+            .transaction_repository
+            .save(&mut refund_tx)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to save transaction: {:?}", e);
+            })?;
+
+        for order in tx.orders_mut() {
+            order
+                .payment_info_mut()
+                .set_refund_transaction_id(refund_tx_id);
+        }
 
         self.transaction_repository
             .save(&mut tx)

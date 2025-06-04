@@ -90,7 +90,7 @@ where
     async fn booking_group(
         &self,
         order_uuid_list: Vec<Uuid>,
-        atomic: bool,
+        _atomic: bool,
     ) -> Result<Vec<TakeawayOrder>, TakeawayBookingServiceError> {
         let mut success_booking_order_list = Vec::new();
 
@@ -100,16 +100,6 @@ where
                 break;
             } else {
                 success_booking_order_list.push(order_uuid);
-            }
-        }
-
-        if atomic {
-            for order_uuid in &success_booking_order_list {
-                if let Err(e) = self.cancel_takeaway(*order_uuid).await {
-                    error!("Failed to cancel takeaway: {:?}", e);
-
-                    return Err(e);
-                }
             }
         }
 

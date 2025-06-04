@@ -25,7 +25,7 @@ pub struct TransactionInfoDTO {
 /// 提交订单后，订单为"未支付"状态，本接口将返回`TransactionInfo`，
 /// 需要根据`TransactionInfo`中的信息调用`支付订单`接口进行支付。
 /// 支付后订单才会真正被处理。
-#[post("")]
+#[post("/order")]
 pub async fn create_hotel_order(
     req: HttpRequest,
     body: Bytes,
