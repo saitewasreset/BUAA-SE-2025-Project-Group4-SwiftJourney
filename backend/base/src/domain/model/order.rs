@@ -232,6 +232,14 @@ impl PaymentInfo {
     pub fn refund_transaction_id(&self) -> Option<TransactionId> {
         self.refund_transaction_id
     }
+
+    pub fn set_pay_transaction_id(&mut self, tx_id: TransactionId) {
+        self.pay_transaction_id = Some(tx_id);
+    }
+
+    pub fn set_refund_transaction_id(&mut self, tx_id: TransactionId) {
+        self.refund_transaction_id = Some(tx_id);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -331,6 +339,8 @@ pub trait Order: DynClone + Debug + Send + Sync + 'static + Any {
     /// Returns:
     /// - 订单的支付信息。
     fn payment_info(&self) -> PaymentInfo;
+
+    fn payment_info_mut(&mut self) -> &mut PaymentInfo;
 
     /// 获取订单关联的个人信息唯一标识符。
     ///
@@ -538,6 +548,10 @@ impl Order for TrainOrder {
         self.base.payment_info
     }
 
+    fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+        &mut self.base.payment_info
+    }
+
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
@@ -682,6 +696,11 @@ impl Order for HotelOrder {
     fn payment_info(&self) -> PaymentInfo {
         self.base.payment_info
     }
+
+    fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+        &mut self.base.payment_info
+    }
+
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
@@ -824,6 +843,11 @@ impl Order for DishOrder {
     fn payment_info(&self) -> PaymentInfo {
         self.base.payment_info
     }
+
+    fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+        &mut self.base.payment_info
+    }
+
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }
@@ -951,6 +975,11 @@ impl Order for TakeawayOrder {
     fn payment_info(&self) -> PaymentInfo {
         self.base.payment_info
     }
+
+    fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+        &mut self.base.payment_info
+    }
+
     fn personal_info_id(&self) -> PersonalInfoId {
         self.base.personal_info_id
     }

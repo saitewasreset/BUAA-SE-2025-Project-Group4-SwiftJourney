@@ -9,7 +9,7 @@ use crate::domain::service::train_booking::TrainBookingService;
 use crate::domain::service::transaction::TransactionService;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 #[async_trait]
 pub trait RabbitMQOrderStatusConsumer: 'static + Send + Sync {
@@ -136,6 +136,8 @@ where
         &self,
         message_pack: OrderStatusMessagePack,
     ) -> Result<(), OrderStatusConsumerError> {
+        info!("Processing Train order status change");
+
         let mut to_cancel_order_id_list = Vec::new();
         let mut to_booking_order_id_list = Vec::new();
 
@@ -200,6 +202,8 @@ where
         &self,
         message_pack: OrderStatusMessagePack,
     ) -> Result<(), OrderStatusConsumerError> {
+        info!("Processing Hotel order status change");
+
         let mut to_cancel_order_id_list = Vec::new();
         let mut to_booking_order_id_list = Vec::new();
 
@@ -264,6 +268,8 @@ where
         &self,
         message_pack: OrderStatusMessagePack,
     ) -> Result<(), OrderStatusConsumerError> {
+        info!("Processing Dish order status change");
+
         let mut to_cancel_order_id_list = Vec::new();
         let mut to_booking_order_id_list = Vec::new();
 
@@ -328,6 +334,8 @@ where
         &self,
         message_pack: OrderStatusMessagePack,
     ) -> Result<(), OrderStatusConsumerError> {
+        info!("Processing Takeaway order status change");
+
         let mut to_cancel_order_id_list = Vec::new();
         let mut to_booking_order_id_list = Vec::new();
 

@@ -4,7 +4,7 @@ use crate::domain::service::order_status::{OrderStatusMessage, OrderStatusMessag
 use crate::infrastructure::service::order_status_producer_service::OrderStatusProducerService;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 pub struct OrderStatusManagerServiceImpl {
@@ -21,6 +21,7 @@ impl OrderStatusManagerServiceImpl {
 
 #[async_trait]
 impl OrderStatusManagerService for OrderStatusManagerServiceImpl {
+    #[instrument(skip_all)]
     async fn notify_status_change(
         &self,
         transaction_uuid: Uuid,
@@ -28,6 +29,11 @@ impl OrderStatusManagerService for OrderStatusManagerServiceImpl {
         orders: &[&dyn Order],
         new_status: OrderStatus,
     ) {
+        info!(
+            "order status change: transaction_uuid: {}, atomic: {}, new_status: {}",
+            transaction_uuid, atomic, new_status
+        );
+
         let mut messages = Vec::new();
 
         for order in orders {

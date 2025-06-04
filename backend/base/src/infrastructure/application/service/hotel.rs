@@ -300,7 +300,7 @@ where
 
             comment_dtos.push(HotelCommentDTO {
                 user_name,
-                comment_time: c.time().format("%Y-%m-%d %H:%M:%S").to_string(),
+                comment_time: c.time().to_rfc3339(),
                 rating: Decimal::from(c.rating()).to_f64().unwrap_or(0.0),
                 comment: c.text().to_string(),
             });

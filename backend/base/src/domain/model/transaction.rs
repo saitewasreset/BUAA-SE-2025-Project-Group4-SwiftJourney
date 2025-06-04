@@ -486,6 +486,10 @@ impl Transaction {
         &self.orders
     }
 
+    pub fn orders_mut(&mut self) -> &mut Vec<Box<dyn Order>> {
+        &mut self.orders
+    }
+
     /// 获取交易状态。
     ///
     /// Returns:

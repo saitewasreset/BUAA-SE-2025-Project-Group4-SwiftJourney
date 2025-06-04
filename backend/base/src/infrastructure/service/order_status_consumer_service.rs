@@ -2,7 +2,8 @@ use crate::domain::service::order_status::OrderStatusMessagePack;
 use crate::infrastructure::RABBITMQ_ORDER_STATUS_EXCHANGE_NAME;
 use crate::infrastructure::messaging::consumer::order_status::RabbitMQOrderStatusConsumer;
 use lapin::options::{
-    BasicConsumeOptions, BasicNackOptions, ExchangeDeclareOptions, QueueDeclareOptions,
+    BasicConsumeOptions, BasicNackOptions, ExchangeDeclareOptions, QueueBindOptions,
+    QueueDeclareOptions,
 };
 use lapin::types::FieldTable;
 use lapin::{ConnectionProperties, ExchangeKind};
@@ -17,6 +18,11 @@ pub struct OrderStatusConsumerService {
 
 #[instrument(skip_all)]
 async fn consume_task(channel: lapin::Channel, consumer: Box<dyn RabbitMQOrderStatusConsumer>) {
+    debug!(
+        "Starting consumer for binding key: {}",
+        consumer.binding_key()
+    );
+
     let queue_options = QueueDeclareOptions {
         passive: false,
         durable: true,
@@ -24,10 +30,23 @@ async fn consume_task(channel: lapin::Channel, consumer: Box<dyn RabbitMQOrderSt
         auto_delete: false,
         nowait: false,
     };
-    let _ = channel
+
+    channel
         .queue_declare(consumer.binding_key(), queue_options, FieldTable::default())
         .await
         .map_err(|e| error!("Failed to declare queue: {}", e))
+        .unwrap();
+
+    channel
+        .queue_bind(
+            consumer.binding_key(),
+            RABBITMQ_ORDER_STATUS_EXCHANGE_NAME,
+            consumer.binding_key(),
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
+        .await
+        .map_err(|e| error!("Failed to bind queue: {}", e))
         .unwrap();
 
     let consume_options = BasicConsumeOptions {
