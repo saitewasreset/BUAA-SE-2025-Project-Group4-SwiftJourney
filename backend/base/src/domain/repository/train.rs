@@ -8,7 +8,7 @@
 //! 注意：具体实现应放在基础设施层(`infrastructure::repository`)。
 use crate::Verified;
 use crate::domain::model::train::{SeatTypeName, Train, TrainId, TrainNumber, TrainType};
-use crate::domain::model::train_schedule::SeatId;
+use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
@@ -87,7 +87,7 @@ pub trait TrainRepository: Repository<Train> + 'static + Send + Sync {
     async fn get_seat_id_map(
         &self,
         train_id: TrainId,
-    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<SeatId>>, RepositoryError>;
+    ) -> Result<HashMap<SeatTypeName<Verified>, Vec<(SeatId, SeatLocationInfo)>>, RepositoryError>;
 
     /// 根据车次编号查找列车车次。
     ///

@@ -13,7 +13,7 @@ use chrono::NaiveDate;
 use rust_decimal::prelude::ToPrimitive;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
 pub struct HotelBookingServiceImpl<HR, OR, ORR>
@@ -53,6 +53,7 @@ where
     OR: OrderRepository,
     ORR: OccupiedRoomRepository,
 {
+    #[instrument(skip(self))]
     async fn get_available_room(
         &self,
         hotel_id: HotelId,
@@ -75,6 +76,11 @@ where
             })
             .collect::<HashMap<_, _>>();
 
+        debug!(
+            "room type id to capacity for hotel id: {:?}",
+            room_type_id_to_capacity
+        );
+
         let room_type_id_to_price = hotel
             .room_type_list()
             .iter()
@@ -85,6 +91,11 @@ where
                 )
             })
             .collect::<HashMap<_, _>>();
+
+        debug!(
+            "room type id to price for hotel id: {:?}",
+            room_type_id_to_price
+        );
 
         let mut room_type_id_to_date_to_occupied_count: HashMap<
             HotelRoomTypeId,
@@ -113,19 +124,27 @@ where
 
         let mut result: HashMap<HotelRoomTypeId, HotelRoomStatus> = HashMap::new();
 
-        for (room_type_id, date_to_occupied_count) in room_type_id_to_date_to_occupied_count {
-            let total_count = *room_type_id_to_capacity
-                .get(&room_type_id)
-                .expect("room type id should exist");
-            let occupied_count = date_to_occupied_count
-                .iter()
-                .filter(|(date, _)| {
-                    date >= &&booking_date_range.begin_date()
-                        && date <= &&booking_date_range.end_date()
-                })
-                .map(|(_, count)| *count)
-                .max()
-                .unwrap_or_default();
+        for (&room_type_id, &total_count) in &room_type_id_to_capacity {
+            let date_to_occupied_count = room_type_id_to_date_to_occupied_count.get(&room_type_id);
+
+            let occupied_count = if let Some(date_to_occupied_count) = date_to_occupied_count {
+                date_to_occupied_count
+                    .iter()
+                    .filter(|(date, _)| {
+                        date >= &&booking_date_range.begin_date()
+                            && date <= &&booking_date_range.end_date()
+                    })
+                    .map(|(_, count)| *count)
+                    .max()
+                    .unwrap_or_default()
+            } else {
+                0
+            };
+
+            debug!(
+                "room type id = {} total = {} occupied = {}",
+                room_type_id, total_count, occupied_count
+            );
 
             if occupied_count > total_count {
                 panic!(
@@ -146,14 +165,18 @@ where
             );
         }
 
+        debug!("result: {:?}", result);
+
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn booking_hotel(&self, order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
-        let order = self
+        let mut order = self
             .order_repository
             .find_hotel_order_by_uuid(order_uuid)
-            .await?
+            .await
+            .inspect_err(|e| error!("Failed to load hotel order: {}", e))?
             .ok_or(HotelBookingServiceError::InvalidOrder(order_uuid))?;
 
         if order.order_status() != OrderStatus::Paid {
@@ -165,7 +188,8 @@ where
 
         let available_room = self
             .get_available_room(order.hotel_id(), order.booking_date_range())
-            .await?;
+            .await
+            .inspect_err(|e| error!("Failed to get available room: {}", e))?;
 
         let available_count = available_room
             .get(&order.room_id())
@@ -178,25 +202,34 @@ where
             return Err(HotelBookingServiceError::NoAvailableRoom(order_uuid));
         }
 
-        let mut occupied_room = OccupiedRoom::new(
-            None,
-            order.hotel_id(),
-            order.room_id(),
-            order.booking_date_range(),
-            order.personal_info_id(),
-        );
-
         for _ in 0..to_order_count {
+            let mut occupied_room = OccupiedRoom::new(
+                None,
+                order.hotel_id(),
+                order.room_id(),
+                order.booking_date_range(),
+                order.personal_info_id(),
+            );
+
             self.occupied_room_repository
                 .save(&mut occupied_room)
-                .await?;
+                .await
+                .inspect_err(|e| error!("Failed to save occupied room: {}", e))?;
         }
+
+        order.set_status(OrderStatus::Ongoing);
+
+        self.order_repository
+            .update(Box::new(order))
+            .await
+            .inspect_err(|e| error!("Failed to update order status: {}", e))?;
 
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn cancel_hotel(&self, order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
-        let order = self
+        let mut order = self
             .order_repository
             .find_hotel_order_by_uuid(order_uuid)
             .await?
@@ -218,6 +251,13 @@ where
             .remove_many(to_cancel_occupied_rooms)
             .await?;
 
+        order.set_status(OrderStatus::Cancelled);
+
+        self.order_repository
+            .update(Box::new(order))
+            .await
+            .inspect_err(|e| error!("Failed to update order status: {}", e))?;
+
         Ok(())
     }
 
@@ -231,6 +271,7 @@ where
         let mut failed_booking_order_list = Vec::new();
         for order_uuid in order_uuid_list {
             if let Err(e) = self.booking_hotel(order_uuid).await {
+                warn!("error while booking hotel: {}", e);
                 failed_booking_order_list.push(order_uuid);
                 match e {
                     HotelBookingServiceError::NoAvailableRoom(_) => continue,
@@ -244,7 +285,7 @@ where
             }
         }
 
-        if atomic {
+        if atomic && !failed_booking_order_list.is_empty() {
             for order_uuid in &success_booking_order_list {
                 if let Err(e) = self.cancel_hotel(*order_uuid).await {
                     error!("Failed to cancel hotel: {:?}", e);

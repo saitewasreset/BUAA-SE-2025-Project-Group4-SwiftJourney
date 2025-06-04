@@ -36,20 +36,22 @@
 use std::sync::Arc;
 
 use crate::application::commands::train_query::{
-    DirectTrainQueryCommand,
-    // TransferTrainQueryCommand,
+    DirectTrainQueryCommand, TrainQueryValidate, TrainScheduleQueryCommand,
+    TransferTrainQueryCommand,
 };
 use crate::application::service::train_query::{
-    DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryService,
-    TrainQueryServiceError,
+    DirectTrainQueryDTO, SeatInfoDTO, StoppingStationInfo, TrainInfoDTO, TrainQueryResponseDTO,
+    TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
-use crate::domain::model::train::TrainNumber;
+use crate::domain::model::station::StationId;
+use crate::domain::repository::route::RouteRepository;
+use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::route::RouteService;
+use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
-use crate::domain::service::train_type::TrainTypeConfigurationService;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use std::collections::HashMap;
@@ -57,44 +59,104 @@ use tracing::{error, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, V, W>
+pub struct TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
+    RR: RouteRepository,
+    TR: TrainRepository,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
     // Exercise 1.2.1D - 5: Your code here. (2 / 6)
     train_schedule_service: Arc<T>,
     station_service: Arc<U>,
-    train_type_service: Arc<V>,
     route_service: Arc<W>,
+    session_manager_service: Arc<SMS>,
+    route_repository: Arc<RR>,
+    train_repository: Arc<TR>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, V, W> TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
+    RR: RouteRepository,
+    TR: TrainRepository,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
-        train_type_service: Arc<V>,
         route_service: Arc<W>,
+        session_manager_service: Arc<SMS>,
+        route_repository: Arc<RR>,
+        train_repository: Arc<TR>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
             station_service,
-            train_type_service,
             route_service,
+            session_manager_service,
+            route_repository,
+            train_repository,
         }
+    }
+
+    async fn resolve_station_ids(
+        &self,
+        station_opt: &Option<String>,
+        city_opt: &Option<String>,
+    ) -> Result<Vec<StationId>, Box<dyn ApplicationError>> {
+        match (station_opt, city_opt) {
+            (Some(s), None) => {
+                let id = self
+                    .station_service
+                    .get_station_by_name(s.trim().to_owned())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get station by station name: {:?}", e);
+                        GeneralError::InternalServerError
+                    })?
+                    .ok_or(TrainQueryServiceError::InvalidStationId)?
+                    .get_id()
+                    // SAFETY：get_station_by_name 返回的 Station 实例必定有 ID
+                    .unwrap();
+                Ok(vec![id])
+            }
+            (None, Some(city)) => {
+                let stations = self
+                    .station_service
+                    .get_station_by_city_name(city)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get stations by city name: {:?}", e);
+                        GeneralError::InternalServerError
+                    })?;
+                Ok(stations.into_iter().filter_map(|st| st.get_id()).collect())
+            }
+            _ => Err(Box::new(TrainQueryServiceError::InconsistentQuery)),
+        }
+    }
+
+    async fn verify_session(&self, session_id: &str) -> Result<(), Box<dyn ApplicationError>> {
+        if !self
+            .session_manager_service
+            .verify_session_id(session_id)
+            .await
+            .inspect_err(|e| error!("Failed to verify session ID: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+        {
+            return Err(Box::new(GeneralError::InvalidSessionId));
+        }
+
+        Ok(())
     }
 }
 
@@ -107,133 +169,190 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, V, W> TrainQueryService for TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, W, SMS, RR, TR> TrainQueryService for TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
+    RR: RouteRepository,
+    TR: TrainRepository,
 {
+    #[instrument(skip(self))]
+    async fn query_train(
+        &self,
+        cmd: TrainScheduleQueryCommand,
+    ) -> Result<TrainQueryResponseDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
+
+        let departure_date =
+            NaiveDate::parse_from_str(&cmd.departure_date, "%Y-%m-%d").map_err(|_| {
+                GeneralError::BadRequest(format!("Invalid date: {}", cmd.departure_date))
+            })?;
+
+        let schedule = self
+            .train_schedule_service
+            .get_schedule_by_train_number_and_date(cmd.train_number.clone(), departure_date)
+            .await
+            .inspect_err(|e| error!("Failed to get schedule by train number and date: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::BadRequest(format!(
+                "invalid train: {} {}",
+                cmd.train_number, cmd.departure_date
+            )))?;
+
+        let route = self
+            .route_repository
+            .get_by_train_schedule(schedule.get_id().expect("Train schedule should have id"))
+            .await
+            .inspect_err(|e| error!("Failed to get route by train schedule id: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or_else(|| {
+                error!(
+                    "Inconsistent: No route found for train schedule id: {:?}",
+                    schedule.get_id()
+                );
+                GeneralError::InternalServerError
+            })?;
+
+        let station = self
+            .station_service
+            .get_stations()
+            .await
+            .inspect_err(|e| error!("Failed to get stations: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+
+        let station_id_to_name = station
+            .into_iter()
+            .map(|s| {
+                (
+                    s.get_id().expect("Station should have id"),
+                    s.name().to_string(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        let mut stopping_station_list = Vec::with_capacity(route.stops().len());
+
+        let mut origin_station = None;
+        let mut origin_departure_time = None;
+        let mut origin_departure_date = None;
+        let mut terminal_station = None;
+        let mut terminal_arrival_time = None;
+
+        for stop in route.stops() {
+            let station_name = station_id_to_name
+                .get(&stop.station_id())
+                .ok_or_else(|| {
+                    error!(
+                        "Inconsistent: No station found for id: {}",
+                        stop.station_id()
+                    );
+
+                    GeneralError::InternalServerError
+                })?
+                .clone();
+
+            let arrival_time_secs = stop.arrival_time() + schedule.origin_departure_time() as u32;
+            let departure_time_secs =
+                stop.departure_time() + schedule.origin_departure_time() as u32;
+
+            if stop.order() == 0 {
+                origin_station = Some(station_name.clone());
+
+                let departure_datetime = departure_date
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                    .unwrap();
+
+                origin_departure_time = Some(departure_datetime.to_string());
+
+                origin_departure_date = Some(departure_datetime.date().to_string());
+            } else if stop.order() == (route.stops().len() - 1) as u32 {
+                terminal_station = Some(station_name.clone());
+
+                terminal_arrival_time = Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                );
+            }
+
+            let arrival_time_opt = if stop.order() == 0 {
+                None
+            } else {
+                Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            let departure_time_opt = if stop.order() == (route.stops().len() - 1) as u32 {
+                None
+            } else {
+                Some(
+                    departure_date
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(departure_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            stopping_station_list.push(StoppingStationInfo {
+                station_name,
+                arrival_time: arrival_time_opt,
+                departure_time: departure_time_opt,
+            });
+        }
+
+        let origin_station = origin_station.expect("should have origin station");
+        let origin_departure_time =
+            origin_departure_time.expect("should have origin departure time");
+        let origin_departure_date =
+            origin_departure_date.expect("should have origin departure date");
+        let terminal_station = terminal_station.expect("should have terminal station");
+        let terminal_arrival_time =
+            terminal_arrival_time.expect("should have terminal arrival time");
+
+        Ok(TrainQueryResponseDTO {
+            origin_station,
+            origin_departure_time,
+            departure_date: origin_departure_date,
+            terminal_station,
+            terminal_arrival_time,
+            route: stopping_station_list,
+        })
+    }
     #[instrument(skip(self))]
     async fn query_direct_trains(
         &self,
         cmd: DirectTrainQueryCommand,
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
+
         cmd.validate()?;
 
-        let station_pairs = match (
-            &cmd.departure_station,
-            &cmd.arrival_station,
-            &cmd.departure_city,
-            &cmd.arrival_city,
-        ) {
-            // 情况1: 站点 -> 站点
-            (Some(from_station), Some(to_station), None, None) => {
-                let from_id = self
-                    .station_service
-                    .get_station_by_name(from_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
+        let from_ids = self
+            .resolve_station_ids(&cmd.departure_station, &cmd.departure_city)
+            .await?;
+        let to_ids = self
+            .resolve_station_ids(&cmd.arrival_station, &cmd.arrival_city)
+            .await?;
 
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-                let to_id = self
-                    .station_service
-                    .get_station_by_name(to_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-                vec![(from_id, to_id)]
-            }
-
-            // 情况2: 城市 -> 城市
-            (None, None, Some(from_city), Some(to_city)) => self
-                .station_service
-                .station_pairs_by_city(from_city, to_city)
-                .await
-                .map_err(|e| {
-                    error!("Failed to get station by name: {:?}", e);
-
-                    GeneralError::InternalServerError
-                })?,
-
-            // 情况3: 站点 -> 城市
-            (Some(from_station), None, None, Some(to_city)) => {
-                let from_id = self
-                    .station_service
-                    .get_station_by_name(from_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-
-                let to_stations = self
-                    .station_service
-                    .get_station_by_city_name(to_city)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?;
-
-                to_stations
-                    .into_iter()
-                    .filter_map(|station| station.get_id().map(|to_id| (from_id, to_id)))
-                    .collect()
-            }
-
-            // 情况4: 城市 -> 站点
-            (None, Some(to_station), Some(from_city), None) => {
-                let to_id = self
-                    .station_service
-                    .get_station_by_name(to_station.trim().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .expect("Station should have an ID");
-
-                let from_stations = self
-                    .station_service
-                    .get_station_by_city_name(from_city)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by name: {:?}", e);
-
-                        GeneralError::InternalServerError
-                    })?;
-
-                from_stations
-                    .into_iter()
-                    .filter_map(|station| station.get_id().map(|from_id| (from_id, to_id)))
-                    .collect()
-            }
-
-            _ => {
-                return Err(Box::new(TrainQueryServiceError::InconsistentQuery)
-                    as Box<dyn ApplicationError>);
-            }
-        };
+        let station_pairs: Vec<(StationId, StationId)> = from_ids
+            .iter()
+            .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
+            .collect();
 
         let schedules = self
             .train_schedule_service
@@ -257,14 +376,134 @@ where
 
         Ok(DirectTrainQueryDTO { solutions: infos })
     }
+
+    #[instrument(skip(self))]
+    async fn query_transfer_trains(
+        &self,
+        cmd: TransferTrainQueryCommand,
+    ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>> {
+        self.verify_session(cmd.session_id.as_str()).await?;
+        cmd.validate()?;
+
+        let from_ids = self
+            .resolve_station_ids(&cmd.departure_station, &cmd.departure_city)
+            .await?;
+        let to_ids = self
+            .resolve_station_ids(&cmd.arrival_station, &cmd.arrival_city)
+            .await?;
+
+        let station_pairs: Vec<(StationId, StationId)> = from_ids
+            .iter()
+            .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
+            .collect();
+
+        let transfer_solutions = self
+            .train_schedule_service
+            .transfer_schedules(cmd.departure_time, &station_pairs)
+            .await
+            .map_err(|e| {
+                error!("Failed to get transfer schedules: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        let routes = self.route_service.get_routes().await.map_err(|e| {
+            error!("Failed to get routes: {:?}", e);
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
+
+        let mut solutions = Vec::new();
+        for (schedule_ids, mid_station) in transfer_solutions {
+            if schedule_ids.len() != 2 || mid_station.is_none() {
+                continue;
+            }
+
+            let mut train_infos = Vec::new();
+            for schedule_id in &schedule_ids {
+                let schedules = self
+                    .train_schedule_service
+                    .get_schedules(cmd.departure_time)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get schedules: {:?}", e);
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
+
+                let schedule = schedules.iter().find(|s| s.get_id() == Some(*schedule_id));
+
+                if let Some(sch) = schedule {
+                    train_infos.push(self.build_dto(sch, &routes, cmd.departure_time).await?);
+                }
+            }
+
+            if train_infos.len() == 2 {
+                let station_name = self
+                    .station_service
+                    .get_station_by_name(mid_station.unwrap().to_string())
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to get station by id: {:?}", e);
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?
+                    .map(|s| s.name().to_string())
+                    .unwrap_or_else(|| "未知站点".to_string());
+
+                let first_train_arrival_time = train_infos[0]
+                    .route
+                    .iter()
+                    .find(|stop| stop.station_name == station_name)
+                    .map(|stop| {
+                        stop.arrival_time
+                            .clone()
+                            .expect("arrival time should exist for non-origin stops")
+                    })
+                    .unwrap_or(train_infos[0].terminal_arrival_time.clone());
+
+                let second_train_departure_time = train_infos[1]
+                    .route
+                    .iter()
+                    .find(|stop| stop.station_name == station_name)
+                    .map(|stop| {
+                        stop.departure_time
+                            .clone()
+                            .expect("departure time should exist for non-terminal stops")
+                    })
+                    .unwrap_or_else(|| train_infos[1].origin_departure_time.clone());
+
+                let first_dt =
+                    NaiveDateTime::parse_from_str(&first_train_arrival_time, "%Y-%m-%d %H:%M:%S")
+                        .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+                let second_dt = NaiveDateTime::parse_from_str(
+                    &second_train_departure_time,
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+
+                let relaxing_time = if second_dt > first_dt {
+                    (second_dt - first_dt).num_seconds() as u32
+                } else {
+                    (second_dt + Duration::hours(24) - first_dt).num_seconds() as u32
+                };
+
+                solutions.push(TransferSolutionDTO {
+                    first_ride: train_infos[0].clone(),
+                    second_ride: train_infos[1].clone(),
+                    relaxing_time,
+                });
+            }
+        }
+
+        Ok(TransferTrainQueryDTO { solutions })
+    }
 }
 
-impl<T, U, V, W> TrainQueryServiceImpl<T, U, V, W>
+impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
-    V: TrainTypeConfigurationService + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
+    SMS: SessionManagerService,
+    RR: RouteRepository,
+    TR: TrainRepository,
 {
     #[instrument(skip(self, routes))]
     async fn build_dto(
@@ -278,21 +517,27 @@ where
             .iter()
             .find(|r| r.get_id() == Some(sch.route_id()))
             .ok_or(TrainQueryServiceError::InvalidStationId)?;
+
+        let station_list = self.station_service.get_stations().await.map_err(|e| {
+            error!("Failed to get stations: {:?}", e);
+
+            GeneralError::InternalServerError
+        })?;
+
+        let station_id_to_name = station_list
+            .into_iter()
+            .map(|s| {
+                (
+                    s.get_id().expect("Station should have id"),
+                    s.name().to_string(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
         let mut stopping = Vec::<StoppingStationInfo>::new();
         for stop in route.stops() {
-            let base = date.and_hms_opt(0, 0, 0).unwrap();
-            let arr = (base + Duration::seconds(stop.arrival_time() as i64)).to_string();
-            let dep = (base + Duration::seconds(stop.departure_time() as i64)).to_string();
-            let name = self
-                .station_service
-                .get_station_by_name(stop.station_id().to_string())
-                .await
-                .map_err(|e| {
-                    error!("Failed to get station by name: {:?}", e);
-
-                    GeneralError::InternalServerError
-                })?
-                .map(|s| s.name().to_string())
+            let name = station_id_to_name
+                .get(&stop.station_id())
                 .ok_or_else(|| {
                     error!(
                         "Inconsistent: no station found for id {}",
@@ -300,21 +545,55 @@ where
                     );
 
                     GeneralError::InternalServerError
-                })?;
+                })?
+                .clone();
+
+            let arrival_time_secs = stop.arrival_time() + sch.origin_departure_time() as u32;
+            let departure_time_secs = stop.departure_time() + sch.origin_departure_time() as u32;
+
+            let arrival_time_opt = if stop.order() == 0 {
+                None
+            } else {
+                Some(
+                    date.and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
+            let departure_time_opt = if stop.order() == (route.stops().len() - 1) as u32 {
+                None
+            } else {
+                Some(
+                    date.and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .checked_add_signed(Duration::seconds(departure_time_secs as i64))
+                        .unwrap()
+                        .to_string(),
+                )
+            };
+
             stopping.push(StoppingStationInfo {
                 station_name: name,
-                arrival_time: arr,
-                departure_time: dep,
+                arrival_time: arrival_time_opt,
+                departure_time: departure_time_opt,
             });
         }
 
         // ——— 列车 / 座位 ———
         let train = self
-            .train_type_service
-            .get_train_by_number(TrainNumber::from_unchecked(sch.train_id().to_string()))
+            .train_repository
+            .find(sch.train_id())
             .await
             .map_err(|e| {
                 error!("Failed to get train by number: {:?}", e);
+
+                GeneralError::InternalServerError
+            })?
+            .ok_or_else(|| {
+                error!("Inconsistent: No train found for id: {}", sch.train_id());
 
                 GeneralError::InternalServerError
             })?;
@@ -331,8 +610,18 @@ where
         }
 
         // ——— 其余字段 ———
-        let dep_time = &stopping.first().unwrap().departure_time;
-        let arr_time = &stopping.last().unwrap().arrival_time;
+        let dep_time = stopping
+            .first()
+            .unwrap()
+            .departure_time
+            .as_ref()
+            .expect("departure time should exist for non-terminal stops");
+        let arr_time = stopping
+            .last()
+            .unwrap()
+            .arrival_time
+            .as_ref()
+            .expect("arrival time should exist for non-origin stops");
         let dep_dt = NaiveDateTime::parse_from_str(dep_time, "%Y-%m-%d %H:%M:%S")
             .unwrap_or_else(|_| date.and_hms_opt(0, 0, 0).unwrap());
         let arr_dt = NaiveDateTime::parse_from_str(arr_time, "%Y-%m-%d %H:%M:%S")
@@ -344,9 +633,19 @@ where
             arrival_station: stopping.last().unwrap().station_name.clone(),
             arrival_time: arr_time.clone(),
             origin_station: stopping.first().unwrap().station_name.clone(),
-            origin_departure_time: stopping.first().unwrap().departure_time.clone(),
+            origin_departure_time: stopping
+                .first()
+                .unwrap()
+                .departure_time
+                .clone()
+                .expect("departure time should exist for origin stop"),
             terminal_station: stopping.last().unwrap().station_name.clone(),
-            terminal_arrival_time: stopping.last().unwrap().arrival_time.clone(),
+            terminal_arrival_time: stopping
+                .last()
+                .unwrap()
+                .arrival_time
+                .clone()
+                .expect("arrival time should exist for terminal stop"),
             train_number: train.number().to_string(),
             travel_time: (arr_dt - dep_dt).num_seconds() as u32,
             price: seat_info.values().map(|i| i.price).min().unwrap_or(0),

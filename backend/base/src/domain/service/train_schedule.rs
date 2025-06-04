@@ -13,10 +13,14 @@ pub enum TrainScheduleServiceError {
     InfrastructureError(ServiceError),
     #[error("invalid station id: {0}")]
     InvalidStationId(u64),
+    #[error("invalid train id: {0}")]
+    InvalidTrainId(TrainId),
+    #[error("invalid train number: {0}")]
+    InvalidTrainNumber(String),
 }
 
 #[async_trait]
-pub trait TrainScheduleService {
+pub trait TrainScheduleService: 'static + Send + Sync {
     async fn add_schedule(
         &self,
         train_id: TrainId,
@@ -28,12 +32,26 @@ pub trait TrainScheduleService {
         date: NaiveDate,
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 
-    async fn find_schedules(
+    async fn get_schedule_by_train_number_and_date(
         &self,
-        date: NaiveDate,
-        from_station: StationId,
-        to_station: StationId,
-    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
+        train_number: String,
+        departure_date: NaiveDate,
+    ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError>;
+
+    async fn auto_plan_schedule(
+        &self,
+        begin_date: NaiveDate,
+        days: i32,
+    ) -> Result<(), TrainScheduleServiceError>;
+
+    async fn auto_plan_schedule_daemon(&self, days: i32);
+
+    // async fn find_schedules(
+    //     &self,
+    //     date: NaiveDate,
+    //     from_station: StationId,
+    //     to_station: StationId,
+    // ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 
     async fn direct_schedules(
         &self,
@@ -41,9 +59,21 @@ pub trait TrainScheduleService {
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError>;
 
+    async fn transfer_schedules(
+        &self,
+        date: chrono::NaiveDate,
+        pairs: &[(StationId, StationId)],
+    ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError>;
+
     async fn get_station_arrival_time(
         &self,
         train_schedule_id: TrainScheduleId,
         station_id: StationId,
     ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError>;
+
+    async fn get_terminal_arrival_time(
+        &self,
+        train_number: &str,
+        origin_departure_time: &str,
+    ) -> Result<Option<String>, TrainScheduleServiceError>;
 }

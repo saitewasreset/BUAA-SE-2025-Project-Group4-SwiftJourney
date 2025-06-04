@@ -12,7 +12,7 @@ pub struct Model {
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub amount: Decimal,
     pub status: String,
-    pub user_id: i64,
+    pub user_id: i32,
     pub atomic: bool,
     pub uuid: Uuid,
 }

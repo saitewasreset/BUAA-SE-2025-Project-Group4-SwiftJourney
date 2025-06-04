@@ -13,6 +13,10 @@ pub mod resource;
 
 pub mod hotel;
 
+pub mod notify;
+
+pub mod dish;
+
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
@@ -96,6 +100,7 @@ impl ApplicationError for ModeError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AppConfig {
     pub debug: bool,
+    pub server_name: String,
 }
 
 #[derive(Serialize)]

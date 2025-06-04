@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, Select};
 use sea_orm::{ColumnTrait, DatabaseBackend, FromQueryResult, Statement};
+use tracing::{error, instrument};
 
 impl_db_id_from_u64!(HotelRatingId, i32, "hotel rating");
 
@@ -153,10 +154,11 @@ impl HotelRatingRepository for HotelRatingRepositoryImpl {
         .await
     }
 
+    #[instrument(skip(self))]
     async fn get_hotel_rating(&self, hotel_id: HotelId) -> Result<Option<Rating>, RepositoryError> {
         #[derive(Debug, FromQueryResult)]
         struct RatingQueryResult {
-            rating: Decimal,
+            rating: Option<Decimal>,
         }
 
         let rating_query_result =
@@ -170,13 +172,14 @@ WHERE "hotel_rating"."hotel_id" = $1"#,
             ))
             .one(&self.db)
             .await
+            .inspect_err(|e| error!("Failed to query hotel rating: {}", e))
             .context(format!(
                 "Failed to calculate hotel rating for hotel id: {}",
                 hotel_id
             ))?;
 
         rating_query_result
-            .map(|r| Rating::try_from(r.rating))
+            .map(|r| Rating::try_from(r.rating.unwrap_or(Decimal::ZERO)))
             .transpose()
             .map_err(|e| {
                 RepositoryError::ValidationError(anyhow!(

@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .table(TakeawayOrder::Table)
                     .modify_column(
                         ColumnDef::new(TakeawayOrder::PayTransactionId)
-                            .big_integer()
+                            .integer()
                             .null(),
                     )
                     .to_owned(),
@@ -26,7 +26,7 @@ impl MigrationTrait for Migration {
                     .table(TakeawayOrder::Table)
                     .modify_column(
                         ColumnDef::new(TakeawayOrder::RefundTransactionId)
-                            .big_integer()
+                            .integer()
                             .null(),
                     )
                     .to_owned(),
@@ -43,7 +43,7 @@ impl MigrationTrait for Migration {
                     .table(TakeawayOrder::Table)
                     .modify_column(
                         ColumnDef::new(TakeawayOrder::PayTransactionId)
-                            .big_integer()
+                            .integer()
                             .not_null(),
                     )
                     .to_owned(),
@@ -56,7 +56,7 @@ impl MigrationTrait for Migration {
                     .table(TakeawayOrder::Table)
                     .modify_column(
                         ColumnDef::new(TakeawayOrder::RefundTransactionId)
-                            .big_integer()
+                            .integer()
                             .not_null(),
                     )
                     .to_owned(),

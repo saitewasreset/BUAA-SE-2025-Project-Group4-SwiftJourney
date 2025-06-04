@@ -32,11 +32,16 @@
  */
 use actix_web::{App, HttpServer, web};
 use api::{AppConfig, MAX_BODY_LENGTH, resource};
+use base::MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER;
+use base::application::service::dish_query::DishQueryService;
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
+use base::application::service::hotel_order::HotelOrderService;
+use base::application::service::message::MessageApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
+use base::application::service::train_dish::TrainDishApplicationService;
 use base::application::service::train_query::TrainQueryService;
 use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
@@ -44,14 +49,19 @@ use base::application::service::user_profile::UserProfileService;
 use base::domain::model::session_config::SessionConfig;
 use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
+use base::domain::service::message::MessageListenerService;
 use base::domain::service::object_storage::ObjectStorageService;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
+use base::domain::service::train_schedule::TrainScheduleService;
 use base::domain::service::train_type::TrainTypeConfigurationService;
 use base::domain::service::user::UserService;
+use base::infrastructure::application::service::dish_query::DishQueryServiceImpl;
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
+use base::infrastructure::application::service::hotel_order::HotelOrderServiceImpl;
+use base::infrastructure::application::service::message::MessageApplicationServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
@@ -59,12 +69,14 @@ use base::infrastructure::application::service::transaction::TransactionApplicat
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
 use base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
 use base::infrastructure::messaging::consumer::order_status::{
-    DishOrderStatusConsumer, RabbitMQOrderStatusConsumer, TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
+    DishOrderStatusConsumer, HotelOrderStatusConsumer, RabbitMQOrderStatusConsumer,
+    TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
 };
 use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
+use base::infrastructure::repository::notify::NotifyRepositoryImpl;
 use base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
 use base::infrastructure::repository::order::OrderRepositoryImpl;
 use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
@@ -79,8 +91,10 @@ use base::infrastructure::repository::transaction::TransactionRepositoryImpl;
 use base::infrastructure::repository::user::UserRepositoryImpl;
 use base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use base::infrastructure::service::geo::GeoServiceImpl;
+use base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
 use base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
+use base::infrastructure::service::message::{MessageListenerServiceImpl, MessageServiceImpl};
 use base::infrastructure::service::object_storage::S3ObjectStorageServiceImpl;
 use base::infrastructure::service::order::OrderServiceImpl;
 use base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
@@ -114,9 +128,14 @@ async fn main() -> std::io::Result<()> {
     let _ = dotenvy::dotenv();
     tracing_subscriber::fmt::init();
 
+    let server_name = read_file_env("SERVER_NAME").expect("cannot get server name");
+
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+
+    let auto_schedule_days_str = read_file_env("AUTO_SCHEDULE_DAYS");
+
     let mini_io_endpoint = read_file_env("MINIO_ENDPOINT").expect("cannot get minio endpoint");
     let mini_io_access_key =
         read_file_env("MINIO_ACCESS_KEY").expect("cannot get minio access key");
@@ -135,6 +154,13 @@ async fn main() -> std::io::Result<()> {
         None => 8,
     };
 
+    let auto_schedule_days = match auto_schedule_days_str {
+        Some(days_str) => days_str
+            .parse::<i32>()
+            .expect("cannot parse auto schedule days"),
+        None => 14,
+    };
+
     let debug_mode = match env::var("DEBUG") {
         Ok(_) => true,
         Err(VarError::NotPresent) => false,
@@ -149,7 +175,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
-    let app_config = AppConfig { debug: debug_mode };
+    let app_config = AppConfig {
+        debug: debug_mode,
+        server_name,
+    };
 
     let session_manager_service_impl =
         Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
@@ -174,6 +203,7 @@ async fn main() -> std::io::Result<()> {
     let train_schedule_repository_impl = Arc::new(TrainScheduleRepositoryImpl::new(conn.clone()));
     let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
     let takeaway_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
+    let notify_repository_impl = Arc::new(NotifyRepositoryImpl::new(conn.clone()));
     let occupied_room_repository_impl = Arc::new(OccupiedRoomRepositoryImpl::new(conn.clone()));
 
     let s3_object_storage_service_impl = Arc::new(S3ObjectStorageServiceImpl::new(
@@ -266,8 +296,8 @@ async fn main() -> std::io::Result<()> {
     ));
 
     let route_service_impl = Arc::new(RouteServiceImpl::new(
-        Arc::clone(&train_type_service_impl),
         Arc::clone(&station_service_impl),
+        Arc::clone(&route_repository_impl),
     ));
 
     let hotel_data_service_impl = Arc::new(HotelDataServiceImpl::new(
@@ -285,6 +315,12 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&order_repository_impl),
     ));
 
+    let hotel_booking_service_impl = Arc::new(HotelBookingServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&order_repository_impl),
+        Arc::clone(&occupied_room_repository_impl),
+    ));
+
     let hotel_query_service_impl = Arc::new(HotelQueryServiceImpl::new(
         Arc::clone(&hotel_repository_impl),
         Arc::clone(&hotel_rating_repository_impl),
@@ -296,12 +332,17 @@ async fn main() -> std::io::Result<()> {
     let hotel_service_impl = Arc::new(HotelServiceImpl::new(
         Arc::clone(&hotel_rating_service_impl),
         Arc::clone(&hotel_query_service_impl),
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&user_repository_impl),
         Arc::clone(&session_manager_service_impl),
     ));
 
     let train_seat_service_impl = Arc::new(TrainSeatServiceImpl::new(
         Arc::clone(&seat_availability_repository_impl),
         Arc::clone(&route_repository_impl),
+        Arc::clone(&train_type_service_impl),
+        Arc::clone(&train_schedule_repository_impl),
     ));
 
     let train_booking_service_impl = Arc::new(TrainBookingServiceImpl::new(
@@ -319,6 +360,73 @@ async fn main() -> std::io::Result<()> {
     let takeaway_booking_service_impl = Arc::new(TakeawayBookingServiceImpl::new(Arc::clone(
         &order_repository_impl,
     )));
+
+    let message_listener_service_impl = Arc::new(MessageListenerServiceImpl::new(
+        MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER,
+    ));
+
+    let message_service_impl = Arc::new(MessageServiceImpl::new(
+        Arc::clone(&message_listener_service_impl),
+        Arc::clone(&notify_repository_impl),
+        Arc::clone(&order_service_impl),
+    ));
+
+    let message_application_service_impl = Arc::new(MessageApplicationServiceImpl::new(
+        Arc::clone(&message_service_impl),
+        Arc::clone(&session_manager_service_impl),
+    ));
+
+    let train_type_configuration_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(
+        Arc::clone(&train_repository_impl),
+    ));
+
+    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
+        Arc::clone(&route_service_impl),
+        Arc::clone(&train_repository_impl),
+        Arc::clone(&train_schedule_repository_impl),
+        tz_offset_hour,
+    ));
+
+    let dish_query_service_impl = Arc::new(DishQueryServiceImpl::new(
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_repository_impl),
+        Arc::clone(&train_repository_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&train_type_configuration_service_impl),
+    ));
+
+    let train_dish_application_service_impl =
+        Arc::new(base::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl::new(
+            Arc::clone(&train_type_configuration_service_impl),
+            Arc::clone(&dish_repository_impl),
+            Arc::clone(&takeaway_repository_impl),
+            Arc::clone(&train_schedule_repository_impl),
+            Arc::clone(&train_repository_impl),
+            Arc::clone(&personal_info_repository_impl),
+            Arc::clone(&session_manager_service_impl),
+            Arc::clone(&station_repository_impl),
+            Arc::clone(&transaction_repository_impl),
+            tz_offset_hour as u32,
+        ));
+
+    let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
+        Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&station_service_impl),
+        Arc::clone(&route_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&route_repository_impl),
+        Arc::clone(&train_repository_impl),
+    ));
+
+    let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&order_repository_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&personal_info_repository_impl),
+    ));
 
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
@@ -365,6 +473,9 @@ async fn main() -> std::io::Result<()> {
     let hotel_service: web::Data<dyn HotelService> =
         web::Data::from(hotel_service_impl as Arc<dyn HotelService>);
 
+    let message_application_service: web::Data<dyn MessageApplicationService> =
+        web::Data::from(message_application_service_impl as Arc<dyn MessageApplicationService>);
+
     let app_config_data = web::Data::new(app_config);
 
     let dish_order_status_consumer = Box::new(DishOrderStatusConsumer::new(
@@ -382,35 +493,48 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&transaction_service_impl),
     ));
 
+    let hotel_order_status_consumer = Box::new(HotelOrderStatusConsumer::new(
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&transaction_service_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
     let order_status_consumer = vec![
         train_order_status_consumer,
         dish_order_status_consumer,
         takeaway_order_status_consumer,
+        hotel_order_status_consumer,
     ];
+
+    let dish_query_service: web::Data<dyn DishQueryService> =
+        web::Data::from(dish_query_service_impl as Arc<dyn DishQueryService>);
+
+    let train_dish_application_service: web::Data<dyn TrainDishApplicationService> =
+        web::Data::from(
+            train_dish_application_service_impl as Arc<dyn TrainDishApplicationService>,
+        );
+
+    let hotel_order_service: web::Data<dyn HotelOrderService> =
+        web::Data::from(hotel_order_service_impl as Arc<dyn HotelOrderService>);
 
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
         .expect("Failed to start order status consumer service");
 
-    // Step 2: Create instance of your application service,
-    // and wrap it with `web::Data::new`
-    // HINT: You can borrow web::Data<T> as &Arc<T>
-    // that means you can pass a &web::Data<T> to `Arc::clone`
-    // Exercise 1.2.1D - 6: Your code here. (1 / 2)
-    let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
-        Arc::clone(&route_service_impl),
-        tz_offset_hour,
-    ));
+    {
+        let train_schedule_service_impl = Arc::clone(&train_schedule_service_impl);
 
-    let train_query_service_impl = Arc::new(TrainQueryServiceImpl::new(
-        Arc::clone(&train_schedule_service_impl),
-        Arc::clone(&station_service_impl),
-        Arc::clone(&train_type_service_impl),
-        Arc::clone(&route_service_impl),
-    ));
+        actix_web::rt::spawn(async move {
+            train_schedule_service_impl
+                .auto_plan_schedule_daemon(auto_schedule_days)
+                .await;
+        });
+    }
 
     let train_query_service: web::Data<dyn TrainQueryService> =
         web::Data::from(train_query_service_impl as Arc<dyn TrainQueryService>);
+
+    let message_listener_service: web::Data<dyn MessageListenerService> =
+        web::Data::from(message_listener_service_impl as Arc<dyn MessageListenerService>);
 
     HttpServer::new(move || {
         App::new()
@@ -428,9 +552,14 @@ async fn main() -> std::io::Result<()> {
             .app_data(route_service.clone())
             .app_data(train_type_service.clone())
             .app_data(hotel_service.clone())
+            .app_data(message_listener_service.clone())
+            .app_data(message_application_service.clone())
             // Step 3: Register your application service using `.app_data` function
             // Exercise 1.2.1D - 6: Your code here. (2 / 2)
             .app_data(train_query_service.clone())
+            .app_data(dish_query_service.clone())
+            .app_data(train_dish_application_service.clone())
+            .app_data(hotel_order_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
@@ -444,10 +573,12 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/data").configure(api::data::scoped_config))
                     .service(web::scope("/payment").configure(api::payment::scoped_config))
                     .service(web::scope("/order").configure(api::order::scoped_config))
+                    .service(web::scope("/notify").configure(api::notify::scoped_config))
                     // Step 6: Register your endpoint using `.service()` function
                     // Exercise 1.2.1D - 7: Your code here. (5 / 5)
                     .service(web::scope("/train").configure(api::train::scoped_config))
-                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)), // Congratulations! You have finished Task 1.2.1D!
+                    .service(web::scope("/hotel").configure(api::hotel::scoped_config)) // Congratulations! You have finished Task 1.2.1D!
+                    .service(web::scope("/dish").configure(api::dish::scoped_config)),
             )
     })
     .bind(("0.0.0.0", 8080))?

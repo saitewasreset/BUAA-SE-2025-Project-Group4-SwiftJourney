@@ -89,6 +89,7 @@ where
     ///
     /// # Returns
     /// 返回新的`TrainDataServiceImpl`实例
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         debug: bool,
         data_path: PathBuf,

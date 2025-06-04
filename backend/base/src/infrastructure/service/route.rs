@@ -3,48 +3,53 @@ use std::sync::Arc;
 
 use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId, Stop};
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService, RouteServiceError};
 use crate::domain::service::station::StationService;
-use crate::domain::service::train_type::TrainTypeConfigurationService;
 use async_trait::async_trait;
+use tracing::{error, instrument};
 
 // Step 1: Define generics parameter over `TrainTypeConfigurationService` service
 // Exercise 1.2.1D - 2: Your code here. (1 / 4)
-pub struct RouteServiceImpl<T, S>
+pub struct RouteServiceImpl<S, RR>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
+    RR: RouteRepository,
 {
     // Step 2: Add struct filed to store an implementation of `TrainTypeConfigurationService` service
     // Exercise 1.2.1D - 2: Your code here. (2 / 4)
-    train_type_configuration_service: Arc<T>,
     station_service: Arc<S>,
+    route_repository: Arc<RR>,
 }
 
-impl<T, S> RouteServiceImpl<T, S>
+impl<S, RR> RouteServiceImpl<S, RR>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
+    RR: RouteRepository,
 {
-    pub fn new(train_type_configuration_service: Arc<T>, station_service: Arc<S>) -> Self {
+    pub fn new(station_service: Arc<S>, route_repository: Arc<RR>) -> Self {
         Self {
-            train_type_configuration_service,
             station_service,
+            route_repository,
         }
     }
 }
 
 #[async_trait]
-impl<T, S> RouteService for RouteServiceImpl<T, S>
+impl<S, RR> RouteService for RouteServiceImpl<S, RR>
 where
-    T: TrainTypeConfigurationService + 'static + Send + Sync,
     S: StationService + 'static + Send + Sync,
+    RR: RouteRepository,
 {
+    #[instrument(skip(self))]
     async fn get_route_map(&self) -> Result<RouteGraph, RouteServiceError> {
         // Step 3: Load route data using `get_routes`
 
-        let routes = self.get_routes().await?;
+        let routes = self
+            .get_routes()
+            .await
+            .inspect_err(|e| error!("Failed to get routes: {}", e))?;
 
         // Step 4: Load train data using `get_trains` from stored `TrainTypeConfigurationService` implementation
         // Exercise 1.2.1D - 2: Your code here. (3 / 4)
@@ -65,9 +70,14 @@ where
         // Good! Next, implement `find_schedules` function in `base::infrastructure::service::train_schedule`
         let mut graph = RouteGraph::new();
         let mut id_to_index = HashMap::new();
-        let stations = self.station_service.get_stations().await.map_err(|e| {
-            RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e.into()))
-        })?;
+        let stations = self
+            .station_service
+            .get_stations()
+            .await
+            .inspect_err(|e| error!("Failed to get stations: {}", e))
+            .map_err(|e| {
+                RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e.into()))
+            })?;
 
         for station in stations {
             let station_id = station.get_id().unwrap();
@@ -96,11 +106,33 @@ where
         Ok(graph)
     }
 
+    #[instrument(skip_all)]
     async fn add_route(&self, stops: Vec<Stop>) -> Result<RouteId, RouteServiceError> {
-        todo!()
+        let mut route = Route::new(None);
+
+        for stop in stops {
+            route.add_stop(
+                stop.get_id(),
+                stop.station_id(),
+                stop.arrival_time(),
+                stop.departure_time(),
+                stop.order(),
+            );
+        }
+
+        self.route_repository
+            .save(&mut route)
+            .await
+            .inspect_err(|e| error!("Failed to add route: {}", e))
+            .map_err(|e| RouteServiceError::InfrastructureError(ServiceError::RepositoryError(e)))
     }
 
+    #[instrument(skip(self))]
     async fn get_routes(&self) -> Result<Vec<Route>, RouteServiceError> {
-        todo!()
+        self.route_repository
+            .load()
+            .await
+            .inspect_err(|e| error!("Failed to get routes: {}", e))
+            .map_err(|e| RouteServiceError::InfrastructureError(ServiceError::RepositoryError(e)))
     }
 }
