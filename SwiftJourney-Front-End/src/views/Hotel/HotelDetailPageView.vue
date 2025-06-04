@@ -270,7 +270,7 @@ import { useHotelOrderStore } from '@/stores/hotelOrder';
 const hotelOrderStore = useHotelOrderStore();
 
 const orderRoom = (room: HotelRoomInfo) => {
-    if(!hotelOrderStore.add(room, hotelDetailInfo.value)){
+    if(!hotelOrderStore.add(room, hotelDetailInfo.value, beginDate.value, endDate.value)){
         ElMessage.error('该酒店房型已在预订列表中');
     } else {
         ElMessage.success('加入预订列表成功，可在预定列表中修改数量');

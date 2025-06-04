@@ -94,9 +94,9 @@ export interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
