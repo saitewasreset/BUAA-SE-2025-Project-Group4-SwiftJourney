@@ -194,6 +194,10 @@ const user = useUserStore();
         this.postData();
       },
       checkAll(){
+        if(this.isSetUsername && this.formTepData.username.trim() == "") {
+          ElMessage.error('用户名不能为空');
+          return false;
+        }
         if(this.isSetGender && this.formTepData.gender != "") {
           if(this.formTepData.gender != "男" && this.formTepData.gender != "女"){
             ElMessage.error('性别只能为“男”或“女”')
