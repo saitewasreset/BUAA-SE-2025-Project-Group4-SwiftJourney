@@ -20,6 +20,7 @@ pub enum HotelOrder {
     PayTransactionId,
     RefundTransactionId,
     Price,
+    Amount,
     CreateTime,
     ActiveTime,
     CompleteTime,
@@ -49,6 +50,11 @@ impl MigrationTrait for Migration {
                         decimal_len(HotelOrder::Price, 10, 2)
                             .not_null()
                             .check(Expr::col(HotelOrder::Price).gte(0)),
+                    )
+                    .col(
+                        integer(HotelOrder::Amount)
+                            .not_null()
+                            .check(Expr::col(HotelOrder::Amount).gt(0)),
                     )
                     .col(timestamp_with_time_zone(HotelOrder::CreateTime).not_null())
                     .col(timestamp_with_time_zone(HotelOrder::ActiveTime))
