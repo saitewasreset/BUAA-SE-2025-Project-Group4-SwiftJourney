@@ -10,7 +10,7 @@ use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
 };
 use crate::domain::model::session::SessionId;
-use crate::domain::model::train::TrainNumber;
+use crate::domain::model::train::{SeatTypeName, TrainNumber};
 use crate::domain::model::train_schedule::StationRange;
 use crate::domain::model::user::UserId;
 use crate::domain::repository::order::OrderRepository;
@@ -226,6 +226,7 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        // 警告：若要修改下一行代码，需要验证创建order_seat_type_name时的SAFETY要求是否仍然满足
         let seat_type_exists = train_details
             .seats()
             .iter()
@@ -234,6 +235,9 @@ where
         if !seat_type_exists {
             return Err(Box::new(TrainOrderServiceError::InvalidTrainNumber));
         }
+
+        // SAFETY: dto.seat_type 已经在上面验证过存在
+        let order_seat_type_name = SeatTypeName::from_unchecked(dto.seat_type.clone());
 
         // === 创建订单 ===
 
@@ -357,6 +361,7 @@ where
                 .get_id()
                 .expect("The train schedule is invalid"),
             None,
+            order_seat_type_name,
             personal_info.preferred_seat_location(),
             station_range,
         );
