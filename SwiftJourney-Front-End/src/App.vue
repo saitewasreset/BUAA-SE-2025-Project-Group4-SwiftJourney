@@ -1,10 +1,7 @@
 <template>
-  <div style="width: 100%; height: 100%; align-items: center; justify-content: center; display: flex;">
-    <div v-if="shouldTitleBarDisplay">
-      <TitleBar v-if="shouldTitleBarDisplay" />
-      <RouterView />
-    </div>
-    <div v-else>
+  <div class="root" :class="{ 'root-center': !shouldTitleBarDisplay }">
+    <TitleBar v-if="shouldTitleBarDisplay" class="title-bar" />
+    <div class="router-view-container" :class="{ 'container-margin': shouldTitleBarDisplay }">
       <RouterView />
     </div>
   </div>
@@ -12,9 +9,9 @@
 
 <script setup lang="ts">
 import TitleBar from './components/TitleBar/TitleBar.vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { computed, onMounted } from 'vue';
-import { useUserStore } from './stores/user';
+import { RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useUserStore } from './stores/user'
 
 const route = useRoute()
 
@@ -28,8 +25,8 @@ const shouldTitleBarDisplay = computed(() => {
 })
 
 onMounted(async () => {
-  const nowUser = useUserStore();
-  await nowUser.restoreUserFromCookie(useRouter());
+  const nowUser = useUserStore()
+  await nowUser.restoreUserFromCookie(useRouter())
 })
 </script>
 
@@ -37,7 +34,12 @@ onMounted(async () => {
 .root {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  width: 100%;
+}
+
+.root-center {
+  align-items: center;
+  justify-content: center;
 }
 
 .title-bar {
@@ -46,6 +48,8 @@ onMounted(async () => {
 
 .router-view-container {
   padding: 20px;
+  align-self: center;
+  width: 100%;
 }
 
 .container-margin {
