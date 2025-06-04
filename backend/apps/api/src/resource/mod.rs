@@ -1,12 +1,10 @@
 use actix_web::web::Data;
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, get, web};
 use base::domain::service::object_storage::{
     ObjectCategory, ObjectStorageService, ObjectStorageServiceError,
 };
 use tracing::{error, instrument};
 use uuid::Uuid;
-
-pub mod hotel;
 
 #[instrument(skip(object_storage_service))]
 pub async fn get_object(
@@ -37,6 +35,38 @@ pub async fn get_object(
     }
 }
 
+#[get("/hotel/images/{uuid}")]
+async fn get_hotel_image(
+    path: web::Path<String>,
+    object_storage_service: Data<dyn ObjectStorageService>,
+) -> HttpResponse {
+    let uuid = path.into_inner();
+
+    get_object(object_storage_service, ObjectCategory::Hotel, &uuid).await
+}
+
+#[get("/dish/images/{uuid}")]
+async fn get_dish_image(
+    path: web::Path<String>,
+    object_storage_service: Data<dyn ObjectStorageService>,
+) -> HttpResponse {
+    let uuid = path.into_inner();
+
+    get_object(object_storage_service, ObjectCategory::Dish, &uuid).await
+}
+
+#[get("/takeaway/images/{uuid}")]
+async fn get_takeaway_image(
+    path: web::Path<String>,
+    object_storage_service: Data<dyn ObjectStorageService>,
+) -> HttpResponse {
+    let uuid = path.into_inner();
+
+    get_object(object_storage_service, ObjectCategory::Takeaway, &uuid).await
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/hotel").service(hotel::get_hotel_image));
+    cfg.service(get_hotel_image)
+        .service(get_dish_image)
+        .service(get_takeaway_image);
 }
