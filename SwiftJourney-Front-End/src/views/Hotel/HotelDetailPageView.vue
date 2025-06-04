@@ -458,7 +458,6 @@ function getdebugInfo() {
     width: 1035px;
     height: 250px;
     border-radius: 8px; /* 圆角大小 */
-    margin-top: 70px;
     position: relative; /* 用于支持绝对定位的子元素 */
     overflow: hidden;
 }

@@ -58,7 +58,7 @@
                 <p class="sub-title">评论数 {{ ratingCountFormat(ratingCountValue) }}</p>
                 <el-slider class="rating-slider" v-model="ratingCountValue" :marks="ratingCountMarks" :show-tooltip="false" />
             </div>
-            <el-scrollbar height="540px" class="HotelInfo">
+            <el-scrollbar height="520px" class="HotelInfo">
                 <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
                     <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
                         <div class="HotelImageContainer">
@@ -543,7 +543,6 @@ roomList.value.forEach((key, index) => {
     background: linear-gradient(to bottom right, #40A5F8, #ffffff);
     position: relative; /* 用于支持绝对定位的子元素 */
     border-radius: 8px; /* 圆角大小 */
-    margin-top: 70px;
 }
 
 .background-hotel-image {
