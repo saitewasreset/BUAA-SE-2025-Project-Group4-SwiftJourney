@@ -26,6 +26,7 @@ use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::transaction::TransactionService;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use chrono::Timelike;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
@@ -134,7 +135,19 @@ where
         let train_schedule = schedules_result
             .iter()
             .find(|schedule| {
-                schedule.origin_departure_time().to_string() == dto.origin_departure_time
+                if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(
+                    &dto.origin_departure_time,
+                    "%Y-%m-%d %H:%M:%S",
+                ) {
+                    let time = dt.time();
+                    let seconds_since_midnight = time.hour() as i32 * 3600
+                        + time.minute() as i32 * 60
+                        + time.second() as i32;
+
+                    schedule.origin_departure_time() == seconds_since_midnight
+                } else {
+                    false
+                }
             })
             .cloned()
             .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
