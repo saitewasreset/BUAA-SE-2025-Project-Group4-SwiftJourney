@@ -284,7 +284,7 @@ impl OrderDataConverter {
             hotel_order_do.complete_time,
         );
         let unit_price = hotel_order_do.price;
-        let amount = Decimal::one();
+        let amount = Decimal::from(hotel_order_do.amount);
         let payment_info = PaymentInfo::new(
             hotel_order_do
                 .pay_transaction_id
@@ -295,7 +295,7 @@ impl OrderDataConverter {
                 .map(TransactionId::try_from)
                 .transpose()?,
         );
-        let personal_info_id = PersonalInfoId::from_db_value(hotel_order_do.person_info_id as i32)?;
+        let personal_info_id = PersonalInfoId::from_db_value(hotel_order_do.person_info_id)?;
 
         let base = BaseOrder::new(
             Some(order_id),
@@ -308,12 +308,11 @@ impl OrderDataConverter {
             personal_info_id,
         );
 
-        let hotel_id = HotelId::from_db_value(hotel_order_do.hotel_id as i32)?;
+        let hotel_id = HotelId::from_db_value(hotel_order_do.hotel_id)?;
 
         let date_range = HotelDateRange::new(hotel_order_do.begin_date, hotel_order_do.end_date)?;
 
-        let hotel_room_type_id =
-            HotelRoomTypeId::from_db_value(hotel_order_do.hotel_room_type_id as i32)?;
+        let hotel_room_type_id = HotelRoomTypeId::from_db_value(hotel_order_do.hotel_room_type_id)?;
 
         Ok(HotelOrder::new(
             base,
@@ -343,6 +342,7 @@ impl OrderDataConverter {
             active_time: ActiveValue::Set(hotel_order.order_time_info().active_time()),
             complete_time: ActiveValue::Set(hotel_order.order_time_info().complete_time()),
             price: ActiveValue::Set(hotel_order.unit_price()),
+            amount: ActiveValue::Set(hotel_order.amount().to_i32().unwrap()),
             pay_transaction_id: ActiveValue::NotSet,
             refund_transaction_id: ActiveValue::NotSet,
             person_info_id: ActiveValue::Set(hotel_order.personal_info_id().to_db_value()),
@@ -737,7 +737,11 @@ pub struct OrderActiveModelPack {
 
 impl OrderActiveModelPack {
     #[instrument(skip_all)]
-    async fn insert_or_update_all(self, txn: &DatabaseTransaction) -> Result<(), DbErr> {
+    async fn insert_or_update_all(
+        mut self,
+        txn: &DatabaseTransaction,
+        transaction_id: Option<i32>,
+    ) -> Result<(), DbErr> {
         let mut train_insert_list = Vec::new();
         let mut train_update_list = Vec::new();
 
@@ -749,6 +753,24 @@ impl OrderActiveModelPack {
 
         let mut takeaway_insert_list = Vec::new();
         let mut takeaway_update_list = Vec::new();
+
+        if let Some(transaction_id) = transaction_id {
+            for order in &mut self.train_orders {
+                order.pay_transaction_id = ActiveValue::Set(Some(transaction_id));
+            }
+
+            for order in &mut self.hotel_orders {
+                order.pay_transaction_id = ActiveValue::Set(Some(transaction_id));
+            }
+
+            for order in &mut self.dish_orders {
+                order.pay_transaction_id = ActiveValue::Set(Some(transaction_id));
+            }
+
+            for order in &mut self.takeaway_orders {
+                order.pay_transaction_id = ActiveValue::Set(Some(transaction_id));
+            }
+        }
 
         for order in self.train_orders {
             if order.id.is_set() {
@@ -1280,7 +1302,7 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
 
         model_pack
             .orders
-            .insert_or_update_all(&txn)
+            .insert_or_update_all(&txn, Some(result.last_insert_id))
             .await
             .inspect_err(|e| {
                 error!("failed to insert or update orders: {}", e);
@@ -1323,7 +1345,6 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             })
             .context("Failed to start transaction")?;
 
-        let mut to_add_orders = Vec::new();
         let mut to_update_orders = Vec::new();
         let mut to_remove_orders = Vec::new();
 
@@ -1333,14 +1354,13 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
                 DiffType::Added => {
                     let order = changes.new_value.unwrap();
 
-                    debug!("order added: {:?}", order);
-
-                    to_add_orders.push(order);
+                    // 不支持在交易中新增订单，故此处的新增一定是因为聚合根管理器中没有缓存旧值
+                    to_update_orders.push(order);
                 }
                 DiffType::Modified => {
                     let order = changes.new_value.unwrap();
 
-                    debug!("order added: {:?}", order);
+                    debug!("order modified: {:?}", order);
 
                     to_update_orders.push(order);
                 }
@@ -1354,22 +1374,12 @@ impl DbRepositorySupport<Transaction> for TransactionRepositoryImpl {
             }
         }
 
-        let to_add_order_pack: OrderPack = to_add_orders.into();
         let to_update_order_pack: OrderPack = to_update_orders.into();
         let to_remove_order_pack: OrderPack = to_remove_orders.into();
 
-        to_add_order_pack
-            .into_active_model()
-            .insert_or_update_all(&txn)
-            .await
-            .inspect_err(|e| {
-                error!("failed to insert order: {}", e);
-            })
-            .map_err(|e| RepositoryError::Db(e.into()))?;
-
         to_update_order_pack
             .into_active_model()
-            .insert_or_update_all(&txn)
+            .insert_or_update_all(&txn, None)
             .await
             .inspect_err(|e| {
                 error!("failed to update order: {}", e);

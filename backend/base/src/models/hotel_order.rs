@@ -21,6 +21,7 @@ pub struct Model {
     pub active_time: DateTimeWithTimeZone,
     pub complete_time: DateTimeWithTimeZone,
     pub status: String,
+    pub amount: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
