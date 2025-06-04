@@ -185,10 +185,10 @@ export default {
     },
     created: function() {
         //测试数据
-        this.debugInit();
+        //this.debugInit();
         
         //访问后端
-        //this.init();
+        this.init();
         for(let tr of this.transactionDetailList) {
             this.isShowTransactionDetailMap.set(tr.id, false);
         }
@@ -255,15 +255,17 @@ export default {
             await orderApi.orderCancel(id)
             .then((res) => {
                 if(res.status == 200) {
-                    this.cancelOrderSuccess();
-                } else if(res.status == 403) {
-                    ElMessage.error('会话无效');
-                } else if(res.status == 404) {
-                    ElMessage.error('订单号不存在，或没有权限访问该订单');
-                } else if(res.status == 14001) {
-                    ElMessage.error('订单已被取消');
-                } else if(res.status == 14002) {
-                    ElMessage.error('订单不满足取消条件');
+                    if(res.data.code == 200) {
+                        this.cancelOrderSuccess();
+                    }  else if(res.data.code == 403) {
+                        ElMessage.error('会话无效');
+                    } else if(res.data.code == 404) {
+                        ElMessage.error('订单号不存在，或没有权限访问该订单');
+                    } else if(res.data.code == 14001) {
+                        ElMessage.error('订单已被取消');
+                    } else if(res.data.code == 14002) {
+                        ElMessage.error('订单不满足取消条件');
+                    }
                 }
             }).catch((error) => {
                 ElMessage.error(error);
@@ -281,9 +283,9 @@ export default {
             this.orderMap.clear();
             this.transactionDetailList.length = 0;
             //debug
-            this.debugInit();
+            //this.debugInit();
             //api
-            //this.init();
+            this.init();
             for(let tr of this.transactionDetailList) {
                 if(!this.isShowTransactionDetailMap.has(tr.id)) {
                     this.isShowTransactionDetailMap.set(tr.id, false);
@@ -340,10 +342,12 @@ export default {
             await orderApi.orderList()
             .then((res) => {
                 if(res.status == 200){
-                    const resData: ResponseData = res.data;
-                    this.dataHandle(resData);
-                } else {
-                    throw new Error(res.statusText);
+                    if(res.data.code == 200) {
+                        const resData: ResponseData = res.data.data;
+                        this.dataHandle(resData);
+                    } else {
+                        throw new Error(res.statusText);
+                    }
                 }
             })
             .catch((error) => {

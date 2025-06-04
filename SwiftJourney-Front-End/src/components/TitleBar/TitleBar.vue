@@ -30,7 +30,7 @@
                     >
                     <div class="Popover">
                         <div class="PopoverTitle">
-                            {{ user.name }}
+                            {{ user.username }}
                         </div>
                         <div class="PopoverSubTitle">
                             {{ user.phone }}
@@ -59,7 +59,7 @@
                     </div>
                     <template #reference>
                         <el-button type="dashed" class="UserInfoButton" round @click="goToPersonalDataPage">
-                          {{ user.name }}
+                          {{ user.username }}
                         </el-button>
                     </template>
                 </el-popover>
