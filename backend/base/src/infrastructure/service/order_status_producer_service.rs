@@ -7,6 +7,7 @@ use lapin::{BasicProperties, ConnectionProperties, ExchangeKind};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
+use tracing::{error, info, instrument};
 
 pub struct OrderStatusProducerService {
     channel: Arc<lapin::Channel>,
@@ -53,6 +54,7 @@ impl OrderStatusProducerService {
         })
     }
 
+    #[instrument(skip(self))]
     pub async fn delivery_message(
         &self,
         messages: OrderStatusMessagePack,
@@ -75,6 +77,13 @@ impl OrderStatusProducerService {
 
             let payload = serde_json::to_vec(&new_pack).unwrap();
 
+            info!(
+                "Publishing message type {} with exchange {}, routing key {}",
+                message_type,
+                RABBITMQ_ORDER_STATUS_EXCHANGE_NAME,
+                message_type.message_queue_name()
+            );
+
             self.channel
                 .basic_publish(
                     RABBITMQ_ORDER_STATUS_EXCHANGE_NAME,
@@ -84,6 +93,7 @@ impl OrderStatusProducerService {
                     BasicProperties::default(),
                 )
                 .await
+                .inspect_err(|e| error!("Failed to publish message: {}", e))
                 .map_err(OrderStatusProducerServiceError::ConnectionError)?;
         }
 
