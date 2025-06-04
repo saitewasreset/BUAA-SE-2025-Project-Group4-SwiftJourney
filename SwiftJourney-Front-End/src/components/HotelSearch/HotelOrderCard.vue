@@ -127,9 +127,11 @@ async function confirmCreateTransaction() {
     await hotelApi.hotelOrder(hotelOrderRequestList)
     .then((res) => {
         if(res.status == 200) {
-            successCreateTransaction(res.data as TransactionInfo)
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                successCreateTransaction(res.data as TransactionInfo);
+            } else {
+                throw new Error(res.data.message);
+            }
         }
     }) .catch ((error) => {
         ElMessage.error('生成订单失败 ' + error);
