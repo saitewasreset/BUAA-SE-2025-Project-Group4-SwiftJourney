@@ -55,6 +55,9 @@
 import { ElMessage } from 'element-plus';
 import { paymentApi } from '@/api/PaymentApi/paymentApi'
 import { userApi } from '@/api/UserApi/userApi'
+import { useUserStore } from '@/stores/user';
+
+const user = useUserStore();
 
 export default{
     data() {
@@ -68,7 +71,7 @@ export default{
                 password: "",
                 newPayPassword: "",
             },
-            setedPayPassword: "未设置",
+            setedPayPassword: user.havePaymentPasswordSet ? '已设置' : '未设置',
             isSetPassword: false,
             isSetPayPassword: false,
             digits: new Array(6).fill(''),
@@ -98,13 +101,14 @@ export default{
             await userApi.updatePassword({originPassword: this.passwordFormData.originPassword, newPassword: this.passwordFormData.newPassword})
             .then((res) => {
                 if(res.status == 200) {
-                    this.successUpdatePassword();
-                } else if (res.status == 403) {
-                    ElMessage.error('会话无效');
-                } else if (res.status == 15002) {
-                    ElMessage.error('密码错误');
-                } else {
-                    throw new Error(res.statusText);
+                    if(res.data.code == 200)  {
+                        this.successUpdatePassword();
+                    }
+                    else if (res.data.code == 403) {
+                        ElMessage.error('会话无效');
+                    } else if (res.data.code == 15002) {
+                        ElMessage.error('密码错误');
+                    }
                 }
             }) .catch ((error) => {
                 ElMessage.error(error);
@@ -166,21 +170,24 @@ export default{
 
             await paymentApi.setPaymentPassword({userPassword: this.payPasswordFormData.password, paymentPassword: this.payPasswordFormData.newPayPassword})
             .then((res) => {
-                if(res.status == 403) {
-                    ElMessage.error('账户密码错误');
-                    return;
-                } else if (res.status == 200) {
-                    ElMessage.success('支付密码设置成功');
-                    this.isSetPayPassword = false;
-                    this.payPasswordFormData.password = "";
-                    this.payPasswordFormData.newPayPassword = "";
-                    for(let i = 0; i < 6; i++){
-                        this.digits[i] = "";
-                        this.confirmDigits[i] = "";
+                if (res.status == 200) {
+                    if(res.data.code == 200) {
+                        ElMessage.success('支付密码设置成功');
+                        this.isSetPayPassword = false;
+                        this.payPasswordFormData.password = "";
+                        this.payPasswordFormData.newPayPassword = "";
+                        for(let i = 0; i < 6; i++){
+                            this.digits[i] = "";
+                            this.confirmDigits[i] = "";
+                        }
+                        this.setedPayPassword = "已设置";
+                    } else if(res.data.code == 403) {
+                        ElMessage.error('会话无效');
+                    } else if(res.data.code == 11002) {
+                        ElMessage.error('用户密码错误');
+                    } else if(res.data.code == 11007) {
+                        ElMessage.error('支付密码格式错误');
                     }
-                    this.setedPayPassword = "已设置";
-                } else {
-                    ElMessage.error(res.status + res.data)
                 }
             })
             .catch((error) => {
