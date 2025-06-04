@@ -474,7 +474,7 @@ body {
 /* 左侧元素样式 */
 .left-area {
   align-self: center;
-  /* margin-left: 40%; */
+  margin-left: 30%;
 }
 
 .logo {
