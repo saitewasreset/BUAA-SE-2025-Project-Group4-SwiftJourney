@@ -322,7 +322,7 @@ where
                 hotel
                     .images()
                     .iter()
-                    .map(|img_uuid| format!("/resource/images/{}", img_uuid))
+                    .map(|img_uuid| format!("/resource/hotel/images/{}", img_uuid))
                     .collect(),
             )
         };

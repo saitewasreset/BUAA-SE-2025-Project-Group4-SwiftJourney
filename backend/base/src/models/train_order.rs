@@ -9,8 +9,8 @@ pub struct Model {
     pub id: i32,
     pub uuid: Uuid,
     pub train_schedule_id: i32,
-    pub seat_type_id: i32,
-    pub seat_id: i32,
+    pub seat_type_id: Option<i32>,
+    pub seat_id: Option<i32>,
     pub begin_station_id: i32,
     pub end_station_id: i32,
     pub person_info_id: i32,
@@ -22,6 +22,8 @@ pub struct Model {
     pub active_time: DateTimeWithTimeZone,
     pub complete_time: DateTimeWithTimeZone,
     pub status: String,
+    pub order_seat_type: String,
+    pub preferred_seat_location: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
