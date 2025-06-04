@@ -37,6 +37,7 @@ use base::application::service::dish_query::DishQueryService;
 use base::application::service::geo::GeoApplicationService;
 use base::application::service::hotel::HotelService;
 use base::application::service::hotel_data::HotelDataService;
+use base::application::service::hotel_order::HotelOrderService;
 use base::application::service::message::MessageApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
@@ -59,6 +60,7 @@ use base::infrastructure::application::service::dish_query::DishQueryServiceImpl
 use base::infrastructure::application::service::geo::GeoApplicationServiceImpl;
 use base::infrastructure::application::service::hotel::HotelServiceImpl;
 use base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
+use base::infrastructure::application::service::hotel_order::HotelOrderServiceImpl;
 use base::infrastructure::application::service::message::MessageApplicationServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
@@ -417,6 +419,15 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&train_repository_impl),
     ));
 
+    let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&order_repository_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&personal_info_repository_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -502,6 +513,9 @@ async fn main() -> std::io::Result<()> {
             train_dish_application_service_impl as Arc<dyn TrainDishApplicationService>,
         );
 
+    let hotel_order_service: web::Data<dyn HotelOrderService> =
+        web::Data::from(hotel_order_service_impl as Arc<dyn HotelOrderService>);
+
     let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
         .await
         .expect("Failed to start order status consumer service");
@@ -545,6 +559,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(train_query_service.clone())
             .app_data(dish_query_service.clone())
             .app_data(train_dish_application_service.clone())
+            .app_data(hotel_order_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
