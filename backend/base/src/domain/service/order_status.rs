@@ -22,6 +22,8 @@ pub trait OrderStatusManagerService: 'static + Send + Sync {
         orders: &[&dyn Order],
         new_status: OrderStatus,
     );
+
+    async fn order_status_daemon(&self);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
