@@ -548,12 +548,19 @@ where
     //     Ok(result)
     // }
 
+    #[instrument(skip(self))]
     async fn direct_schedules(
         &self,
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+        let begin = std::time::Instant::now();
+
         let schedules = self.get_schedules(date).await?;
+
+        let get_schedules_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
+
         let route_map_by_id = self
             .route_service
             .get_routes()
@@ -566,6 +573,9 @@ where
             .into_iter()
             .map(|r| (r.get_id().unwrap(), r))
             .collect::<HashMap<_, _>>();
+
+        let get_routes_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
 
         let want: HashSet<_> = pairs.iter().copied().collect();
 
@@ -602,6 +612,13 @@ where
                 }
             }
         }
+
+        let calc_elapsed = begin.elapsed();
+
+        info!(
+            "Direct schedules completed: get_schedules: {:?}, get_routes: {:?} calc: {:?}",
+            get_schedules_elapsed, get_routes_elapsed, calc_elapsed
+        );
 
         result.sort_by_key(|s| s.origin_departure_time());
         Ok(result)
