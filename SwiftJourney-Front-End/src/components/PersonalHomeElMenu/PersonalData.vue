@@ -238,32 +238,34 @@ const user = useUserStore();
         await userApi.setUserInfo(formPostData)
           .then((res) =>{
             if(res.status == 200) {
-              ElMessage.success('设置成功');
+              if(res.data.code == 200) {
+                ElMessage.success('设置成功');
 
-              if(this.isSetUsername) {
-                this.setUsername();
-                user.username = formPostData.username;
+                if(this.isSetUsername) {
+                  this.setUsername();
+                  user.username = formPostData.username;
+                }
+                if(this.isSetGender) {
+                  this.setGender();
+                  user.gender = formPostData.gender;
+                }
+                if(this.isSetAge) {
+                  this.setAge();
+                  user.age = formPostData.age;
+                }
+                if(this.isSetEmail){
+                  this.setEmail();
+                  user.email = formPostData.email;
+                }
+              }  else if (res.data.code == 403) {
+                ElMessage.error('会话无效');
+              } else if (res.data.code == 15003) {
+                ElMessage.error('用户名格式错误');
+              } else if (res.data.code == 15006) {
+                ElMessage.error('年龄格式错误');
+              } else if (res.data.code == 15007) {
+                ElMessage.error('邮箱格式错误');
               }
-              if(this.isSetGender) {
-                this.setGender();
-                user.gender = formPostData.gender;
-              }
-              if(this.isSetAge) {
-                this.setAge();
-                user.age = formPostData.age;
-              }
-              if(this.isSetEmail){
-                this.setEmail();
-                user.email = formPostData.email;
-              }
-            } else if (res.status == 403) {
-              ElMessage.error('会话无效');
-            } else if (res.status == 15003) {
-              ElMessage.error('用户名格式错误');
-            } else if (res.status == 15006) {
-              ElMessage.error('年龄格式错误');
-            } else if (res.status == 15007) {
-              ElMessage.error('邮箱格式错误');
             }
           })
           .catch((error) => {
