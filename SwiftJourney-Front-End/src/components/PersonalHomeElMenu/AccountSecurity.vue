@@ -55,6 +55,9 @@
 import { ElMessage } from 'element-plus';
 import { paymentApi } from '@/api/PaymentApi/paymentApi'
 import { userApi } from '@/api/UserApi/userApi'
+import { useUserStore } from '@/stores/user';
+
+const user = useUserStore();
 
 export default{
     data() {
@@ -68,7 +71,7 @@ export default{
                 password: "",
                 newPayPassword: "",
             },
-            setedPayPassword: "未设置",
+            setedPayPassword: user.havePaymentPasswordSet ? '已设置' : '未设置',
             isSetPassword: false,
             isSetPayPassword: false,
             digits: new Array(6).fill(''),
