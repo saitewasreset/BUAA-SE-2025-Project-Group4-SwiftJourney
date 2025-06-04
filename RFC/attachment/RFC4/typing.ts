@@ -429,7 +429,7 @@ interface DishQuery {
 
 interface DishInfo {
   // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
+  availableTime: Array<"lunch" | "dinner">;
   // 火车餐名称
   name: string;
   // 火车餐图片，URL
@@ -468,7 +468,7 @@ interface DishStationQuery {
 
 interface DishInfo {
   // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
+  availableTime: Array<"lunch" | "dinner">;
   // 火车餐名称
   name: string;
   // 火车餐类别，例如：主食、饮料、零食
@@ -530,7 +530,7 @@ interface DishOrder {
   // 份数
   amount: number;
   // 用餐时间
-  dishTime: "launch" | "dinner";
+  dishTime: "lunch" | "dinner";
 }
 
 interface TakeawayOrder {

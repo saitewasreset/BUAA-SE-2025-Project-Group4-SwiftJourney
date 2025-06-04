@@ -10,11 +10,6 @@
 //! - 自动会话淘汰机制
 //! - 配置驱动的会话管理策略
 
-use async_trait::async_trait;
-use chrono::Utc;
-use dashmap::DashMap;
-use std::{collections::VecDeque, sync::Arc};
-
 use crate::domain::{
     RepositoryError,
     model::{
@@ -25,6 +20,11 @@ use crate::domain::{
     repository::session::SessionRepository,
     service::session::SessionManagerService,
 };
+use async_trait::async_trait;
+use chrono::Utc;
+use dashmap::DashMap;
+use std::{collections::VecDeque, sync::Arc};
+use tracing::{error, instrument};
 
 /// 会话管理服务实现
 ///
@@ -131,6 +131,20 @@ where
             .find(session_id)
             .await
             .map(|session| session.map(|s| s.user_id()))
+    }
+
+    #[instrument(skip(self))]
+    async fn verify_session_id(&self, session_id_str: &str) -> Result<bool, RepositoryError> {
+        if let Ok(session_id) = SessionId::try_from(session_id_str) {
+            Ok(self
+                .session_repository
+                .find(session_id)
+                .await
+                .inspect_err(|e| error!("Failed to load session: {}", e))?
+                .is_some())
+        } else {
+            Ok(false)
+        }
     }
 }
 

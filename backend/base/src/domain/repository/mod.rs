@@ -2,6 +2,7 @@ pub mod city;
 pub mod dish;
 pub mod hotel;
 pub mod hotel_rating;
+pub mod notify;
 pub mod occupied_room;
 pub mod order;
 pub mod personal_info;

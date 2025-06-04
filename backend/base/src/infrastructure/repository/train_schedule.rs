@@ -23,16 +23,18 @@ use crate::domain::model::train_schedule::{
     SeatAvailabilityId, SeatId, StationRange, TrainSchedule, TrainScheduleId,
 };
 
+use crate::DB_CHUNK_SIZE;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
 use anyhow::Context;
 use async_trait::async_trait;
-use chrono::NaiveDate;
-use sea_orm::ColumnTrait;
+use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 use sea_orm::{ActiveValue, DatabaseConnection};
+use sea_orm::{ColumnTrait, QueryOrder};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
 use std::collections::HashMap;
+use tracing::{error, instrument};
 
 impl_db_id_from_u64!(TrainScheduleId, i32, "train schedule");
 impl_db_id_from_u64!(SeatId, i64, "seat id");
@@ -266,15 +268,49 @@ impl Repository<TrainSchedule> for TrainScheduleRepositoryImpl {
 
 #[async_trait]
 impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
+    #[instrument(skip(self))]
     async fn find_by_date(&self, date: NaiveDate) -> Result<Vec<TrainSchedule>, RepositoryError> {
         Ok(self
             .query_train_schedule(|q| {
                 q.filter(crate::models::train_schedule::Column::DepartureDate.eq(date))
             })
             .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
             .context(format!("Failed to find train schedule with date: {}", date))?)
     }
 
+    #[instrument(skip(self))]
+    async fn find_by_id_and_date(
+        &self,
+        train_id: TrainId,
+        date: NaiveDate,
+    ) -> Result<Option<TrainSchedule>, RepositoryError> {
+        Ok(self
+            .query_train_schedule(|q| {
+                q.filter(
+                    crate::models::train_schedule::Column::DepartureDate
+                        .eq(date)
+                        .and(
+                            crate::models::train_schedule::Column::TrainId
+                                .eq(train_id.to_db_value()),
+                        ),
+                )
+            })
+            .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
+            .context(format!(
+                "Failed to find train schedule with date: {} and train id {}",
+                date, train_id
+            ))?
+            .into_iter()
+            .next())
+    }
+
+    #[instrument(skip(self))]
     async fn find_by_train_id(
         &self,
         train_id: TrainId,
@@ -284,9 +320,94 @@ impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
                 q.filter(crate::models::train_schedule::Column::TrainId.eq(train_id.to_db_value()))
             })
             .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
             .context(format!(
                 "Failed to find train schedule with train id: {}",
                 train_id.to_db_value()
             ))?)
+    }
+
+    #[instrument(skip(self))]
+    async fn find_by_train_id_and_origin_departure_time(
+        &self,
+        train_id: TrainId,
+        origin_departure_time: DateTime<FixedOffset>,
+    ) -> Result<Option<TrainSchedule>, RepositoryError> {
+        let departure_date = origin_departure_time.date_naive();
+
+        let origin_departure_time = origin_departure_time.time().num_seconds_from_midnight() as i32;
+
+        let result = self
+            .query_train_schedule(|q| {
+                q.filter(
+                    crate::models::train_schedule::Column::TrainId
+                        .eq(train_id.to_db_value())
+                        .and(
+                            crate::models::train_schedule::Column::DepartureDate.eq(departure_date),
+                        )
+                        .and(
+                            crate::models::train_schedule::Column::OriginDepartureTime
+                                .eq(origin_departure_time),
+                        ),
+                )
+            })
+            .await
+            .inspect_err(|e| {
+                error!("failed to find train schedule: {}", e);
+            })
+            .context(format!(
+                "Failed to find train schedule with train id: {} and origin departure time: {}",
+                train_id.to_db_value(),
+                origin_departure_time
+            ))?;
+
+        Ok(result.into_iter().next())
+    }
+
+    #[instrument(skip_all)]
+    async fn save_many_no_conflict(
+        &self,
+        schedules: Vec<TrainSchedule>,
+    ) -> Result<(), RepositoryError> {
+        let transaction = self
+            .db
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
+
+        let train_schedule_to_list = schedules
+            .into_iter()
+            .map(TrainScheduleDataConverter::transform_to_do)
+            .collect::<Vec<_>>();
+
+        for chunk in train_schedule_to_list.chunks(DB_CHUNK_SIZE) {
+            crate::models::train_schedule::Entity::insert_many(chunk.to_vec())
+                .on_conflict_do_nothing()
+                .exec(&transaction)
+                .await
+                .inspect_err(|e| error!("Failed to insert train schedules: {}", e))
+                .context("Failed to insert train schedules")?;
+        }
+
+        transaction
+            .commit()
+            .await
+            .context("Failed to commit transaction")?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn get_latest_schedule_date(&self) -> Result<Option<NaiveDate>, RepositoryError> {
+        let latest_do = crate::models::train_schedule::Entity::find()
+            .order_by_desc(crate::models::train_schedule::Column::DepartureDate)
+            .one(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to get latest schedule from db: {}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(latest_do.map(|latest_do| latest_do.departure_date))
     }
 }

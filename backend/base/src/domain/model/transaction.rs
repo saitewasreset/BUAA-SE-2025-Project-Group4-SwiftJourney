@@ -219,7 +219,7 @@ impl Transaction {
     ///
     /// Returns:
     /// - 当前系统时间，带有时区。
-    fn now() -> DateTimeWithTimeZone {
+    pub fn now() -> DateTimeWithTimeZone {
         let local_now = Local::now();
         let offset = *local_now.offset(); // 获取系统当前时区偏移
         local_now.with_timezone(&offset)
@@ -484,6 +484,10 @@ impl Transaction {
     /// - 交易包含的订单列表的不可变引用。
     pub fn orders(&self) -> &[Box<dyn Order>] {
         &self.orders
+    }
+
+    pub fn orders_mut(&mut self) -> &mut Vec<Box<dyn Order>> {
+        &mut self.orders
     }
 
     /// 获取交易状态。

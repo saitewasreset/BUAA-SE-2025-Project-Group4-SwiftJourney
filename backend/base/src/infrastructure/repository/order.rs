@@ -202,6 +202,7 @@ FROM "train_order"
     "hotel_order"."pay_transaction_id",
     "hotel_order"."refund_transaction_id",
     "hotel_order"."price",
+    "hotel_order"."amount",
     "hotel_order"."create_time",
     "hotel_order"."active_time",
     "hotel_order"."complete_time",
