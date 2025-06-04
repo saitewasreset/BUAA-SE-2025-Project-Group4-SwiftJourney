@@ -1,9 +1,13 @@
 # Request For Comments 4: API 文档
 
-Version: 17 (2025-05-30 17:45:00)
+Version: 18 (2025-06-03 20:00:00)
 
 最近变更：
 
+- Version 18
+  - 取消订单：对于不满足取消条件的订单，现在统一返回 11005 错误
+  - 酒店查询：修改拼写错误
+  - 酒店预订：`beginDate`和`endDate`应当为必填项
 - Version 17
   - 火车餐预订：更新错误代码
 - Version 16
@@ -1158,8 +1162,7 @@ interface CancelOrderInfo {
 | 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据   |
 | 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                           |
 | 404   | `Sorry, but this was meant to be a private game: invalid order id`   | 订单号不存在，或没有权限访问该订单 |
-| 14001 | `Order already cancelled`                                            | 订单已被取消                       |
-| 14002 | `Order doesn't fulfill cancellation condition: {reason}`             | 订单不满足取消条件                 |
+| 11005 | `cannot refund this transaction: {reason}`                           | 订单不满足取消条件                 |
 
 响应**数据**：
 
@@ -1189,7 +1192,7 @@ type Request = HotelQuery;
 interface HotelQuery {
   // 目标城市/火车站，由`target_type`属性指定
   target: string;
-  target_type: "city" | "station";
+  targetType: "city" | "station";
   // 通过酒店名称进行匹配，可不存在
   search?: string;
   // 入住日期
@@ -1377,9 +1380,9 @@ interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
