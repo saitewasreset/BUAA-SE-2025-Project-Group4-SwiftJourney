@@ -115,7 +115,7 @@ const today = dayjs();
 const nextday = today.add(1, 'day');
 const hotelQuery = ref<HotelQuery> ({
     target: '',
-    target_type: "city",
+    targetType: "city",
     beginDate: formateDate(today),
     endDate: formateDate(nextday),
 });
@@ -195,15 +195,17 @@ async function searchHotel() {
     await hotelApi.hotelQuery(hotelQuery.value)
     .then((res) => {
         if(res.status == 200){
-            successSearchHotel(res.data);
-        } else if (res.status == 403) {
-            ElMessage.error('会话无效');
-        } else if (res.status == 404) {
-            ElMessage.error('查询的目标城市/火车站不存在');
-        } else if (res.status == 21001) {
-            ElMessage.error('入住/离开日期不合法：离开比入住早；只设置其中一个；入住时间超过 7 天');
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                successSearchHotel(res.data.data);
+            }  else if (res.data.code == 403) {
+                ElMessage.error('会话无效');
+            } else if (res.data.code == 404) {
+                ElMessage.error('查询的目标城市/火车站不存在');
+            } else if (res.data.code == 21001) {
+                ElMessage.error('入住/离开日期不合法：离开比入住早；只设置其中一个；入住时间超过 7 天');
+            } else {
+                throw new Error(res.data.message);
+            }
         }
     }) .catch ((error) => {
         ElMessage.error(error);
@@ -216,6 +218,7 @@ function checkHotelQuery() {
         ElMessage.error('目的地城市不能为空');
         return false;
     }
+    hotelQuery.value.target = hotelQuery.value.target + '市';
     if(hotelQuery.value.beginDate == '' || hotelQuery.value.endDate == '') {
         ElMessage.error('入住和离店时间不能为空');
         return false;
@@ -282,17 +285,18 @@ async function hotelDetailRoom(id: string) {
         hotelId: id, beginDate: hotelQuery.value.beginDate, endDate: hotelQuery.value.endDate} as HotelOrderQuery
     ).then((res) => {
         if(res.status == 200) {
-            let myMap = new Map(Object.entries(res.data as { [key: string]: HotelRoomDetailInfo }));
-            myMap.forEach((value, key) => {
-                roomSet.add(key);
-            })
-            return myMap;
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                let myMap = new Map(Object.entries(res.data.data as { [key: string]: HotelRoomDetailInfo }));
+                myMap.forEach((value, key) => {
+                    roomSet.add(key);
+                })
+                return myMap;
+            }  else {
+                throw new Error(res.data.message);
+            }
         }
     }).catch((error) => {
         ElMessage.error(error);
-        console.error(error);
         return new Map<string, HotelRoomDetailInfo>();
     })
 }
@@ -426,7 +430,7 @@ function showRoomOrder() {
 }
 
 //-----------------------------------debug-----------------------------------
-import hotelImage from '../../assets/hotel.jpg'
+/*import hotelImage from '../../assets/hotel.jpg'
 const debugdataMap = new Map<string, HotelRoomDetailInfo>();
 const debugHotelRoomDetailInfo1: HotelRoomDetailInfo = {
     capacity: 1,
@@ -523,7 +527,7 @@ debugRoomSet.forEach((key) => {
 })
 roomList.value.forEach((key, index) => {
     roomMapIndex.set(key.type, index);
-})
+})*/
 </script>
 
 
