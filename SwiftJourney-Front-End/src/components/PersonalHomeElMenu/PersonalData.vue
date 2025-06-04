@@ -54,7 +54,7 @@ import { userApi } from '@/api/UserApi/userApi'
 import validator from 'validator';
 
 const user = useUserStore();
-const debugUser = useDebugUserStore();
+//const debugUser = useDebugUserStore();
 
   export default {
     data() {
@@ -99,6 +99,9 @@ const debugUser = useDebugUserStore();
         return `${prefix}**`;
       },
       desensitizeEmail() {
+        if(this.formData.email == '' || this.formData.email == null) {
+          return '未设置';
+        }
         const prefix = this.formData.email.substring(0, 3);
         const atIndex = this.formData.email.indexOf('@');
         if(atIndex != -1) {
@@ -152,13 +155,19 @@ const debugUser = useDebugUserStore();
     },
     methods: {
       initFormData() {
-        this.formData.name = debugUser.name;
-        this.formData.username = debugUser.username;
-        this.formData.identityCardId = debugUser.identityCardId;
-        this.formData.phone = debugUser.phone;
-        this.formData.gender = debugUser.gender === 'male' ? '男' : '女';
-        this.formData.email = debugUser.email;
-        this.formData.age = debugUser.age;
+        this.formData.name = user.name;
+        this.formData.username = user.username;
+        this.formData.identityCardId = user.identityCardId;
+        this.formData.phone = user.phone;
+        if(user.gender === 'male') {
+          this.formData.gender = '男';
+        } else if (user.gender === 'female') {
+          this.formData.gender = '女';
+        } else {
+          this.formData.gender = '未设置';
+        }
+        this.formData.email = user.email;
+        this.formData.age = user.age == null ? '未设置' : user.age;
       },
       setUsername() {
         this.isSetUsername = !this.isSetUsername;
