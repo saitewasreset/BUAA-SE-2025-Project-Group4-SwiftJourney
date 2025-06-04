@@ -51,6 +51,7 @@ use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
 use base::domain::service::message::MessageListenerService;
 use base::domain::service::object_storage::ObjectStorageService;
+use base::domain::service::order_status::OrderStatusManagerService;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_schedule::TrainScheduleService;
@@ -234,7 +235,17 @@ async fn main() -> std::io::Result<()> {
 
     let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new(
         Arc::clone(&order_status_producer_service),
+        Arc::clone(&order_repository_impl),
     ));
+
+    {
+        let order_status_manager_service_impl = Arc::clone(&order_status_manager_service_impl);
+        actix_web::rt::spawn(async move {
+            order_status_manager_service_impl
+                .order_status_daemon()
+                .await;
+        });
+    }
 
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
