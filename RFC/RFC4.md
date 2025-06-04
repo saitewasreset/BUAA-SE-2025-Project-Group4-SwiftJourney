@@ -1,9 +1,24 @@
 # Request For Comments 4: API 文档
 
-Version: 12 (2025-05-24 15:07:00)
+Version: 18 (2025-06-03 20:00:00)
 
 最近变更：
 
+- Version 18
+  - 取消订单：对于不满足取消条件的订单，现在统一返回 11005 错误
+  - 酒店查询：修改拼写错误
+  - 酒店预订：`beginDate`和`endDate`应当为必填项
+- Version 17
+  - 火车餐预订：更新错误代码
+- Version 16
+  - 新增车次信息查询
+  - 修改火车餐接口设计，删除冗余接口
+- Version 15
+  - 修复`lunch`拼写错误
+- Version 14
+  - “酒店查询”详情信息新增酒店 info
+- Version 13
+  - 获取 WebSocket 端点：使用的具体协议需由前端判断
 - Version 12
   - 修复“城市信息”API 的错误描述
   - “酒店查询”返回新增酒店 info
@@ -408,7 +423,7 @@ interface PersonalInfo {
 请求：
 
 ```typescript
-type Request = type Request = UpdatePersonalInfo;
+type Request = UpdatePersonalInfo;
 
 interface UpdatePersonalInfo {
   // 姓名
@@ -420,7 +435,6 @@ interface UpdatePersonalInfo {
   // 是否为默认个人资料，即，当前用户的身份
   default?: boolean;
 }
-
 ```
 
 若要新增/更新信息，至少设置`name`、`identityCardId`、`default`字段。
@@ -713,6 +727,66 @@ type ResponseData = TransactionInfo;
 - 无
 
 ## 车次查询系统（FE1.2 FE3.1）
+
+### 车次信息查询
+
+`POST /api/train/schedule/`
+
+**注意：不要遗漏最后的斜杠！**
+
+需要 Cookie：
+
+- session_id
+
+请求：
+
+```typescript
+type Request = TrainInfoQuery;
+
+interface TrainInfoQuery {
+  // 车次号，例如：“G53”
+  trainNumber: string;
+  // 离开“始发站”的日期
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+}
+```
+
+响应代码表：
+
+| 代码 | 可能的响应消息                                                                                   | 含义                                          |
+| ---- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| 200  | `For Super Earth!`                                                                               | 请求已被成功执行，可访问响应数据              |
+| 403  | `Sorry, but this was meant to be a private game: invalid session_id`                             | 会话无效                                      |
+| 404  | `Sorry, but this was meant to be a private game: invalid train: {train_number} {departure_date}` | 查询的车次号或离开“始发站”的日期不存在/不合法 |
+
+响应**数据**：
+
+```typescript
+type ResponseData = TrainScheduleInfo;
+
+// 站点停靠信息
+interface StoppingStationInfo {
+  stationName: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  departureTime?: string;
+}
+
+interface TrainScheduleInfo {
+  originStation: string;
+  terminalStation: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+  // 车次经停车站信息
+  route: StoppingStationInfo[];
+}
+```
+
+设置 Cookie：
+
+- 无
 
 ### 直达车次查询（US1.2.1）
 
@@ -1088,8 +1162,7 @@ interface CancelOrderInfo {
 | 200   | `For Super Earth!`                                                   | 请求已被成功执行，可访问响应数据   |
 | 403   | `Sorry, but this was meant to be a private game: invalid session_id` | 会话无效                           |
 | 404   | `Sorry, but this was meant to be a private game: invalid order id`   | 订单号不存在，或没有权限访问该订单 |
-| 14001 | `Order already cancelled`                                            | 订单已被取消                       |
-| 14002 | `Order doesn't fulfill cancellation condition: {reason}`             | 订单不满足取消条件                 |
+| 11005 | `cannot refund this transaction: {reason}`                           | 订单不满足取消条件                 |
 
 响应**数据**：
 
@@ -1119,7 +1192,7 @@ type Request = HotelQuery;
 interface HotelQuery {
   // 目标城市/火车站，由`target_type`属性指定
   target: string;
-  target_type: "city" | "station";
+  targetType: "city" | "station";
   // 通过酒店名称进行匹配，可不存在
   search?: string;
   // 入住日期
@@ -1211,6 +1284,8 @@ interface HotelDetailInfo {
   address: string;
   // 联系电话
   phone: string[];
+  // 酒店信息
+  info: string;
 
   // 酒店图片列表，URL
   picture?: string[];
@@ -1305,9 +1380,9 @@ interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
@@ -1416,9 +1491,9 @@ type ResponseData = null;
 
 ## 火车餐服务（FE2.2）
 
-### 火车餐查询（按车次）（US2.2.1）
+### 火车餐查询（US2.2.1）
 
-`POST /api/dish/query_by_train_number`
+`POST /api/dish/query`
 
 需要 Cookie：
 
@@ -1452,7 +1527,7 @@ type ResponseData = TrainDishInfo;
 
 interface DishInfo {
   // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
+  availableTime: Array<"lunch" | "dinner">;
   // 火车餐名称
   name: string;
   // 火车餐类别，例如：主食、饮料、零食
@@ -1503,74 +1578,6 @@ interface TrainDishInfo {
 
 - 无
 
-### 火车餐查询（按起始到达站）（US2.2.1）
-
-`POST /api/dish/query_by_station`
-
-需要 Cookie：
-
-- session_id
-
-请求：
-
-```typescript
-type Request = DishStationQuery;
-
-interface DishStationQuery {
-  // 起始站
-  departureStation: string;
-  // 到达站
-  arrivalStation: string;
-  // 查询日期
-  targetDate: string;
-}
-```
-
-响应代码表：
-
-| 代码 | 可能的响应消息                                                               | 含义                             |
-| ---- | ---------------------------------------------------------------------------- | -------------------------------- |
-| 200  | `For Super Earth!`                                                           | 请求已被成功执行，可访问响应数据 |
-| 403  | `Sorry, but this was meant to be a private game: invalid session_id`         | 会话无效                         |
-| 404  | `Sorry, but this was meant to be a private game: invalid station: {station}` | 查询的起始/到达站不存在          |
-
-响应**数据**：
-
-```typescript
-type ResponseData = FullTrainDishInfo[];
-
-interface FullTrainDishInfo {
-  // 车次
-  trainNumber: string;
-
-  departureStation: string;
-  // 离开“起始站”的日期时间
-  departureTime: string;
-  arrivalStation: string;
-  // 到达“到达站”的日期时间
-  arrivalTime: string;
-  originStation: string;
-  // 离开“始发站”的日期时间
-  originDepartureTime: string;
-  terminalStation: string;
-  // 到达“终到站”的日期时间
-  terminalArrivalTime: string;
-
-  dishes: DishInfo[];
-  // 车站名称 -> 可点的外卖列表
-  takeaway: Map<string, Takeaway[]>;
-
-  // 能否预订
-  canBooking: boolean;
-  // 不能预订原因
-  reason?: string;
-}
-```
-
-设置 Cookie：
-
-- 无
-
 ### 火车餐预订（US2.2.2）
 
 `POST /api/dish/order`
@@ -1594,7 +1601,7 @@ interface DishOrder {
   // 份数
   amount: number;
   // 用餐时间
-  dishTime: "launch" | "dinner";
+  dishTime: "lunch" | "dinner";
 }
 
 interface TakeawayOrder {
@@ -1627,17 +1634,18 @@ interface TrainDishOrderRequest {
 
 响应代码表：
 
-| 代码  | 可能的响应消息                                                                      | 含义                                 |
-| ----- | ----------------------------------------------------------------------------------- | ------------------------------------ |
-| 200   | `For Super Earth!`                                                                  | 请求已被成功执行，可访问响应数据     |
-| 403   | `Sorry, but this was meant to be a private game: invalid session_id`                | 会话无效                             |
-| 404   | `Sorry, but this was meant to be a private game: invalid trainNumber: {target}`     | 目标车次不存在                       |
-| 404   | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}` | 乘车人 Id 不存在，或未与当前用户绑定 |
-| 22001 | `Invalid dish name: {name}`                                                         | 火车餐不存在                         |
-| 22002 | `Invalid dish amount: {amount}`                                                     | 非法份数                             |
-| 22003 | `Invalid takeaway station: {station}`                                               | 非法车站名称                         |
-| 22004 | `Invalid takeaway shop name: {shop_name}`                                           | 非法店铺名称                         |
-| 22005 | `Invalid takeaway name: {name}`                                                     | 非法外卖名称                         |
+| 代码  | 可能的响应消息                                                                      | 含义                                                                        |
+| ----- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 200   | `For Super Earth!`                                                                  | 请求已被成功执行，可访问响应数据                                            |
+| 403   | `Sorry, but this was meant to be a private game: invalid session_id`                | 会话无效                                                                    |
+| 404   | `Sorry, but this was meant to be a private game: invalid trainNumber: {target}`     | 目标车次不存在                                                              |
+| 404   | `Sorry, but this was meant to be a private game: invalid personal id: {personalId}` | 乘车人 Id 不存在，或未与当前用户绑定                                        |
+| 22001 | `Invalid dish name: {name}`                                                         | 火车餐不存在                                                                |
+| 22002 | `Invalid dish amount: {amount}`                                                     | 非法份数                                                                    |
+| 22003 | `Invalid takeaway station: {station}`                                               | 非法车站名称                                                                |
+| 22004 | `Invalid takeaway shop name: {shop_name}`                                           | 非法店铺名称                                                                |
+| 22005 | `Invalid takeaway name: {name}`                                                     | 非法外卖名称                                                                |
+| 22006 | `No related train order found`                                                      | 没有对应的车次订单/对应的车次订单未支付/对应的车次订单已完成（失败/已取消） |
 
 响应**数据**：
 
@@ -1686,7 +1694,8 @@ interface Message<T> {
 
 ```typescript
 type ResponseData = string;
-// string 中为 WebSocket 端点，格式：`ws://xxx.xxx/xxx/xxx`
+// string 中为 WebSocket 端点，格式：`xxx.xxx/xxx/xxx`
+// 注意：前端需要根据实际情况，选择使用ws还是wss协议
 ```
 
 设置 Cookie：

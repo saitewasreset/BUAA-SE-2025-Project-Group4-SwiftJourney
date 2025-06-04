@@ -1,6 +1,6 @@
 use crate::application::commands::transaction::{
-    BalanceQuery, GenerateDebugTransactionCommand, PayTransactionCommand, RechargeCommand,
-    SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
+    BalanceQuery, CancelOrderCommand, GenerateDebugTransactionCommand, PayTransactionCommand,
+    RechargeCommand, SetPaymentPasswordCommand, TransactionDetailQuery, TransactionQuery,
 };
 use crate::application::service::transaction::{
     BalanceInfoDTO, TransactionApplicationService, TransactionApplicationServiceError,
@@ -15,13 +15,13 @@ use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::order::order_dto::TransactionDataDto;
 use crate::domain::service::session::SessionManagerService;
-use crate::domain::service::transaction::TransactionService;
+use crate::domain::service::transaction::{TransactionService, TransactionServiceError};
 use crate::domain::service::user::{UserService, UserServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, instrument, warn};
 
 pub struct TransactionApplicationServiceImpl<S, T, R, U, UR>
 where
@@ -301,6 +301,7 @@ where
         Ok(tx.into())
     }
 
+    #[instrument(skip(self))]
     async fn query_transaction_details(
         &self,
         query: TransactionDetailQuery,
@@ -311,6 +312,7 @@ where
             .transaction_repository
             .find_by_user_id(user_id)
             .await
+            .inspect_err(|e| error!("failed to find transactions for user_id {}: {}", user_id, e))
             .map_err(|e| {
                 error!("failed to query transaction for user_id {}: {}", user_id, e);
 
@@ -325,6 +327,9 @@ where
                 self.transaction_service
                     .convert_transaction_to_dto(transaction)
                     .await
+                    .inspect_err(|e| {
+                        error!("failed to convert transaction {:?} to dto: {}", txid, e);
+                    })
                     .map_err(|e| {
                         error!("failed to convert transaction {:?} to dto {}", txid, e);
 
@@ -334,5 +339,60 @@ where
         }
 
         Ok(result)
+    }
+
+    #[instrument(skip(self))]
+    async fn cancel_order(
+        &self,
+        command: CancelOrderCommand,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        let user_id = self.get_user_id_by_session_id(&command.session_id).await?;
+
+        let tx_list = self
+            .transaction_repository
+            .find_by_user_id(user_id)
+            .await
+            .map_err(|e| {
+                error!("failed to find tx list for user_id {}: {}", user_id, e);
+                GeneralError::InternalServerError
+            })?;
+
+        let target_order_uuid = command.order_id;
+
+        let mut target_tx = None;
+        let mut target_order = None;
+
+        for tx in &tx_list {
+            for order in tx.orders() {
+                if order.uuid() == target_order_uuid {
+                    target_order = Some(order);
+                    target_tx = Some(tx);
+                    break;
+                }
+            }
+        }
+
+        let target_tx = target_tx.ok_or_else(|| {
+            warn!("No transaction found for order id {}", target_order_uuid);
+            GeneralError::NotFound
+        })?;
+
+        let target_order = target_order.unwrap();
+
+        self.transaction_service
+            .refund_transaction(target_tx.uuid(), &[target_order.clone()])
+            .await
+            .map_err(|e| match e {
+                TransactionServiceError::RefundError(e) => Box::new(
+                    TransactionApplicationServiceError::RefundError(e.to_string()),
+                )
+                    as Box<dyn ApplicationError>,
+                x => {
+                    error!("Failed to refund order {}: {}", target_order_uuid, x);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        Ok(())
     }
 }
