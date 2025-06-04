@@ -160,19 +160,21 @@ onBeforeMount(async () => {
     initBeginDateFromRoute();
     initEndDateFromRoute();
     initSelectedDateRange();
-    //getHotelDetailInfo();
-    //getHotelOrderInfo();
-    getdebugInfo();
+    getHotelDetailInfo();
+    getHotelOrderInfo();
+    //getdebugInfo();
 })
 
 async function getHotelDetailInfo() {
     hotelApi.hotelInfo(hotelId)
     .then((res) => {
         if(res.status == 200) {
-            hotelDetailInfo.value = res.data;
-            sortCommentByDate();
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                hotelDetailInfo.value = res.data.data;
+                sortCommentByDate();
+            } else {
+                throw new Error(res.data.message);
+            }
         }
     }).catch((error) => {
         ElMessage.error(error);
@@ -183,9 +185,7 @@ async function getHotelDetailInfo() {
 async function getHotelOrderInfo() {
     let tepBeginDate = dayjs(selectedDateRange.value[0]).format('YYYY-MM-DD');
     let tepEndDate = dayjs(selectedDateRange.value[1]).format('YYYY-MM-DD');
-    if(tepBeginDate == beginDate.value && tepEndDate == endDate.value) {
-        return;
-    } else  if (dateRangeNum.value > 7) {
+    if (dateRangeNum.value > 7) {
         ElMessage.error('入住时间不能超过7晚');
         return;
     }
@@ -197,28 +197,30 @@ async function getHotelOrderInfo() {
     hotelApi.hotelOrderInfo(hotelOrderQuery)
     .then((res) => {
         if(res.status == 200) {
-            hotelRoomInfoList.value = [];
-            beginDate.value = tepBeginDate;
-            endDate.value = tepEndDate;
-            let myMap = new Map(Object.entries(res.data as { [key: string]: HotelRoomDetailInfo }));
-            myMap.forEach((value, key) => {
-                let tepHotelRoomInfo: HotelRoomInfo = {
-                    ...value,
-                    roomType: key,
-                }
-                hotelRoomInfoList.value.push(tepHotelRoomInfo);
-            })
-            hotelRoomInfoList.value.sort((a, b) => {
-                if(a.remainCount == 0) {
-                    return 1;
-                } else if(b.remainCount ==0) {
-                    return -1;
-                } else {
-                    return 0;
-                }
-            });
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                hotelRoomInfoList.value = [];
+                beginDate.value = tepBeginDate;
+                endDate.value = tepEndDate;
+                let myMap = new Map(Object.entries(res.data.data as { [key: string]: HotelRoomDetailInfo }));
+                myMap.forEach((value, key) => {
+                    let tepHotelRoomInfo: HotelRoomInfo = {
+                        ...value,
+                        roomType: key,
+                    }
+                    hotelRoomInfoList.value.push(tepHotelRoomInfo);
+                })
+                hotelRoomInfoList.value.sort((a, b) => {
+                    if(a.remainCount == 0) {
+                        return 1;
+                    } else if(b.remainCount ==0) {
+                        return -1;
+                    } else {
+                        return 0;
+                    }
+                });
+            }  else {
+                throw new Error(res.data.message);
+            }
         }
     }) .catch((error) => {
         ElMessage.error(error);
@@ -292,9 +294,11 @@ async function sendComment() {
         await hotelApi.hotelQuota(hotelId)
         .then((res) => {
             if(res.status == 200) {
-                hotelCommentQuota.value =  res.data as HotelCommentQuota;
-            } else {
-                throw new Error(res.statusText);
+                if(res.data.code == 200) {
+                    hotelCommentQuota.value =  res.data.data as HotelCommentQuota;
+                } else {
+                    throw new Error(res.data.message);
+                }
             }
         }) .catch((err) => {
             ElMessage.error(err);
@@ -319,10 +323,12 @@ async function realySendComment() {
     await hotelApi.hotelComment(newComment)
     .then((res)=> {
         if(res.status == 200){
-            getHotelDetailInfo(); //重新获取，以更新评论
-        } else {
-            throw new Error(res.statusText);
-        }
+            if(res.data.code == 200) {
+                getHotelDetailInfo(); //重新获取，以更新评论
+            } else {
+                throw new Error(res.data.message);
+            }
+        } 
     }).catch((err) => {
         ElMessage.error(err);
     })
