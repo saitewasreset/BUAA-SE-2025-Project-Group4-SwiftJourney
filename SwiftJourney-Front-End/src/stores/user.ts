@@ -12,7 +12,7 @@ export const useUserStore = defineStore('user', {
         identityCardId: '',
         preferredSeatLocation: 'A' as 'A' | 'B' | 'C' | 'D' | 'F',
         gender: 'male' as 'male' | 'female' | undefined,
-        age: 0,
+        age: undefined as number | undefined,
         phone: '',
         email: '',
         havePaymentPasswordSet: false,

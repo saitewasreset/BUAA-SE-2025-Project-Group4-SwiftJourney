@@ -46,12 +46,19 @@
     </div>
   </template>
   
-<script>
+<script lang="ts">
 import { ElMessage } from 'element-plus';
 import { useUserStore } from '@/stores/user';
 import { useDebugUserStore } from '@/stores/user';
 import { userApi } from '@/api/UserApi/userApi'
 import validator from 'validator';
+
+interface UserUpdateInfo {
+  username: string;
+  gender?: "male" | "female";
+  age?: number;
+  email: string;
+}
 
 const user = useUserStore();
 //const debugUser = useDebugUserStore();
@@ -59,22 +66,7 @@ const user = useUserStore();
   export default {
     data() {
       return {
-        formData: {
-          name: "", //姓名
-          username: "",
-          identityCardId: "", //身份证号
-          phone: "",
-          gender: "",
-          email: "",
-          age: "",
-        },
         formTepData: {
-          username: "",
-          gender: "",
-          age: "",
-          email: "",
-        },
-        formPostData: {
           username: "",
           gender: "",
           age: "",
@@ -90,47 +82,53 @@ const user = useUserStore();
         setEmailButtonText: "设置",
       };
     },
-    created() {
-      this.initFormData();
-    },
     computed: {
       desensitizeName() {
-        const prefix = this.formData.name.substring(0, 1);
+        const prefix = user.name.substring(0, 1);
         return `${prefix}**`;
       },
       desensitizeEmail() {
-        if(this.formData.email == '' || this.formData.email == null) {
+        if(user.email == null) {
           return '未设置';
         }
-        const prefix = this.formData.email.substring(0, 3);
-        const atIndex = this.formData.email.indexOf('@');
+        const prefix = user.email.substring(0, 3);
+        const atIndex = user.email.indexOf('@');
         if(atIndex != -1) {
-          const suffix = this.formData.email.substring(atIndex);
+          const suffix = user.email.substring(atIndex);
           return `${prefix} **** ${suffix}`;
         }
         return `***`
       },
       username: {
         get(){
-          return this.isSetUsername ? this.formTepData.username : this.formData.username;
+          return this.isSetUsername ? this.formTepData.username : user.username;
         },
-        set(value) {
+        set(value: string) {
           this.formTepData.username = value;
         }
       },
       gender: {
         get(){
-          return this.isSetGender ? this.formTepData.gender : this.formData.gender;
+          let gender;
+          if(user.gender == 'female') {
+            gender = '女';
+          } else if (user.gender == 'male') {
+            gender = '男';
+          } else {
+            gender = '未设置';
+          }
+          return this.isSetGender ? this.formTepData.gender : gender;
         },
-        set(value) {
+        set(value: string) {
           this.formTepData.gender = value;
         }
       },
       age: {
         get(){
-          return this.isSetAge ? this.formTepData.age : this.formData.age;
+          let age = user.age ? user.age : '未设置';
+          return this.isSetAge ? this.formTepData.age : age;
         },
-        set(value) {
+        set(value: string) {
           this.formTepData.age = value;
         }
       },
@@ -138,37 +136,22 @@ const user = useUserStore();
         get(){
           return this.isSetEmail ? this.formTepData.email : this.desensitizeEmail;
         },
-        set(value) {
+        set(value: string) {
           this.formTepData.email = value;
         }
       },
       desensitizeIdentityCardId() {
-        const prefix = this.formData.identityCardId.substring(0, 6);
-        const suffix = this.formData.identityCardId.substring(this.formData.identityCardId.length - 4);
+        const prefix = user.identityCardId.substring(0, 6);
+        const suffix = user.identityCardId.substring(user.identityCardId.length - 4);
         return `${prefix} ******** ${suffix}`;
       },
       desensitizePhone() {
-        const prefix = this.formData.phone.substring(0, 3);
-        const suffix = this.formData.phone.substring(this.formData.phone.length - 2);
+        const prefix = user.phone.substring(0, 3);
+        const suffix = user.phone.substring(user.phone.length - 2);
         return `${prefix} **** **${suffix}`;
       },
     },
     methods: {
-      initFormData() {
-        this.formData.name = user.name;
-        this.formData.username = user.username;
-        this.formData.identityCardId = user.identityCardId;
-        this.formData.phone = user.phone;
-        if(user.gender === 'male') {
-          this.formData.gender = '男';
-        } else if (user.gender === 'female') {
-          this.formData.gender = '女';
-        } else {
-          this.formData.gender = '未设置';
-        }
-        this.formData.email = user.email;
-        this.formData.age = user.age == null ? '未设置' : user.age;
-      },
       setUsername() {
         this.isSetUsername = !this.isSetUsername;
         this.setUsernameButtonText = this.isSetUsername ? "取消" : "设置";
@@ -208,27 +191,7 @@ const user = useUserStore();
           return;
         }
 
-        if(this.postData() != true){
-          return;
-        }
-
-        this.formData.age = this.formPostData.age;
-        this.formData.email = this.formPostData.email;
-        this.formData.gender = this.formPostData.gender;
-        this.formData.username = this.formPostData.username;
-
-        if(this.isSetUsername) {
-          this.setUsername();
-        }
-        if(this.isSetGender) {
-          this.setGender();
-        }
-        if(this.isSetAge) {
-          this.setAge();
-        }
-        if(this.isSetEmail){
-          this.setEmail();
-        }
+        this.postData();
       },
       checkAll(){
         if(this.isSetGender && this.formTepData.gender != "") {
@@ -238,9 +201,14 @@ const user = useUserStore();
           }
         }
         if(this.isSetAge && this.formTepData.age != "") {
-          if(this.formTepData.age < 1 || this.formTepData.age > 200){
-            ElMessage.error('年龄只能为1~200的数字');
+          if (!/^\d+$/.test(this.formTepData.age)) {
+            ElMessage.error('请输入有效的数字作为年龄');
             return false;
+          }
+          const age = parseInt(this.formTepData.age, 10);
+          if (age < 1 || age > 200) {
+              ElMessage.error('年龄只能为1~200的数字');
+              return false;
           }
         }
         if(this.isSetEmail && this.formTepData.email != ""){
@@ -249,31 +217,45 @@ const user = useUserStore();
             return false;
           }
         }
+        if(user.email == null && !this.isSetEmail) {
+          ElMessage.error('当前未设置邮箱，需先设置邮箱');
+          return false;
+        }
         return true;
       },
       async postData(){
-        this.formPostData.age = this.formData.age;
-        this.formPostData.email = this.formData.email;
-        this.formPostData.gender = this.formData.gender == '男' ? 'male' : 'female';
-        this.formPostData.username = this.formData.username;
-        if(this.formTepData.username != "") {
-          this.formPostData.username = this.formTepData.username;
+        const formPostData: UserUpdateInfo = {
+          username: this.isSetUsername ? this.formTepData.username : user.username,
+          email: this.isSetEmail ? this.formTepData.email : user.email,
         }
-        if(this.formTepData.gender != "") {
-          this.formPostData.gender = this.formTepData.gender == '男' ? 'male' : 'female';
+        if(this.isSetAge) {
+          formPostData.age = parseInt(this.formTepData.age);
         }
-        if(this.formTepData.age != "") {
-          this.formPostData.age = this.formTepData.age;
-        }
-        if(this.formTepData.email != "") {
-          this.formPostData.email = this.formTepData.email;
+        if(this.isSetGender) {
+          formPostData.gender = this.formTepData.gender == '男' ? 'male' : 'female';
         }
 
-        await userApi.setUserInfo(this.formPostData)
+        await userApi.setUserInfo(formPostData)
           .then((res) =>{
             if(res.status == 200) {
               ElMessage.success('设置成功');
-              return true;
+
+              if(this.isSetUsername) {
+                this.setUsername();
+                user.username = formPostData.username;
+              }
+              if(this.isSetGender) {
+                this.setGender();
+                user.gender = formPostData.gender;
+              }
+              if(this.isSetAge) {
+                this.setAge();
+                user.age = formPostData.age;
+              }
+              if(this.isSetEmail){
+                this.setEmail();
+                user.email = formPostData.email;
+              }
             } else if (res.status == 403) {
               ElMessage.error('会话无效');
             } else if (res.status == 15003) {
@@ -287,8 +269,6 @@ const user = useUserStore();
           .catch((error) => {
             ElMessage.error(error);
           })
-
-          return false;
       },
     },
   };

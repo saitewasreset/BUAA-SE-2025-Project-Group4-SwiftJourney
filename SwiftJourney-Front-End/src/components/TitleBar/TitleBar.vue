@@ -30,7 +30,7 @@
                     >
                     <div class="Popover">
                         <div class="PopoverTitle">
-                            {{ user.name }}
+                            {{ user.username }}
                         </div>
                         <div class="PopoverSubTitle">
                             {{ user.phone }}
