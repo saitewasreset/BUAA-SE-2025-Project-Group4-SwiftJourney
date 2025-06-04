@@ -402,7 +402,7 @@ impl OrderDataConverter {
                 .map(TransactionId::try_from)
                 .transpose()?,
         );
-        let personal_info_id = PersonalInfoId::from_db_value(dish_order_do.person_info_id as i32)?;
+        let personal_info_id = PersonalInfoId::from_db_value(dish_order_do.person_info_id)?;
 
         let base = BaseOrder::new(
             Some(order_id),
