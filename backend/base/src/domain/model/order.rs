@@ -11,11 +11,13 @@
 //! - `HotelOrder`: 结构体，表示酒店预订订单。
 //! - `DishOrder`: 结构体，表示火车餐订单。
 //! - `TakeawayOrder`: 结构体，表示外卖订单。
+use super::personal_info::PreferredSeatLocation;
 use crate::Verified;
 use crate::domain::model::dish::DishId;
 use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomTypeId};
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::takeaway::TakeawayDishId;
+use crate::domain::model::train::SeatTypeName;
 use crate::domain::model::train_schedule::{Seat, StationRange, TrainScheduleId};
 use crate::domain::model::transaction::TransactionId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
@@ -28,8 +30,6 @@ use std::any::Any;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use uuid::Uuid;
-
-use super::personal_info::PreferredSeatLocation;
 
 /// 枚举类型，表示订单的状态。
 ///
@@ -427,6 +427,7 @@ pub struct TrainOrder {
     base: BaseOrder,
     train_schedule_id: TrainScheduleId,
     seat: Option<Seat>,
+    order_seat_type_name: SeatTypeName<Verified>,
     preferred_seat_location: Option<PreferredSeatLocation>,
     station_range: StationRange<Verified>,
 }
@@ -446,6 +447,7 @@ impl TrainOrder {
         base_order: BaseOrder,
         train_schedule_id: TrainScheduleId,
         seat: Option<Seat>,
+        order_seat_type_name: SeatTypeName<Verified>,
         preferred_seat_location: Option<PreferredSeatLocation>,
         station_range: StationRange<Verified>,
     ) -> Self {
@@ -453,6 +455,7 @@ impl TrainOrder {
             base: base_order,
             train_schedule_id,
             seat,
+            order_seat_type_name,
             preferred_seat_location,
             station_range,
         }
@@ -508,6 +511,10 @@ impl TrainOrder {
 
     pub fn base(&self) -> &BaseOrder {
         &self.base
+    }
+
+    pub fn order_seat_type_name(&self) -> &SeatTypeName<Verified> {
+        &self.order_seat_type_name
     }
 }
 
