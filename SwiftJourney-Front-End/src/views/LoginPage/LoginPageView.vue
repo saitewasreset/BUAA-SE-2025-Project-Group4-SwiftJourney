@@ -47,12 +47,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
-import { useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
-import { userApi } from '@/api/UserApi/userApi';
-import { useUserStore } from '@/stores/user';
-import type { AxiosResponse } from 'axios';
-import type { UserApiResponseData } from '@/interface/userInterface';
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
+import { userApi } from '@/api/UserApi/userApi'
+import { useUserStore } from '@/stores/user'
+import type { AxiosResponse } from 'axios'
+import type { UserApiResponseData } from '@/interface/userInterface'
 
 const inputPhone = ref('')
 const inputPassword = ref('')
@@ -72,23 +72,21 @@ function goToRegisterPage() {
 // -------------------- 处理登录逻辑 --------------------
 
 async function postLoginMsg() {
-  
   const params: Object = {
     phone: inputPhone.value,
-    password: inputPassword.value
-  };
+    password: inputPassword.value,
+  }
 
-  const res: UserApiResponseData = (await userApi.userLogin(params)).data;
+  const res: UserApiResponseData = (await userApi.userLogin(params)).data
   if (res.code === 200) {
-    const nowUser = useUserStore();
-    await nowUser.restoreUserFromCookie(router);
-    message.success('登录成功');
-    goToHomePage();
-  } else  {
-    message.error('登录失败，请检查手机号和密码是否正确');
+    const nowUser = useUserStore()
+    await nowUser.restoreUserFromCookie(router)
+    message.success('登录成功')
+    goToHomePage()
+  } else {
+    message.error('登录失败，请检查手机号和密码是否正确')
   }
 }
-
 </script>
 
 <style lang="css" scoped>
@@ -105,6 +103,7 @@ body {
 /* 左侧元素样式 */
 .left-area {
   align-self: center;
+  margin-left: 30%;
 }
 
 .logo {
