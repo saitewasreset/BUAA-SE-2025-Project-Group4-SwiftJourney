@@ -268,16 +268,16 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
             roomTypeMap: map,
         }
         hotelGInfoWRoom.value.push(tepInfoWRoom);
+        roomSet.forEach((key) => {
+            if (!roomMapIndex.has(key)) {
+                roomList.value.push({
+                    type: key,
+                    isShow: true,
+                });
+                roomMapIndex.set(key, roomList.value.length - 1);
+            }
+        })
     }
-    roomSet.forEach((key) => {
-        roomList.value.push({
-            type: key,
-            isShow: true,
-        });
-    })
-    roomList.value.forEach((key, index) => {
-        roomMapIndex.set(key.type, index);
-    })
 }
 
 async function hotelDetailRoom(id: string) {
