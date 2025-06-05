@@ -22,7 +22,7 @@ SELECT
 FROM
     transaction
 WHERE
-    status = 'Paid'
+    status = 'paid'
 GROUP BY
     user_id",
             ))
