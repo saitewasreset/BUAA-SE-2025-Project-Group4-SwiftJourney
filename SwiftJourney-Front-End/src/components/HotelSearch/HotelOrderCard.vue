@@ -130,7 +130,7 @@ async function confirmCreateTransaction() {
     .then((res) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
-                successCreateTransaction(res.data as TransactionInfo);
+                successCreateTransaction(res.data.data as TransactionInfo);
             } else {
                 throw new Error(res.data.message);
             }

@@ -105,7 +105,7 @@ export interface HotelOrderRequest {
 }
 
 export interface HotelRoomInfo extends HotelRoomDetailInfo {
-    roomType: string,
+    roomType: "标准间" | "大床房" | "行政套房";
 }
 
 export interface HotelOrderInfo extends HotelOrderRequest {
