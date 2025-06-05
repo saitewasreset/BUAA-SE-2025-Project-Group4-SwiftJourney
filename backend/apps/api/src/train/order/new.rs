@@ -35,13 +35,7 @@ pub async fn create_train_order(
 
     let transaction_result = train_order_service
         .process_train_order_packs(session_id, order_packs)
-        .await
-        .map_err(|e| {
-            error!("Failed to process orders: {:?}", e);
-            ApplicationErrorBox::from(
-                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-            )
-        })?;
+        .await?;
 
     if transaction_result.transaction_id.is_nil() {
         error!("No transaction was created");
