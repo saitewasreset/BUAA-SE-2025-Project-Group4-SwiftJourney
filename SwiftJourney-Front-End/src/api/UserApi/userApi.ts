@@ -24,4 +24,10 @@ export const userApi = {
     queryUserBalance: () => {
         return getRequest('/api/payment/balance');
     },
+    getUserPersonalInfo: () => {
+        return getRequest('/api/user/personal_info');
+    },
+    postUserPersonalInfo: (params: Object) => {
+        return postRequest('/api/user/personal_info', params);
+    }
 };
