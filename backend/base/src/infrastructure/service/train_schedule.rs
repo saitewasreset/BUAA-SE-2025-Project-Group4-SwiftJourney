@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -547,42 +548,80 @@ where
     //     Ok(result)
     // }
 
+    #[instrument(skip(self))]
     async fn direct_schedules(
         &self,
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-        let (schedules, _, connections, graph, index_map) = self.load_daily_context(date).await?;
+        let begin = std::time::Instant::now();
 
-        let lookup: HashMap<_, _> = schedules
-            .iter()
-            .filter_map(|s| s.get_id().map(|id| (id, s.clone())))
-            .collect();
+        let schedules = self.get_schedules(date).await?;
 
-        let mut res = Vec::<TrainSchedule>::new();
-        let mut seen = HashSet::<TrainScheduleId>::new();
+        let get_schedules_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
 
-        for &(dep, arr) in pairs {
-            let departure_index = index_map[&dep];
-            let arrival_index = index_map[&arr];
+        let route_map_by_id = self
+            .route_service
+            .get_routes()
+            .await
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
+            })?
+            .into_iter()
+            .map(|r| (r.get_id().unwrap(), r))
+            .collect::<HashMap<_, _>>();
 
-            let (level0, _) = earliest_arrival_k1(
-                departure_index,
-                graph.node_count(),
-                0, // 起点时间：当天 00:00
-                &connections,
-                &index_map,
-            );
+        let get_routes_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
 
-            for schedule_id in backtrack_direct(&level0, arrival_index) {
-                if seen.insert(schedule_id) {
-                    if let Some(s) = lookup.get(&schedule_id) {
-                        res.push(s.clone());
+        let want: HashSet<_> = pairs.iter().copied().collect();
+
+        let mut result = Vec::new();
+
+        let mut route_pos_cache: HashMap<RouteId, Arc<HashMap<StationId, usize>>> =
+            HashMap::with_capacity(route_map_by_id.len());
+
+        for schedule in &schedules {
+            let route_id = schedule.route_id();
+
+            let route = match route_map_by_id.get(&route_id) {
+                Some(r) => r,
+                None => continue,
+            };
+
+            let pos_map: Arc<HashMap<StationId, usize>> = match route_pos_cache.entry(route_id) {
+                Entry::Occupied(o) => o.get().clone(),
+                Entry::Vacant(v) => {
+                    let mut m = HashMap::with_capacity(route.stops().len());
+                    for (idx, stop) in route.stops().iter().enumerate() {
+                        m.insert(stop.station_id(), idx);
+                    }
+                    v.insert(Arc::new(m)).clone()
+                }
+            };
+
+            for &(from, to) in &want {
+                if let (Some(&i_from), Some(&i_to)) = (pos_map.get(&from), pos_map.get(&to)) {
+                    if i_from < i_to {
+                        result.push(schedule.clone());
+                        break;
                     }
                 }
             }
         }
-        Ok(res)
+
+        let calc_elapsed = begin.elapsed();
+
+        info!(
+            "Direct schedules completed: get_schedules: {:?}, get_routes: {:?} calc: {:?}",
+            get_schedules_elapsed, get_routes_elapsed, calc_elapsed
+        );
+
+        result.sort_by_key(|s| s.origin_departure_time());
+        Ok(result)
     }
 
     // 原本的想法是「交集‑筛站法」，但时间复杂度较高，达到 O(N · L) （N 为站点对数，L 为列车时刻表长度）
