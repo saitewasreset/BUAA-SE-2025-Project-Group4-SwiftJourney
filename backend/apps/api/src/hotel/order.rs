@@ -36,11 +36,7 @@ pub async fn create_hotel_order(
 
     let transaction_result = hotel_order_service
         .process_hotel_orders(session_id, hotel_orders)
-        .await
-        .map_err(|e| {
-            error!("Failed to process hotel orders: {:?}", e);
-            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-        })?;
+        .await?;
 
     Ok(ApiResponse {
         code: API_SUCCESS_CODE,
