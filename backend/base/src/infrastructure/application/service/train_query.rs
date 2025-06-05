@@ -55,7 +55,7 @@ use crate::domain::service::train_schedule::TrainScheduleService;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use std::collections::HashMap;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
@@ -338,9 +338,14 @@ where
         &self,
         cmd: DirectTrainQueryCommand,
     ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
+        let begin = std::time::Instant::now();
+
         self.verify_session(cmd.session_id.as_str()).await?;
 
         cmd.validate()?;
+
+        let validate_command_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
 
         let from_ids = self
             .resolve_station_ids(&cmd.departure_station, &cmd.departure_city)
@@ -354,6 +359,9 @@ where
             .flat_map(|f| to_ids.iter().map(move |t| (*f, *t)))
             .collect();
 
+        let resolve_station_ids_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
+
         let schedules = self
             .train_schedule_service
             .direct_schedules(cmd.departure_time, &station_pairs)
@@ -364,15 +372,33 @@ where
                 GeneralError::InternalServerError
             })?;
 
+        let get_direct_schedules_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
+
         let routes = self.route_service.get_routes().await.map_err(|e| {
             error!("Failed to get routes: {:?}", e);
 
             GeneralError::InternalServerError
         })?;
+
+        let get_routes_elapsed = begin.elapsed();
+        let begin = std::time::Instant::now();
+
         let mut infos = Vec::new();
         for sch in schedules {
             infos.push(self.build_dto(&sch, &routes, cmd.departure_time).await?);
         }
+
+        let build_dto_elapsed = begin.elapsed();
+
+        info!(
+            "Direct train query completed in: validate_command: {:?}, resolve_station_ids: {:?}, get_direct_schedules: {:?}, get_routes: {:?}, build_dto: {:?}",
+            validate_command_elapsed,
+            resolve_station_ids_elapsed,
+            get_direct_schedules_elapsed,
+            get_routes_elapsed,
+            build_dto_elapsed
+        );
 
         Ok(DirectTrainQueryDTO { solutions: infos })
     }
