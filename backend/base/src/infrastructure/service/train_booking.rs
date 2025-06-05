@@ -1,65 +1,91 @@
 use crate::domain::model::order::{Order, OrderStatus, TrainOrder};
 use crate::domain::repository::order::OrderRepository;
+use crate::domain::repository::seat_availability::SeatAvailabilityRepository;
+use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::train_booking::{TrainBookingService, TrainBookingServiceError};
 use crate::domain::service::train_seat::{TrainSeatService, TrainSeatServiceError};
+use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::service::transaction::TransactionService;
+use crate::domain::{DbId, Identifiable};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use std::ops::Deref;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-pub struct TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
+pub struct TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TS: TransactionService,
     TR: TransactionRepository,
+    TRR: TrainRepository,
     OR: OrderRepository,
+    SAR: SeatAvailabilityRepository,
+    TTCS: TrainTypeConfigurationService,
 {
     train_schedule_repository: Arc<TSR>,
     train_seat_service: Arc<TSS>,
     transaction_server: Arc<TS>,
     transaction_repository: Arc<TR>,
+    train_repository: Arc<TRR>,
     order_repository: Arc<OR>,
+    seat_availability_repository: Arc<SAR>,
+    train_type_configuration_service: Arc<TTCS>,
 }
 
-impl<TSR, TSS, TS, TR, OR> TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
+impl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
+    TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TS: TransactionService,
     TR: TransactionRepository,
+    TRR: TrainRepository,
     OR: OrderRepository,
+    SAR: SeatAvailabilityRepository,
+    TTCS: TrainTypeConfigurationService,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         train_schedule_repository: Arc<TSR>,
         train_seat_service: Arc<TSS>,
         transaction_server: Arc<TS>,
         transaction_repository: Arc<TR>,
+        train_repository: Arc<TRR>,
         order_repository: Arc<OR>,
+        seat_availability_repository: Arc<SAR>,
+        train_type_configuration_service: Arc<TTCS>,
     ) -> Self {
         Self {
             train_schedule_repository,
             train_seat_service,
             transaction_server,
             transaction_repository,
+            train_repository,
             order_repository,
+            seat_availability_repository,
+            train_type_configuration_service,
         }
     }
 }
 
 #[async_trait]
-impl<TSR, TSS, TS, TR, OR> TrainBookingService for TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
+impl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS> TrainBookingService
+    for TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TS: TransactionService,
     TR: TransactionRepository,
+    TRR: TrainRepository,
     OR: OrderRepository,
+    SAR: SeatAvailabilityRepository,
+    TTCS: TrainTypeConfigurationService,
 {
     #[instrument(skip(self))]
     async fn booking_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
@@ -81,18 +107,8 @@ where
                 train_order.order_status(),
             ));
         }
-
-        let train_schedule_id = train_order.train_schedule_id();
-        let seat = match train_order.seat() {
-            Some(seat) => seat,
-            None => {
-                return Err(TrainBookingServiceError::InfrastructureError(
-                    ServiceError::RelatedServiceError(anyhow!("Seat information is missing")),
-                ));
-            }
-        };
-        let seat_type = seat.seat_type();
         let station_range = train_order.station_range();
+        let train_schedule_id = train_order.train_schedule_id();
 
         let train_schedule = match self.train_schedule_repository.find(train_schedule_id).await {
             Ok(Some(schedule)) => schedule,
@@ -104,10 +120,120 @@ where
             Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
         };
 
+        let train_id = train_schedule.train_id();
+        let train = match self.train_repository.find(train_id).await {
+            Ok(Some(train)) => train,
+            Ok(None) => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!(
+                        "Train not found for id {}",
+                        train_id
+                    )),
+                ));
+            }
+            Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
+        };
+
+        let seat_type_name = train_order.order_seat_type_name();
+        let seat_type = match train.seats().get(seat_type_name.deref()) {
+            Some(seat_type) => seat_type.clone(),
+            None => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!(
+                        "Seat type '{}' not found in train",
+                        seat_type_name.deref()
+                    )),
+                ));
+            }
+        };
+        let preferred_location = train_order.preferred_seat_location();
+
+        let seat_id_map = match self
+            .train_type_configuration_service
+            .get_seat_id_map(train_id)
+            .await
+        {
+            Ok(seat_id_map) => seat_id_map,
+            Err(err) => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!(
+                        "Failed to get seat ID map: {}",
+                        err
+                    )),
+                ));
+            }
+        };
+
+        let train_schedule_occupied_seat = match self
+            .seat_availability_repository
+            .get_train_schedule_occupied_seat(train_schedule_id)
+            .await
+        {
+            Ok(seat) => seat,
+            Err(err) => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!(
+                        "Failed to get occupied seat: {}",
+                        err
+                    )),
+                ));
+            }
+        };
+
+        let seat_locations = match seat_id_map.get(seat_type_name) {
+            Some(seats) => seats,
+            None => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(anyhow!(
+                        "Seat type '{}' not found in seat ID map",
+                        seat_type_name.deref()
+                    )),
+                ));
+            }
+        };
+
+        let seat_type_id = seat_type.get_id().expect("Seat type should have ID");
+        let station_begin_id = station_range.get_from_station_id();
+        let station_end_id = station_range.get_to_station_id();
+
+        let occupied_seats = match train_schedule_occupied_seat
+            .get(&seat_type_id.to_db_value())
+            .and_then(|map| {
+                map.get(&(station_begin_id.to_db_value(), station_end_id.to_db_value()))
+            }) {
+            Some(seats) => seats,
+            None => &Vec::new(),
+        };
+
+        let available_seats: Vec<_> = seat_locations
+            .iter()
+            .filter(|(id, _)| !occupied_seats.contains(&id.to_db_value()))
+            .collect();
+
+        if available_seats.is_empty() {
+            train_order.set_status(OrderStatus::Failed);
+
+            return Err(TrainBookingServiceError::NoAvailableTickets(order_uuid));
+        }
+
+        let selected_seat = match preferred_location {
+            Some(pref_loc) => {
+                let pref_char = char::from(*pref_loc);
+
+                available_seats
+                    .iter()
+                    .find(|(_, info)| info.location == pref_char)
+                    .or_else(|| available_seats.first()) // 没有匹配的就选第一个可用的
+                    // SAFETY: 前面的检查保证了 available_seats 不为空
+                    .unwrap()
+            }
+            None => available_seats.first().unwrap(),
+        };
+
+        let seat_location_info = selected_seat.1;
+
         let seat_availability_id =
             train_schedule.get_seat_availability_id(station_range, seat_type.clone());
-
-        let seat_location_info = seat.location_info();
 
         let seat = match self
             .train_seat_service
@@ -131,6 +257,7 @@ where
         train_order.set_status(OrderStatus::Ongoing);
         train_order.set_seat(Some(seat.clone()));
 
+        info!("Train order {} successfully booked with seat", order_uuid);
         Ok(())
     }
 
