@@ -259,8 +259,9 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
     beginDate.value = hotelQuery.value.beginDate;
     endDate.value = hotelQuery.value.endDate;
     hotelGInfoWRoom.value = [];
-    roomSet.clear();
     roomList.value = [];
+    roomSet.clear();
+    roomMapIndex.clear();
     for(let tepInfo of hotelGeneralInfo) {
         let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
