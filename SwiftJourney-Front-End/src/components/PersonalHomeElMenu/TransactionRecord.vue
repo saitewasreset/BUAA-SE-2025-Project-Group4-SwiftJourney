@@ -161,7 +161,7 @@ const statusChangeTab = {
     active: "行程中",
     completed: "已完成",
     failed: "失败",
-    canceled: "已取消",
+    cancelled: "已取消",
 }
 
 const typeChangeTab = {
@@ -376,7 +376,7 @@ export default {
                     id: transactionData.transactionId,
                     status: statusChangeTab[transactionData.status],
                     time: dayjs(transactionData.createTime).format("YYYY-MM-DD HH:mm:ss"),
-                    payTime: transactionData.payTime,
+                    payTime: dayjs(transactionData.payTime).format("YYYY-MM-DD HH:mm:ss"),
                     money: 'SC ' + String(transactionData.amount),
                     orderInfo: [] as OrderInform [],
                 };
