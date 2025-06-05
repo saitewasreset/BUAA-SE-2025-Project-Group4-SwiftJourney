@@ -78,7 +78,7 @@ impl TryFrom<&str> for OrderStatus {
             "active" => OrderStatus::Active,
             "completed" => OrderStatus::Completed,
             "failed" => OrderStatus::Failed,
-            "cancelled" => OrderStatus::Failed,
+            "cancelled" => OrderStatus::Cancelled,
             x => return Err(format!("Invalid order status: {}", x)),
         })
     }
