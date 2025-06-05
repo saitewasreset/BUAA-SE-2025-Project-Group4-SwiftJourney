@@ -116,10 +116,10 @@
                                     </div>
                                 </template>
                             </el-table-column>
-                            <el-table-column prop="id" label="订单ID" width="200" />
-                            <el-table-column prop="type" label="订单类型" width="200" />
-                            <el-table-column prop="status" label="订单状态" width="200" />
-                            <el-table-column prop="money" label="订单金额" width="200"/>
+                            <el-table-column prop="id" label="订单ID" width="350" />
+                            <el-table-column prop="type" label="订单类型" width="150" />
+                            <el-table-column prop="status" label="订单状态" width="150" />
+                            <el-table-column prop="money" label="订单金额" width="150"/>
                             <el-table-column fixed="right" label="操作" min-width="150">
                                 <template #default="props">
                                     <el-button v-if="props.row.status != '失败' && props.row.status != '已取消'" text type="danger" size="16px" @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
@@ -360,7 +360,7 @@ export default {
                 let transactionDetail: TransactionDetail = {
                     id: transactionData.transactionId,
                     status: statusChangeTab[transactionData.status],
-                    time: transactionData.createTime,
+                    time: dayjs(transactionData.createTime).format("YYYY-MM-DD HH:mm:ss"),
                     payTime: transactionData.payTime,
                     money: 'SC ' + String(transactionData.amount),
                     orderInfo: [] as OrderInform [],
