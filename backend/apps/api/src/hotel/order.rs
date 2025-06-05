@@ -2,12 +2,10 @@ use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, post, web};
 use base::application::{
-    ApplicationError, GeneralError, commands::hotel_order::HotelOrderRequestsDTO,
-    service::hotel_order::HotelOrderService,
+    commands::hotel_order::HotelOrderRequestsDTO, service::hotel_order::HotelOrderService,
 };
 use serde::{Deserialize, Serialize};
 use shared::{API_SUCCESS_CODE, API_SUCCESS_MESSAGE};
-use tracing::error;
 
 /// 用于响应的交易信息
 #[derive(Serialize, Deserialize, Debug)]
