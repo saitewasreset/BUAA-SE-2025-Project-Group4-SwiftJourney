@@ -141,7 +141,7 @@ where
                 name: dish.name().to_string(),
                 dish_type: dish.dish_type().to_string(),
                 picture: format!(
-                    "/resource/image/{}",
+                    "/resource/dish/image/{}",
                     dish.images().first().unwrap_or(&Uuid::nil())
                 ),
                 price: dish.unit_price().to_f64().unwrap_or(0.0),
@@ -182,7 +182,7 @@ where
                         .map(|dish| TakeawayDishInfoDTO {
                             name: dish.name().to_string(),
                             picture: format!(
-                                "/resource/image/{}",
+                                "/resource/takeaway/image/{}",
                                 dish.images().first().unwrap_or(&Uuid::nil())
                             ),
                             price: dish.unit_price().to_f64().unwrap_or(0.0),
