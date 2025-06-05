@@ -5,12 +5,13 @@
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
             <p class="background-hotel-order-text">预订酒店</p>
             <div class="SelectCity">
-                <CitySelect v-if="isChooseCity" :el="inputRef" @handleCityClick="handleCityClick"/>
+                <SelectCard v-if="isChooseCity" :el="inputRef" :input="suggestions" @handleCityClick="handleCityClick"/>
                 <div class="TargetCity">
                     <p>目的地城市</p>
                     <a-input class="CityInput" v-model:value="hotelQuery.target" id="CityInput"
-                    :bordered="false" size="large" placeholder="目的地"
-                    @Focus="handleInputFocus()"></a-input>
+                    :bordered="false" size="large" placeholder="目的地" @input="handleCityInput"
+                    @Focus="handleInputFocus()"
+                    @compositionupdate="handleCompositionUpdate"></a-input>
                 </div>
             </div>
             <div class="SelectHotel">
@@ -100,6 +101,7 @@
 import { ref, nextTick, reactive, computed, watch } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import type { HotelQuery, HotelGeneralInfo, HotelGInfoWRoom, HotelOrderQuery, HotelRoomDetailInfo } from '@/interface/hotelInterface';
+import SelectCard from '../SelectCard/SelectCard.vue'
 import CitySelect from '../TicketSearch/CitySelect/CitySelect.vue';
 import { SearchOutlined } from '@ant-design/icons-vue';
 import locale from 'ant-design-vue/es/date-picker/locale/zh_CN';
@@ -159,8 +161,8 @@ async function handleInputFocus() {
     isChooseCity.value = true;
 }
 
-function handleCityClick(item: Object) {
-    const cityName: string = item.cityName;
+function handleCityClick(item: string) {
+    const cityName: string = item;
     hotelQuery.value.target = cityName;
     isChooseCity.value = false;
 }
@@ -429,6 +431,91 @@ const isOrderShow = ref<boolean>(false);
 function showRoomOrder() {
     isOrderShow.value = !isOrderShow.value;
 }
+
+//----------------------------------城市拼音推荐-----------------------------
+import { pinyin } from 'pinyin-pro'
+import { useGeneralStore } from '@/stores/general';
+const generalStore = useGeneralStore();
+
+generalStore.init();
+
+const suggestions = ref<string[]>([]);
+
+const handleCityInput = () => {
+    updateSuggestions(hotelQuery.value.target);
+};
+
+const handleCompositionUpdate = (event: CompositionEvent) => {
+    updateSuggestions(hotelQuery.value.target + event.data.toLowerCase());
+};
+
+const updateSuggestions = (userInput: string) => {
+    const chineseChars: string[] = [];
+    const otherChars: string[] = [];
+    const stringChars: string[] = [];
+    suggestions.value = [];
+
+    if(userInput.trim() == '') {
+        return;
+    }
+
+    for (const char of userInput) {
+        if (char >= '\u4e00' && char <= '\u9fff') { // 判断字符是否为汉字
+            chineseChars.push(char);
+            stringChars.push(pinyin(char, { toneType: 'none' }));
+            stringChars.push(" ");
+        } else {
+            otherChars.push(char);
+            stringChars.push(char);
+        }
+    }
+
+    const chineseString = chineseChars.join('');
+    const otherString = otherChars.join('');
+    const stringString = stringChars.join('');
+
+    if(chineseString == '') {
+        pinyinCmp(generalStore.PinYinList, otherString);
+    }
+    else if(generalStore.CityMapPinYin.has(chineseString)) {
+        let pinyins = generalStore.CityMapPinYin.get(chineseString);
+        if(pinyins != null) {
+            pinyinCmp(pinyins, stringString);
+        }
+    } else {
+        for(let i = 1; i <= chineseString.length; i++) {
+            let tep = chineseString.substring(i-1, i);
+            let pinyins = generalStore.CityMapPinYin.get(tep);
+            if(pinyins != null) {
+                pinyinCmp(pinyins, stringString);
+            }
+        }
+    }
+}
+
+function pinyinCmp(pinyins: string[], pinYin: string) {
+    pinyins.forEach((value) => {
+        const templateParts = value.split(" ");
+        const testParts = pinYin.split(" ");
+        if (testParts.length <= templateParts.length) {
+            // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
+            for (let i = 0; i < testParts.length; i++) {
+                // 如果测试字符串的区域不是从模板字符串对应区域开头开始的子串，返回false
+                if (!templateParts[i].startsWith(testParts[i])) {
+                    return;
+                }
+            }
+            const cities = generalStore.PinYinMapCity.get(value);
+            if(cities != null) {
+                cities.forEach((tep) => {
+                    suggestions.value.push(tep);
+                })
+            }
+        }
+    })
+}
+
+
 
 //-----------------------------------debug-----------------------------------
 /*import hotelImage from '../../assets/hotel.jpg'
