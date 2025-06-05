@@ -26,6 +26,8 @@ pub enum TrainOrder {
     ActiveTime,
     CompleteTime,
     Status,
+    OrderSeatType,
+    PreferredSeatLocation,
 }
 
 #[async_trait::async_trait]
@@ -39,8 +41,8 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(TrainOrder::Id))
                     .col(uuid(TrainOrder::Uuid).not_null())
                     .col(integer(TrainOrder::TrainScheduleId).not_null())
-                    .col(integer(TrainOrder::SeatTypeId).not_null())
-                    .col(integer(TrainOrder::SeatId).not_null())
+                    .col(ColumnDef::new(TrainOrder::SeatTypeId).integer().null())
+                    .col(ColumnDef::new(TrainOrder::SeatId).integer().null())
                     .col(integer(TrainOrder::BeginStationId).not_null())
                     .col(integer(TrainOrder::EndStationId).not_null())
                     .col(integer(TrainOrder::PersonInfoId).not_null())
@@ -55,6 +57,12 @@ impl MigrationTrait for Migration {
                     .col(timestamp_with_time_zone(TrainOrder::ActiveTime))
                     .col(timestamp_with_time_zone(TrainOrder::CompleteTime))
                     .col(string(TrainOrder::Status).not_null())
+                    .col(string(TrainOrder::OrderSeatType).not_null())
+                    .col(
+                        ColumnDef::new(TrainOrder::PreferredSeatLocation)
+                            .string()
+                            .null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .from(TrainOrder::Table, TrainOrder::TrainScheduleId)

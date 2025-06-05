@@ -26,7 +26,7 @@ use crate::domain::model::train_schedule::{
 use crate::DB_CHUNK_SIZE;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 use sea_orm::{ActiveValue, DatabaseConnection};
@@ -160,36 +160,43 @@ impl TrainScheduleRepositoryImpl {
 
         let mut r = Vec::new();
 
+        let seat_type_list = crate::models::seat_type::Entity::find()
+            .all(&self.db)
+            .await
+            .context("Failed to find seat type".to_string())?;
+
+        let seat_type_map = seat_type_list
+            .into_iter()
+            .map(|item| (item.id, item))
+            .collect::<HashMap<_, _>>();
+
+        let seat_availability_do_list = crate::models::seat_availability::Entity::find()
+            .all(&self.db)
+            .await
+            .context("Failed to find seat availability".to_string())?;
+
+        let mut seat_availability_by_schedule_id: HashMap<
+            i32,
+            Vec<crate::models::seat_availability::Model>,
+        > = HashMap::new();
+
+        for item in seat_availability_do_list {
+            seat_availability_by_schedule_id
+                .entry(item.train_schedule_id)
+                .or_default()
+                .push(item);
+        }
+
         for train_schedule_do in result {
-            let seat_availability_do_list = crate::models::seat_availability::Entity::find()
-                .filter(
-                    crate::models::seat_availability::Column::TrainScheduleId
-                        .eq(train_schedule_do.id),
-                )
-                .all(&self.db)
-                .await
-                .context(format!(
-                    "Failed to find seat availability for train schedule id: {}",
-                    train_schedule_do.id
-                ))?;
-
-            let seat_type_list = crate::models::seat_type::Entity::find()
-                .all(&self.db)
-                .await
-                .context(format!(
-                    "Failed to find seat type for train schedule id: {}",
-                    train_schedule_do.id
-                ))?;
-
-            let seat_type_map = seat_type_list
-                .into_iter()
-                .map(|item| (item.id, item))
-                .collect::<HashMap<_, _>>();
+            let train_schedule_id = train_schedule_do.id;
 
             let train_schedule_do_pack = TrainScheduleDoPack {
                 train_schedule_do,
-                seat_availability_do_list,
-                seat_type: seat_type_map,
+                seat_availability_do_list: seat_availability_by_schedule_id
+                    .get(&train_schedule_id)
+                    .cloned()
+                    .unwrap_or_default(),
+                seat_type: seat_type_map.clone(),
             };
 
             r.push(TrainScheduleDataConverter::make_from_do(

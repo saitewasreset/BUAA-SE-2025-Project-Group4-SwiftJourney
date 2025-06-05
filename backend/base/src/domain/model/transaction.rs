@@ -48,8 +48,8 @@ pub enum TransactionStatusError {
 impl Display for TransactionStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TransactionStatus::Unpaid => write!(f, "Unpaid"),
-            TransactionStatus::Paid => write!(f, "Paid"),
+            TransactionStatus::Unpaid => write!(f, "unpaid"),
+            TransactionStatus::Paid => write!(f, "paid"),
         }
     }
 }
@@ -61,8 +61,8 @@ impl From<TransactionStatus> for &'static str {
     /// - 对应的字符串。
     fn from(status: TransactionStatus) -> Self {
         match status {
-            TransactionStatus::Unpaid => "Unpaid",
-            TransactionStatus::Paid => "Paid",
+            TransactionStatus::Unpaid => "unpaid",
+            TransactionStatus::Paid => "paid",
         }
     }
 }
@@ -80,8 +80,8 @@ impl TryFrom<&str> for TransactionStatus {
     /// - 失败时返回错误字符串。
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "Unpaid" => Ok(TransactionStatus::Unpaid),
-            "Paid" => Ok(TransactionStatus::Paid),
+            "unpaid" => Ok(TransactionStatus::Unpaid),
+            "paid" => Ok(TransactionStatus::Paid),
             _ => Err("Invalid transaction status"),
         }
     }
