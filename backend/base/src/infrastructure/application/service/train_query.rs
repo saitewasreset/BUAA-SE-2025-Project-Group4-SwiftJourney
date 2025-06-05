@@ -44,6 +44,7 @@ use crate::application::service::train_query::{
     TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
+use crate::domain::repository::station::StationRepository;
 use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
 use crate::domain::repository::route::RouteRepository;
@@ -59,7 +60,7 @@ use tracing::{error, info, instrument};
 
 // Thinking 1.2.1D - 4: 为何需要使用`+ 'static + Send + Sync`约束泛型参数？
 // Thinking 1.2.1D - 5: 为何需要使用`Arc<T>`存储领域服务？为何无需使用`Arc<Mutex<T>>`？
-pub struct TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
+pub struct TrainQueryServiceImpl<T, U, W, SMS, RR, TR, SR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
@@ -67,6 +68,7 @@ where
     SMS: SessionManagerService,
     RR: RouteRepository,
     TR: TrainRepository,
+    SR: StationRepository,
 {
     // Step 3: Store service instance you need using `Arc<T>` and generics parameter
     // HINT: You may refer to `UserManagerServiceImpl` for example
@@ -77,12 +79,13 @@ where
     session_manager_service: Arc<SMS>,
     route_repository: Arc<RR>,
     train_repository: Arc<TR>,
+    station_repository: Arc<SR>,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (3 / 6)
-impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
+impl<T, U, W, SMS, RR, TR, SR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR, SR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
@@ -90,6 +93,7 @@ where
     SMS: SessionManagerService,
     RR: RouteRepository,
     TR: TrainRepository,
+    SR: StationRepository,
 {
     pub fn new(
         train_schedule_service: Arc<T>,
@@ -98,6 +102,7 @@ where
         session_manager_service: Arc<SMS>,
         route_repository: Arc<RR>,
         train_repository: Arc<TR>,
+        station_repository: Arc<SR>,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
@@ -106,6 +111,7 @@ where
             session_manager_service,
             route_repository,
             train_repository,
+            station_repository,
         }
     }
 
@@ -169,7 +175,7 @@ where
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (4 / 6)
 #[async_trait]
-impl<T, U, W, SMS, RR, TR> TrainQueryService for TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
+impl<T, U, W, SMS, RR, TR, SR> TrainQueryService for TrainQueryServiceImpl<T, U, W, SMS, RR, TR, SR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
@@ -177,6 +183,7 @@ where
     SMS: SessionManagerService,
     RR: RouteRepository,
     TR: TrainRepository,
+    SR: StationRepository,
 {
     #[instrument(skip(self))]
     async fn query_train(
@@ -437,92 +444,142 @@ where
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
 
+        // 获取所有当天的车次
+        let schedules = self
+            .train_schedule_service
+            .get_schedules(cmd.departure_time)
+            .await
+            .map_err(|e| {
+                error!("Failed to get schedules: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        // 构建ID到车次的映射，方便查找
+        let schedule_by_id: HashMap<_, _> = schedules
+            .iter()
+            .filter_map(|s| s.get_id().map(|id| (id, s)))
+            .collect();
+
         let mut solutions = Vec::new();
-        for (schedule_ids, mid_station) in transfer_solutions {
-            if schedule_ids.len() != 2 || mid_station.is_none() {
+        for (schedule_ids, mid_station_opt) in transfer_solutions {
+            if schedule_ids.len() != 2 || mid_station_opt.is_none() {
                 continue;
             }
 
-            let mut train_infos = Vec::new();
-            for schedule_id in &schedule_ids {
-                let schedules = self
-                    .train_schedule_service
-                    .get_schedules(cmd.departure_time)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get schedules: {:?}", e);
-                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-                    })?;
+            let mid_station = mid_station_opt.unwrap();
 
-                let schedule = schedules.iter().find(|s| s.get_id() == Some(*schedule_id));
+            // 获取中转站的名称
+            let station_name = match self.station_repository.find(mid_station).await {
+                Ok(Some(station)) => station.name().to_string(),
+                _ => continue,
+            };
 
-                if let Some(sch) = schedule {
-                    train_infos.push(self.build_dto(sch, &routes, cmd.departure_time).await?);
-                }
-            }
+            // 获取两段行程的车次信息
+            let first_schedule = match schedule_by_id.get(&schedule_ids[0]) {
+                Some(s) => s,
+                None => continue,
+            };
 
-            if train_infos.len() == 2 {
-                let station_name = self
-                    .station_service
-                    .get_station_by_name(mid_station.unwrap().to_string())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to get station by id: {:?}", e);
-                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-                    })?
-                    .map(|s| s.name().to_string())
-                    .unwrap_or_else(|| "未知站点".to_string());
+            let second_schedule = match schedule_by_id.get(&schedule_ids[1]) {
+                Some(s) => s,
+                None => continue,
+            };
 
-                let first_train_arrival_time = train_infos[0]
-                    .route
-                    .iter()
-                    .find(|stop| stop.station_name == station_name)
-                    .map(|stop| {
-                        stop.arrival_time
-                            .clone()
-                            .expect("arrival time should exist for non-origin stops")
-                    })
-                    .unwrap_or(train_infos[0].terminal_arrival_time.clone());
+            // 构建完整DTO
+            let mut first_dto = match self
+                .build_dto(first_schedule, &routes, cmd.departure_time)
+                .await
+            {
+                Ok(dto) => dto,
+                Err(_) => continue,
+            };
 
-                let second_train_departure_time = train_infos[1]
-                    .route
-                    .iter()
-                    .find(|stop| stop.station_name == station_name)
-                    .map(|stop| {
-                        stop.departure_time
-                            .clone()
-                            .expect("departure time should exist for non-terminal stops")
-                    })
-                    .unwrap_or_else(|| train_infos[1].origin_departure_time.clone());
+            let mut second_dto = match self
+                .build_dto(second_schedule, &routes, cmd.departure_time)
+                .await
+            {
+                Ok(dto) => dto,
+                Err(_) => continue,
+            };
 
-                let first_dt =
-                    NaiveDateTime::parse_from_str(&first_train_arrival_time, "%Y-%m-%d %H:%M:%S")
-                        .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
-                let second_dt = NaiveDateTime::parse_from_str(
-                    &second_train_departure_time,
-                    "%Y-%m-%d %H:%M:%S",
-                )
-                .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+            // 修改第一段行程，只保留从出发站到中转站的部分
+            let first_mid_idx = match first_dto
+                .route
+                .iter()
+                .position(|stop| stop.station_name == station_name)
+            {
+                Some(idx) => idx,
+                None => continue, // 第一段行程中没有找到中转站
+            };
 
-                let relaxing_time = if second_dt > first_dt {
-                    (second_dt - first_dt).num_seconds() as u32
-                } else {
-                    (second_dt + Duration::hours(24) - first_dt).num_seconds() as u32
-                };
+            // 更新第一段行程的到达站信息
+            first_dto.arrival_station = station_name.clone();
+            first_dto.arrival_time = first_dto.route[first_mid_idx]
+                .arrival_time
+                .clone()
+                .expect("应该有到达时间");
 
-                solutions.push(TransferSolutionDTO {
-                    first_ride: train_infos[0].clone(),
-                    second_ride: train_infos[1].clone(),
-                    relaxing_time,
-                });
-            }
+            // 截取路线，只保留到中转站的部分
+            first_dto.route.truncate(first_mid_idx + 1);
+
+            // 更新行程时间
+            let first_dep_dt =
+                NaiveDateTime::parse_from_str(&first_dto.departure_time, "%Y-%m-%d %H:%M:%S")
+                    .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+            let first_arr_dt =
+                NaiveDateTime::parse_from_str(&first_dto.arrival_time, "%Y-%m-%d %H:%M:%S")
+                    .unwrap_or_else(|_| first_dep_dt + chrono::Duration::hours(1));
+            first_dto.travel_time = (first_arr_dt - first_dep_dt).num_seconds() as u32;
+
+            // 修改第二段行程，只保留从中转站到目的地的部分
+            let second_mid_idx = match second_dto
+                .route
+                .iter()
+                .position(|stop| stop.station_name == station_name)
+            {
+                Some(idx) => idx,
+                None => continue, // 第二段行程中没有找到中转站
+            };
+
+            // 更新第二段行程的出发站信息
+            second_dto.departure_station = station_name.clone();
+            second_dto.departure_time = second_dto.route[second_mid_idx]
+                .departure_time
+                .clone()
+                .expect("应该有出发时间");
+
+            // 截取路线，只保留从中转站开始的部分
+            second_dto.route = second_dto.route[second_mid_idx..].to_vec();
+
+            // 更新行程时间
+            let second_dep_dt =
+                NaiveDateTime::parse_from_str(&second_dto.departure_time, "%Y-%m-%d %H:%M:%S")
+                    .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+            let second_arr_dt =
+                NaiveDateTime::parse_from_str(&second_dto.arrival_time, "%Y-%m-%d %H:%M:%S")
+                    .unwrap_or_else(|_| second_dep_dt + chrono::Duration::hours(1));
+            second_dto.travel_time = (second_arr_dt - second_dep_dt).num_seconds() as u32;
+
+            // 计算中转等待时间
+            let relaxing_time = if second_dep_dt > first_arr_dt {
+                (second_dep_dt - first_arr_dt).num_seconds() as u32
+            } else {
+                // 处理跨天的情况
+                (second_dep_dt + chrono::Duration::days(1) - first_arr_dt).num_seconds() as u32
+            };
+
+            solutions.push(TransferSolutionDTO {
+                first_ride: first_dto,
+                second_ride: second_dto,
+                relaxing_time,
+            });
         }
 
         Ok(TransferTrainQueryDTO { solutions })
     }
 }
 
-impl<T, U, W, SMS, RR, TR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR>
+impl<T, U, W, SMS, RR, TR, SR> TrainQueryServiceImpl<T, U, W, SMS, RR, TR, SR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     U: StationService + 'static + Send + Sync,
@@ -530,6 +587,7 @@ where
     SMS: SessionManagerService,
     RR: RouteRepository,
     TR: TrainRepository,
+    SR: StationRepository,
 {
     #[instrument(skip(self, routes))]
     async fn build_dto(
