@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import type { HotelOrderInfo, HotelRoomInfo, HotelDetailInfo } from "@/interface/hotelInterface";
 import { useUserStore } from "./user";
+import type { BadgeInstance } from "element-plus";
 const userStore = useUserStore();
 
 export const useHotelOrderStore = defineStore('hotelOrder', {
@@ -8,7 +9,7 @@ export const useHotelOrderStore = defineStore('hotelOrder', {
         hotelOrderInfoList: [] as HotelOrderInfo[],
     }),
     actions: {
-        add(room: HotelRoomInfo, hotel: HotelDetailInfo | undefined): boolean {
+        add(room: HotelRoomInfo, hotel: HotelDetailInfo | undefined, beginDate: string, endDate: string): boolean {
             if(hotel == undefined) {
                 return false;
             }
@@ -19,10 +20,12 @@ export const useHotelOrderStore = defineStore('hotelOrder', {
                 roomType: room.roomType,
                 amount: 1,
                 price: room.price,
-                personalId: userStore.phone,
+                personalId: userStore.personalId,
+                beginDate: beginDate,
+                endDate: endDate,
             }
             for (let key of this.hotelOrderInfoList) {
-                if (hotel.hotelId === key.hotelId && room.roomType === key.roomType) {
+                if (hotel.hotelId === key.hotelId && room.roomType === key.roomType && beginDate == key.beginDate && endDate == key.endDate) {
                     return false;
                 }
             }
@@ -30,8 +33,8 @@ export const useHotelOrderStore = defineStore('hotelOrder', {
             this.syncToLocalStorage();
             return true;
         },
-        delete(hotelId: string, roomType: string) {
-            this.hotelOrderInfoList = this.hotelOrderInfoList.filter(key => !(hotelId == key.hotelId && roomType == key.roomType));
+        delete(hotelId: string, roomType: string, beginDate: string, endDate: string) {
+            this.hotelOrderInfoList = this.hotelOrderInfoList.filter(key => !(hotelId == key.hotelId && roomType == key.roomType && beginDate == key.beginDate && endDate == key.endDate));
             this.syncToLocalStorage();
         },
         syncToLocalStorage() {
