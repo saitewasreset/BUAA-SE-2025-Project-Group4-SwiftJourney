@@ -661,6 +661,7 @@ function getdebugInfo() {
 }
 .RoomTable {
     margin-top: 20px;
+    resize: none;
 }
 
 .OrderInfo {
