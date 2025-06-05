@@ -28,7 +28,7 @@
         </el-card>
         <el-card v-else class="PayCard">
             <el-icon class="PayedIcon"><SuccessFilled /></el-icon>
-            <p class="PayedText">交易成功</p>
+            <p class="PayedText">支付成功，已加入处理队列</p>
         </el-card>
     </div>
 </template>
