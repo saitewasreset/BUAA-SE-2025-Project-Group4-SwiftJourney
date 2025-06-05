@@ -252,6 +252,7 @@ where
         Ok(refund_tx.uuid())
     }
 
+    #[instrument(skip(self))]
     async fn convert_transaction_to_dto(
         &self,
         transaction: Transaction,
@@ -270,6 +271,7 @@ where
         let mut orders = Vec::with_capacity(origin_orders.len());
 
         for order in origin_orders {
+            debug!("Converting order to DTO: {:?}", order);
             orders.push(self.order_service.convert_order_to_dto(order).await?)
         }
 
