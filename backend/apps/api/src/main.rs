@@ -358,12 +358,19 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&train_schedule_repository_impl),
     ));
 
+    let train_type_configuration_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(
+        Arc::clone(&train_repository_impl),
+    ));
+
     let train_booking_service_impl = Arc::new(TrainBookingServiceImpl::new(
         Arc::clone(&train_schedule_repository_impl),
         Arc::clone(&train_seat_service_impl),
         Arc::clone(&transaction_service_impl),
         Arc::clone(&transaction_repository_impl),
+        Arc::clone(&train_repository_impl),
         Arc::clone(&order_repository_impl),
+        Arc::clone(&seat_availability_repository_impl),
+        Arc::clone(&train_type_configuration_service_impl),
     ));
 
     let dish_booking_service_impl = Arc::new(DishBookingServiceImpl::new(Arc::clone(
@@ -387,10 +394,6 @@ async fn main() -> std::io::Result<()> {
     let message_application_service_impl = Arc::new(MessageApplicationServiceImpl::new(
         Arc::clone(&message_service_impl),
         Arc::clone(&session_manager_service_impl),
-    ));
-
-    let train_type_configuration_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(
-        Arc::clone(&train_repository_impl),
     ));
 
     let train_schedule_service_impl = Arc::new(TrainScheduleServiceImpl::new(
