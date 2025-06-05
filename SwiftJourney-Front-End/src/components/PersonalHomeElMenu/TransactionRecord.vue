@@ -118,11 +118,18 @@
                             </el-table-column>
                             <el-table-column prop="id" label="订单ID" width="350" />
                             <el-table-column prop="type" label="订单类型" width="150" />
-                            <el-table-column prop="status" label="订单状态" width="150" />
+                            <el-table-column label="订单状态" width="150">
+                                <template #default="props">
+                                    <div :style="{ color: getStatusColor(props.row.status) }">{{ props.row.status }}</div>
+                                </template>
+                            </el-table-column>
                             <el-table-column prop="money" label="订单金额" width="150"/>
                             <el-table-column fixed="right" label="操作" min-width="150">
                                 <template #default="props">
-                                    <el-button v-if="props.row.status != '失败' && props.row.status != '已取消'" text type="danger" size="16px" @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
+                                    <el-tooltip :content="props.row.reason" :disabled="props.row.canCanceled">
+                                        <el-button text type="danger" size="16px" :disabled="!props.row.canCanceled"
+                                        @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
+                                    </el-tooltip>
                                 </template>
                             </el-table-column>
                         </el-table>
@@ -150,8 +157,8 @@ dayjs.locale('zh-cn');
 const statusChangeTab = {
     unpaid: "未支付",
     paid: "已支付",
-    ongoing: "进行中",
-    active: "",
+    ongoing: "未出行",
+    active: "行程中",
     completed: "已完成",
     failed: "失败",
     canceled: "已取消",
@@ -229,6 +236,14 @@ export default {
             }
         },
 
+        getStatusColor(status: string) {
+            if(status == '行程中') {
+                return 'green';
+            } else if (status == '未支付') {
+                return 'red';
+            }
+        },
+
 
         cancelOrder(id: string, canCancel: boolean, reason: string) {
             if(canCancel){
@@ -242,9 +257,9 @@ export default {
                     }
                 ).then(() => {
                     //api取消订单
-                    //this.apiOrderCancel(id);
+                    this.apiOrderCancel(id);
                     //debug取消订单
-                    this.cancelOrderSuccess();
+                    //this.cancelOrderSuccess();
                 })
             } else {
                 ElMessage.error('不可取消该订单 ' + reason);
