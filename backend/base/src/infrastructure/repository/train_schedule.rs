@@ -26,7 +26,7 @@ use crate::domain::model::train_schedule::{
 use crate::DB_CHUNK_SIZE;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
 use sea_orm::{ActiveValue, DatabaseConnection};
