@@ -25,6 +25,8 @@
     "element-plus": "^2.9.7",
     "moment": "^2.30.1",
     "pinia": "^3.0.1",
+    "pinyin": "^4.0.0",
+    "pinyin-pro": "^3.26.0",
     "validator": "^13.15.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
