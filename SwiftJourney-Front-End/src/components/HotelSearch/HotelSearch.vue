@@ -5,9 +5,9 @@
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
             <p class="background-hotel-order-text">预订酒店</p>
             <div class="SelectCity">
-                <SelectCard v-if="isChooseCity" :el="inputRef" :input="suggestions" @handleCityClick="handleCityClick"/>
+                <SelectCard v-if="isChooseCity" :el="inputRef" :input="cityInput"  @handleCityClick="handleCityClick"/>
                 <div class="TargetCity">
-                    <p>目的地城市</p>
+                    <p>目的地城市/车站</p>
                     <a-input class="CityInput" v-model:value="hotelQuery.target" id="CityInput"
                     :bordered="false" size="large" placeholder="目的地" @input="handleCityInput"
                     @Focus="handleInputFocus()"
@@ -190,11 +190,28 @@ onUnmounted(() => {
 });
 
 //---------------------------------------------------------
+import { useGeneralStore } from '@/stores/general';
+const generalStore = useGeneralStore();
+
 async function searchHotel() {
     if(!checkHotelQuery()) {
         return;
     }
-    await hotelApi.hotelQuery(hotelQuery.value)
+
+    let result = generalStore.checkInputString(hotelQuery.value.target);
+    if(result == undefined) {
+        ElMessage.error('请输入正确的城市名/站名');
+        return;
+    }
+
+    let postQuery: HotelQuery = {
+        beginDate: hotelQuery.value.beginDate,
+        endDate: hotelQuery.value.endDate,
+        target: result.target,
+        targetType: result.targetType,
+        search: hotelQuery.value.search,
+    };
+    await hotelApi.hotelQuery(postQuery)
     .then((res) => {
         if(res.status == 200){
             if(res.data.code == 200) {
@@ -216,8 +233,9 @@ async function searchHotel() {
 }
 
 function checkHotelQuery() {
+    hotelQuery.value.target = hotelQuery.value.target.trim();
     if(hotelQuery.value.target == '') {
-        ElMessage.error('目的地城市不能为空');
+        ElMessage.error('目的地不能为空');
         return false;
     }
     hotelQuery.value.target = hotelQuery.value.target;
@@ -433,90 +451,15 @@ function showRoomOrder() {
 }
 
 //----------------------------------城市拼音推荐-----------------------------
-import { pinyin } from 'pinyin-pro'
-import { useGeneralStore } from '@/stores/general';
-const generalStore = useGeneralStore();
-
-generalStore.init();
-
-const suggestions = ref<string[]>([]);
+const cityInput = ref('');
 
 const handleCityInput = () => {
-    updateSuggestions(hotelQuery.value.target);
+    cityInput.value = hotelQuery.value.target;
 };
 
 const handleCompositionUpdate = (event: CompositionEvent) => {
-    updateSuggestions(hotelQuery.value.target + event.data.toLowerCase());
+    cityInput.value = hotelQuery.value.target + event.data.toLowerCase();
 };
-
-const updateSuggestions = (userInput: string) => {
-    const chineseChars: string[] = [];
-    const otherChars: string[] = [];
-    const stringChars: string[] = [];
-    suggestions.value = [];
-
-    if(userInput.trim() == '') {
-        return;
-    }
-
-    for (const char of userInput) {
-        if (char >= '\u4e00' && char <= '\u9fff') { // 判断字符是否为汉字
-            chineseChars.push(char);
-            stringChars.push(pinyin(char, { toneType: 'none' }));
-            stringChars.push(" ");
-        } else if (char == '\'') {
-            otherChars.push(' ');
-            stringChars.push(' ');
-        } else {
-            otherChars.push(char);
-            stringChars.push(char);
-        }
-    }
-
-    const chineseString = chineseChars.join('');
-    const otherString = otherChars.join('');
-    const stringString = stringChars.join('');
-
-    if(chineseString == '') {
-        pinyinCmp(generalStore.PinYinList, otherString);
-    }
-    else if(generalStore.CityMapPinYin[chineseString]) {
-        let pinyins = generalStore.CityMapPinYin[chineseString];
-        if(pinyins != null) {
-            pinyinCmp(pinyins, stringString);
-        }
-    } else {
-        for(let i = 1; i <= chineseString.length; i++) {
-            let tep = chineseString.substring(i-1, i);
-            let pinyins = generalStore.CityMapPinYin[tep];
-            if(pinyins != null) {
-                pinyinCmp(pinyins, stringString);
-            }
-        }
-    }
-}
-
-function pinyinCmp(pinyins: string[], pinYin: string) {
-    pinyins.forEach((value) => {
-        const templateParts = value.split(" ");
-        const testParts = pinYin.split(" ");
-        if (testParts.length <= templateParts.length) {
-            // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
-            for (let i = 0; i < testParts.length; i++) {
-                // 如果测试字符串的区域不是从模板字符串对应区域开头开始的子串，返回false
-                if (!templateParts[i].startsWith(testParts[i])) {
-                    return;
-                }
-            }
-            const cities = generalStore.PinYinMapCity[value];
-            if(cities != null) {
-                cities.forEach((tep) => {
-                    suggestions.value.push(tep);
-                })
-            }
-        }
-    })
-}
 
 
 
