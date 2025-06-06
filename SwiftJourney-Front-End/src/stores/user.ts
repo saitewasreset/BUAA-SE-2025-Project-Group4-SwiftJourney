@@ -17,16 +17,17 @@ export const useUserStore = defineStore('user', {
         phone: '',
         email: '',
         havePaymentPasswordSet: false,
-        remainingMoney: 'SC' + '0',
+        remainingMoney: 'SC' + " " + '0',
     }),
     getters: {
-        isLogin: () => localStorage.getItem('isLogin') === 'true',
+        isLogin: (state) => localStorage.getItem('isLogin') === 'true' || state.username !== '',
     },
     actions: {
         setPreferredSeatLocation(location: 'A' | 'B' | 'C' | 'D' | 'F') {
             this.preferredSeatLocation = location;
         },
         setUserInfo(userInfo: UserInfo) {
+            localStorage.setItem('isLogin', 'true');
             this.username = userInfo.username;
             this.gender = userInfo.gender;
             this.age = userInfo.age !== undefined ? userInfo.age : 0;
@@ -35,7 +36,6 @@ export const useUserStore = defineStore('user', {
             this.havePaymentPasswordSet = userInfo.havePaymentPasswordSet;
             this.name = userInfo.name;
             this.identityCardId = userInfo.identityCardId;
-            localStorage.setItem('isLogin', 'true');
         },
         setPersonalInfo(personalInfo: PersonalInfo) {
             this.personalId = personalInfo.personalId;
@@ -44,7 +44,7 @@ export const useUserStore = defineStore('user', {
             this.preferredSeatLocation = personalInfo.preferredSeatLocation;
         },
         setUserBalance(balance: number) {
-            this.remainingMoney = 'SC' + balance.toString();
+            this.remainingMoney = 'SC' + " " + balance.toString();
         },
         clearUserInfo() {
             this.username = '';
@@ -56,7 +56,7 @@ export const useUserStore = defineStore('user', {
             this.phone = '';
             this.email = '';
             this.havePaymentPasswordSet = false;
-            this.remainingMoney = 'SC' + '0';
+            this.remainingMoney = 'SC' + " " + '0';
             localStorage.removeItem('isLogin');
         },
         async restoreUserFromCookie(router: Router) {
@@ -109,26 +109,14 @@ export const useUserStore = defineStore('user', {
             return;
         },
         async postPersonalInfo(name: string, identityCardId: string) {
-            const res: UserApiResponseData = (await userApi.postUserPersonalInfo({name: name, identityCardId: identityCardId, default: true})).data;
-            if(res.code === 200) {
-                console.log('personalInfo is setted');
-            } else {
-                console.log(res.message);
-            }
+            const res: UserApiResponseData = (await userApi.setPersonalInfo({name: name, identityCardId: identityCardId, preferredSeatLocation: 'A', default: true})).data;
         },
         async getPersonalInfo() {
-            const personalRes: UserApiResponseData = (await userApi.getUserPersonalInfo()).data;
+            const personalRes: UserApiResponseData = (await userApi.queryPersonalInfo()).data;
             if(personalRes.code == 200) {
                 const personalInfo: PersonalInfo[] = personalRes.data as PersonalInfo[];
                 if(personalInfo.length == 0) {
                     this.postPersonalInfo(this.name, this.identityCardId);
-                    this.getPersonalInfo();
-                } else {
-                    personalInfo.forEach((key) => {
-                        if(key.default) {
-                            this.setPersonalInfo(key);
-                        }
-                    })
                 }
             } else
               throw new Error('invalid session id');  
