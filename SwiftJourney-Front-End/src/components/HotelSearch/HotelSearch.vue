@@ -5,12 +5,13 @@
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
             <p class="background-hotel-order-text">预订酒店</p>
             <div class="SelectCity">
-                <CitySelect v-if="isChooseCity" :el="inputRef" @handleCityClick="handleCityClick"/>
+                <SelectCard v-if="isChooseCity" :el="inputRef" :input="suggestions" @handleCityClick="handleCityClick"/>
                 <div class="TargetCity">
                     <p>目的地城市</p>
                     <a-input class="CityInput" v-model:value="hotelQuery.target" id="CityInput"
-                    :bordered="false" size="large" placeholder="目的地"
-                    @Focus="handleInputFocus()"></a-input>
+                    :bordered="false" size="large" placeholder="目的地" @input="handleCityInput"
+                    @Focus="handleInputFocus()"
+                    @compositionupdate="handleCompositionUpdate"></a-input>
                 </div>
             </div>
             <div class="SelectHotel">
@@ -58,7 +59,7 @@
                 <p class="sub-title">评论数 {{ ratingCountFormat(ratingCountValue) }}</p>
                 <el-slider class="rating-slider" v-model="ratingCountValue" :marks="ratingCountMarks" :show-tooltip="false" />
             </div>
-            <el-scrollbar height="540px" class="HotelInfo">
+            <el-scrollbar height="520px" class="HotelInfo">
                 <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
                     <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
                         <div class="HotelImageContainer">
@@ -100,6 +101,7 @@
 import { ref, nextTick, reactive, computed, watch } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import type { HotelQuery, HotelGeneralInfo, HotelGInfoWRoom, HotelOrderQuery, HotelRoomDetailInfo } from '@/interface/hotelInterface';
+import SelectCard from '../SelectCard/SelectCard.vue'
 import CitySelect from '../TicketSearch/CitySelect/CitySelect.vue';
 import { SearchOutlined } from '@ant-design/icons-vue';
 import locale from 'ant-design-vue/es/date-picker/locale/zh_CN';
@@ -115,7 +117,7 @@ const today = dayjs();
 const nextday = today.add(1, 'day');
 const hotelQuery = ref<HotelQuery> ({
     target: '',
-    target_type: "city",
+    targetType: "city",
     beginDate: formateDate(today),
     endDate: formateDate(nextday),
 });
@@ -159,8 +161,8 @@ async function handleInputFocus() {
     isChooseCity.value = true;
 }
 
-function handleCityClick(item: Object) {
-    const cityName: string = item.cityName;
+function handleCityClick(item: string) {
+    const cityName: string = item;
     hotelQuery.value.target = cityName;
     isChooseCity.value = false;
 }
@@ -195,15 +197,17 @@ async function searchHotel() {
     await hotelApi.hotelQuery(hotelQuery.value)
     .then((res) => {
         if(res.status == 200){
-            successSearchHotel(res.data);
-        } else if (res.status == 403) {
-            ElMessage.error('会话无效');
-        } else if (res.status == 404) {
-            ElMessage.error('查询的目标城市/火车站不存在');
-        } else if (res.status == 21001) {
-            ElMessage.error('入住/离开日期不合法：离开比入住早；只设置其中一个；入住时间超过 7 天');
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                successSearchHotel(res.data.data);
+            }  else if (res.data.code == 403) {
+                ElMessage.error('会话无效');
+            } else if (res.data.code == 404) {
+                ElMessage.error('查询的目标城市/火车站不存在');
+            } else if (res.data.code == 21001) {
+                ElMessage.error('入住/离开日期不合法：离开比入住早；只设置其中一个；入住时间超过 7 天');
+            } else {
+                throw new Error(res.data.message);
+            }
         }
     }) .catch ((error) => {
         ElMessage.error(error);
@@ -216,6 +220,7 @@ function checkHotelQuery() {
         ElMessage.error('目的地城市不能为空');
         return false;
     }
+    hotelQuery.value.target = hotelQuery.value.target;
     if(hotelQuery.value.beginDate == '' || hotelQuery.value.endDate == '') {
         ElMessage.error('入住和离店时间不能为空');
         return false;
@@ -256,8 +261,9 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
     beginDate.value = hotelQuery.value.beginDate;
     endDate.value = hotelQuery.value.endDate;
     hotelGInfoWRoom.value = [];
-    roomSet.clear();
     roomList.value = [];
+    roomSet.clear();
+    roomMapIndex.clear();
     for(let tepInfo of hotelGeneralInfo) {
         let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
@@ -265,16 +271,16 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
             roomTypeMap: map,
         }
         hotelGInfoWRoom.value.push(tepInfoWRoom);
+        roomSet.forEach((key) => {
+            if (!roomMapIndex.has(key)) {
+                roomList.value.push({
+                    type: key,
+                    isShow: true,
+                });
+                roomMapIndex.set(key, roomList.value.length - 1);
+            }
+        })
     }
-    roomSet.forEach((key) => {
-        roomList.value.push({
-            type: key,
-            isShow: true,
-        });
-    })
-    roomList.value.forEach((key, index) => {
-        roomMapIndex.set(key.type, index);
-    })
 }
 
 async function hotelDetailRoom(id: string) {
@@ -282,17 +288,18 @@ async function hotelDetailRoom(id: string) {
         hotelId: id, beginDate: hotelQuery.value.beginDate, endDate: hotelQuery.value.endDate} as HotelOrderQuery
     ).then((res) => {
         if(res.status == 200) {
-            let myMap = new Map(Object.entries(res.data as { [key: string]: HotelRoomDetailInfo }));
-            myMap.forEach((value, key) => {
-                roomSet.add(key);
-            })
-            return myMap;
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                let myMap = new Map(Object.entries(res.data.data as { [key: string]: HotelRoomDetailInfo }));
+                myMap.forEach((value, key) => {
+                    roomSet.add(key);
+                })
+                return myMap;
+            }  else {
+                throw new Error(res.data.message);
+            }
         }
     }).catch((error) => {
         ElMessage.error(error);
-        console.error(error);
         return new Map<string, HotelRoomDetailInfo>();
     })
 }
@@ -425,8 +432,93 @@ function showRoomOrder() {
     isOrderShow.value = !isOrderShow.value;
 }
 
+//----------------------------------城市拼音推荐-----------------------------
+import { pinyin } from 'pinyin-pro'
+import { useGeneralStore } from '@/stores/general';
+const generalStore = useGeneralStore();
+
+generalStore.init();
+
+const suggestions = ref<string[]>([]);
+
+const handleCityInput = () => {
+    updateSuggestions(hotelQuery.value.target);
+};
+
+const handleCompositionUpdate = (event: CompositionEvent) => {
+    updateSuggestions(hotelQuery.value.target + event.data.toLowerCase());
+};
+
+const updateSuggestions = (userInput: string) => {
+    const chineseChars: string[] = [];
+    const otherChars: string[] = [];
+    const stringChars: string[] = [];
+    suggestions.value = [];
+
+    if(userInput.trim() == '') {
+        return;
+    }
+
+    for (const char of userInput) {
+        if (char >= '\u4e00' && char <= '\u9fff') { // 判断字符是否为汉字
+            chineseChars.push(char);
+            stringChars.push(pinyin(char, { toneType: 'none' }));
+            stringChars.push(" ");
+        } else {
+            otherChars.push(char);
+            stringChars.push(char);
+        }
+    }
+
+    const chineseString = chineseChars.join('');
+    const otherString = otherChars.join('');
+    const stringString = stringChars.join('');
+
+    if(chineseString == '') {
+        pinyinCmp(generalStore.PinYinList, otherString);
+    }
+    else if(generalStore.CityMapPinYin.has(chineseString)) {
+        let pinyins = generalStore.CityMapPinYin.get(chineseString);
+        if(pinyins != null) {
+            pinyinCmp(pinyins, stringString);
+        }
+    } else {
+        for(let i = 1; i <= chineseString.length; i++) {
+            let tep = chineseString.substring(i-1, i);
+            let pinyins = generalStore.CityMapPinYin.get(tep);
+            if(pinyins != null) {
+                pinyinCmp(pinyins, stringString);
+            }
+        }
+    }
+}
+
+function pinyinCmp(pinyins: string[], pinYin: string) {
+    pinyins.forEach((value) => {
+        const templateParts = value.split(" ");
+        const testParts = pinYin.split(" ");
+        if (testParts.length <= templateParts.length) {
+            // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
+            for (let i = 0; i < testParts.length; i++) {
+                // 如果测试字符串的区域不是从模板字符串对应区域开头开始的子串，返回false
+                if (!templateParts[i].startsWith(testParts[i])) {
+                    return;
+                }
+            }
+            const cities = generalStore.PinYinMapCity.get(value);
+            if(cities != null) {
+                cities.forEach((tep) => {
+                    suggestions.value.push(tep);
+                })
+            }
+        }
+    })
+}
+
+
+
 //-----------------------------------debug-----------------------------------
-import hotelImage from '../../assets/hotel.jpg'
+/*import hotelImage from '../../assets/hotel.jpg'
 const debugdataMap = new Map<string, HotelRoomDetailInfo>();
 const debugHotelRoomDetailInfo1: HotelRoomDetailInfo = {
     capacity: 1,
@@ -523,7 +615,7 @@ debugRoomSet.forEach((key) => {
 })
 roomList.value.forEach((key, index) => {
     roomMapIndex.set(key.type, index);
-})
+})*/
 </script>
 
 
@@ -539,7 +631,6 @@ roomList.value.forEach((key, index) => {
     background: linear-gradient(to bottom right, #40A5F8, #ffffff);
     position: relative; /* 用于支持绝对定位的子元素 */
     border-radius: 8px; /* 圆角大小 */
-    margin-top: 70px;
 }
 
 .background-hotel-image {

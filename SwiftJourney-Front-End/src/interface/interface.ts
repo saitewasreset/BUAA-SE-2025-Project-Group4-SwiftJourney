@@ -12,7 +12,7 @@ export interface TransactionData {
 
 export interface OrderInfo {
   orderId: string;
-  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "cancelled";
   unitPrice: number;
   amount: number;
   orderType: "train" | "hotel" | "dish" | "takeaway";

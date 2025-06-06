@@ -9,6 +9,7 @@ use crate::domain::service::transaction::TransactionService;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 pub struct TrainBookingServiceImpl<TSR, TSS, TS, TR, OR>
@@ -60,7 +61,10 @@ where
     TR: TransactionRepository,
     OR: OrderRepository,
 {
+    #[instrument(skip(self))]
     async fn booking_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
+        info!("Booking train order: {}", order_uuid);
+
         let mut train_order = match self
             .order_repository
             .find_train_order_by_uuid(order_uuid)
@@ -233,17 +237,21 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn booking_group(
         &self,
         order_uuid_list: Vec<Uuid>,
         atomic: bool,
     ) -> Result<Vec<TrainOrder>, TrainBookingServiceError> {
+        info!("Booking group of train orders: {:?}", order_uuid_list);
+
         let mut successful_orders: Vec<TrainOrder> = Vec::new();
 
         for order_uuid in order_uuid_list.iter() {
             let result = self.booking_ticket(*order_uuid).await;
 
             if let Err(err) = result {
+                error!("Failed to booking ticket {}: {}", order_uuid, err);
                 if atomic {
                     for order in &successful_orders {
                         let _ = self.cancel_ticket(order.uuid()).await;
@@ -275,6 +283,8 @@ where
                     }
                 }
                 Err(err) => {
+                    error!("Failed to get train order {}: {}", order_uuid, err);
+
                     if atomic {
                         for order in &successful_orders {
                             let _ = self.cancel_ticket(order.uuid()).await;
