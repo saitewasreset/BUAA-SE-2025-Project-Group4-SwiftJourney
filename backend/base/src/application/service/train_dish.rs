@@ -70,7 +70,6 @@ pub struct VerifiedDishOrderRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TakeawayOrderRequestDTO {
     pub station: String,
-    pub arrival_time: String,
     pub shop_name: String,
     pub name: String,
     pub personal_id: Uuid,
