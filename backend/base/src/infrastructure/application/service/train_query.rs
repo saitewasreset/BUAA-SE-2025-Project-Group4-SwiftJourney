@@ -495,18 +495,18 @@ where
 
         meter.meter("build train info DTOs");
 
-        infos.sort_by(|a, b| {
-            let a_time = DateTimeWithTimeZone::parse_from_rfc3339(&a.departure_time).unwrap();
-            let b_time = DateTimeWithTimeZone::parse_from_rfc3339(&b.departure_time).unwrap();
-            a_time.cmp(&b_time)
-        });
+        // infos.sort_by(|a, b| {
+        //     let a_time = DateTimeWithTimeZone::parse_from_rfc3339(&a.departure_time).unwrap();
+        //     let b_time = DateTimeWithTimeZone::parse_from_rfc3339(&b.departure_time).unwrap();
+        //     a_time.cmp(&b_time)
+        // });
 
-        // 限制结果数量为50个，应前端要求
-        if infos.len() > 50 {
-            infos.truncate(50);
-        }
+        // // 限制结果数量为50个，应前端要求
+        // if infos.len() > 50 {
+        //     infos.truncate(50);
+        // }
 
-        meter.meter("sort and limit results");
+        // meter.meter("sort and limit results");
 
         info!("{}", meter);
 
