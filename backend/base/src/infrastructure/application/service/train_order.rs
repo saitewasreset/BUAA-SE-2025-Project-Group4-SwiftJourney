@@ -29,6 +29,7 @@ use async_trait::async_trait;
 use chrono::Timelike;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
@@ -132,22 +133,21 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        let origin_departure_time =
+            DateTimeWithTimeZone::parse_from_rfc3339(&dto.origin_departure_time).map_err(|e| {
+                GeneralError::BadRequest(format!("Invalid origin departure time format: {}", e))
+            })?;
+
         let train_schedule = schedules_result
             .iter()
             .find(|schedule| {
-                if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(
-                    &dto.origin_departure_time,
-                    "%Y-%m-%d %H:%M:%S",
-                ) {
-                    let time = dt.time();
-                    let seconds_since_midnight = time.hour() as i32 * 3600
-                        + time.minute() as i32 * 60
-                        + time.second() as i32;
+                let date = origin_departure_time.date_naive();
 
-                    schedule.origin_departure_time() == seconds_since_midnight
-                } else {
-                    false
-                }
+                let origin_departure_seconds =
+                    origin_departure_time.time().num_seconds_from_midnight() as i32;
+
+                schedule.date() == date
+                    && schedule.origin_departure_time() == origin_departure_seconds
             })
             .cloned()
             .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
