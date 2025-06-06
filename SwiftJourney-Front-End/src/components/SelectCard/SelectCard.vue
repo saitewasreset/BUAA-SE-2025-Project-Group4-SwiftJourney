@@ -14,7 +14,7 @@
                         <div class="city_name_box" v-for="c in 'ABCDEF'.split('')" :key="c">
                             <div class="font-semibold">{{ c }}</div>
                             <div class="city_name">
-                                <p v-for="item in partTwoByCharacter(c)" :key="item" @click="handleCityClick(item.cityName)">
+                                <p v-for="(item, index) in partTwoByCharacter(c)" :key="index" @click="handleCityClick(item.cityName)">
                                     {{ item.cityName }}
                                 </p>
                             </div>
@@ -26,7 +26,7 @@
                         <div class="city_name_box" v-for="c in 'GHIJ'.split('')" :key="c">
                             <div class="font-semibold">{{ c }}</div>
                             <div class="city_name">
-                                <p v-for="item in partTwoByCharacter(c)" :key="item" @click="handleCityClick(item.cityName)">
+                                <p v-for="(item, index) in partTwoByCharacter(c)" :key="index" @click="handleCityClick(item.cityName)">
                                     {{ item.cityName }}
                                 </p>
                             </div>
@@ -38,7 +38,7 @@
                         <div class="city_name_box" v-for="c in 'KLMN'.split('')" :key="c">
                             <div class="font-semibold">{{ c }}</div>
                             <div class="city_name">
-                                <p v-for="item in partTwoByCharacter(c)" :key="item" @click="handleCityClick(item.cityName)">
+                                <p v-for="(item, index) in partTwoByCharacter(c)" :key="index" @click="handleCityClick(item.cityName)">
                                     {{ item.cityName }}
                                 </p>
                             </div>
@@ -50,7 +50,7 @@
                         <div class="city_name_box" v-for="c in 'PQRSTUVW'.split('')" :key="c">
                             <div class="font-semibold">{{ c }}</div>
                             <div class="city_name">
-                                <p v-for="item in partTwoByCharacter(c)" :key="item" @click="handleCityClick(item.cityName)">
+                                <p v-for="(item, index) in partTwoByCharacter(c)" :key="index" @click="handleCityClick(item.cityName)">
                                     {{ item.cityName }}
                                 </p>
                             </div>
@@ -62,7 +62,7 @@
                         <div class="city_name_box" v-for="c in 'XYZ'.split('')" :key="c">
                             <div class="font-semibold">{{ c }}</div>
                             <div class="city_name">
-                                <p v-for="item in partTwoByCharacter(c)" :key="item" @click="handleCityClick(item.cityName)">
+                                <p v-for="(item, index) in partTwoByCharacter(c)" :key="index" @click="handleCityClick(item.cityName)">
                                     {{ item.cityName }}
                                 </p>
                             </div>
@@ -76,7 +76,9 @@
 
 <script setup lang="ts">
 import { reactive, onMounted, ref } from 'vue';
-import city from '@/components/TicketSearch/CitySelect/city.json'
+import { useGeneralStore } from '@/stores/general';
+
+const generalStore = useGeneralStore();
 
 const props = defineProps({
   input: {
@@ -112,14 +114,18 @@ function handleCityClick(item: string) {
 
 function partTwoByCharacter(c: string) {
     c = c.toUpperCase()
-    return cityList.value.filter((v: any) => {
-        return v.pinYin.charAt(0).toUpperCase() === c
-    })
+    let result: {cityName: string, pinYin: string}[] = [];
+    cityList.value.forEach((value) => {
+        if(value.pinYin.charAt(0).toUpperCase() === c) {
+            result.push(value);
+        }
+    });
+    return result;
 }
 
 onMounted(() => {
     calcModalPosition();
-    cityList.value = Object.values(city).flat()
+    cityList.value = generalStore.CityPinYinList;
 })
 </script>
 
