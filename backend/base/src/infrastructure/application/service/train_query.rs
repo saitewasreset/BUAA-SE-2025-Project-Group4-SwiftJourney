@@ -395,7 +395,6 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to get direct schedules: {:?}", e);
-
                 GeneralError::InternalServerError
             })?;
 
@@ -406,11 +405,6 @@ where
 
             GeneralError::InternalServerError
         })?;
-
-        let route_map_by_id: HashMap<_, _> = routes
-            .iter()
-            .filter_map(|r| r.get_id().map(|id| (id, r)))
-            .collect();
 
         meter.meter("get routes");
 
@@ -449,7 +443,7 @@ where
             .map(|t| (t.get_id().expect("Train should have id"), t))
             .collect::<HashMap<_, _>>();
 
-        for sch in schedules {
+        for (sch, from_station, to_station) in schedules {
             let train = train_id_to_train
                 .get(&sch.train_id())
                 .cloned()
@@ -458,39 +452,21 @@ where
                         "Inconsistent: No train found for schedule id: {}",
                         sch.get_id().unwrap()
                     );
-
                     GeneralError::InternalServerError
                 })?;
 
-            let route = route_map_by_id.get(&sch.route_id()).ok_or_else(|| {
-                error!("Inconsistent: No route found for schedule");
-                GeneralError::InternalServerError
-            })?;
-
-            let matching_pair = station_pairs.iter().find(|(from, to)| {
-                let from_pos = route.stops().iter().position(|s| s.station_id() == *from);
-                let to_pos = route.stops().iter().position(|s| s.station_id() == *to);
-
-                match (from_pos, to_pos) {
-                    (Some(f), Some(t)) => f < t,
-                    _ => false,
-                }
-            });
-
-            if let Some(&(from, to)) = matching_pair {
-                infos.push(
-                    self.build_dto(
-                        &sch,
-                        train,
-                        &routes,
-                        &station_id_to_name,
-                        cmd.departure_time,
-                        Some(from),
-                        Some(to),
-                    )
-                    .await?,
-                );
-            }
+            infos.push(
+                self.build_dto(
+                    &sch,
+                    train,
+                    &routes,
+                    &station_id_to_name,
+                    cmd.departure_time,
+                    Some(from_station),
+                    Some(to_station),
+                )
+                .await?,
+            );
         }
 
         meter.meter("build train info DTOs");
@@ -594,7 +570,7 @@ where
             .collect::<HashMap<_, _>>();
 
         let mut solutions = Vec::new();
-        for (schedule_ids, mid_station_opt) in transfer_solutions {
+        for (schedule_ids, from_station, to_station, mid_station_opt) in transfer_solutions {
             if schedule_ids.len() != 2 || mid_station_opt.is_none() {
                 continue;
             }
@@ -609,20 +585,6 @@ where
 
                     GeneralError::InternalServerError
                 })?;
-
-            let matching_pair = station_pairs
-                .iter()
-                .find(|(from, to)| from_ids.contains(from) && to_ids.contains(to))
-                .cloned();
-
-            if matching_pair.is_none() {
-                return Ok(TransferTrainQueryDTO {
-                    solutions: Vec::new(),
-                });
-            }
-
-            // SAFETY: `matching_pair`在上一步中已经检查过了
-            let (from_station, to_station) = matching_pair.unwrap();
 
             let first_schedule = match schedule_by_id.get(&schedule_ids[0]) {
                 Some(s) => s,
@@ -691,7 +653,7 @@ where
                 .clone()
                 .expect("missing arrival time");
 
-            first_dto.route.truncate(first_mid_idx + 1);
+            // first_dto.route.truncate(first_mid_idx + 1);
 
             let first_dep_dt =
                 DateTimeWithTimeZone::parse_from_rfc3339(&first_dto.departure_time).unwrap();
@@ -716,7 +678,7 @@ where
                 .clone()
                 .expect("missing departure time");
 
-            second_dto.route = second_dto.route[second_mid_idx..].to_vec();
+            // second_dto.route = second_dto.route[second_mid_idx..].to_vec();
 
             let second_dep_dt =
                 DateTimeWithTimeZone::parse_from_rfc3339(&second_dto.departure_time).unwrap();
