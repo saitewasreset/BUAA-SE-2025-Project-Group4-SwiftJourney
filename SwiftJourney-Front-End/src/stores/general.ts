@@ -5,10 +5,10 @@ import { pinyin } from 'pinyin-pro'
 export const useGeneralStore = defineStore('general', {
     state: () => ({
         hasInit: false,
-        CityMapPinYin: new Map<string, string[]>(),
-        PinYinMapCity: new Map<string, string[]>(),
+        CityMapPinYin: {} as { [key: string]: string[] },
+        PinYinMapCity: {} as { [key: string]: string[] },
         PinYinList: [] as string[],
-        CityMap: {}, // 后端原始数据
+        CityMap: {} as { [province: string]: string[] }, // 后端原始数据
     }),
     actions: {
         async init() {
@@ -48,16 +48,12 @@ export const useGeneralStore = defineStore('general', {
                             });
                         }
 
-                        // 批量更新CityMapPinYin
-                        for (const key in cityMapPinYinBatch) {
-                            this.CityMapPinYin.set(key, cityMapPinYinBatch[key]);
-                        }
-
-                        // 批量更新PinYinMapCity
                         for (const pinYin in pinYinMapCityBatch) {
-                            this.PinYinMapCity.set(pinYin, pinYinMapCityBatch[pinYin]);
                             this.PinYinList.push(pinYin);
                         }
+
+                        this.PinYinMapCity = pinYinMapCityBatch;
+                        this.CityMapPinYin = cityMapPinYinBatch;
 
                         this.hasInit = true;
                     } else {
