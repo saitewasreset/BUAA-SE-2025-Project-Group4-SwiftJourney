@@ -41,6 +41,7 @@
                     end-placeholder="结束日期" 
                     @change="handleDateChange"
                     class="date-picker"
+                    :locale="locale"
                 />
           </div>
         </div>
@@ -358,6 +359,7 @@ export default {
             // 分页相关数据
             currentPage: 1,
             pageSize: 10,
+            locale: locale,
         }
     },
     computed: {
