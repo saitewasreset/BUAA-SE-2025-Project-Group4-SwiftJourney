@@ -25,7 +25,9 @@
                 style="width: 400px"
               />
             </template>
-            <div class="train-number">{{ content.trainNumber }}</div>
+            <div class="train-number" :class="{ small: content.trainNumber.length > 5 }">
+              {{ content.trainNumber }}
+            </div>
           </a-popover>
           <!-- 箭头 -->
           <div class="schedule-arrow">
@@ -352,6 +354,9 @@ const processedRoute = computed(() => {
 .train-number:hover {
   color: #1677ff;
   cursor: pointer;
+}
+.train-number.small {
+  font-size: 0.9rem;
 }
 
 .travel-time {
