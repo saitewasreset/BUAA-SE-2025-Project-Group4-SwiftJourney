@@ -75,14 +75,16 @@ fn build_connections(
         let origin_offset = schedule.origin_departure_time() as u32;
 
         if let Some(route) = route_map_by_id.get(&schedule.route_id()) {
-            for (prev_stop, next_stop) in route.stop_pairs() {
-                connections.push(Connection {
-                    departure_station: prev_stop.station_id(),
-                    departure_time: origin_offset + prev_stop.departure_time(),
-                    arrival_station: next_stop.station_id(),
-                    arrival_time: origin_offset + next_stop.arrival_time(),
-                    train_schedule_id: schedule.get_id().unwrap(),
-                });
+            for (i, from_stop) in route.stops().iter().enumerate() {
+                for to_stop in route.stops().iter().skip(i + 1) {
+                    connections.push(Connection {
+                        departure_station: from_stop.station_id(),
+                        departure_time: origin_offset + from_stop.departure_time(),
+                        arrival_station: to_stop.station_id(),
+                        arrival_time: origin_offset + to_stop.arrival_time(),
+                        train_schedule_id: schedule.get_id().unwrap(),
+                    });
+                }
             }
         }
     }
@@ -455,7 +457,7 @@ where
         let schedules = self.get_schedules(date).await?;
 
         let get_schedules_elapsed = begin.elapsed();
-        let begin = std::time::Instant::now();
+        let get_routes_elapsed = begin.elapsed();
 
         let route_map_by_id = self
             .route_service
@@ -469,9 +471,6 @@ where
             .into_iter()
             .map(|r| (r.get_id().unwrap(), r))
             .collect::<HashMap<_, _>>();
-
-        let get_routes_elapsed = begin.elapsed();
-        let begin = std::time::Instant::now();
 
         let want: HashSet<_> = pairs.iter().copied().collect();
 
@@ -552,10 +551,6 @@ where
 
             for &i in first_leg_indices {
                 let first = &connections[i];
-
-                if first.arrival_station == dest {
-                    continue;
-                }
 
                 let earliest_next_dep = first.arrival_time + MIN_TRANSFER_SEC;
                 let latest_next_dep = first.arrival_time + MAX_TRANSFER_SEC;
