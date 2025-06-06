@@ -24,7 +24,12 @@
                   :customRow="handleCustomRow"
                 />
               </template>
-              <div class="train-number">{{ content.first_ride.trainNumber }}</div>
+              <div
+                class="train-number"
+                :class="{ small: content.first_ride.trainNumber.length > 5 }"
+              >
+                {{ content.first_ride.trainNumber }}
+              </div>
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
@@ -64,7 +69,12 @@
                   :customRow="handleCustomRow"
                 />
               </template>
-              <div class="train-number">{{ content.second_ride.trainNumber }}</div>
+              <div
+                class="train-number"
+                :class="{ small: content.second_ride.trainNumber.length > 5 }"
+              >
+                {{ content.second_ride.trainNumber }}
+              </div>
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
@@ -547,6 +557,9 @@ onBeforeMount(() => {
 .train-number:hover {
   color: #1677ff;
   cursor: pointer;
+}
+.train-number.small {
+  font-size: 0.9rem;
 }
 
 .travel-time {
