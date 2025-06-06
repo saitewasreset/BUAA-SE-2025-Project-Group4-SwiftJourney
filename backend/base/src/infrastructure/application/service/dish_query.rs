@@ -3,6 +3,8 @@ use std::sync::Arc;
 use tracing::{error, instrument};
 use uuid::Uuid;
 
+use crate::domain::Identifiable;
+use crate::domain::service::station::StationService;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
 };
@@ -25,7 +27,7 @@ use crate::{
 use rust_decimal::prelude::ToPrimitive;
 use std::collections::HashMap;
 
-pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
+pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -33,6 +35,7 @@ where
     SMS: SessionManagerService,
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
+    SS: StationService,
 {
     dish_repository: Arc<DR>,
     takeaway_shop_repository: Arc<TSR>,
@@ -40,9 +43,10 @@ where
     session_manager: Arc<SMS>,
     train_schedule_service: Arc<TSS>,
     train_type_configuration_service: Arc<TTCS>,
+    station_service: Arc<SS>,
 }
 
-impl<DR, TSR, TR, SMS, TSS, TTCS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
+impl<DR, TSR, TR, SMS, TSS, TTCS, SS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -50,6 +54,7 @@ where
     SMS: SessionManagerService,
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
+    SS: StationService,
 {
     pub fn new(
         dish_repository: Arc<DR>,
@@ -58,6 +63,7 @@ where
         session_manager: Arc<SMS>,
         train_schedule_service: Arc<TSS>,
         train_type_configuration_service: Arc<TTCS>,
+        station_service: Arc<SS>,
     ) -> Self {
         DishQueryServiceImpl {
             dish_repository,
@@ -66,13 +72,14 @@ where
             session_manager,
             train_schedule_service,
             train_type_configuration_service,
+            station_service,
         }
     }
 }
 
 #[async_trait]
-impl<DR, TSR, TR, SMS, TSS, TTCS> DishQueryService
-    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS>
+impl<DR, TSR, TR, SMS, TSS, TTCS, SS> DishQueryService
+    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -80,6 +87,7 @@ where
     SMS: SessionManagerService,
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
+    SS: StationService,
 {
     #[instrument(skip(self))]
     async fn query_dish(
@@ -169,9 +177,23 @@ where
             })?;
 
         let mut takeaway_map = HashMap::new();
+
+        let stations = self.station_service.get_stations().await.map_err(|e| {
+            error!("Failed to get stations: {:?}", e);
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
+
+        let station_id_to_name = stations
+            .into_iter()
+            .map(|x| (x.get_id().unwrap(), x.name().to_string()))
+            .collect::<HashMap<_, _>>();
+
         for (stop, shops) in shop_by_stop {
             let station_id = stop.station_id();
-            let station_name = format!("Station_{}", station_id);
+            let station_name = station_id_to_name.get(&station_id).ok_or_else(|| {
+                error!("Station ID {} not found in station list", station_id);
+                GeneralError::InternalServerError
+            })?;
 
             let shop_dtos = shops
                 .into_iter()
@@ -197,7 +219,7 @@ where
                 .collect::<Vec<_>>();
 
             if !shop_dtos.is_empty() {
-                takeaway_map.insert(station_name, shop_dtos);
+                takeaway_map.insert(station_name.to_string(), shop_dtos);
             }
         }
 
