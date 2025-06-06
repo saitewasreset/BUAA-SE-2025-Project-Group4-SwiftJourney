@@ -21,6 +21,8 @@
                 :data-source="processedRoute"
                 :pagination="false"
                 :customRow="handleCustomRow"
+                :scroll="{ y: 200 }"
+                style="width: 400px"
               />
             </template>
             <div class="train-number">{{ content.trainNumber }}</div>
@@ -49,7 +51,7 @@
       <!-- 车票信息 -->
       <div class="ticket-info">
         <!-- 座位 - 车票元素 -->
-        <div v-for="([seatType, seatInfo], index) in content.seatInfo" :key="index">
+        <div v-for="([seatType, seatInfo], index) in Object.entries(content.seatInfo)" :key="index">
           <!-- 座位类型 -->
           <div class="seat-type-info">{{ seatType }}</div>
           <!-- 价格 -->
@@ -58,18 +60,13 @@
           <div
             class="remain-count-info"
             :class="{
-              rich: getRemainCountType(seatInfo.remainCount) === 'rich',
-              few: getRemainCountType(seatInfo.remainCount) === 'few',
-              little: getRemainCountType(seatInfo.remainCount) === 'little',
-              none: getRemainCountType(seatInfo.remainCount) === 'none',
+              rich: getleftType(seatInfo.left) === 'rich',
+              few: getleftType(seatInfo.left) === 'few',
+              little: getleftType(seatInfo.left) === 'little',
+              none: getleftType(seatInfo.left) === 'none',
             }"
           >
-            {{
-              formatRemainCount(
-                getRemainCountType(seatInfo.remainCount),
-                seatInfo.remainCount,
-              )
-            }}
+            {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
           </div>
         </div>
       </div>
@@ -133,17 +130,17 @@ const props = withDefaults(
         },
       ] as stoppingStationInfo[],
       seatInfo: new Map<string, seatTypeInfo>([
-        ['优选一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-        ['一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-        ['二等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-        ['无座', { capacity: 0, remainCount: 0, price: 0.0 }],
+        ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
+        ['一等座', { capacity: 0, left: 0, price: 0.0 }],
+        ['二等座', { capacity: 0, left: 0, price: 0.0 }],
+        ['无座', { capacity: 0, left: 0, price: 0.0 }],
       ]),
     }),
   },
 )
 // -------------------- 类型定义 --------------------
 // 定义车票信息类型
-type remainCountType = 'rich' | 'few' | 'little' | 'none'
+type leftType = 'rich' | 'few' | 'little' | 'none'
 // 列车信息表格列定义
 const columns = [
   {
@@ -198,7 +195,7 @@ function formatTravelTime(seconds: number): string {
   return `${minutes.toString()}分`
 }
 // 格式化余票信息
-function formatRemainCount(type: remainCountType, count: number): string {
+function formatleft(type: leftType, count: number): string {
   if (type === 'rich') {
     return `有票`
   } else if (type === 'few' || type === 'little') {
@@ -231,12 +228,12 @@ const overDateFlag = computed(() => {
 })
 // -------------------- 余票判断逻辑 --------------------
 // 根据余票数量和总容量判断余票类型
-function getRemainCountType(remainCount: number): remainCountType {
-  if (remainCount > 30) {
+function getleftType(left: number): leftType {
+  if (left > 30) {
     return 'rich'
-  } else if (remainCount >= 10) {
+  } else if (left >= 10) {
     return 'few'
-  } else if (remainCount > 0) {
+  } else if (left > 0) {
     return 'little'
   } else {
     return 'none'
@@ -244,7 +241,8 @@ function getRemainCountType(remainCount: number): remainCountType {
 }
 // 订票检查
 const checkBookable = computed(() => {
-  return Array.from(props.content.seatInfo.values()).some((seat) => seat.remainCount > 0)
+  // 检查是否有任何座位类型还有余票（left > 0）
+  return Object.values(props.content.seatInfo).some((seatInfo) => seatInfo.left > 0)
 })
 // -------------------- 车次信息表格 --------------------
 // 应用行样式
