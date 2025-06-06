@@ -30,7 +30,7 @@ use chrono::Timelike;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -479,6 +479,7 @@ where
     PIR: PersonalInfoRepository + Send + Sync + 'static,
     TSS: TrainScheduleService + Send + Sync + 'static,
 {
+    #[instrument(skip_all)]
     async fn process_train_order_packs(
         &self,
         session_id: String,
