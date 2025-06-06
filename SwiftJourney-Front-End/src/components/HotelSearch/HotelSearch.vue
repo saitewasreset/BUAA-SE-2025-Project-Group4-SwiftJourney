@@ -480,15 +480,15 @@ const updateSuggestions = (userInput: string) => {
     if(chineseString == '') {
         pinyinCmp(generalStore.PinYinList, otherString);
     }
-    else if(generalStore.CityMapPinYin.has(chineseString)) {
-        let pinyins = generalStore.CityMapPinYin.get(chineseString);
+    else if(generalStore.CityMapPinYin[chineseString]) {
+        let pinyins = generalStore.CityMapPinYin[chineseString];
         if(pinyins != null) {
             pinyinCmp(pinyins, stringString);
         }
     } else {
         for(let i = 1; i <= chineseString.length; i++) {
             let tep = chineseString.substring(i-1, i);
-            let pinyins = generalStore.CityMapPinYin.get(tep);
+            let pinyins = generalStore.CityMapPinYin[tep];
             if(pinyins != null) {
                 pinyinCmp(pinyins, stringString);
             }
@@ -508,7 +508,7 @@ function pinyinCmp(pinyins: string[], pinYin: string) {
                     return;
                 }
             }
-            const cities = generalStore.PinYinMapCity.get(value);
+            const cities = generalStore.PinYinMapCity[value];
             if(cities != null) {
                 cities.forEach((tep) => {
                     suggestions.value.push(tep);
