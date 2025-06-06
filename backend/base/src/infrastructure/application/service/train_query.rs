@@ -100,6 +100,7 @@ where
     TR: TrainRepository,
     SR: StationRepository,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
@@ -406,6 +407,11 @@ where
             GeneralError::InternalServerError
         })?;
 
+        let route_map_by_id: HashMap<_, _> = routes
+            .iter()
+            .filter_map(|r| r.get_id().map(|id| (id, r)))
+            .collect();
+
         meter.meter("get routes");
 
         let mut infos = Vec::new();
@@ -456,16 +462,35 @@ where
                     GeneralError::InternalServerError
                 })?;
 
-            infos.push(
-                self.build_dto(
-                    &sch,
-                    train,
-                    &routes,
-                    &station_id_to_name,
-                    cmd.departure_time,
-                )
-                .await?,
-            );
+            let route = route_map_by_id.get(&sch.route_id()).ok_or_else(|| {
+                error!("Inconsistent: No route found for schedule");
+                GeneralError::InternalServerError
+            })?;
+
+            let matching_pair = station_pairs.iter().find(|(from, to)| {
+                let from_pos = route.stops().iter().position(|s| s.station_id() == *from);
+                let to_pos = route.stops().iter().position(|s| s.station_id() == *to);
+
+                match (from_pos, to_pos) {
+                    (Some(f), Some(t)) => f < t,
+                    _ => false,
+                }
+            });
+
+            if let Some(&(from, to)) = matching_pair {
+                infos.push(
+                    self.build_dto(
+                        &sch,
+                        train,
+                        &routes,
+                        &station_id_to_name,
+                        cmd.departure_time,
+                        Some(from),
+                        Some(to),
+                    )
+                    .await?,
+                );
+            }
         }
 
         meter.meter("build train info DTOs");
@@ -585,6 +610,20 @@ where
                     GeneralError::InternalServerError
                 })?;
 
+            let matching_pair = station_pairs
+                .iter()
+                .find(|(from, to)| from_ids.contains(from) && to_ids.contains(to))
+                .cloned();
+
+            if matching_pair.is_none() {
+                return Ok(TransferTrainQueryDTO {
+                    solutions: Vec::new(),
+                });
+            }
+
+            // SAFETY: `matching_pair`在上一步中已经检查过了
+            let (from_station, to_station) = matching_pair.unwrap();
+
             let first_schedule = match schedule_by_id.get(&schedule_ids[0]) {
                 Some(s) => s,
                 None => continue,
@@ -607,6 +646,8 @@ where
                     &routes,
                     &station_id_to_name,
                     cmd.departure_time,
+                    Some(from_station),
+                    Some(mid_station),
                 )
                 .await
             {
@@ -626,6 +667,8 @@ where
                     &routes,
                     &station_id_to_name,
                     cmd.departure_time,
+                    Some(mid_station),
+                    Some(to_station),
                 )
                 .await
             {
@@ -713,6 +756,7 @@ where
     TR: TrainRepository,
     SR: StationRepository,
 {
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip(self, routes, station_id_to_name))]
     async fn build_dto(
         &self,
@@ -721,6 +765,8 @@ where
         routes: &[crate::domain::model::route::Route],
         station_id_to_name: &HashMap<StationId, String>,
         date: NaiveDate,
+        user_departure_station: Option<StationId>,
+        user_arrival_station: Option<StationId>,
     ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>> {
         // ——— 路线、停站 ———
         let route = routes
@@ -818,9 +864,13 @@ where
         let arr_dt = DateTimeWithTimeZone::parse_from_rfc3339(arr_time).unwrap();
 
         Ok(TrainInfoDTO {
-            departure_station: stopping.first().unwrap().station_name.clone(),
+            departure_station: user_departure_station
+                .and_then(|id| station_id_to_name.get(&id).cloned())
+                .unwrap(),
             departure_time: dep_time.clone(),
-            arrival_station: stopping.last().unwrap().station_name.clone(),
+            arrival_station: user_arrival_station
+                .and_then(|id| station_id_to_name.get(&id).cloned())
+                .unwrap(),
             arrival_time: arr_time.clone(),
             origin_station: stopping.first().unwrap().station_name.clone(),
             origin_departure_time: stopping
