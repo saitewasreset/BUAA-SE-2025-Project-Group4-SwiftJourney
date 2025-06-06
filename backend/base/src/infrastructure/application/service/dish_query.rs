@@ -3,7 +3,10 @@ use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
+use crate::application::commands::transaction::TransactionDetailQuery;
+use crate::application::service::transaction::TransactionApplicationService;
 use crate::domain::Identifiable;
+use crate::domain::service::order::order_dto::OrderInfoDto;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
@@ -29,7 +32,7 @@ use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::utils::TimeMeter;
 use std::collections::HashMap;
 
-pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
+pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, TAS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -38,6 +41,7 @@ where
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
     SS: StationService,
+    TAS: TransactionApplicationService,
 {
     dish_repository: Arc<DR>,
     takeaway_shop_repository: Arc<TSR>,
@@ -46,9 +50,11 @@ where
     train_schedule_service: Arc<TSS>,
     train_type_configuration_service: Arc<TTCS>,
     station_service: Arc<SS>,
+    transaction_application_service: Arc<TAS>,
 }
 
-impl<DR, TSR, TR, SMS, TSS, TTCS, SS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
+impl<DR, TSR, TR, SMS, TSS, TTCS, SS, TAS>
+    DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, TAS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -57,7 +63,9 @@ where
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
     SS: StationService,
+    TAS: TransactionApplicationService,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dish_repository: Arc<DR>,
         takeaway_shop_repository: Arc<TSR>,
@@ -66,6 +74,7 @@ where
         train_schedule_service: Arc<TSS>,
         train_type_configuration_service: Arc<TTCS>,
         station_service: Arc<SS>,
+        transaction_application_service: Arc<TAS>,
     ) -> Self {
         DishQueryServiceImpl {
             dish_repository,
@@ -75,13 +84,14 @@ where
             train_schedule_service,
             train_type_configuration_service,
             station_service,
+            transaction_application_service,
         }
     }
 }
 
 #[async_trait]
-impl<DR, TSR, TR, SMS, TSS, TTCS, SS> DishQueryService
-    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
+impl<DR, TSR, TR, SMS, TSS, TTCS, SS, TAS> DishQueryService
+    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, TAS>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
@@ -90,6 +100,7 @@ where
     TSS: TrainScheduleService,
     TTCS: TrainTypeConfigurationService,
     SS: StationService,
+    TAS: TransactionApplicationService,
 {
     #[instrument(skip(self))]
     async fn query_dish(
@@ -252,12 +263,39 @@ where
             }
         }
 
+        meter.meter("check ticket ownership");
+
+        let transaction_detail_list = self
+            .transaction_application_service
+            .query_transaction_details(TransactionDetailQuery {
+                session_id: session_id.to_string(),
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to query transaction details: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        let mut can_booking = false;
+        let mut reason = Some("您尚未购买此车次的火车票，无法预订餐食".to_string());
+
+        'outer: for transaction in &transaction_detail_list {
+            for order in &transaction.orders {
+                if let OrderInfoDto::Train(train_order) = order {
+                    if train_order.train_number == query.train_number &&
+                           train_order.departure_time ==
+                           query.origin_departure_time &&
+                           train_order.base.status != "canceled"
+                    {
+                        can_booking = true;
+                        reason = None;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
         meter.meter("calculate");
-
-        // 不能预订的话，直接就返回错误了？
-        let can_booking = true;
-
-        let reason = None;
 
         info!("{}", meter);
 
