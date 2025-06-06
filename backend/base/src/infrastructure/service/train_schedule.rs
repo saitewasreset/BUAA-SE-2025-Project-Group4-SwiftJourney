@@ -479,7 +479,7 @@ where
         &self,
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
-    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+    ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
         let mut meter = TimeMeter::new("direct_schedules");
 
         let schedules = self.get_schedules(date).await?;
@@ -530,14 +530,14 @@ where
             for &(from, to) in &want {
                 if let (Some(&i_from), Some(&i_to)) = (pos_map.get(&from), pos_map.get(&to)) {
                     if i_from < i_to {
-                        result.push(schedule.clone());
+                        result.push((schedule.clone(), from, to));
                         break;
                     }
                 }
             }
         }
 
-        result.sort_by_key(|s| s.origin_departure_time());
+        result.sort_by_key(|(s, _, _)| s.origin_departure_time());
 
         meter.meter("calc");
 
@@ -559,9 +559,17 @@ where
     #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
-        date: NaiveDate,
+        date: chrono::NaiveDate,
         pairs: &[(StationId, StationId)],
-    ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError> {
+    ) -> Result<
+        Vec<(
+            Vec<TrainScheduleId>,
+            StationId,
+            StationId,
+            Option<StationId>,
+        )>,
+        TrainScheduleServiceError,
+    > {
         let mut meter = TimeMeter::new("transfer_schedules");
 
         let (_, _, connections, _graph, _index_map) = self.load_daily_context(date).await?;
@@ -573,7 +581,12 @@ where
 
         meter.meter("build outgoing index");
 
-        let mut all_solutions = Vec::<(Vec<TrainScheduleId>, Option<StationId>)>::new();
+        let mut all_solutions = Vec::<(
+            Vec<TrainScheduleId>,
+            StationId,
+            StationId,
+            Option<StationId>,
+        )>::new();
 
         for &(origin, dest) in pairs {
             let Some(first_leg_indices) = outgoing_index.get(&origin) else {
@@ -630,6 +643,8 @@ where
                     if seen.insert(key) {
                         all_solutions.push((
                             vec![first.train_schedule_id, second.train_schedule_id],
+                            origin,
+                            dest,
                             Some(mid_station),
                         ));
                     }
