@@ -14,6 +14,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDate, TimeDelta};
 use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::utils::TimeMeter;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -83,14 +84,16 @@ fn build_connections(
         let origin_offset = schedule.origin_departure_time() as u32;
 
         if let Some(route) = route_map_by_id.get(&schedule.route_id()) {
-            for (prev_stop, next_stop) in route.stop_pairs() {
-                connections.push(Connection {
-                    departure_station: prev_stop.station_id(),
-                    departure_time: origin_offset + prev_stop.departure_time(),
-                    arrival_station: next_stop.station_id(),
-                    arrival_time: origin_offset + next_stop.arrival_time(),
-                    train_schedule_id: schedule.get_id().unwrap(),
-                });
+            for (i, from_stop) in route.stops().iter().enumerate() {
+                for to_stop in route.stops().iter().skip(i + 1) {
+                    connections.push(Connection {
+                        departure_station: from_stop.station_id(),
+                        departure_time: origin_offset + from_stop.departure_time(),
+                        arrival_station: to_stop.station_id(),
+                        arrival_time: origin_offset + to_stop.arrival_time(),
+                        train_schedule_id: schedule.get_id().unwrap(),
+                    });
+                }
             }
         }
     }
@@ -106,132 +109,28 @@ fn build_station_index(graph: &RouteGraph) -> HashMap<StationId, usize> {
         .collect()
 }
 
-//--------------------------------------------------------//
-//  Earliest‑arrival CSA (k = 1)
-//--------------------------------------------------------//
+/*--------------------------------------------------------*
+|                    辅助索引：按站点分组的出发连接         |
+*--------------------------------------------------------*/
+/// 为每个车站建立其所有出发 Connection 的 **索引列表**（按出发时间已排序）
+fn build_outgoing_index(connections: &[Connection]) -> HashMap<StationId, Vec<usize>> {
+    let mut map: HashMap<StationId, Vec<usize>> = HashMap::new();
 
-const INF_SEC: u32 = u32::MAX / 2;
-const MIN_TRANSFER_SEC: u32 = 10 * 60; // 10 min
-
-#[derive(Clone, Copy, Default)]
-struct Predecessor {
-    previous_index: Option<usize>,
-    previous_schedule: Option<TrainScheduleId>,
-    first_schedule: Option<TrainScheduleId>, // 仅换乘层
-    transfer_index: Option<usize>,           // 仅换乘层
-}
-
-#[derive(Clone, Copy, Default)]
-struct Arrival {
-    time: u32,
-    pred: Predecessor,
-}
-
-/// CSA‑k=1。返回 (直达层, 换乘层)
-fn earliest_arrival_k1(
-    origin_index: usize,
-    station_cnt: usize,
-    origin_start_sec: u32,
-    connections: &[Connection],
-    index_map: &HashMap<StationId, usize>,
-) -> (Vec<Arrival>, Vec<Arrival>) {
-    let mut level0 = vec![
-        Arrival {
-            time: INF_SEC,
-            ..Default::default()
-        };
-        station_cnt
-    ];
-    let mut level1 = level0.clone();
-
-    level0[origin_index].time = origin_start_sec;
-    level1[origin_index].time = origin_start_sec;
-
-    for conn in connections {
-        let dep = index_map[&conn.departure_station];
-        let arr = index_map[&conn.arrival_station];
-
-        /* ---------- 直达层 ---------- */
-        if level0[dep].time <= conn.departure_time && conn.arrival_time < level0[arr].time {
-            level0[arr] = Arrival {
-                time: conn.arrival_time,
-                pred: Predecessor {
-                    previous_index: Some(dep),
-                    previous_schedule: Some(conn.train_schedule_id),
-                    ..Default::default()
-                },
-            };
-            // 同步到换乘层
-            if conn.arrival_time < level1[arr].time {
-                level1[arr] = level0[arr];
-            }
-        }
-
-        /* ---------- 换乘层 ---------- */
-        let ready_time = level1[dep].time.saturating_add(MIN_TRANSFER_SEC);
-        if ready_time <= conn.departure_time && conn.arrival_time < level1[arr].time {
-            let dep_pred = level1[dep].pred;
-            level1[arr] = Arrival {
-                time: conn.arrival_time,
-                pred: Predecessor {
-                    previous_index: Some(dep),
-                    previous_schedule: Some(conn.train_schedule_id),
-                    first_schedule: dep_pred.previous_schedule.or(dep_pred.first_schedule),
-                    transfer_index: Some(dep),
-                },
-            };
-        }
-    }
-    (level0, level1)
-}
-
-/* -------- 回溯工具 -------- */
-
-fn backtrack_direct(level0: &[Arrival], dst_index: usize) -> Vec<TrainScheduleId> {
-    let mut ids = Vec::<TrainScheduleId>::new();
-    let mut current = Some(dst_index);
-
-    while let Some(i) = current {
-        if let Some(sid) = level0[i].pred.previous_schedule {
-            ids.push(sid);
-        }
-        current = level0[i].pred.previous_index;
-    }
-    ids.reverse();
-    ids
-}
-
-fn backtrack_transfer(
-    level1: &[Arrival],
-    dst_index: usize,
-    index_station_map: &HashMap<usize, StationId>,
-) -> (Vec<TrainScheduleId>, Option<StationId>) {
-    let mut ids = Vec::<TrainScheduleId>::new();
-    let mut mid_station = None;
-    let mut current = Some(dst_index);
-
-    while let Some(i) = current {
-        if let Some(sid) = level1[i].pred.previous_schedule {
-            ids.push(sid);
-        }
-
-        if mid_station.is_none() {
-            if let Some(mid_index) = level1[i].pred.transfer_index {
-                mid_station = index_station_map.get(&mid_index).copied();
-            }
-        }
-
-        current = level1[i].pred.previous_index;
+    for (idx, conn) in connections.iter().enumerate() {
+        map.entry(conn.departure_station).or_default().push(idx);
     }
 
-    if let Some(first) = level1[dst_index].pred.first_schedule {
-        ids.push(first);
+    // `build_connections` 已保证全局时间排序，因此同站点内也近似有序；
+    // 为严谨起见再按时间排序一次。
+    for vec in map.values_mut() {
+        vec.sort_by_key(|&i| connections[i].departure_time);
     }
 
-    ids.reverse();
-    ids.dedup();
-    (ids, mid_station)
+    map
 }
+
+const MIN_TRANSFER_SEC: u32 = 10 * 60; // ≥10 分钟
+const MAX_TRANSFER_SEC: u32 = 3 * 60 * 60; // ≤3 小时
 
 impl<RS, TR, TSR, RR> TrainScheduleServiceImpl<RS, TR, TSR, RR>
 where
@@ -240,6 +139,7 @@ where
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
 {
+    #[instrument(skip(self))]
     async fn load_daily_context(
         &self,
         date: NaiveDate,
@@ -253,13 +153,20 @@ where
         ),
         TrainScheduleServiceError,
     > {
+        let mut meter = TimeMeter::new("load_daily_context");
+
         let schedules = self.get_schedules(date).await?;
+
+        meter.meter("get schedules");
 
         let routes = self.route_service.get_routes().await.map_err(|e| {
             TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
                 e.into(),
             ))
         })?;
+
+        meter.meter("get routes");
+
         let mut route_map = HashMap::with_capacity(routes.len());
         for r in routes {
             route_map.insert(r.get_id().unwrap(), r);
@@ -267,12 +174,21 @@ where
 
         let connections = build_connections(&schedules, &route_map);
 
+        meter.meter("build connections");
+
         let graph = self.route_service.get_route_map().await.map_err(|e| {
             TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
                 e.into(),
             ))
         })?;
+
+        meter.meter("get route graph");
+
         let index_map = build_station_index(&graph);
+
+        meter.meter("build station index");
+
+        info!("{}", meter);
 
         Ok((schedules, route_map, connections, graph, index_map))
     }
@@ -564,12 +480,11 @@ where
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-        let begin = std::time::Instant::now();
+        let mut meter = TimeMeter::new("direct_schedules");
 
         let schedules = self.get_schedules(date).await?;
 
-        let get_schedules_elapsed = begin.elapsed();
-        let begin = std::time::Instant::now();
+        meter.meter("get schedules");
 
         let route_map_by_id = self
             .route_service
@@ -584,14 +499,13 @@ where
             .map(|r| (r.get_id().unwrap(), r))
             .collect::<HashMap<_, _>>();
 
-        let get_routes_elapsed = begin.elapsed();
-        let begin = std::time::Instant::now();
+        meter.meter("get routes");
 
         let want: HashSet<_> = pairs.iter().copied().collect();
 
         let mut result = Vec::new();
 
-        let mut route_pos_cache: HashMap<RouteId, Arc<HashMap<StationId, usize>>> =
+        let mut route_pos_cache: HashMap<RouteId, HashMap<StationId, usize>> =
             HashMap::with_capacity(route_map_by_id.len());
 
         for schedule in &schedules {
@@ -602,14 +516,14 @@ where
                 None => continue,
             };
 
-            let pos_map: Arc<HashMap<StationId, usize>> = match route_pos_cache.entry(route_id) {
+            let pos_map: HashMap<StationId, usize> = match route_pos_cache.entry(route_id) {
                 Entry::Occupied(o) => o.get().clone(),
                 Entry::Vacant(v) => {
                     let mut m = HashMap::with_capacity(route.stops().len());
                     for (idx, stop) in route.stops().iter().enumerate() {
                         m.insert(stop.station_id(), idx);
                     }
-                    v.insert(Arc::new(m)).clone()
+                    v.insert(m).clone()
                 }
             };
 
@@ -623,52 +537,111 @@ where
             }
         }
 
-        let calc_elapsed = begin.elapsed();
-
-        info!(
-            "Direct schedules completed: get_schedules: {:?}, get_routes: {:?} calc: {:?}",
-            get_schedules_elapsed, get_routes_elapsed, calc_elapsed
-        );
-
         result.sort_by_key(|s| s.origin_departure_time());
+
+        meter.meter("calc");
+
+        info!("{}", meter);
+
         Ok(result)
     }
 
-    // 原本的想法是「交集‑筛站法」，但时间复杂度较高，达到 O(N · L) （N 为站点对数，L 为列车时刻表长度）
-    // 故改用Connection Scan Algorithm（CSA）算法。详见https://arxiv.org/abs/1703.05997
+    //--------------------------------------------------------//
+    //  换乘查询 (k = 1) —— 列举 **所有** 满足条件的方案
+    //--------------------------------------------------------//
+    /// 返回值含义：`(两段列车ID, Some(中转站))`
+    ///
+    /// * **只允许一次换乘**（两段列车，且必须在同一方向继续前进）。
+    /// * 对于同一出发/到达车站对，**列举所有可行方案**，并去重。
+    /// * 为保证性能：
+    ///   1. 预先对 `Connection` 构建 **出发索引**（O(M) 内存，M≈连接数）。
+    ///   2. 遍历时只访问与给定站点相关的连接，避免 O(N·M) 的暴力交叉。
     #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError> {
-        let (_, _, connections, graph, index_map) = self.load_daily_context(date).await?;
+        let mut meter = TimeMeter::new("transfer_schedules");
 
-        let index_station_map: HashMap<usize, _> =
-            index_map.iter().map(|(s, &i)| (i, *s)).collect();
+        let (_, _, connections, _graph, _index_map) = self.load_daily_context(date).await?;
 
-        let mut transfer_solutions = Vec::new();
+        meter.meter("load daily context");
 
-        for &(dep, arr) in pairs {
-            let departure_index = index_map[&dep];
-            let arrival_index = index_map[&arr];
+        // 站点 -> 出发 Connection 索引表
+        let outgoing_index = build_outgoing_index(&connections);
 
-            let (_, level1) = earliest_arrival_k1(
-                departure_index,
-                graph.node_count(),
-                0,
-                &connections,
-                &index_map,
-            );
+        meter.meter("build outgoing index");
 
-            let (ids, mid_option) = backtrack_transfer(&level1, arrival_index, &index_station_map);
+        let mut all_solutions = Vec::<(Vec<TrainScheduleId>, Option<StationId>)>::new();
 
-            if ids.len() == 2 && mid_option.is_some() {
-                transfer_solutions.push((ids, mid_option));
+        for &(origin, dest) in pairs {
+            let Some(first_leg_indices) = outgoing_index.get(&origin) else {
+                continue;
+            };
+
+            // 用于去重，避免同方案多次加入
+            let mut seen: HashSet<(TrainScheduleId, TrainScheduleId, StationId)> = HashSet::new();
+
+            for &i in first_leg_indices {
+                let first = &connections[i];
+
+                let earliest_next_dep = first.arrival_time + MIN_TRANSFER_SEC;
+                let latest_next_dep = first.arrival_time + MAX_TRANSFER_SEC;
+
+                let Some(second_leg_indices) = outgoing_index.get(&first.arrival_station) else {
+                    continue;
+                };
+
+                // ---------- 二分定位可行第二段起始位置 ---------- //
+                let start_idx = match second_leg_indices
+                    .binary_search_by_key(&earliest_next_dep, |&idx| {
+                        connections[idx].departure_time
+                    }) {
+                    Ok(pos) | Err(pos) => pos,
+                };
+
+                for &j in &second_leg_indices[start_idx..] {
+                    let second = &connections[j];
+
+                    if second.departure_time > latest_next_dep {
+                        break;
+                    }
+
+                    if second.departure_station != first.arrival_station {
+                        continue;
+                    }
+
+                    if second.arrival_station != dest {
+                        continue;
+                    }
+
+                    if first.train_schedule_id == second.train_schedule_id {
+                        continue;
+                    }
+
+                    let mid_station = first.arrival_station;
+                    let key = (
+                        first.train_schedule_id,
+                        second.train_schedule_id,
+                        mid_station,
+                    );
+
+                    if seen.insert(key) {
+                        all_solutions.push((
+                            vec![first.train_schedule_id, second.train_schedule_id],
+                            Some(mid_station),
+                        ));
+                    }
+                }
             }
         }
 
-        Ok(transfer_solutions)
+        meter.meter("calc");
+
+        info!("{}", meter);
+
+        Ok(all_solutions)
     }
 
     async fn get_station_arrival_time(
