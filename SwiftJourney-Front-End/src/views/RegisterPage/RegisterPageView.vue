@@ -249,16 +249,7 @@ async function postRegisterMsg() {
     const res: UserApiResponseData = (await userApi.userRegister(params)).data;
     if (res.code === 200) {
       message.success('注册成功');
-      const params_info: UpdatePersonalInfo = {
-        identityCardId: inputIdNumber.value,
-        name: inputName.value,
-        preferredSeatLocation: 'A', // 默认座位位置
-        default: true,
-      };
-      const res_info: UserApiResponseData = (await userApi.setPersonalInfo(params_info)).data;
-      if(res_info.code === 200) {
-        router.push({ name: 'login' }) 
-      }
+      router.push({ name: 'login' }) 
     } else if (res.code === 13001) {
       message.error('身份证号格式错误')
     } else if (res.code === 15001) {
