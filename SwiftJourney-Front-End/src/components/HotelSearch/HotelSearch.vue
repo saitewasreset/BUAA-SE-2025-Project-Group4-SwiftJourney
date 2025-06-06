@@ -220,7 +220,7 @@ function checkHotelQuery() {
         ElMessage.error('目的地城市不能为空');
         return false;
     }
-    hotelQuery.value.target = hotelQuery.value.target + '市';
+    hotelQuery.value.target = hotelQuery.value.target;
     if(hotelQuery.value.beginDate == '' || hotelQuery.value.endDate == '') {
         ElMessage.error('入住和离店时间不能为空');
         return false;
