@@ -152,6 +152,13 @@ import type { ResponseData, TransactionData, SeatLocationInfo, TrainOrderInfo, H
     OrderInform, TransactionDetail, OrderDetail, TrainOrderDetail, HotelOrderDetail, FoodOrderDetail } from '@/interface/interface';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
+import router from '@/router';
+import type { UserApiBalanceData } from '@/interface/userInterface';
+import { useUserStore } from '@/stores/user';
+import { userApi } from '@/api/UserApi/userApi';
+
+const user = useUserStore();
+
 dayjs.locale('zh-cn');
 
 const statusChangeTab = {
@@ -289,7 +296,22 @@ export default {
 
         cancelOrderSuccess(){
             ElMessage.success('成功取消该订单');
+            this.setBalance();
             this.refresh();
+        },
+
+        async setBalance() {
+            try {
+                const balRes: UserApiBalanceData = (await userApi.queryUserBalance()).data;
+                if(balRes.code === 200) {
+                    const balance: number = balRes.data.balance;
+                    user.setUserBalance(balance);
+                }
+                else
+                    throw new Error('invalid session id');
+            } catch(e: any) {
+                console.log(e);
+            }
         },
 
         refresh() {
@@ -459,15 +481,14 @@ export default {
         },
 
         //----------------------------支付----------------------------------
-        goToPay(transactionaId: string, money: string) {
-            const routeUrl = this.router.resolve({
-            name: 'paypage',
-            params: { transactionId: transactionaId },
-            query: {
-                money: money,
-            }
+        goToPay(transactionId: string, money: string) {
+            router.push({
+                name: 'paypage',
+                params: { transactionId: transactionId },
+                query: {
+                    money: money,
+                }
             });
-            window.open(routeUrl.href, '_blank');
         },
 
         //测试数据

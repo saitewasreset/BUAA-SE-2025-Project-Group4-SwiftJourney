@@ -17,7 +17,7 @@ export const useUserStore = defineStore('user', {
         phone: '',
         email: '',
         havePaymentPasswordSet: false,
-        remainingMoney: NormalConstants.RMB_SIGNAL + '0',
+        remainingMoney: 'SC' + '0',
     }),
     getters: {
         isLogin: () => localStorage.getItem('isLogin') === 'true',
@@ -44,7 +44,7 @@ export const useUserStore = defineStore('user', {
             this.preferredSeatLocation = personalInfo.preferredSeatLocation;
         },
         setUserBalance(balance: number) {
-            this.remainingMoney = NormalConstants.RMB_SIGNAL + balance.toString();
+            this.remainingMoney = 'SC' + balance.toString();
         },
         clearUserInfo() {
             this.username = '';
@@ -56,7 +56,7 @@ export const useUserStore = defineStore('user', {
             this.phone = '';
             this.email = '';
             this.havePaymentPasswordSet = false;
-            this.remainingMoney = NormalConstants.RMB_SIGNAL + '0';
+            this.remainingMoney = 'SC' + '0';
             localStorage.removeItem('isLogin');
         },
         async restoreUserFromCookie(router: Router) {
@@ -150,7 +150,7 @@ export const useDebugUserStore = defineStore('debugUser', {
         phone: '15338297650',
         email: 'john.doe@example.com',
         havePaymentPasswordSet: false,
-        remainingMoney: NormalConstants.RMB_SIGNAL + '30000',
+        remainingMoney: 'SC' + '30000',
     }),
     getters: {
 

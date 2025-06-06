@@ -40,6 +40,8 @@ import { ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { paymentApi } from '@/api/PaymentApi/paymentApi';
 import { useUserStore } from '@/stores/user';
+import type { UserApiBalanceData } from '@/interface/userInterface'; 
+import { userApi } from '@/api/UserApi/userApi';
 
 const user = useUserStore();
 
@@ -99,12 +101,13 @@ async function apiPay() {
     } else if (payType.value == '2') {
         payment.paymentPassword = payPassword.value;
     }
-    paymentApi.pay(transactionId, payment)
+    await paymentApi.pay(transactionId, payment)
     .then((res) => {
         if(res.status == 200) {
             //成功支付
             if(res.data.code == 200) {
                 successPay.value = true;
+                setBalance();
             } else if (res.data.code == 11001) {
                 ElMessage.error('支付密码错误');
             } else if (res.data.code == 11002) {
@@ -122,6 +125,20 @@ async function apiPay() {
     }).catch((err) => {
         ElMessage.error(err)
     })
+}
+
+async function setBalance() {
+    try {
+        const balRes: UserApiBalanceData = (await userApi.queryUserBalance()).data;
+        if(balRes.code === 200) {
+            const balance: number = balRes.data.balance;
+            user.setUserBalance(balance);
+        }
+        else
+            throw new Error('invalid session id');
+    } catch(e: any) {
+        console.log(e);
+    }
 }
 
 function checkInput() {
