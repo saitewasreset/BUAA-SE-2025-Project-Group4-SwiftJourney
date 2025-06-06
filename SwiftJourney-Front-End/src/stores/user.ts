@@ -3,20 +3,21 @@ import { NormalConstants } from '@/constant/NormalConstant';
 import { userApi } from '@/api/UserApi/userApi';
 import { type Router } from 'vue-router';
 import { message } from 'ant-design-vue';
-import type { UserApiBalanceData, UserApiResponseData, UserInfo } from '@/interface/userInterface';
+import type { UserApiBalanceData, UserApiResponseData, UserInfo, PersonalInfo } from '@/interface/userInterface';
 
 export const useUserStore = defineStore('user', {
     state: () => ({
+        personalId: '',
         username: '',
         name: '',
         identityCardId: '',
-        preferredSeatLocation: 'A' as 'A' | 'B' | 'C' | 'D' | 'F',
+        preferredSeatLocation: undefined as 'A' | 'B' | 'C' | 'D' | 'F' | undefined,
         gender: 'male' as 'male' | 'female' | undefined,
-        age: 0,
+        age: undefined as number | undefined,
         phone: '',
         email: '',
         havePaymentPasswordSet: false,
-        remainingMoney: NormalConstants.RMB_SIGNAL + '0',
+        remainingMoney: 'SC' + '0',
     }),
     getters: {
         isLogin: () => localStorage.getItem('isLogin') === 'true',
@@ -36,8 +37,14 @@ export const useUserStore = defineStore('user', {
             this.identityCardId = userInfo.identityCardId;
             localStorage.setItem('isLogin', 'true');
         },
+        setPersonalInfo(personalInfo: PersonalInfo) {
+            this.personalId = personalInfo.personalId;
+            this.name = personalInfo.name;
+            this.identityCardId = personalInfo.identityCardId;
+            this.preferredSeatLocation = personalInfo.preferredSeatLocation;
+        },
         setUserBalance(balance: number) {
-            this.remainingMoney = NormalConstants.RMB_SIGNAL + balance.toString();
+            this.remainingMoney = 'SC' + balance.toString();
         },
         clearUserInfo() {
             this.username = '';
@@ -49,7 +56,7 @@ export const useUserStore = defineStore('user', {
             this.phone = '';
             this.email = '';
             this.havePaymentPasswordSet = false;
-            this.remainingMoney = NormalConstants.RMB_SIGNAL + '0';
+            this.remainingMoney = 'SC' + '0';
             localStorage.removeItem('isLogin');
         },
         async restoreUserFromCookie(router: Router) {
@@ -58,7 +65,6 @@ export const useUserStore = defineStore('user', {
                 if(res.code === 200) {
                     const userInfo: UserInfo = res.data as UserInfo;
                     this.setUserInfo(userInfo);
-                    
                 }
                 else
                     throw new Error('invalid session id');
@@ -69,6 +75,7 @@ export const useUserStore = defineStore('user', {
                 }
                 else
                     throw new Error('invalid session id');
+                this.getPersonalInfo();
             } catch(e: any) {
                 if(e.message === 'invalid session id') {
                     if(!this.isLogin) {
@@ -100,6 +107,31 @@ export const useUserStore = defineStore('user', {
             }
                 router.push('/login');
             return;
+        },
+        async postPersonalInfo(name: string, identityCardId: string) {
+            const res: UserApiResponseData = (await userApi.postUserPersonalInfo({name: name, identityCardId: identityCardId, default: true})).data;
+            if(res.code === 200) {
+                console.log('personalInfo is setted');
+            } else {
+                console.log(res.message);
+            }
+        },
+        async getPersonalInfo() {
+            const personalRes: UserApiResponseData = (await userApi.getUserPersonalInfo()).data;
+            if(personalRes.code == 200) {
+                const personalInfo: PersonalInfo[] = personalRes.data as PersonalInfo[];
+                if(personalInfo.length == 0) {
+                    this.postPersonalInfo(this.name, this.identityCardId);
+                    this.getPersonalInfo();
+                } else {
+                    personalInfo.forEach((key) => {
+                        if(key.default) {
+                            this.setPersonalInfo(key);
+                        }
+                    })
+                }
+            } else
+              throw new Error('invalid session id');  
         }
     }
 });
@@ -118,7 +150,7 @@ export const useDebugUserStore = defineStore('debugUser', {
         phone: '15338297650',
         email: 'john.doe@example.com',
         havePaymentPasswordSet: false,
-        remainingMoney: NormalConstants.RMB_SIGNAL + '30000',
+        remainingMoney: 'SC' + '30000',
     }),
     getters: {
 
