@@ -27,7 +27,7 @@
                         </div>
                         <div style="min-width: 150px">交易金额: {{ transactionDetail.money }}</div>
                         <div>创建时间: {{ transactionDetail.time }}</div>
-                        <div style="min-width: 185px">付款时间: {{ transactionDetail.payTime == null ? '待付款' : transactionDetail.payTime }}</div>
+                        <div style="min-width: 185px">付款时间: {{ transactionDetail.payTime == undefined ? '待付款' : transactionDetail.payTime }}</div>
                     </div>
                     <div v-if="isShowTransactionDetail(transactionDetail.id)">
                         <el-table :data="transactionDetail.orderInfo" stripe style="width: 100%">
@@ -398,7 +398,7 @@ export default {
                     id: transactionData.transactionId,
                     status: statusChangeTab[transactionData.status],
                     time: dayjs(transactionData.createTime).format("YYYY-MM-DD HH:mm:ss"),
-                    payTime: dayjs(transactionData.payTime).format("YYYY-MM-DD HH:mm:ss"),
+                    payTime: transactionData.payTime ? dayjs(transactionData.payTime).format("YYYY-MM-DD HH:mm:ss") : undefined,
                     money: 'SC ' + String(transactionData.amount),
                     orderInfo: [] as OrderInform [],
                 };
@@ -414,6 +414,7 @@ export default {
                     switch(orderInfo.orderType){
                         case "train":
                             const trainOrderInfo = orderInfo as TrainOrderInfo;
+                            trainOrderInfo.departureTime = dayjs(trainOrderInfo.departureTime).format("YYYY-MM-DD HH:mm")
                             let trainOrderDetail: TrainOrderDetail = {
                                 id: trainOrderInfo.orderId,
                                 name: trainOrderInfo.name,
@@ -428,6 +429,7 @@ export default {
                             break;
                         case "dish":
                             const dishOrderInfo = orderInfo as DishOrderInfo;
+                            dishOrderInfo.depatureTime = dayjs(dishOrderInfo.depatureTime).format("YYYY-MM-DD HH:mm:ss")
                             let dishOrederDetail: FoodOrderDetail = {
                                 id: dishOrderInfo.orderId,
                                 shopName: "餐车",
@@ -446,8 +448,8 @@ export default {
                                 id: hotelOrderInfo.orderId,
                                 hotelName: hotelOrderInfo.hotelName,
                                 roomType: hotelOrderInfo.roomType,
-                                beginDate: hotelOrderInfo.beginDate,
-                                endDate: hotelOrderInfo.endDate,
+                                beginDate: dayjs(hotelOrderInfo.beginDate).format("YYYY-MM-DD"),
+                                endDate: dayjs(hotelOrderInfo.endDate).format("YYYY-MM-DD"),
                                 name: hotelOrderInfo.name,
                                 number: hotelOrderInfo.amount,
                             }
@@ -455,6 +457,8 @@ export default {
                             break;
                         case "takeaway":
                             const takeawayOrderInfo = orderInfo as TakeawayOrderInfo;
+                            takeawayOrderInfo.depatureTime = dayjs(takeawayOrderInfo.depatureTime).format("YYYY-MM-DD HH:mm:ss");
+                            takeawayOrderInfo.dishTime = dayjs(takeawayOrderInfo.dishTime).format("YYYY-MM-DD HH:mm");
                             let takeawayOrederDetail: FoodOrderDetail = {
                                 id: takeawayOrderInfo.orderId,
                                 shopName: takeawayOrderInfo.shopName,
@@ -462,7 +466,7 @@ export default {
                                 trainNumber: takeawayOrderInfo.trainNumber,
                                 station: takeawayOrderInfo.station,
                                 date: takeawayOrderInfo.depatureTime.substring(0,10),
-                                time: takeawayOrderInfo.dishTime,
+                                time: takeawayOrderInfo.dishTime.substring(11),
                                 name: takeawayOrderInfo.name,
                             }
                             this.setOrderMap(takeawayOrederDetail);
