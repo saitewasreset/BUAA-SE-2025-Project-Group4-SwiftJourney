@@ -151,7 +151,7 @@ where
                     .await
                     .map_err(|e| {
                         error!("Failed to get stations by city name: {:?}", e);
-                        GeneralError::InternalServerError
+                        TrainQueryServiceError::InvalidCityId
                     })?;
                 Ok(stations.into_iter().filter_map(|st| st.get_id()).collect())
             }
