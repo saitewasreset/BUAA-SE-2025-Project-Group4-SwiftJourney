@@ -27,7 +27,7 @@
                         </div>
                         <div style="min-width: 150px">交易金额: {{ transactionDetail.money }}</div>
                         <div>创建时间: {{ transactionDetail.time }}</div>
-                        <div style="min-width: 185px">付款时间: {{ transactionDetail.payTime == null ? '待付款' : transactionDetail.payTime }}</div>
+                        <div style="min-width: 185px">付款时间: {{ transactionDetail.payTime == undefined ? '待付款' : transactionDetail.payTime }}</div>
                     </div>
                     <div v-if="isShowTransactionDetail(transactionDetail.id)">
                         <el-table :data="transactionDetail.orderInfo" stripe style="width: 100%">
@@ -116,13 +116,20 @@
                                     </div>
                                 </template>
                             </el-table-column>
-                            <el-table-column prop="id" label="订单ID" width="200" />
-                            <el-table-column prop="type" label="订单类型" width="200" />
-                            <el-table-column prop="status" label="订单状态" width="200" />
-                            <el-table-column prop="money" label="订单金额" width="200"/>
+                            <el-table-column prop="id" label="订单ID" width="350" />
+                            <el-table-column prop="type" label="订单类型" width="150" />
+                            <el-table-column label="订单状态" width="150">
+                                <template #default="props">
+                                    <div :style="{ color: getStatusColor(props.row.status) }">{{ props.row.status }}</div>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="money" label="订单金额" width="150"/>
                             <el-table-column fixed="right" label="操作" min-width="150">
                                 <template #default="props">
-                                    <el-button v-if="props.row.status != '失败' && props.row.status != '已取消'" text type="danger" size="16px" @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
+                                    <el-tooltip :content="props.row.reason" :disabled="props.row.canCanceled">
+                                        <el-button text type="danger" size="16px" :disabled="!props.row.canCanceled"
+                                        @click="cancelOrder(props.row.id, props.row.canCanceled, props.row.reason)">取消订单</el-button>
+                                    </el-tooltip>
                                 </template>
                             </el-table-column>
                         </el-table>
@@ -145,16 +152,23 @@ import type { ResponseData, TransactionData, SeatLocationInfo, TrainOrderInfo, H
     OrderInform, TransactionDetail, OrderDetail, TrainOrderDetail, HotelOrderDetail, FoodOrderDetail } from '@/interface/interface';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
+import router from '@/router';
+import type { UserApiBalanceData } from '@/interface/userInterface';
+import { useUserStore } from '@/stores/user';
+import { userApi } from '@/api/UserApi/userApi';
+
+const user = useUserStore();
+
 dayjs.locale('zh-cn');
 
 const statusChangeTab = {
     unpaid: "未支付",
     paid: "已支付",
-    ongoing: "进行中",
-    active: "",
+    ongoing: "未出行",
+    active: "行程中",
     completed: "已完成",
     failed: "失败",
-    canceled: "已取消",
+    cancelled: "已取消",
 }
 
 const typeChangeTab = {
@@ -185,10 +199,10 @@ export default {
     },
     created: function() {
         //测试数据
-        this.debugInit();
+        //this.debugInit();
         
         //访问后端
-        //this.init();
+        this.init();
         for(let tr of this.transactionDetailList) {
             this.isShowTransactionDetailMap.set(tr.id, false);
         }
@@ -229,6 +243,14 @@ export default {
             }
         },
 
+        getStatusColor(status: string) {
+            if(status == '行程中') {
+                return 'green';
+            } else if (status == '未支付') {
+                return 'red';
+            }
+        },
+
 
         cancelOrder(id: string, canCancel: boolean, reason: string) {
             if(canCancel){
@@ -242,9 +264,9 @@ export default {
                     }
                 ).then(() => {
                     //api取消订单
-                    //this.apiOrderCancel(id);
+                    this.apiOrderCancel(id);
                     //debug取消订单
-                    this.cancelOrderSuccess();
+                    //this.cancelOrderSuccess();
                 })
             } else {
                 ElMessage.error('不可取消该订单 ' + reason);
@@ -255,15 +277,17 @@ export default {
             await orderApi.orderCancel(id)
             .then((res) => {
                 if(res.status == 200) {
-                    this.cancelOrderSuccess();
-                } else if(res.status == 403) {
-                    ElMessage.error('会话无效');
-                } else if(res.status == 404) {
-                    ElMessage.error('订单号不存在，或没有权限访问该订单');
-                } else if(res.status == 14001) {
-                    ElMessage.error('订单已被取消');
-                } else if(res.status == 14002) {
-                    ElMessage.error('订单不满足取消条件');
+                    if(res.data.code == 200) {
+                        this.cancelOrderSuccess();
+                    }  else if(res.data.code == 403) {
+                        ElMessage.error('会话无效');
+                    } else if(res.data.code == 404) {
+                        ElMessage.error('订单号不存在，或没有权限访问该订单');
+                    } else if(res.data.code == 14001) {
+                        ElMessage.error('订单已被取消');
+                    } else if(res.data.code == 14002) {
+                        ElMessage.error('订单不满足取消条件');
+                    }
                 }
             }).catch((error) => {
                 ElMessage.error(error);
@@ -272,7 +296,22 @@ export default {
 
         cancelOrderSuccess(){
             ElMessage.success('成功取消该订单');
+            this.setBalance();
             this.refresh();
+        },
+
+        async setBalance() {
+            try {
+                const balRes: UserApiBalanceData = (await userApi.queryUserBalance()).data;
+                if(balRes.code === 200) {
+                    const balance: number = balRes.data.balance;
+                    user.setUserBalance(balance);
+                }
+                else
+                    throw new Error('invalid session id');
+            } catch(e: any) {
+                console.log(e);
+            }
         },
 
         refresh() {
@@ -281,9 +320,9 @@ export default {
             this.orderMap.clear();
             this.transactionDetailList.length = 0;
             //debug
-            this.debugInit();
+            //this.debugInit();
             //api
-            //this.init();
+            this.init();
             for(let tr of this.transactionDetailList) {
                 if(!this.isShowTransactionDetailMap.has(tr.id)) {
                     this.isShowTransactionDetailMap.set(tr.id, false);
@@ -340,10 +379,12 @@ export default {
             await orderApi.orderList()
             .then((res) => {
                 if(res.status == 200){
-                    const resData: ResponseData = res.data;
-                    this.dataHandle(resData);
-                } else {
-                    throw new Error(res.statusText);
+                    if(res.data.code == 200) {
+                        const resData: ResponseData = res.data.data;
+                        this.dataHandle(resData);
+                    } else {
+                        throw new Error(res.statusText);
+                    }
                 }
             })
             .catch((error) => {
@@ -356,8 +397,8 @@ export default {
                 let transactionDetail: TransactionDetail = {
                     id: transactionData.transactionId,
                     status: statusChangeTab[transactionData.status],
-                    time: transactionData.createTime,
-                    payTime: transactionData.payTime,
+                    time: dayjs(transactionData.createTime).format("YYYY-MM-DD HH:mm:ss"),
+                    payTime: transactionData.payTime ? dayjs(transactionData.payTime).format("YYYY-MM-DD HH:mm:ss") : undefined,
                     money: 'SC ' + String(transactionData.amount),
                     orderInfo: [] as OrderInform [],
                 };
@@ -373,6 +414,7 @@ export default {
                     switch(orderInfo.orderType){
                         case "train":
                             const trainOrderInfo = orderInfo as TrainOrderInfo;
+                            trainOrderInfo.departureTime = dayjs(trainOrderInfo.departureTime).format("YYYY-MM-DD HH:mm")
                             let trainOrderDetail: TrainOrderDetail = {
                                 id: trainOrderInfo.orderId,
                                 name: trainOrderInfo.name,
@@ -387,6 +429,7 @@ export default {
                             break;
                         case "dish":
                             const dishOrderInfo = orderInfo as DishOrderInfo;
+                            dishOrderInfo.depatureTime = dayjs(dishOrderInfo.depatureTime).format("YYYY-MM-DD HH:mm:ss")
                             let dishOrederDetail: FoodOrderDetail = {
                                 id: dishOrderInfo.orderId,
                                 shopName: "餐车",
@@ -405,8 +448,8 @@ export default {
                                 id: hotelOrderInfo.orderId,
                                 hotelName: hotelOrderInfo.hotelName,
                                 roomType: hotelOrderInfo.roomType,
-                                beginDate: hotelOrderInfo.beginDate,
-                                endDate: hotelOrderInfo.endDate,
+                                beginDate: dayjs(hotelOrderInfo.beginDate).format("YYYY-MM-DD"),
+                                endDate: dayjs(hotelOrderInfo.endDate).format("YYYY-MM-DD"),
                                 name: hotelOrderInfo.name,
                                 number: hotelOrderInfo.amount,
                             }
@@ -414,6 +457,8 @@ export default {
                             break;
                         case "takeaway":
                             const takeawayOrderInfo = orderInfo as TakeawayOrderInfo;
+                            takeawayOrderInfo.depatureTime = dayjs(takeawayOrderInfo.depatureTime).format("YYYY-MM-DD HH:mm:ss");
+                            takeawayOrderInfo.dishTime = dayjs(takeawayOrderInfo.dishTime).format("YYYY-MM-DD HH:mm");
                             let takeawayOrederDetail: FoodOrderDetail = {
                                 id: takeawayOrderInfo.orderId,
                                 shopName: takeawayOrderInfo.shopName,
@@ -421,7 +466,7 @@ export default {
                                 trainNumber: takeawayOrderInfo.trainNumber,
                                 station: takeawayOrderInfo.station,
                                 date: takeawayOrderInfo.depatureTime.substring(0,10),
-                                time: takeawayOrderInfo.dishTime,
+                                time: takeawayOrderInfo.dishTime.substring(11),
                                 name: takeawayOrderInfo.name,
                             }
                             this.setOrderMap(takeawayOrederDetail);
@@ -440,15 +485,14 @@ export default {
         },
 
         //----------------------------支付----------------------------------
-        goToPay(transactionaId: string, money: string) {
-            const routeUrl = this.router.resolve({
-            name: 'paypage',
-            params: { transactionId: transactionaId },
-            query: {
-                money: money,
-            }
+        goToPay(transactionId: string, money: string) {
+            router.push({
+                name: 'paypage',
+                params: { transactionId: transactionId },
+                query: {
+                    money: money,
+                }
             });
-            window.open(routeUrl.href, '_blank');
         },
 
         //测试数据

@@ -7,6 +7,8 @@
                     <el-descriptions class="OrderInfoCard" border :column="1" size="default"
                     @mouseenter="showDeleteIcon(index)" @mouseleave="hideDeleteIcon(index)">
                         <el-descriptions-item label="酒店名称">{{ key.name }}</el-descriptions-item>
+                        <el-descriptions-item label="入住日期">{{ key.beginDate }}</el-descriptions-item>
+                        <el-descriptions-item label="离店日期">{{ key.endDate }}</el-descriptions-item>
                         <el-descriptions-item label="房型">{{ key.roomType }}</el-descriptions-item>
                         <el-descriptions-item label="数量">
                             <el-input-number v-model="key.amount" min="1" :max="key.maxCount" style="width: 100px;"/>
@@ -15,7 +17,7 @@
                     </el-descriptions>
                     <el-icon v-if="deleteIconsVisible[index]" class="DeleteIcon"
                     @mouseenter="showDeleteIcon(index)" @mouseleave="hideDeleteIcon(index)"
-                    @click="deleteRoomFromOrder(key.hotelId, key.name, key.roomType)">
+                    @click="deleteRoomFromOrder(key.hotelId, key.name, key.roomType, key.beginDate, key.endDate)">
                     <CircleCloseFilled /></el-icon>
                 </div>
             </div>
@@ -75,7 +77,7 @@ function hideDeleteIcon(index: number) {
 
 }
 
-function deleteRoomFromOrder(hotelId: string,hotelName: string, roomType: string) {
+function deleteRoomFromOrder(hotelId: string,hotelName: string, roomType: string, beginDate: string, endDate: string) {
     ElMessageBox.confirm(
         '是否取消选择' + hotelName + '的' + roomType,
         '警告',
@@ -86,7 +88,7 @@ function deleteRoomFromOrder(hotelId: string,hotelName: string, roomType: string
         }
     )
     .then(() => {
-        hotelOrderStore.delete(hotelId, roomType);
+        hotelOrderStore.delete(hotelId, roomType, beginDate, endDate);
         ElMessage.success('成功取消选择' + hotelName + '的' + roomType);
     })
 }
@@ -127,9 +129,11 @@ async function confirmCreateTransaction() {
     await hotelApi.hotelOrder(hotelOrderRequestList)
     .then((res) => {
         if(res.status == 200) {
-            successCreateTransaction(res.data as TransactionInfo)
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                successCreateTransaction(res.data.data as TransactionInfo);
+            } else {
+                throw new Error(res.data.message);
+            }
         }
     }) .catch ((error) => {
         ElMessage.error('生成订单失败 ' + error);
@@ -154,15 +158,14 @@ function successCreateTransaction(transactionInfo: TransactionInfo) {
 
 const router = useRouter();
 
-function goToPay(transactionaId: string, money: string) {
-    const routeUrl = router.resolve({
+function goToPay(transactionId: string, money: string) {
+    router.push({
         name: 'paypage',
-        params: { transactionId: transactionaId },
+        params: { transactionId: transactionId },
         query: {
-          money: money,
+            money: money,
         }
-      });
-    window.open(routeUrl.href, '_blank');
+    });
 }
 
 </script>

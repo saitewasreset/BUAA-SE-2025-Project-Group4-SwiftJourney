@@ -1,7 +1,7 @@
 export interface HotelQuery {
   // 目标城市/火车站，由`target_type`属性指定
   target: string;
-  target_type: "city" | "station";
+  targetType: "city" | "station";
   // 通过酒店名称进行匹配，可不存在
   search?: string;
   // 入住日期
@@ -94,9 +94,9 @@ export interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
@@ -105,7 +105,7 @@ export interface HotelOrderRequest {
 }
 
 export interface HotelRoomInfo extends HotelRoomDetailInfo {
-    roomType: string,
+    roomType: "标准间" | "大床房" | "行政套房";
 }
 
 export interface HotelOrderInfo extends HotelOrderRequest {
