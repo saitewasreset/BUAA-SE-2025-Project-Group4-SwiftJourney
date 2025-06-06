@@ -444,7 +444,6 @@ where
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
 
-        // 获取所有当天的车次
         let schedules = self
             .train_schedule_service
             .get_schedules(cmd.departure_time)
@@ -454,7 +453,6 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
-        // 构建ID到车次的映射，方便查找
         let schedule_by_id: HashMap<_, _> = schedules
             .iter()
             .filter_map(|s| s.get_id().map(|id| (id, s)))
@@ -468,13 +466,11 @@ where
 
             let mid_station = mid_station_opt.unwrap();
 
-            // 获取中转站的名称
             let station_name = match self.station_repository.find(mid_station).await {
                 Ok(Some(station)) => station.name().to_string(),
                 _ => continue,
             };
 
-            // 获取两段行程的车次信息
             let first_schedule = match schedule_by_id.get(&schedule_ids[0]) {
                 Some(s) => s,
                 None => continue,
@@ -485,7 +481,6 @@ where
                 None => continue,
             };
 
-            // 构建完整DTO
             let mut first_dto = match self
                 .build_dto(first_schedule, &routes, cmd.departure_time)
                 .await
@@ -502,27 +497,23 @@ where
                 Err(_) => continue,
             };
 
-            // 修改第一段行程，只保留从出发站到中转站的部分
             let first_mid_idx = match first_dto
                 .route
                 .iter()
                 .position(|stop| stop.station_name == station_name)
             {
                 Some(idx) => idx,
-                None => continue, // 第一段行程中没有找到中转站
+                None => continue,
             };
 
-            // 更新第一段行程的到达站信息
             first_dto.arrival_station = station_name.clone();
             first_dto.arrival_time = first_dto.route[first_mid_idx]
                 .arrival_time
                 .clone()
-                .expect("应该有到达时间");
+                .expect("missing arrival time");
 
-            // 截取路线，只保留到中转站的部分
             first_dto.route.truncate(first_mid_idx + 1);
 
-            // 更新行程时间
             let first_dep_dt =
                 NaiveDateTime::parse_from_str(&first_dto.departure_time, "%Y-%m-%d %H:%M:%S")
                     .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
@@ -531,27 +522,23 @@ where
                     .unwrap_or_else(|_| first_dep_dt + chrono::Duration::hours(1));
             first_dto.travel_time = (first_arr_dt - first_dep_dt).num_seconds() as u32;
 
-            // 修改第二段行程，只保留从中转站到目的地的部分
             let second_mid_idx = match second_dto
                 .route
                 .iter()
                 .position(|stop| stop.station_name == station_name)
             {
                 Some(idx) => idx,
-                None => continue, // 第二段行程中没有找到中转站
+                None => continue,
             };
 
-            // 更新第二段行程的出发站信息
             second_dto.departure_station = station_name.clone();
             second_dto.departure_time = second_dto.route[second_mid_idx]
                 .departure_time
                 .clone()
-                .expect("应该有出发时间");
+                .expect("missing departure time");
 
-            // 截取路线，只保留从中转站开始的部分
             second_dto.route = second_dto.route[second_mid_idx..].to_vec();
 
-            // 更新行程时间
             let second_dep_dt =
                 NaiveDateTime::parse_from_str(&second_dto.departure_time, "%Y-%m-%d %H:%M:%S")
                     .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
@@ -560,11 +547,9 @@ where
                     .unwrap_or_else(|_| second_dep_dt + chrono::Duration::hours(1));
             second_dto.travel_time = (second_arr_dt - second_dep_dt).num_seconds() as u32;
 
-            // 计算中转等待时间
             let relaxing_time = if second_dep_dt > first_arr_dt {
                 (second_dep_dt - first_arr_dt).num_seconds() as u32
             } else {
-                // 处理跨天的情况
                 (second_dep_dt + chrono::Duration::days(1) - first_arr_dt).num_seconds() as u32
             };
 
