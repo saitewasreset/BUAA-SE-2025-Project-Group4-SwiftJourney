@@ -1,7 +1,7 @@
 // -------------------- Interface 定义 --------------------
-export type directScheduleRequest = directScheduleQuery
+export type scheduleRequest = scheduleQuery
 
-export interface directScheduleQuery {
+export interface scheduleQuery {
   departureStation?: string
   arrivalStation?: string
   departureCity?: string
@@ -25,7 +25,7 @@ export interface seatTypeInfo {
   // 该类型座位总计容量
   capacity: number
   // 该类型座位剩余量
-  remainCount: number
+  left: number
   // 这种座位的价格
   price: number
 }
@@ -54,26 +54,15 @@ export interface directScheduleInfo {
   seatInfo: Map<string, seatTypeInfo>
 }
 
-export type indirectScheduleRequest = indirectScheduleQuery;
-
-export interface indirectScheduleQuery {
-  departureStation?: string;
-  arrivalStation?: string;
-  departureCity?: string;
-  arrivalCity?: string;
-  // departureDate：YYYY-MM-DD
-  departureDate: string;
-}
-
 export type indirectScheduleResponseData = indirectScheduleInfo[];
 
 export interface indirectScheduleInfo {
   // 中转乘车第一程的信息
-  firstRide: directScheduleInfo;
+  first_ride: directScheduleInfo;
   // 中转乘车第二程的信息
-  secondRide: directScheduleInfo;
+  second_ride: directScheduleInfo;
   // 中间换乘可用的时间，单位：秒
-  relaxingTime: number;
+  relaxing_time: number;
 }
 
 // -------------------- Type 定义 --------------------
@@ -99,3 +88,6 @@ export enum SortType {
   TravelTime = 1, // 运行时长
   Price = 2, // 价格
 }
+
+// -------------------- 查询相关 --------------------
+export type QueryMode = 'direct' | 'indirect';
