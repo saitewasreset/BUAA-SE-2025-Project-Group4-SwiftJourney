@@ -12,7 +12,7 @@ interface DishTakeawayPack {
 
 interface DishInfo {
   // 该火车餐在哪些时段提供？
-  availableTime: Array<"launch" | "dinner">;
+  availableTime: Array<"lunch" | "dinner">;
   // 火车餐名称
   name: string;
   // 火车餐类别，例如：主食、饮料、零食
