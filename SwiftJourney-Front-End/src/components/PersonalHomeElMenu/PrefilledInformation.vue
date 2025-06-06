@@ -246,6 +246,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, User, Edit, Delete, InfoFilled, Check } from '@element-plus/icons-vue';
 import { useUserStore } from '@/stores/user';
 import { userApi } from '@/api/UserApi/userApi';
+import type { UserApiResponseData } from '@/interface/userInterface';
 
 type ResponseData = PersonalInfo[];
 
@@ -385,8 +386,12 @@ export default {
     // 删除乘车人
     async deletePersonalInfo(personalInfo: PersonalInfo) {
       try {
-        await userApi.setPersonalInfo({identityCardId: personalInfo.identityCardId});
-        ElMessage.success('删除成功');
+        const res: UserApiResponseData = (await userApi.setPersonalInfo({identityCardId: personalInfo.identityCardId})).data;
+        if(res.code === 200) {
+          ElMessage.success('删除成功');
+        } else {
+          ElMessage.error('删除失败');
+        }
       } catch (error) {
         ElMessage.error('删除失败');
       }
@@ -405,15 +410,21 @@ export default {
             ...this.formData,
             default: this.isEditingSelf ? true: false,
           };
-          await userApi.setPersonalInfo(newPersonalInfo);
-          ElMessage.success('修改成功');
+          const res: UserApiResponseData = (await userApi.setPersonalInfo(newPersonalInfo)).data;
+          if(res.code === 200)
+            ElMessage.success('修改成功');
+          else
+            ElMessage.error('修改失败');
         } else {
           const newPersonalInfo: UpdatePersonalInfo = {
             ...this.formData,
             default: false,
           };
-          await userApi.setPersonalInfo(newPersonalInfo);
-          ElMessage.success('添加成功');
+          const res: UserApiResponseData = (await userApi.setPersonalInfo(newPersonalInfo)).data;
+          if(res.code === 200)
+            ElMessage.success('添加成功');
+          else
+            ElMessage.error('添加失败');
         }
         this.dialogVisible = false;
       } catch (error) {
