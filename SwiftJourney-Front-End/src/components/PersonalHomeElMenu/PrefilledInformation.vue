@@ -184,7 +184,7 @@
                     'window': seat === 'A',
                     'aisle': seat === 'C'
                   }"
-                  @click="formData.preferredSeatLocation = seat"
+                  @click="formData.preferredSeatLocation = seat as 'A' | 'B' | 'C' | 'D' | 'F'"
                 >
                   {{ seat }}
                 </div>
@@ -199,7 +199,7 @@
                     'window': seat === 'F',
                     'aisle': seat === 'D'
                   }"
-                  @click="formData.preferredSeatLocation = seat"
+                  @click="formData.preferredSeatLocation = seat as 'A' | 'B' | 'C' | 'D' | 'F'"
                 >
                   {{ seat }}
                 </div>
