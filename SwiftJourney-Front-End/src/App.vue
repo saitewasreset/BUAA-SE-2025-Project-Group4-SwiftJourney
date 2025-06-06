@@ -2,7 +2,7 @@
   <div class="root" :class="{ 'root-center': !shouldTitleBarDisplay }">
     <TitleBar v-if="shouldTitleBarDisplay" class="title-bar" />
     <div class="router-view-container" :class="{ 'container-margin': shouldTitleBarDisplay }">
-      <RouterView />
+      <RouterView :key="$route.fullPath" />
     </div>
   </div>
 </template>
