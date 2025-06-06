@@ -19,11 +19,15 @@ pub mod order_dto {
     }
 
     #[derive(Serialize, Clone)]
-    #[serde(tag = "orderType", content = "data")]
+    #[serde(untagged)]
     pub enum OrderInfoDto {
+        #[serde(rename = "train")]
         Train(TrainOrderDto),
+        #[serde(rename = "hotel")]
         Hotel(HotelOrderDto),
+        #[serde(rename = "dish")]
         Dish(DishOrderDto),
+        #[serde(rename = "takeaway")]
         Takeaway(TakeawayOrderDto),
     }
 
@@ -50,7 +54,7 @@ pub mod order_dto {
         pub departure_time: String,
         pub terminal_time: String,
         pub name: String,
-        pub seat: SeatLocationInfoDTO,
+        pub seat: Option<SeatLocationInfoDTO>,
     }
 
     #[derive(Serialize, Clone)]
@@ -95,6 +99,7 @@ pub mod order_dto {
     }
 
     #[derive(Serialize, Clone)]
+    #[serde(rename_all = "camelCase")]
     pub struct BaseOrderDto {
         pub order_id: String,
         pub status: String,

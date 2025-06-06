@@ -1,6 +1,6 @@
 use crate::domain::model::hotel::HotelId;
 use crate::domain::model::order::{
-    DishOrder, HotelOrder, Order, OrderId, TakeawayOrder, TrainOrder,
+    DishOrder, HotelOrder, Order, OrderId, OrderStatus, TakeawayOrder, TrainOrder,
 };
 use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::model::user::UserId;
@@ -20,6 +20,7 @@ use sea_orm::{
 };
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use tracing::{error, instrument};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
@@ -276,6 +277,159 @@ WHERE "user"."id" = $1 AND "hotel_order"."hotel_id" = $2"#,
         }
     }
 
+    #[instrument(skip(self))]
+    async fn load_all_active_orders(&self) -> Result<Vec<Box<dyn Order>>, RepositoryError> {
+        let train_list = crate::models::train::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load trains: {}", e))
+            .context("failed to load trains from db")?;
+
+        let train_schedule_list = crate::models::train_schedule::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load train schedules: {}", e))
+            .context("failed to load train schedules from db")?;
+
+        let train_id_to_train_type_id = train_list
+            .into_iter()
+            .map(|x| (x.id, x.type_id))
+            .collect::<HashMap<_, _>>();
+
+        let train_schedule_id_to_train_id = train_schedule_list
+            .into_iter()
+            .map(|x| (x.id, x.train_id))
+            .collect::<HashMap<_, _>>();
+
+        let mut train_schedule_id_to_train_type_id: HashMap<i32, i32> = HashMap::new();
+
+        for (train_schedule_id, train_id) in train_schedule_id_to_train_id {
+            if let Some(train_type_id) = train_id_to_train_type_id.get(&train_id) {
+                train_schedule_id_to_train_type_id.insert(train_schedule_id, *train_type_id);
+            } else {
+                return Err(RepositoryError::InconsistentState(anyhow!(
+                    "no train type id for train schedule id: {}",
+                    train_schedule_id
+                )));
+            }
+        }
+
+        let train_orders = crate::models::train_order::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load train orders: {}", e))
+            .context("failed to load train orders".to_string())?;
+
+        let hotel_orders = crate::models::hotel_order::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load hotel orders: {}", e))
+            .context("failed to load hotel orders".to_string())?;
+
+        let dish_orders = crate::models::dish_order::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load dish orders: {}", e))
+            .context("failed to load dish orders".to_string())?;
+
+        let takeaway_orders = crate::models::takeaway_order::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load takeaway orders: {}", e))
+            .context("failed to load takeaway orders".to_string())?;
+
+        let seat_type_models = crate::models::seat_type::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load seat type: {}", e))
+            .context("failed to find seat type from db")?;
+
+        let seat_type_mapping_models = crate::models::seat_type_mapping::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load seat type mappings: {}", e))
+            .context("failed to load seat type mapping from db".to_string())?;
+
+        let seat_type_map = seat_type_models
+            .into_iter()
+            .map(|x| (x.id, x))
+            .collect::<HashMap<_, _>>();
+
+        let mut train_type_id_to_seat_type_mapping_map: HashMap<
+            i32,
+            HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
+        > = HashMap::new();
+
+        for model in seat_type_mapping_models {
+            train_type_id_to_seat_type_mapping_map
+                .entry(model.train_type_id)
+                .or_default()
+                .entry(model.seat_type_id)
+                .or_default()
+                .insert(model.seat_id, model);
+        }
+
+        let mut result = Vec::with_capacity(
+            train_orders.len() + hotel_orders.len() + dish_orders.len() + takeaway_orders.len(),
+        );
+
+        for order in train_orders {
+            let train_type_id = train_schedule_id_to_train_type_id
+                .get(&order.train_schedule_id)
+                .copied()
+                .ok_or(RepositoryError::InconsistentState(anyhow!(
+                    "no train type id for train schedule id: {}",
+                    order.train_schedule_id
+                )))?;
+
+            let train_order_do_pack = TrainOrderDoPack {
+                train_order: order,
+                seat_type: seat_type_map.clone(),
+                seat_type_mapping: train_type_id_to_seat_type_mapping_map
+                    .get(&train_type_id)
+                    .cloned()
+                    .ok_or(RepositoryError::InconsistentState(anyhow!(
+                        "no seat type mapping for train type id: {}",
+                        train_type_id
+                    )))?,
+            };
+
+            let train_order = OrderDataConverter::make_from_do_train(train_order_do_pack)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            result.push(Box::new(train_order) as Box<dyn Order>);
+        }
+
+        for order in hotel_orders {
+            let hotel_order = OrderDataConverter::make_from_do_hotel(order)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            result.push(Box::new(hotel_order) as Box<dyn Order>);
+        }
+
+        for order in dish_orders {
+            let dish_order = OrderDataConverter::make_from_do_dish(order)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            result.push(Box::new(dish_order) as Box<dyn Order>);
+        }
+
+        for order in takeaway_orders {
+            let takeaway_order = OrderDataConverter::make_from_do_takeaway(order)
+                .map_err(RepositoryError::InconsistentState)?;
+
+            result.push(Box::new(takeaway_order) as Box<dyn Order>);
+        }
+
+        Ok(result
+            .into_iter()
+            .filter(|order| {
+                order.order_status() == OrderStatus::Ongoing
+                    || order.order_status() == OrderStatus::Active
+            })
+            .collect())
+    }
+
     async fn update(&self, order: Box<dyn Order>) -> Result<(), RepositoryError> {
         match order.as_ref().type_id() {
             id if id == TypeId::of::<TrainOrder>() => {
@@ -407,7 +561,7 @@ FROM "takeaway_order"
         ON "route"."line_id" = "train_schedule"."line_id"
     INNER JOIN "station"
         ON "station"."id" = "route"."station_id"
-    WHERE "takeaway_order"."id" = ? ORDER BY "route"."order""#,
+    WHERE "takeaway_order"."id" = $1 ORDER BY "route"."order""#,
             [order_id.to_db_value().into()],
         ))
         .all(&self.db)
@@ -665,7 +819,7 @@ FROM "takeaway_order"
         ON "takeaway_dish"."takeaway_shop_id" = "takeaway_shop"."id"
     INNER JOIN "station"
         ON "takeaway_shop"."station_id" = "station"."id"
-    WHERE "takeaway_order"."id" = ? AND "route"."order" = 0;"#,
+    WHERE "takeaway_order"."id" = $1 AND "route"."order" = 0;"#,
                 [order_id.to_db_value().into()],
             ))
             .one(&self.db)

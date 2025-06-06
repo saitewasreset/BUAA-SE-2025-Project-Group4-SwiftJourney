@@ -10,6 +10,7 @@ use crate::domain::service::transaction::{TransactionService, TransactionService
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{ToPrimitive, Zero};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
@@ -216,6 +217,11 @@ where
                 transaction_id,
             ))?;
 
+        let to_refund_order_uuid_set = to_refund_orders
+            .iter()
+            .map(|o| o.uuid())
+            .collect::<HashSet<_>>();
+
         let mut refund_tx = tx.refund_transaction_partial(to_refund_orders)?;
 
         let refund_tx_id = self
@@ -227,9 +233,11 @@ where
             })?;
 
         for order in tx.orders_mut() {
-            order
-                .payment_info_mut()
-                .set_refund_transaction_id(refund_tx_id);
+            if to_refund_order_uuid_set.contains(&order.uuid()) {
+                order
+                    .payment_info_mut()
+                    .set_refund_transaction_id(refund_tx_id);
+            }
         }
 
         self.transaction_repository
@@ -242,6 +250,7 @@ where
         let orders = tx
             .orders()
             .iter()
+            .filter(|order| to_refund_order_uuid_set.contains(&order.uuid()))
             .map(|order| order.as_ref())
             .collect::<Vec<_>>();
 
@@ -252,6 +261,7 @@ where
         Ok(refund_tx.uuid())
     }
 
+    #[instrument(skip(self))]
     async fn convert_transaction_to_dto(
         &self,
         transaction: Transaction,
@@ -270,6 +280,7 @@ where
         let mut orders = Vec::with_capacity(origin_orders.len());
 
         for order in origin_orders {
+            debug!("Converting order to DTO: {:?}", order);
             orders.push(self.order_service.convert_order_to_dto(order).await?)
         }
 
