@@ -10,7 +10,7 @@ use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
 };
 use crate::domain::model::session::SessionId;
-use crate::domain::model::train::TrainNumber;
+use crate::domain::model::train::{SeatTypeName, TrainNumber};
 use crate::domain::model::train_schedule::StationRange;
 use crate::domain::model::user::UserId;
 use crate::domain::repository::order::OrderRepository;
@@ -26,10 +26,12 @@ use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::transaction::TransactionService;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use chrono::Timelike;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -131,10 +133,21 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        let origin_departure_time =
+            DateTimeWithTimeZone::parse_from_rfc3339(&dto.origin_departure_time).map_err(|e| {
+                GeneralError::BadRequest(format!("Invalid origin departure time format: {}", e))
+            })?;
+
         let train_schedule = schedules_result
             .iter()
             .find(|schedule| {
-                schedule.origin_departure_time().to_string() == dto.origin_departure_time
+                let date = origin_departure_time.date_naive();
+
+                let origin_departure_seconds =
+                    origin_departure_time.time().num_seconds_from_midnight() as i32;
+
+                schedule.date() == date
+                    && schedule.origin_departure_time() == origin_departure_seconds
             })
             .cloned()
             .ok_or(TrainOrderServiceError::InvalidTrainNumber)?;
@@ -213,6 +226,7 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        // 警告：若要修改下一行代码，需要验证创建order_seat_type_name时的SAFETY要求是否仍然满足
         let seat_type_exists = train_details
             .seats()
             .iter()
@@ -221,6 +235,9 @@ where
         if !seat_type_exists {
             return Err(Box::new(TrainOrderServiceError::InvalidTrainNumber));
         }
+
+        // SAFETY: dto.seat_type 已经在上面验证过存在
+        let order_seat_type_name = SeatTypeName::from_unchecked(dto.seat_type.clone());
 
         // === 创建订单 ===
 
@@ -344,6 +361,7 @@ where
                 .get_id()
                 .expect("The train schedule is invalid"),
             None,
+            order_seat_type_name,
             personal_info.preferred_seat_location(),
             station_range,
         );
@@ -461,6 +479,7 @@ where
     PIR: PersonalInfoRepository + Send + Sync + 'static,
     TSS: TrainScheduleService + Send + Sync + 'static,
 {
+    #[instrument(skip_all)]
     async fn process_train_order_packs(
         &self,
         session_id: String,
