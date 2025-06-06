@@ -7,14 +7,14 @@
           <!-- 出发站信息 -->
           <div class="departure-info">
             <!-- 时间 -->
-            <div class="schedule-time">{{ formatTime(content.firstRide.departureTime) }}</div>
+            <div class="schedule-time">{{ formatTime(content.first_ride.departureTime) }}</div>
             <!-- 站名 -->
-            <div class="schedule-station">{{ content.firstRide.departureStation }}</div>
+            <div class="schedule-station">{{ content.first_ride.departureStation }}</div>
           </div>
           <!-- 过程信息 1 -->
           <div class="schedule-process">
             <!-- 车次信息 -->
-            <a-popover :title="content.firstRide.trainNumber + ' 车次信息'" trigger="click">
+            <a-popover :title="content.first_ride.trainNumber + ' 车次信息'" trigger="click">
               <template #content>
                 <a-table
                   size="small"
@@ -24,14 +24,14 @@
                   :customRow="handleCustomRow"
                 />
               </template>
-              <div class="train-number">{{ content.firstRide.trainNumber }}</div>
+              <div class="train-number">{{ content.first_ride.trainNumber }}</div>
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
               <img src="@/assets/TicketArrowGrey.svg" />
             </div>
             <!-- 到达时间 -->
-            <div class="travel-time">{{ formatTime(content.firstRide.arrivalTime) }} 到达</div>
+            <div class="travel-time">{{ formatTime(content.first_ride.arrivalTime) }} 到达</div>
           </div>
           <!-- 中转信息 -->
           <div>
@@ -40,21 +40,21 @@
               全程
               {{
                 formatTravelTime(
-                  content.firstRide.travelTime +
-                    content.secondRide.travelTime +
-                    content.relaxingTime,
+                  content.first_ride.travelTime +
+                    content.second_ride.travelTime +
+                    content.relaxing_time,
                 )
               }}
             </div>
             <!-- 中转站 -->
-            <div class="schedule-station-mid">{{ content.firstRide.arrivalStation }}</div>
+            <div class="schedule-station-mid">{{ content.first_ride.arrivalStation }}</div>
             <!-- 换乘时间 -->
-            <div class="travel-time">中转换乘 {{ formatTravelTime(content.relaxingTime) }}</div>
+            <div class="travel-time">中转换乘 {{ formatTravelTime(content.relaxing_time) }}</div>
           </div>
           <!-- 过程信息 2 -->
           <div class="schedule-process">
             <!-- 车次信息 -->
-            <a-popover :title="content.secondRide.trainNumber + ' 车次信息'" trigger="click">
+            <a-popover :title="content.second_ride.trainNumber + ' 车次信息'" trigger="click">
               <template #content>
                 <a-table
                   size="small"
@@ -64,22 +64,22 @@
                   :customRow="handleCustomRow"
                 />
               </template>
-              <div class="train-number">{{ content.secondRide.trainNumber }}</div>
+              <div class="train-number">{{ content.second_ride.trainNumber }}</div>
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
               <img src="@/assets/TicketArrowGrey.svg" />
             </div>
             <!-- 出发时间 -->
-            <div class="travel-time">{{ formatTime(content.secondRide.departureTime) }} 出发</div>
+            <div class="travel-time">{{ formatTime(content.second_ride.departureTime) }} 出发</div>
           </div>
           <!-- 到达站信息 -->
           <div class="arrival-info">
             <div class="arrival-info-main">
               <!-- 时间 -->
-              <div class="schedule-time">{{ formatTime(content.secondRide.arrivalTime) }}</div>
+              <div class="schedule-time">{{ formatTime(content.second_ride.arrivalTime) }}</div>
               <!-- 站名 -->
-              <div class="schedule-station">{{ content.secondRide.arrivalStation }}</div>
+              <div class="schedule-station">{{ content.second_ride.arrivalStation }}</div>
             </div>
             <!-- 过夜标志 -->
             <div class="over-date-flag">
@@ -94,7 +94,7 @@
             <div class="ride-title">第1程</div>
             <!-- 车票信息 -->
             <div
-              v-for="([seatType, seatInfo], index) in content.firstRide.seatInfo"
+              v-for="([seatType, seatInfo], index) in Object.entries(content.first_ride.seatInfo)"
               :key="index"
               class="seat-info"
             >
@@ -104,18 +104,13 @@
               <div
                 class="remain-count-info"
                 :class="{
-                  rich: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'rich',
-                  few: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'few',
-                  little: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'little',
-                  none: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'none',
+                  rich: getleftType(seatInfo.left, seatInfo.capacity) === 'rich',
+                  few: getleftType(seatInfo.left, seatInfo.capacity) === 'few',
+                  little: getleftType(seatInfo.left, seatInfo.capacity) === 'little',
+                  none: getleftType(seatInfo.left, seatInfo.capacity) === 'none',
                 }"
               >
-                {{
-                  formatRemainCount(
-                    getRemainCountType(seatInfo.remainCount, seatInfo.capacity),
-                    seatInfo.remainCount,
-                  )
-                }}
+                {{ formatleft(getleftType(seatInfo.left, seatInfo.capacity), seatInfo.left) }}
               </div>
             </div>
           </div>
@@ -124,7 +119,7 @@
             <div class="ride-title">第2程</div>
             <!-- 车票信息 -->
             <div
-              v-for="([seatType, seatInfo], index) in content.secondRide.seatInfo"
+              v-for="([seatType, seatInfo], index) in Object.entries(content.second_ride.seatInfo)"
               :key="index"
               class="seat-info"
             >
@@ -134,18 +129,13 @@
               <div
                 class="remain-count-info"
                 :class="{
-                  rich: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'rich',
-                  few: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'few',
-                  little: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'little',
-                  none: getRemainCountType(seatInfo.remainCount, seatInfo.capacity) === 'none',
+                  rich: getleftType(seatInfo.left, seatInfo.capacity) === 'rich',
+                  few: getleftType(seatInfo.left, seatInfo.capacity) === 'few',
+                  little: getleftType(seatInfo.left, seatInfo.capacity) === 'little',
+                  none: getleftType(seatInfo.left, seatInfo.capacity) === 'none',
                 }"
               >
-                {{
-                  formatRemainCount(
-                    getRemainCountType(seatInfo.remainCount, seatInfo.capacity),
-                    seatInfo.remainCount,
-                  )
-                }}
+                {{ formatleft(getleftType(seatInfo.left, seatInfo.capacity), seatInfo.left) }}
               </div>
             </div>
           </div>
@@ -154,7 +144,7 @@
       <!-- 功能区 -->
       <div class="function-area">
         <!-- 最低价格 -->
-        <div class="price-info">SC {{ content.firstRide.price + content.secondRide.price }}</div>
+        <div class="price-info">SC {{ content.first_ride.price + content.second_ride.price }}</div>
         <a-button :disable="!checkBookable" type="primary" class="book-btn">订票</a-button>
       </div>
     </div>
@@ -162,14 +152,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeMount } from 'vue'
 import type {
   indirectScheduleInfo,
   directScheduleInfo,
   stoppingStationInfo,
   seatTypeInfo,
 } from '@/interface/ticketServiceInterface'
-import { getAdapter } from 'axios'
 
 // -------------------- 接口数据类型 --------------------
 const props = withDefaults(
@@ -178,7 +167,7 @@ const props = withDefaults(
   }>(),
   {
     content: () => ({
-      firstRide: {
+      first_ride: {
         departureStation: '加载中..',
         departureTime: '2000-01-01T08:00:00+08:00',
         arrivalStation: '加载中..',
@@ -216,13 +205,13 @@ const props = withDefaults(
           },
         ] as stoppingStationInfo[],
         seatInfo: new Map<string, seatTypeInfo>([
-          ['优选一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['二等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['无座', { capacity: 0, remainCount: 0, price: 0.0 }],
+          ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['一等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['二等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['无座', { capacity: 0, left: 0, price: 0.0 }],
         ]),
       },
-      secondRide: {
+      second_ride: {
         departureStation: '加载中..',
         departureTime: '2000-01-02T09:05:00+08:00',
         arrivalStation: '加载中..',
@@ -260,19 +249,19 @@ const props = withDefaults(
           },
         ] as stoppingStationInfo[],
         seatInfo: new Map<string, seatTypeInfo>([
-          ['优选一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['一等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['二等座', { capacity: 0, remainCount: 0, price: 0.0 }],
-          ['无座', { capacity: 0, remainCount: 0, price: 0.0 }],
+          ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['一等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['二等座', { capacity: 0, left: 0, price: 0.0 }],
+          ['无座', { capacity: 0, left: 0, price: 0.0 }],
         ]),
       },
-      relaxingTime: 65 * 60,
+      relaxing_time: 65 * 60,
     }),
   },
 )
 // -------------------- 类型定义 --------------------
 // 定义车票信息类型
-type remainCountType = 'rich' | 'few' | 'little' | 'none'
+type leftType = 'rich' | 'few' | 'little' | 'none'
 // 列车信息表格列定义
 const columns = [
   {
@@ -327,7 +316,7 @@ function formatTravelTime(seconds: number): string {
   return `${minutes.toString()}分`
 }
 // 格式化余票信息
-function formatRemainCount(type: remainCountType, count: number): string {
+function formatleft(type: leftType, count: number): string {
   if (type === 'rich') {
     return `有票`
   } else if (type === 'few' || type === 'little') {
@@ -341,7 +330,7 @@ function formatRemainCount(type: remainCountType, count: number): string {
 function formatTrainInfoTime(text: string): string {
   const time = formatTime(text)
   const date = new Date(text)
-  const departureDate = new Date(props.content.firstRide.departureTime)
+  const departureDate = new Date(props.content.first_ride.departureTime)
   const overNum = date.getDate() - departureDate.getDate()
   if (overNum > 0) {
     return `${time} +${overNum}`
@@ -350,8 +339,8 @@ function formatTrainInfoTime(text: string): string {
 }
 // -------------------- 过夜标志逻辑 --------------------
 const overDateNum = computed(() => {
-  const departureDate = new Date(props.content.firstRide.departureTime)
-  const arrivalDate = new Date(props.content.secondRide.arrivalTime)
+  const departureDate = new Date(props.content.first_ride.departureTime)
+  const arrivalDate = new Date(props.content.second_ride.arrivalTime)
   return arrivalDate.getDate() - departureDate.getDate()
 })
 // 过夜标志
@@ -360,12 +349,12 @@ const overDateFlag = computed(() => {
 })
 // -------------------- 余票判断逻辑 --------------------
 // 根据余票数量和总容量判断余票类型
-function getRemainCountType(remainCount: number, totalCount: number): remainCountType {
-  if (remainCount > 30) {
+function getleftType(left: number, totalCount: number): leftType {
+  if (left > 30) {
     return 'rich'
-  } else if (remainCount >= 10) {
+  } else if (left >= 10) {
     return 'few'
-  } else if (remainCount > 0) {
+  } else if (left > 0) {
     return 'little'
   } else {
     return 'none'
@@ -373,10 +362,17 @@ function getRemainCountType(remainCount: number, totalCount: number): remainCoun
 }
 // 订票检查
 const checkBookable = computed(() => {
-  return (
-    Array.from(props.content.firstRide.seatInfo.values()).some((seat) => seat.remainCount > 0) &&
-    Array.from(props.content.secondRide.seatInfo.values()).some((seat) => seat.remainCount > 0)
+  // 中转车次检查第一程余票
+  const firstRideHasTicket = Object.values(props.content.first_ride.seatInfo).some(
+    (seatInfo) => seatInfo.left > 0,
   )
+
+  // 中转车次检查第二程余票
+  const secondRideHasTicket = Object.values(props.content.second_ride.seatInfo).some(
+    (seatInfo) => seatInfo.left > 0,
+  )
+  // 只有两程都有余票才能订票
+  return firstRideHasTicket && secondRideHasTicket
 })
 // -------------------- 车次信息表格 --------------------
 // 应用行样式
@@ -385,7 +381,7 @@ const handleCustomRow = (record: any) => ({
 })
 // 按时间顺序排序车次信息
 const sortedRouteFirstRide = computed(() => {
-  return props.content.firstRide.route.sort((a, b) => {
+  return props.content.first_ride.route.sort((a, b) => {
     let aDate = null,
       bDate = null
     if (a.arrivalTime) {
@@ -402,7 +398,7 @@ const sortedRouteFirstRide = computed(() => {
   })
 })
 const sortedRouteSecondRide = computed(() => {
-  return props.content.secondRide.route.sort((a, b) => {
+  return props.content.second_ride.route.sort((a, b) => {
     let aDate = null,
       bDate = null
     if (a.arrivalTime) {
@@ -422,29 +418,29 @@ const sortedRouteSecondRide = computed(() => {
 const startIndexFirstRide = computed(() => {
   return sortedRouteFirstRide.value.findIndex(
     (station) =>
-      station.stationName === props.content.firstRide.departureStation &&
-      station.departureTime === props.content.firstRide.departureTime,
+      station.stationName === props.content.first_ride.departureStation &&
+      station.departureTime === props.content.first_ride.departureTime,
   )
 })
 const endIndexFirstRide = computed(() => {
   return sortedRouteFirstRide.value.findIndex(
     (station) =>
-      station.stationName === props.content.firstRide.arrivalStation &&
-      station.arrivalTime === props.content.firstRide.arrivalTime,
+      station.stationName === props.content.first_ride.arrivalStation &&
+      station.arrivalTime === props.content.first_ride.arrivalTime,
   )
 })
 const startIndexSecondRide = computed(() => {
   return sortedRouteSecondRide.value.findIndex(
     (station) =>
-      station.stationName === props.content.secondRide.departureStation &&
-      station.departureTime === props.content.secondRide.departureTime,
+      station.stationName === props.content.second_ride.departureStation &&
+      station.departureTime === props.content.second_ride.departureTime,
   )
 })
 const endIndexSecondRide = computed(() => {
   return sortedRouteSecondRide.value.findIndex(
     (station) =>
-      station.stationName === props.content.secondRide.arrivalStation &&
-      station.arrivalTime === props.content.secondRide.arrivalTime,
+      station.stationName === props.content.second_ride.arrivalStation &&
+      station.arrivalTime === props.content.second_ride.arrivalTime,
   )
 })
 // 处理车次信息
@@ -477,6 +473,10 @@ const processedRouteSecondRide = computed(() => {
       rowStyle,
     }
   })
+})
+
+onBeforeMount(() => {
+  console.log('组件挂载，内容:', props.content)
 })
 </script>
 
