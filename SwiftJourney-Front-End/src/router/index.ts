@@ -51,7 +51,10 @@ const router = createRouter({
       path: '/paytransaction/:transactionId',
       name: 'paypage',
       component: () => import('../views/PayPage/PayPageView.vue'),
-      props: true
+      props: route => ({
+        transactionId: route.params.transactionId,
+        money: route.query.money
+    })
     }
   ],
 })
