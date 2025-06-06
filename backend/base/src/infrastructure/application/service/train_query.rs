@@ -53,7 +53,7 @@ use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use async_trait::async_trait;
-use chrono::{Duration, FixedOffset, NaiveDate, NaiveDateTime};
+use chrono::{Duration, FixedOffset, NaiveDate};
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::collections::HashMap;
 use tracing::{error, info, instrument};
