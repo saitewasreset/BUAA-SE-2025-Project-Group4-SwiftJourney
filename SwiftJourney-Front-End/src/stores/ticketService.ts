@@ -1,9 +1,20 @@
 import { defineStore } from 'pinia'
-import type { CheckBoxGroup } from '@/interface/ticketServiceInterface'
-import { SortType } from '@/interface/ticketServiceInterface'
+import type {
+  CheckBoxGroup,
+  directScheduleInfo,
+  indirectScheduleInfo,
+  QueryMode,
+  scheduleRequest,
+  seatTypeInfo,
+} from '@/interface/ticketServiceInterface'
+import { CheckType, SortType } from '@/interface/ticketServiceInterface'
 import dayjs, { Dayjs } from 'dayjs'
 import { useUserStore } from './user'
+import { useGeneralStore } from './general'
+import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
+import { message } from 'ant-design-vue'
 
+const generalStore = useGeneralStore()
 const userStore = useUserStore()
 
 export const useTicketServiceStore = defineStore('ticketService', {
@@ -14,8 +25,8 @@ export const useTicketServiceStore = defineStore('ticketService', {
     checkGroups: [
       // 车次类型
       {
-        options: ['G/C', 'D', 'Z', 'T', 'K', '其他'],
-        checkedList: ['G/C', 'D', 'Z', 'T', 'K', '其他'],
+        options: ['G/C', 'D', 'T', 'K', 'Z', '其他'],
+        checkedList: ['G/C', 'D', 'T', 'K', 'Z', '其他'],
         indeterminate: false,
         checkAll: true,
       },
@@ -61,7 +72,15 @@ export const useTicketServiceStore = defineStore('ticketService', {
     sortOrderAsc: true,
     // -------------------- 查询相关 --------------------
     // 查询日期
+    // 默认查询今天的日期
     queryDate: new Date().toISOString().split('T')[0],
+    // 查询城市/站点
+    queryDepartureText: '',
+    queryArrivalText: '',
+    // 查询模式
+    queryMode: 'direct' as QueryMode,
+    // 查询结果
+    queryResult: [] as directScheduleInfo[] | indirectScheduleInfo[],
   }),
   getters: {
     // -------------------- 时间相关 --------------------
@@ -91,6 +110,282 @@ export const useTicketServiceStore = defineStore('ticketService', {
     },
     isSortByPrice(): boolean {
       return this.sortType === SortType.Price
+    },
+    // -------------------- 筛选结果 --------------------
+    // 根据筛选条件过滤显示的车次（所有条件同时满足）
+    displaySchedules(): directScheduleInfo[] | indirectScheduleInfo[] {
+      let filteredSchedules = [...this.queryResult]
+
+      // 1. 只显示有票的车次
+      if (this.onlyShowAvailable) {
+        if (this.queryMode === 'direct') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const directSchedule = schedule as directScheduleInfo
+            return Object.values(directSchedule.seatInfo).some((seatInfo) => seatInfo.left > 0)
+          })
+        } else if (this.queryMode === 'indirect') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            // 检查第一程是否有余票（安全版本）
+            const firstRideHasTicket = Object.values(indirectSchedule.first_ride.seatInfo).some(
+              (seatInfo) => seatInfo.left > 0,
+            )
+            // 检查第二程是否有余票（安全版本）
+            const secondRideHasTicket = Object.values(indirectSchedule.second_ride.seatInfo).some(
+              (seatInfo) => seatInfo.left > 0,
+            )
+            // 只有两程都有余票才能订票
+            return firstRideHasTicket && secondRideHasTicket
+          })
+        }
+      }
+
+      // 2. 车次类型筛选
+      const trainTypeChecked = this.checkGroups[CheckType.TrainType].checkedList
+      if (trainTypeChecked.length < this.checkGroups[CheckType.TrainType].options.length) {
+        if (this.queryMode === 'direct') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const directSchedule = schedule as directScheduleInfo
+            const trainNumber = directSchedule.trainNumber
+            const trainType = trainNumber.charAt(0)
+            if (trainType === 'G' || trainType === 'C') {
+              return trainTypeChecked.includes('G/C')
+            } else if (trainType === 'D') {
+              return trainTypeChecked.includes('D')
+            } else if (trainType === 'T') {
+              return trainTypeChecked.includes('T')
+            } else if (trainType === 'K') {
+              return trainTypeChecked.includes('K')
+            } else if (trainType === 'Z') {
+              return trainTypeChecked.includes('Z')
+            } else {
+              return trainTypeChecked.includes('其他')
+            }
+          })
+        } else if (this.queryMode === 'indirect') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            const firstTrainNumber = indirectSchedule.first_ride.trainNumber
+            const secondTrainNumber = indirectSchedule.second_ride.trainNumber
+            const firstTrainType = firstTrainNumber.charAt(0)
+            const secondTrainType = secondTrainNumber.charAt(0)
+
+            const subTrainType = ['G', 'C']
+            if (subTrainType.includes(firstTrainType) && subTrainType.includes(secondTrainType)) {
+              return trainTypeChecked.includes('G/C')
+            }
+            subTrainType.push('D')
+            if (subTrainType.includes(firstTrainType) && subTrainType.includes(secondTrainType)) {
+              return trainTypeChecked.includes('D')
+            }
+            subTrainType.push('T')
+            if (subTrainType.includes(firstTrainType) && subTrainType.includes(secondTrainType)) {
+              return trainTypeChecked.includes('T')
+            }
+            subTrainType.push('K')
+            if (subTrainType.includes(firstTrainType) && subTrainType.includes(secondTrainType)) {
+              return trainTypeChecked.includes('K')
+            }
+            subTrainType.push('Z')
+            if (subTrainType.includes(firstTrainType) && subTrainType.includes(secondTrainType)) {
+              return trainTypeChecked.includes('Z')
+            }
+            return trainTypeChecked.includes('其他')
+          })
+        }
+      }
+
+      // 3. 座位类型筛选
+      const seatTypeChecked = this.checkGroups[CheckType.SeatType].checkedList
+      if (
+        seatTypeChecked.length < this.checkGroups[CheckType.SeatType].options.length &&
+        !seatTypeChecked.includes('加载中...')
+      ) {
+        if (this.queryMode === 'direct') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const directSchedule = schedule as directScheduleInfo
+            return Object.keys(directSchedule.seatInfo).some((seatType) =>
+              seatTypeChecked.includes(seatType),
+            )
+          })
+        } else if (this.queryMode === 'indirect') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            const firstRideSeatTypes = Object.keys(indirectSchedule.first_ride.seatInfo)
+            const secondRideSeatTypes = Object.keys(indirectSchedule.second_ride.seatInfo)
+            return (
+              firstRideSeatTypes.some((seatType) => seatTypeChecked.includes(seatType)) ||
+              secondRideSeatTypes.some((seatType) => seatTypeChecked.includes(seatType))
+            )
+          })
+        }
+      }
+
+      // 4. 出发站筛选
+      const departureStationChecked = this.checkGroups[CheckType.DepartureStation].checkedList
+      if (
+        departureStationChecked.length <
+          this.checkGroups[CheckType.DepartureStation].options.length &&
+        !departureStationChecked.includes('加载中...')
+      ) {
+        if (this.queryMode === 'direct') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const directSchedule = schedule as directScheduleInfo
+            const departureStation = directSchedule.departureStation
+            return departureStationChecked.includes(departureStation)
+          })
+        } else if (this.queryMode === 'indirect') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            const departureStation = indirectSchedule.first_ride.departureStation
+            return departureStationChecked.includes(departureStation)
+          })
+        }
+      }
+
+      // 5. 中转站筛选（仅适用于中转车次）
+      if (this.queryMode === 'indirect') {
+        const transferStationChecked = this.checkGroups[CheckType.TransferStation].checkedList
+        if (
+          transferStationChecked.length <
+            this.checkGroups[CheckType.TransferStation].options.length &&
+          !transferStationChecked.includes('加载中...')
+        ) {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            const transferStations = indirectSchedule.second_ride.departureStation
+            return transferStationChecked.includes(transferStations)
+          })
+        }
+      }
+
+      // 6. 到达站筛选
+      const arrivalStationChecked = this.checkGroups[CheckType.ArrivalStation].checkedList
+      if (
+        arrivalStationChecked.length < this.checkGroups[CheckType.ArrivalStation].options.length &&
+        !arrivalStationChecked.includes('加载中...')
+      ) {
+        if (this.queryMode === 'direct') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const directSchedule = schedule as directScheduleInfo
+            const arrivalStation = directSchedule.arrivalStation
+            return arrivalStationChecked.includes(arrivalStation)
+          })
+        } else if (this.queryMode === 'indirect') {
+          filteredSchedules = filteredSchedules.filter((schedule: any) => {
+            const indirectSchedule = schedule as indirectScheduleInfo
+            const arrivalStation = indirectSchedule.second_ride.arrivalStation
+            return arrivalStationChecked.includes(arrivalStation)
+          })
+        }
+      }
+
+      // 7. 出发时间筛选
+      filteredSchedules = filteredSchedules.filter((schedule: any) => {
+        if (this.queryMode === 'direct') {
+          const directSchedule = schedule as directScheduleInfo
+          const departureTime = directSchedule.departureTime
+          const departureDate = new Date(departureTime)
+          const departureTimeNumber = departureDate.getHours() * 60 + departureDate.getMinutes()
+          return (
+            departureTimeNumber >= this.startTimeRangeNumber[0] &&
+            departureTimeNumber <= this.startTimeRangeNumber[1]
+          )
+        } else if (this.queryMode === 'indirect') {
+          const indirectSchedule = schedule as indirectScheduleInfo
+          const firstDepartureTime = indirectSchedule.first_ride.departureTime
+          const firstDepartureDate = new Date(firstDepartureTime)
+          const firstDepartureTimeNumber =
+            firstDepartureDate.getHours() * 60 + firstDepartureDate.getMinutes()
+          return (
+            firstDepartureTimeNumber >= this.startTimeRangeNumber[0] &&
+            firstDepartureTimeNumber <= this.startTimeRangeNumber[1]
+          )
+        }
+      })
+
+      // 8. 到达时间筛选
+      filteredSchedules = filteredSchedules.filter((schedule: any) => {
+        if (this.queryMode === 'direct') {
+          const directSchedule = schedule as directScheduleInfo
+          const arrivalTime = directSchedule.arrivalTime
+          const arrivalDate = new Date(arrivalTime)
+          const arrivalTimeNumber = arrivalDate.getHours() * 60 + arrivalDate.getMinutes()
+          return (
+            arrivalTimeNumber >= this.endTimeRangeNumber[0] &&
+            arrivalTimeNumber <= this.endTimeRangeNumber[1]
+          )
+        } else if (this.queryMode === 'indirect') {
+          const indirectSchedule = schedule as indirectScheduleInfo
+          const secondArrivalTime = indirectSchedule.second_ride.arrivalTime
+          const secondArrivalDate = new Date(secondArrivalTime)
+          const secondArrivalTimeNumber =
+            secondArrivalDate.getHours() * 60 + secondArrivalDate.getMinutes()
+          return (
+            secondArrivalTimeNumber >= this.endTimeRangeNumber[0] &&
+            secondArrivalTimeNumber <= this.endTimeRangeNumber[1]
+          )
+        }
+      })
+
+      // 9. 排序
+      filteredSchedules.sort((a: any, b: any) => {
+        let compareValue = 0
+
+        if (this.queryMode === 'direct') {
+          const directA = a as directScheduleInfo
+          const directB = b as directScheduleInfo
+
+          switch (this.sortType) {
+            case SortType.DepartureTime:
+              compareValue =
+                new Date(directA.departureTime).getTime() -
+                new Date(directB.departureTime).getTime()
+              break
+            case SortType.TravelTime:
+              compareValue = directA.travelTime - directB.travelTime
+              break
+            case SortType.Price:
+              compareValue = directA.price - directB.price
+              break
+            default:
+              break
+          }
+        } else if (this.queryMode === 'indirect') {
+          const indirectA = a as indirectScheduleInfo
+          const indirectB = b as indirectScheduleInfo
+          switch (this.sortType) {
+            case SortType.DepartureTime:
+              const firstDepartureA = new Date(indirectA.first_ride.departureTime).getTime()
+              const firstDepartureB = new Date(indirectB.first_ride.departureTime).getTime()
+              compareValue = firstDepartureA - firstDepartureB
+              break
+            case SortType.TravelTime:
+              const totalTravelTimeA =
+                indirectA.first_ride.travelTime +
+                indirectA.relaxing_time +
+                indirectA.second_ride.travelTime
+              const totalTravelTimeB =
+                indirectB.first_ride.travelTime +
+                indirectB.relaxing_time +
+                indirectB.second_ride.travelTime
+              compareValue = totalTravelTimeA - totalTravelTimeB
+              break
+            case SortType.Price:
+              const firstPriceA = indirectA.first_ride.price
+              const firstPriceB = indirectB.first_ride.price
+              const secondPriceA = indirectA.second_ride.price
+              const secondPriceB = indirectB.second_ride.price
+              compareValue = firstPriceA + secondPriceA - (firstPriceB + secondPriceB)
+              break
+            default:
+              break
+          }
+        }
+        return this.sortOrderAsc ? compareValue : -compareValue
+      })
+
+      return filteredSchedules as directScheduleInfo[] | indirectScheduleInfo[]
     },
   },
   actions: {
@@ -157,6 +452,142 @@ export const useTicketServiceStore = defineStore('ticketService', {
         // 否则，设置新的排序方式并默认升序
         this.sortType = type
         this.sortOrderAsc = true
+      }
+    },
+    // ---------------------- 查询相关 --------------------
+    // 查询方法封装
+    async querySchedule() {
+      if (this.queryDate === '') {
+        message.error('请填写查询日期')
+        return
+      }
+      if (this.queryDepartureText === '' || this.queryArrivalText === '') {
+        message.error('请填写出发地点和到达地点')
+        return
+      }
+      const params: scheduleRequest = {
+        departureDate: this.queryDate,
+      }
+      // 根据文本判断城市/站点 - 调用 GeneralStore 的方法
+      // TODO
+
+      if (this.queryMode === 'direct') {
+        try {
+          const response = await TicketServiceApi.queryDirectSchedule(params)
+          if (response.data) {
+            this.handleResponse(response.data)
+          }
+        } catch (e: any) {
+          message.error(`查询直达车次失败: ${e.message}`)
+        }
+      } else if (this.queryMode === 'indirect') {
+        try {
+          const response = await TicketServiceApi.queryIndirectSchedule(params)
+          if (response.data) {
+            this.handleResponse(response.data)
+          }
+        } catch (e: any) {
+          message.error(`查询中转车次失败: ${e.message}`)
+        }
+      } else {
+        message.error('查询模式不正确，请选择直达或中转')
+      }
+    },
+    // 处理查询结果
+    handleResponse(res: any) {
+      if (res.code === 200) {
+        this.queryResult = res.data.solutions
+        // 更新筛选选项
+        // 座位类型
+        this.checkGroups[CheckType.SeatType].options = Array.from(
+          new Set(
+            this.queryResult.flatMap((schedule: any) => {
+              if (this.queryMode === 'direct') {
+                const directSchedule = schedule as directScheduleInfo
+                return Object.keys(directSchedule.seatInfo)
+              }
+              if (this.queryMode === 'indirect') {
+                const indirectSchedule = schedule as indirectScheduleInfo
+                return [
+                  ...Object.keys(indirectSchedule.first_ride.seatInfo),
+                  ...Object.keys(indirectSchedule.second_ride.seatInfo),
+                ]
+              }
+              return []
+            }),
+          ),
+        )
+        this.checkGroups[CheckType.SeatType].checkedList =
+          this.checkGroups[CheckType.SeatType].options
+        this.checkGroups[CheckType.SeatType].indeterminate = false
+        this.checkGroups[CheckType.SeatType].checkAll = true
+        // 出发站
+        this.checkGroups[CheckType.DepartureStation].options = Array.from(
+          new Set(
+            this.queryResult.flatMap((schedule: any) => {
+              if (this.queryMode === 'direct') {
+                const directSchedule = schedule as directScheduleInfo
+                return [directSchedule.departureStation]
+              }
+              if (this.queryMode === 'indirect') {
+                const indirectSchedule = schedule as indirectScheduleInfo
+                return [indirectSchedule.first_ride.departureStation]
+              }
+              return []
+            }),
+          ),
+        )
+        this.checkGroups[CheckType.DepartureStation].checkedList =
+          this.checkGroups[CheckType.DepartureStation].options
+        this.checkGroups[CheckType.DepartureStation].indeterminate = false
+        this.checkGroups[CheckType.DepartureStation].checkAll = true
+        // 中转站
+        if (this.queryMode === 'indirect') {
+          this.checkGroups[CheckType.TransferStation].options = Array.from(
+            new Set(
+              this.queryResult.flatMap((schedule: any) => {
+                if (this.queryMode === 'indirect') {
+                  const indirectSchedule = schedule as indirectScheduleInfo
+                  return [indirectSchedule.second_ride.departureStation]
+                }
+                return []
+              }),
+            ),
+          )
+          this.checkGroups[CheckType.TransferStation].checkedList =
+            this.checkGroups[CheckType.TransferStation].options
+          this.checkGroups[CheckType.TransferStation].indeterminate = false
+          this.checkGroups[CheckType.TransferStation].checkAll = true
+        }
+        // 到达站
+        this.checkGroups[CheckType.ArrivalStation].options = Array.from(
+          new Set(
+            this.queryResult.flatMap((schedule: any) => {
+              if (this.queryMode === 'direct') {
+                const directSchedule = schedule as directScheduleInfo
+                return [directSchedule.arrivalStation]
+              }
+              if (this.queryMode === 'indirect') {
+                const indirectSchedule = schedule as indirectScheduleInfo
+                return [indirectSchedule.second_ride.arrivalStation]
+              }
+              return []
+            }),
+          ),
+        )
+        this.checkGroups[CheckType.ArrivalStation].checkedList =
+          this.checkGroups[CheckType.ArrivalStation].options
+        this.checkGroups[CheckType.ArrivalStation].indeterminate = false
+        this.checkGroups[CheckType.ArrivalStation].checkAll = true
+        message.success('查询成功')
+      } else if (res.code === 403) {
+        message.error('查询直达车次失败: 无效的 session_id')
+      } else if (res.code === 404) {
+        message.error('查询直达车次失败: 无效的城市或车站名称')
+      } else if (res.code === 12001) {
+        message.error('查询直达车次失败: 查询字段不符合要求，请将问题报告给开发人员')
+      } else {
+        message.error(`查询直达车次失败: 未知错误`)
       }
     },
   },
