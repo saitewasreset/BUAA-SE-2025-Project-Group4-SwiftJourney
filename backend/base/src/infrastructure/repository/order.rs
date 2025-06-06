@@ -561,7 +561,7 @@ FROM "takeaway_order"
         ON "route"."line_id" = "train_schedule"."line_id"
     INNER JOIN "station"
         ON "station"."id" = "route"."station_id"
-    WHERE "takeaway_order"."id" = ? ORDER BY "route"."order""#,
+    WHERE "takeaway_order"."id" = $1 ORDER BY "route"."order""#,
             [order_id.to_db_value().into()],
         ))
         .all(&self.db)
@@ -819,7 +819,7 @@ FROM "takeaway_order"
         ON "takeaway_dish"."takeaway_shop_id" = "takeaway_shop"."id"
     INNER JOIN "station"
         ON "takeaway_shop"."station_id" = "station"."id"
-    WHERE "takeaway_order"."id" = ? AND "route"."order" = 0;"#,
+    WHERE "takeaway_order"."id" = $1 AND "route"."order" = 0;"#,
                 [order_id.to_db_value().into()],
             ))
             .one(&self.db)
