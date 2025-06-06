@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 pub struct TrainSeatServiceImpl<SAR, RR, TTCS, TSR>
 where
@@ -254,6 +254,11 @@ where
         seat_availability_id: SeatAvailabilityId,
         seat_location_info: SeatLocationInfo,
     ) -> Result<Seat, TrainSeatServiceError> {
+        info!(
+            "reserving seat for seat availability id: {}, seat location: {:?}",
+            seat_availability_id, seat_location_info
+        );
+
         let mut seat_availability = self
             .seat_availability_repository
             .find(seat_availability_id)
@@ -358,6 +363,11 @@ where
                 break;
             }
         }
+
+        info!(
+            "allocated seat: {:?} for seat availability id: {}",
+            allocated_seat, seat_availability_id
+        );
 
         self.seat_availability_repository
             .save(&mut seat_availability)
