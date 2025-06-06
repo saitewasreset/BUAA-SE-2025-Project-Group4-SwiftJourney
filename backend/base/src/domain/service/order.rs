@@ -54,7 +54,7 @@ pub mod order_dto {
         pub departure_time: String,
         pub terminal_time: String,
         pub name: String,
-        pub seat: SeatLocationInfoDTO,
+        pub seat: Option<SeatLocationInfoDTO>,
     }
 
     #[derive(Serialize, Clone)]

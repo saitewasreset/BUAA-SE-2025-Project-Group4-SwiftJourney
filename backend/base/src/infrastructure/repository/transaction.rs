@@ -1215,6 +1215,7 @@ impl TransactionRepositoryImpl {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn query_transaction(
         &self,
         builder: impl FnOnce(
@@ -1251,10 +1252,34 @@ impl TransactionRepositoryImpl {
             .await
             .context("Failed to query train schedule")?;
 
-        let train_type_id_map = train_schedules
+        let trains = crate::models::train::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to query trains: {}", e))
+            .context("Failed to query trains")?;
+
+        let train_schedule_id_to_train_id = train_schedules
             .into_iter()
             .map(|item| (item.id, item.train_id))
             .collect::<HashMap<_, _>>();
+
+        let train_id_to_train_type_id = trains
+            .into_iter()
+            .map(|item| (item.id, item.type_id))
+            .collect::<HashMap<_, _>>();
+
+        let mut train_schedule_id_to_train_type_id = HashMap::new();
+
+        for (train_schedule_id, train_id) in train_schedule_id_to_train_id {
+            let train_type_id = *train_id_to_train_type_id.get(&train_id).ok_or(
+                RepositoryError::InconsistentState(anyhow!(
+                    "no train type id for train id: {}",
+                    train_id
+                )),
+            )?;
+
+            train_schedule_id_to_train_type_id.insert(train_schedule_id, train_type_id);
+        }
 
         for model in seat_type_mapping {
             seat_type_mapping_all
@@ -1273,7 +1298,11 @@ impl TransactionRepositoryImpl {
                 .context("Failed to query order")?;
 
             let orders = order_do_pack
-                .into_order_pack(&train_type_id_map, &seat_type, &seat_type_mapping_all)
+                .into_order_pack(
+                    &train_schedule_id_to_train_type_id,
+                    &seat_type,
+                    &seat_type_mapping_all,
+                )
                 .map_err(RepositoryError::InconsistentState)?;
 
             let transaction_do_pack = TransactionDoPack {
