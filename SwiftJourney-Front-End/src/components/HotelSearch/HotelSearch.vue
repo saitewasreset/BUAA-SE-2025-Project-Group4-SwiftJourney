@@ -464,6 +464,9 @@ const updateSuggestions = (userInput: string) => {
             chineseChars.push(char);
             stringChars.push(pinyin(char, { toneType: 'none' }));
             stringChars.push(" ");
+        } else if (char == '\'') {
+            otherChars.push(' ');
+            stringChars.push(' ');
         } else {
             otherChars.push(char);
             stringChars.push(char);
