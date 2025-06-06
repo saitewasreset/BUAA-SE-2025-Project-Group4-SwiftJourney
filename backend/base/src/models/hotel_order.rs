@@ -17,11 +17,11 @@ pub struct Model {
     pub refund_transaction_id: Option<i32>,
     #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
     pub price: Decimal,
+    pub amount: i32,
     pub create_time: DateTimeWithTimeZone,
     pub active_time: DateTimeWithTimeZone,
     pub complete_time: DateTimeWithTimeZone,
     pub status: String,
-    pub amount: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
