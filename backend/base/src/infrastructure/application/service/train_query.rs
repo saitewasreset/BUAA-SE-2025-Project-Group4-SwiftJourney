@@ -495,6 +495,19 @@ where
 
         meter.meter("build train info DTOs");
 
+        infos.sort_by(|a, b| {
+            let a_time = DateTimeWithTimeZone::parse_from_rfc3339(&a.departure_time).unwrap();
+            let b_time = DateTimeWithTimeZone::parse_from_rfc3339(&b.departure_time).unwrap();
+            a_time.cmp(&b_time)
+        });
+
+        // 限制结果数量为50个，应前端要求
+        if infos.len() > 50 {
+            infos.truncate(50);
+        }
+
+        meter.meter("sort and limit results");
+
         info!("{}", meter);
 
         Ok(DirectTrainQueryDTO { solutions: infos })
@@ -739,6 +752,21 @@ where
         }
 
         meter.meter("build transfer solutions");
+
+        solutions.sort_by(|a, b| {
+            let a_total_time =
+                a.first_ride.travel_time + a.relaxing_time + a.second_ride.travel_time;
+            let b_total_time =
+                b.first_ride.travel_time + b.relaxing_time + b.second_ride.travel_time;
+            a_total_time.cmp(&b_total_time)
+        });
+
+        // 限制结果数量为50个，应前端要求
+        if solutions.len() > 50 {
+            solutions.truncate(50);
+        }
+
+        meter.meter("sort and limit results");
 
         info!("{}", meter);
 
