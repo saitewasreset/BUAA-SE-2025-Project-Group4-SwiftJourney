@@ -120,7 +120,7 @@ watch(
 <style scoped>
 .page-container {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 60px);
   background: linear-gradient(135deg, #f0f4f8 0%, #e6f3ff 100%);
 }
 
