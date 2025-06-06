@@ -138,7 +138,8 @@ impl DishRepository for DishRepositoryImpl {
         train_number: TrainNumber<Verified>,
     ) -> Result<Vec<Dish>, RepositoryError> {
         let dish_list = crate::models::dish::Entity::find()
-            .filter(crate::models::dish::Column::TrainId.eq(train_number.deref()))
+            .inner_join(crate::models::train::Entity)
+            .filter(crate::models::train::Column::Number.eq(train_number.to_string()))
             .all(&self.db)
             .await
             .context(format!(
