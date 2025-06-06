@@ -229,9 +229,9 @@
                         </div>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="id" label="订单ID" width="300" />
-                    <el-table-column prop="type" label="订单类型" width="120" />
-                    <el-table-column label="订单状态" width="120">
+                    <el-table-column prop="id" label="订单ID" width="370" />
+                    <el-table-column prop="type" label="订单类型" width="180" />
+                    <el-table-column label="订单状态" width="170">
                       <template #default="props">
                         <span 
                           class="order-status-badge"
@@ -241,8 +241,8 @@
                         </span>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="money" label="订单金额" width="120" />
-                    <el-table-column fixed="right" label="操作" width="120">
+                    <el-table-column prop="money" label="订单金额" width="170" />
+                    <el-table-column fixed="right" label="操作" width="170">
                       <template #default="props">
                         <el-tooltip :content="props.row.reason" :disabled="props.row.canCanceled">
                           <el-button 
