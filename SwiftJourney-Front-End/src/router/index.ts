@@ -56,7 +56,7 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
   //const isLogin: Boolean = true;
   if (!isLogin) {
@@ -71,6 +71,9 @@ router.beforeEach((to, from, next) => {
     if (to.path === '/login' || to.path === '/register') {
       message.info('您已登录');
       next({ path: '/homepage' });
+    } else if(to.path === '/personalhomepage/personaldata') {
+      await useUserStore().restoreUserFromCookie(router);
+      next();
     } else {
       next();
     }
