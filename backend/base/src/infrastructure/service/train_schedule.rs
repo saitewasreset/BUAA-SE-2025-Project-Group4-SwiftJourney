@@ -12,7 +12,7 @@ use crate::domain::service::train_schedule::{TrainScheduleService, TrainSchedule
 use crate::domain::{Identifiable, RepositoryError};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use chrono::{FixedOffset, NaiveDate, NaiveDateTime, TimeDelta};
+use chrono::{FixedOffset, NaiveDate, TimeDelta};
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -745,7 +745,7 @@ where
     async fn get_terminal_arrival_time(
         &self,
         train_number: TrainNumber<Verified>,
-        origin_departure_time: NaiveDateTime,
+        origin_departure_time: DateTimeWithTimeZone,
     ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
         let train = self
             .train_repository
@@ -757,7 +757,7 @@ where
             })?;
 
         let train_id = train.get_id().expect("train should have id");
-        let origin_departure_date = origin_departure_time.date();
+        let origin_departure_date = origin_departure_time.date_naive();
 
         let train_schedule = self
             .train_schedule_repository
@@ -807,10 +807,6 @@ where
         let terminal_arrival_offset = terminal_stop.arrival_time() as i64;
 
         let arrival_time = origin_departure_time + TimeDelta::seconds(terminal_arrival_offset);
-
-        let arrival_time = arrival_time
-            .and_local_timezone(FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap())
-            .unwrap();
 
         Ok(arrival_time)
     }
