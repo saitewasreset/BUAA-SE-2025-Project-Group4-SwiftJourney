@@ -123,9 +123,10 @@ async function postLoginMsg() {
     const res: UserApiResponseData = (await userApi.userLogin(params)).data
     if (res.code === 200) {
       const nowUser = useUserStore()
-      await nowUser.restoreUserFromCookie(router)
-      message.success('登录成功')
-      goToHomePage()
+      await nowUser.restoreUserFromCookie(router).then(() => {
+        message.success('登录成功')
+        goToHomePage()
+      })
     } else {
       message.error('登录失败，请检查手机号和密码是否正确')
     }
