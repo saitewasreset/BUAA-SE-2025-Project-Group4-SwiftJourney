@@ -109,26 +109,14 @@ export const useUserStore = defineStore('user', {
             return;
         },
         async postPersonalInfo(name: string, identityCardId: string) {
-            const res: UserApiResponseData = (await userApi.postUserPersonalInfo({name: name, identityCardId: identityCardId, default: true})).data;
-            if(res.code === 200) {
-                console.log('personalInfo is setted');
-            } else {
-                console.log(res.message);
-            }
+            const res: UserApiResponseData = (await userApi.setPersonalInfo({name: name, identityCardId: identityCardId, preferredSeatLocation: 'A', default: true})).data;
         },
         async getPersonalInfo() {
-            const personalRes: UserApiResponseData = (await userApi.getUserPersonalInfo()).data;
+            const personalRes: UserApiResponseData = (await userApi.queryPersonalInfo()).data;
             if(personalRes.code == 200) {
                 const personalInfo: PersonalInfo[] = personalRes.data as PersonalInfo[];
                 if(personalInfo.length == 0) {
                     this.postPersonalInfo(this.name, this.identityCardId);
-                    this.getPersonalInfo();
-                } else {
-                    personalInfo.forEach((key) => {
-                        if(key.default) {
-                            this.setPersonalInfo(key);
-                        }
-                    })
                 }
             } else
               throw new Error('invalid session id');  
