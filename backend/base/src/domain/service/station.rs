@@ -52,7 +52,7 @@ impl From<GeoServiceError> for StationServiceError {
 /// 定义了对火车站实体进行业务操作的核心契约。
 /// 所有方法都是异步的，返回实现了`Future` trait的结果。
 #[async_trait]
-pub trait StationService {
+pub trait StationService: 'static + Send + Sync {
     /// 获取所有火车站信息
     ///
     /// # Returns
