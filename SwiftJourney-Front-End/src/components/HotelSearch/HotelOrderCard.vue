@@ -158,15 +158,14 @@ function successCreateTransaction(transactionInfo: TransactionInfo) {
 
 const router = useRouter();
 
-function goToPay(transactionaId: string, money: string) {
-    const routeUrl = router.resolve({
+function goToPay(transactionId: string, money: string) {
+    router.push({
         name: 'paypage',
-        params: { transactionId: transactionaId },
+        params: { transactionId: transactionId },
         query: {
-          money: money,
+            money: money,
         }
-      });
-    window.open(routeUrl.href, '_blank');
+    });
 }
 
 </script>
