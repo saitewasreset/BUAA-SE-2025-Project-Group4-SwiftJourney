@@ -55,8 +55,9 @@ use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use async_trait::async_trait;
-use chrono::{Duration, NaiveDate, NaiveDateTime};
+use chrono::{Duration, FixedOffset, NaiveDate};
 use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::utils::TimeMeter;
 use std::collections::HashMap;
 use tracing::{error, info, instrument};
@@ -83,6 +84,7 @@ where
     route_repository: Arc<RR>,
     train_repository: Arc<TR>,
     station_repository: Arc<SR>,
+    tz_offset_hour: i32,
 }
 
 // Step 4: Implement `new` associate function for `TrainQueryServiceImpl`
@@ -106,6 +108,7 @@ where
         route_repository: Arc<RR>,
         train_repository: Arc<TR>,
         station_repository: Arc<SR>,
+        tz_offset_hour: i32,
     ) -> Self {
         TrainQueryServiceImpl {
             train_schedule_service,
@@ -115,6 +118,7 @@ where
             route_repository,
             train_repository,
             station_repository,
+            tz_offset_hour,
         }
     }
 
@@ -274,11 +278,13 @@ where
                     .and_hms_opt(0, 0, 0)
                     .unwrap()
                     .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
+                    .unwrap()
+                    .and_local_timezone(FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap())
                     .unwrap();
 
-                origin_departure_time = Some(departure_datetime.to_string());
+                origin_departure_time = Some(departure_datetime.to_rfc3339());
 
-                origin_departure_date = Some(departure_datetime.date().to_string());
+                origin_departure_date = Some(departure_datetime.date_naive().to_string());
             } else if stop.order() == (route.stops().len() - 1) as u32 {
                 terminal_station = Some(station_name.clone());
 
@@ -288,7 +294,11 @@ where
                         .unwrap()
                         .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
                         .unwrap()
-                        .to_string(),
+                        .and_local_timezone(
+                            FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap(),
+                        )
+                        .unwrap()
+                        .to_rfc3339(),
                 );
             }
 
@@ -301,7 +311,11 @@ where
                         .unwrap()
                         .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
                         .unwrap()
-                        .to_string(),
+                        .and_local_timezone(
+                            FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap(),
+                        )
+                        .unwrap()
+                        .to_rfc3339(),
                 )
             };
 
@@ -314,7 +328,11 @@ where
                         .unwrap()
                         .checked_add_signed(Duration::seconds(departure_time_secs as i64))
                         .unwrap()
-                        .to_string(),
+                        .and_local_timezone(
+                            FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap(),
+                        )
+                        .unwrap()
+                        .to_rfc3339(),
                 )
             };
 
@@ -415,7 +433,7 @@ where
             .train_repository
             .get_trains()
             .await
-            .inspect_err(|e| error!("Failed to load trains"))
+            .inspect_err(|_for_super_earth| error!("Failed to load trains"))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         meter.meter("load trains");
@@ -530,7 +548,7 @@ where
             .train_repository
             .get_trains()
             .await
-            .inspect_err(|e| error!("Failed to load trains"))
+            .inspect_err(|_for_super_earth| error!("Failed to load trains"))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         meter.meter("load trains");
@@ -633,11 +651,11 @@ where
             first_dto.route.truncate(first_mid_idx + 1);
 
             let first_dep_dt =
-                NaiveDateTime::parse_from_str(&first_dto.departure_time, "%Y-%m-%d %H:%M:%S")
-                    .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+                DateTimeWithTimeZone::parse_from_rfc3339(&first_dto.departure_time).unwrap();
+
             let first_arr_dt =
-                NaiveDateTime::parse_from_str(&first_dto.arrival_time, "%Y-%m-%d %H:%M:%S")
-                    .unwrap_or_else(|_| first_dep_dt + chrono::Duration::hours(1));
+                DateTimeWithTimeZone::parse_from_rfc3339(&first_dto.arrival_time).unwrap();
+
             first_dto.travel_time = (first_arr_dt - first_dep_dt).num_seconds() as u32;
 
             let second_mid_idx = match second_dto
@@ -658,17 +676,16 @@ where
             second_dto.route = second_dto.route[second_mid_idx..].to_vec();
 
             let second_dep_dt =
-                NaiveDateTime::parse_from_str(&second_dto.departure_time, "%Y-%m-%d %H:%M:%S")
-                    .unwrap_or_else(|_| cmd.departure_time.and_hms_opt(0, 0, 0).unwrap());
+                DateTimeWithTimeZone::parse_from_rfc3339(&second_dto.departure_time).unwrap();
             let second_arr_dt =
-                NaiveDateTime::parse_from_str(&second_dto.arrival_time, "%Y-%m-%d %H:%M:%S")
-                    .unwrap_or_else(|_| second_dep_dt + chrono::Duration::hours(1));
+                DateTimeWithTimeZone::parse_from_rfc3339(&second_dto.arrival_time).unwrap();
+
             second_dto.travel_time = (second_arr_dt - second_dep_dt).num_seconds() as u32;
 
             let relaxing_time = if second_dep_dt > first_arr_dt {
                 (second_dep_dt - first_arr_dt).num_seconds() as u32
             } else {
-                (second_dep_dt + chrono::Duration::days(1) - first_arr_dt).num_seconds() as u32
+                (second_dep_dt + Duration::days(1) - first_arr_dt).num_seconds() as u32
             };
 
             solutions.push(TransferSolutionDTO {
@@ -736,7 +753,11 @@ where
                         .unwrap()
                         .checked_add_signed(Duration::seconds(arrival_time_secs as i64))
                         .unwrap()
-                        .to_string(),
+                        .and_local_timezone(
+                            FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap(),
+                        )
+                        .unwrap()
+                        .to_rfc3339(),
                 )
             };
 
@@ -748,7 +769,11 @@ where
                         .unwrap()
                         .checked_add_signed(Duration::seconds(departure_time_secs as i64))
                         .unwrap()
-                        .to_string(),
+                        .and_local_timezone(
+                            FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap(),
+                        )
+                        .unwrap()
+                        .to_rfc3339(),
                 )
             };
 
@@ -789,10 +814,8 @@ where
             .arrival_time
             .as_ref()
             .expect("arrival time should exist for non-origin stops");
-        let dep_dt = NaiveDateTime::parse_from_str(dep_time, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or_else(|_| date.and_hms_opt(0, 0, 0).unwrap());
-        let arr_dt = NaiveDateTime::parse_from_str(arr_time, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or_else(|_| dep_dt + Duration::hours(2));
+        let dep_dt = DateTimeWithTimeZone::parse_from_rfc3339(dep_time).unwrap();
+        let arr_dt = DateTimeWithTimeZone::parse_from_rfc3339(arr_time).unwrap();
 
         Ok(TrainInfoDTO {
             departure_station: stopping.first().unwrap().station_name.clone(),
