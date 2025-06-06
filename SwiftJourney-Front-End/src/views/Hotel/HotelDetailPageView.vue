@@ -15,9 +15,7 @@
                 </div>
                 <div class="HotelPhoneContainer">
                     <el-icon style="margin-top: 7px;"><Phone /></el-icon>
-                    <div>
-                        <p class="HotelPhone" v-for="(phone, index) in hotelDetailInfo.phone.slice(0, 2)" :key="index">{{ phone }}</p>
-                    </div>
+                    <p class="HotelPhone" v-for="(phone, index) in hotelDetailInfo.phone.slice(0, 2)" :key="index">{{ phone }}</p>
                 </div>
             </div>
             <div class="HotelInfo2">
@@ -504,6 +502,7 @@ function getdebugInfo() {
     font-size: 18px;
     margin-bottom: 5px;
     margin-top: 10px;
+    width: 600px;
 }
 .HotelAddressContainer {
     display: flex;
