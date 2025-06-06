@@ -1,6 +1,6 @@
 <template>
     <div class="hotel-search">
-        <div class="search-card">
+        <div class="search-card" :style="isHeadPage ? 'margin-top: 30vh;' : 'margin-top: 15px;'">
             <img class="background-hotel-image" src="../../assets/hotel-image.png" alt="background hotel image">
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
             <p class="background-hotel-order-text">预订酒店</p>
@@ -44,7 +44,7 @@
                 </a-button>
             </div>
         </div>
-        <div class="Grid">
+        <div v-if="!isHeadPage" class="Grid">
             <div class="Selected">
                 <p class="title">筛选</p>
                 <p class="sub-title">最低价格 {{ moneyFormat(moneyValue) }}</p>
@@ -125,6 +125,10 @@ const hotelQuery = ref<HotelQuery> ({
     beginDate: formateDate(today),
     endDate: formateDate(nextday),
 });
+
+
+//---------------------------首页查询页切换-----------------
+const isHeadPage = ref(true);
 
 //---------------------------日期---------------------------
 const beginDate = ref(hotelQuery.value.beginDate);
@@ -286,6 +290,8 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
     roomList.value = [];
     roomSet.clear();
     roomMapIndex.clear();
+    isHeadPage.value = false;
+
     for(let tepInfo of hotelGeneralInfo) {
         let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
@@ -449,6 +455,8 @@ const moneyDisplays = computed(() =>{
 })
 //-----------------------------------roomOrder-------------------------------
 import HotelOrderCard from '@/components/HotelSearch/HotelOrderCard.vue';
+import { RefSymbol } from '@vue/reactivity';
+import { fa } from 'element-plus/es/locales.mjs';
 const isOrderShow = ref<boolean>(false);
 function showRoomOrder() {
     isOrderShow.value = !isOrderShow.value;
