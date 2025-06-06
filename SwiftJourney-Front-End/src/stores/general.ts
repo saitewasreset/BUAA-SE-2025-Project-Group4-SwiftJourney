@@ -8,55 +8,65 @@ export const useGeneralStore = defineStore('general', {
         CityMapPinYin: new Map<string, string[]>(),
         PinYinMapCity: new Map<string, string[]>(),
         PinYinList: [] as string[],
-        CityMap: {}, //后端原始数据
+        CityMap: {}, // 后端原始数据
     }),
     actions: {
         async init() {
-            if(this.hasInit){
+            if (this.hasInit) {
                 return;
             }
-            await generalApi.getCity().then((res) => {
-                if(res.status == 200) {
-                    if(res.data.code == 200) {
-                        let cityMap: { [province: string]: string[] } = res.data.data;
+            try {
+                const res = await generalApi.getCity();
+                if (res.status === 200) {
+                    if (res.data.code === 200) {
+                        const cityMap: { [province: string]: string[] } = res.data.data;
                         this.CityMap = cityMap;
+
+                        // 准备批量更新的数据
+                        const cityMapPinYinBatch: { [key: string]: string[] } = {};
+                        const pinYinMapCityBatch: { [key: string]: string[] } = {};
+
                         for (const province in cityMap) {
                             const cities = cityMap[province];
-                            cities.forEach(city => this.addCityToMap(city));
+                            cities.forEach(city => {
+                                const pinYin = pinyin(city, { toneType: 'none' });
+
+                                // 更新CityMapPinYinBatch
+                                for (let i = 1; i <= city.length; i++) {
+                                    const key = city.substring(0, i);
+                                    if (!cityMapPinYinBatch[key]) {
+                                        cityMapPinYinBatch[key] = [];
+                                    }
+                                    cityMapPinYinBatch[key].push(pinYin);
+                                }
+
+                                // 更新pinYinMapCityBatch
+                                if (!pinYinMapCityBatch[pinYin]) {
+                                    pinYinMapCityBatch[pinYin] = [];
+                                }
+                                pinYinMapCityBatch[pinYin].push(city);
+                            });
                         }
-                        this.PinYinMapCity.forEach((vlaue, key) => {
-                            this.PinYinList.push(key);
-                        })
+
+                        // 批量更新CityMapPinYin
+                        for (const key in cityMapPinYinBatch) {
+                            this.CityMapPinYin.set(key, cityMapPinYinBatch[key]);
+                        }
+
+                        // 批量更新PinYinMapCity
+                        for (const pinYin in pinYinMapCityBatch) {
+                            this.PinYinMapCity.set(pinYin, pinYinMapCityBatch[pinYin]);
+                            this.PinYinList.push(pinYin);
+                        }
+
                         this.hasInit = true;
                     } else {
                         throw new Error(res.data.message);
                     }
                 }
-            }).catch((err) => {
+            } catch (err) {
                 console.log(err);
-            })
+            }
         },
-        addCityToMap(city: string) {
-            let pinYin = pinyin(city, { toneType: 'none' });
-            for (let i = 1; i < city.length; i++) {
-                const key = city.substring(0, i);
-                if (!this.CityMapPinYin.has(key)) {
-                    this.CityMapPinYin.set(key, []);
-                }
-                let cities = this.CityMapPinYin.get(key);
-                if (cities != null) {
-                    cities.push(pinYin);
-                    this.CityMapPinYin.set(key, cities);
-                }
-            }
-            if(!this.PinYinMapCity.has(pinYin)) {
-                this.PinYinMapCity.set(pinYin, []);
-            }
-            let pinyins = this.PinYinMapCity.get(pinYin);
-            if(pinyins != null) {
-                pinyins.push(city);
-                this.PinYinMapCity.set(pinYin, pinyins);
-            }
-        }
     }
 });
