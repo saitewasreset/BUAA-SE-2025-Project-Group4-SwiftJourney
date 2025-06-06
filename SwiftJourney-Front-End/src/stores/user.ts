@@ -117,6 +117,11 @@ export const useUserStore = defineStore('user', {
                 const personalInfo: PersonalInfo[] = personalRes.data as PersonalInfo[];
                 if(personalInfo.length == 0) {
                     this.postPersonalInfo(this.name, this.identityCardId);
+                    this.getPersonalInfo();
+                }
+                const defaultPersonalInfo = personalInfo.find((item) => item.default === true);
+                if (defaultPersonalInfo) {
+                    this.setPersonalInfo(defaultPersonalInfo);
                 }
             } else
               throw new Error('invalid session id');  
