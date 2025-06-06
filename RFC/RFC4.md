@@ -1607,8 +1607,6 @@ interface DishOrder {
 interface TakeawayOrder {
   // 车站名称
   station: string;
-  // 用餐时间（到达station的时间）
-  arrivalTime: string;
   // 店铺名称
   shopName: string;
   // 餐品名称
