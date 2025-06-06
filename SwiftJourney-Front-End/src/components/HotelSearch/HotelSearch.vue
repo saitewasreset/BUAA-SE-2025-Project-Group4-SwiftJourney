@@ -60,6 +60,10 @@
                 <el-slider class="rating-slider" v-model="ratingCountValue" :marks="ratingCountMarks" :show-tooltip="false" />
             </div>
             <el-scrollbar height="520px" class="HotelInfo">
+                <div v-if="hotelGInfoWRoom.length == 0" class="HotelUnFind">
+                    <img class="UnfindImage" src="../../assets/unfind.jpg" alt="unfind">
+                    <p style="text-align: center;">没有搜索到符合条件的酒店，请重新输入</p>
+                </div>
                 <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
                     <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
                         <div class="HotelImageContainer">
@@ -746,6 +750,14 @@ roomList.value.forEach((key, index) => {
 
 .HotelInfo {
     width: 730px;
+}
+
+.HotelUnFind {
+    width: 700px; 
+}
+.UnfindImage {
+    width: 700px;
+    height: auto;
 }
 
 .HotelInfoCard {
