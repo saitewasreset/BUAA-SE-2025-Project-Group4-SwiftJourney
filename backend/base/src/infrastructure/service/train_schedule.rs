@@ -553,17 +553,15 @@ where
             for &i in first_leg_indices {
                 let first = &connections[i];
 
-                // 已经直达目标，无需换乘
                 if first.arrival_station == dest {
                     continue;
                 }
 
-                // 计算换乘时间下限
                 let earliest_next_dep = first.arrival_time + MIN_TRANSFER_SEC;
                 let latest_next_dep = first.arrival_time + MAX_TRANSFER_SEC;
 
                 let Some(second_leg_indices) = outgoing_index.get(&first.arrival_station) else {
-                    continue; // 中转站后续无车
+                    continue;
                 };
 
                 // ---------- 二分定位可行第二段起始位置 ---------- //
@@ -585,12 +583,10 @@ where
                         continue;
                     }
 
-                    // 终点必须符合
                     if second.arrival_station != dest {
                         continue;
                     }
 
-                    // 不同列车班次
                     if first.train_schedule_id == second.train_schedule_id {
                         continue;
                     }
