@@ -47,7 +47,7 @@ onMounted(async () => {
 }
 
 .router-view-container {
-  padding: 20px;
+  /* padding: 20px; */
   align-self: center;
   width: 100%;
 }
@@ -59,7 +59,7 @@ onMounted(async () => {
 #app {
   height: 100%;
   width: 100%;
-  padding: 0%;
+  padding: 0 0 0 0 !important;
   margin: 0%;
 }
 
