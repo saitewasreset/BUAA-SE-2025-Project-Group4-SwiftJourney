@@ -97,6 +97,9 @@ function deleteRoomFromOrder(hotelId: string,hotelName: string, roomType: string
 import type { HotelOrderRequest } from '@/interface/hotelInterface';
 import type { TransactionInfo } from '@/interface/interface';
 import { hotelApi } from '@/api/HotelApi/hotelApi';
+import { useUserStore } from '@/stores/user';
+
+const nowUser = useUserStore();
 
 function createTransaction() {
     ElMessageBox.confirm(
@@ -121,7 +124,7 @@ async function confirmCreateTransaction() {
             roomType: key.roomType,
             beginDate: key.beginDate,
             endDate: key.endDate,
-            personalId: key.personalId,
+            personalId: nowUser.personalId,
             amount: key.amount,
         };
         hotelOrderRequestList.push(hotelOrderRequest);
