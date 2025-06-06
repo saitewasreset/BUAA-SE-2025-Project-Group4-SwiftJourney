@@ -9,7 +9,9 @@
             <div class="line3">
                 <el-radio-group v-model="payType">
                     <el-radio value="1" size="large">账户密码</el-radio>
-                    <el-radio value="2" size="large">支付密码</el-radio>
+                    <el-tooltip content="未设置支付密码" placement="right" :disabled="user.havePaymentPasswordSet">
+                        <el-radio value="2" size="large" :disabled="!user.havePaymentPasswordSet">支付密码</el-radio>
+                    </el-tooltip>
                 </el-radio-group>
             </div>
             <div v-if="payType == '1'" class="line4">
@@ -26,7 +28,8 @@
         </el-card>
         <el-card v-else class="PayCard">
             <el-icon class="PayedIcon"><SuccessFilled /></el-icon>
-            <p class="PayedText">交易成功</p>
+            <p class="PayedText">支付成功</p>
+            <p class="PayedText">已加入处理队列</p>
         </el-card>
     </div>
 </template>
@@ -36,6 +39,9 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { paymentApi } from '@/api/PaymentApi/paymentApi';
+import { useUserStore } from '@/stores/user';
+
+const user = useUserStore();
 
 const payType = ref('1')
 
@@ -97,19 +103,21 @@ async function apiPay() {
     .then((res) => {
         if(res.status == 200) {
             //成功支付
-            successPay.value = true;
-        } else if (res.status == 11001) {
-            ElMessage.error('支付密码错误');
-        } else if (res.status == 11002) {
-            ElMessage.error('账户密码错误');
-        } else if (res.status == 11003) {
-            ElMessage.error('支付密码错误次数过多，请稍后重试');
-        } else if (res.status == 11004) {
-            ElMessage.error('余额不足');
-        } else if (res.status == 11006) {
-            ElMessage.error('交易状态错误');
-        } else {
-            throw new Error(res.statusText);
+            if(res.data.code == 200) {
+                successPay.value = true;
+            } else if (res.data.code == 11001) {
+                ElMessage.error('支付密码错误');
+            } else if (res.data.code == 11002) {
+                ElMessage.error('账户密码错误');
+            } else if (res.data.code == 11003) {
+                ElMessage.error('支付密码错误次数过多，请稍后重试');
+            } else if (res.data.code == 11004) {
+                ElMessage.error('余额不足');
+            } else if (res.data.code == 11006) {
+                ElMessage.error('交易状态错误');
+            } else {
+                throw new Error(res.statusText);
+            }
         }
     }).catch((err) => {
         ElMessage.error(err)
@@ -145,14 +153,14 @@ function checkInput() {
 <style scoped>
 .CardContainer {
     width: 100%;
-    height: 100%;
+    height: 60vh;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .PayCard {
-    width: 600px;
+    width: 650px;
     display: flex;
     align-items: center;
     flex-direction: column;
@@ -181,13 +189,13 @@ function checkInput() {
     margin-bottom: 10px;
 }
 .PayCard .line2 {
-    width: 500px;
+    width: 550px;
     display: flex;
     justify-content: space-between;
 }
 
 .PayCard .line2 p {
-    font-size: 1.25rem;
+    font-size: 16px;
     margin-bottom: 10px;
 }
 

@@ -94,9 +94,9 @@ export interface HotelOrderRequest {
   roomType: string;
 
   // 入住日期
-  beginDate?: string;
+  beginDate: string;
   // 离开日期
-  endDate?: string;
+  endDate: string;
 
   // 预订人 UUID（见`PersonalInfo`）
   personalId: string;
@@ -105,7 +105,7 @@ export interface HotelOrderRequest {
 }
 
 export interface HotelRoomInfo extends HotelRoomDetailInfo {
-    roomType: string,
+    roomType: "标准间" | "大床房" | "行政套房";
 }
 
 export interface HotelOrderInfo extends HotelOrderRequest {
