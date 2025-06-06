@@ -268,7 +268,7 @@ where
                 let min_price = prices.get(&hotel_id).cloned().unwrap_or_default();
 
                 let picture_url = if !hotel.images().is_empty() {
-                    Some(format!("/resource/images/{}", hotel.images()[0]))
+                    Some(format!("/resource/hotel/images/{}", hotel.images()[0]))
                 } else {
                     None
                 };

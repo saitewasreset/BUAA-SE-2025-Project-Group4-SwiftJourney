@@ -164,6 +164,8 @@ pub trait OrderRepository: 'static + Send + Sync {
         order_uuid: Uuid,
     ) -> Result<Option<TakeawayOrder>, RepositoryError>;
 
+    async fn load_all_active_orders(&self) -> Result<Vec<Box<dyn Order>>, RepositoryError>;
+
     async fn update(&self, order: Box<dyn Order>) -> Result<(), RepositoryError>;
 
     async fn get_route_info_train_order(

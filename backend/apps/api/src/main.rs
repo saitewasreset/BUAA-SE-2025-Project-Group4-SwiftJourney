@@ -42,6 +42,7 @@ use base::application::service::message::MessageApplicationService;
 use base::application::service::personal_info::PersonalInfoService;
 use base::application::service::train_data::TrainDataService;
 use base::application::service::train_dish::TrainDishApplicationService;
+use base::application::service::train_order::TrainOrderService;
 use base::application::service::train_query::TrainQueryService;
 use base::application::service::transaction::TransactionApplicationService;
 use base::application::service::user_manager::UserManagerService;
@@ -51,6 +52,7 @@ use base::domain::repository::session::SessionRepositoryConfig;
 use base::domain::repository::user::UserRepository;
 use base::domain::service::message::MessageListenerService;
 use base::domain::service::object_storage::ObjectStorageService;
+use base::domain::service::order_status::OrderStatusManagerService;
 use base::domain::service::route::RouteService;
 use base::domain::service::session::SessionManagerService;
 use base::domain::service::train_schedule::TrainScheduleService;
@@ -64,6 +66,7 @@ use base::infrastructure::application::service::hotel_order::HotelOrderServiceIm
 use base::infrastructure::application::service::message::MessageApplicationServiceImpl;
 use base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
 use base::infrastructure::application::service::train_data::TrainDataServiceImpl;
+use base::infrastructure::application::service::train_order::TrainOrderServiceImpl;
 use base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
 use base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
@@ -234,7 +237,17 @@ async fn main() -> std::io::Result<()> {
 
     let order_status_manager_service_impl = Arc::new(OrderStatusManagerServiceImpl::new(
         Arc::clone(&order_status_producer_service),
+        Arc::clone(&order_repository_impl),
     ));
+
+    {
+        let order_status_manager_service_impl = Arc::clone(&order_status_manager_service_impl);
+        actix_web::rt::spawn(async move {
+            order_status_manager_service_impl
+                .order_status_daemon()
+                .await;
+        });
+    }
 
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
@@ -384,6 +397,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&route_service_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&train_schedule_repository_impl),
+        Arc::clone(&route_repository_impl),
         tz_offset_hour,
     ));
 
@@ -394,6 +408,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&train_schedule_service_impl),
         Arc::clone(&train_type_configuration_service_impl),
+        Arc::clone(&station_service_impl),
     ));
 
     let train_dish_application_service_impl =
@@ -417,6 +432,21 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&route_repository_impl),
         Arc::clone(&train_repository_impl),
+        Arc::clone(&station_repository_impl),
+        tz_offset_hour,
+    ));
+
+    let train_order_service_impl = Arc::new(TrainOrderServiceImpl::new(
+        Arc::clone(&train_schedule_repository_impl),
+        Arc::clone(&train_booking_service_impl),
+        Arc::clone(&train_repository_impl),
+        Arc::clone(&route_repository_impl),
+        Arc::clone(&station_repository_impl),
+        Arc::clone(&order_repository_impl),
+        Arc::clone(&transaction_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&personal_info_repository_impl),
+        Arc::clone(&train_schedule_service_impl),
     ));
 
     let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
@@ -513,6 +543,9 @@ async fn main() -> std::io::Result<()> {
             train_dish_application_service_impl as Arc<dyn TrainDishApplicationService>,
         );
 
+    let train_order_service: web::Data<dyn TrainOrderService> =
+        web::Data::from(train_order_service_impl as Arc<dyn TrainOrderService>);
+
     let hotel_order_service: web::Data<dyn HotelOrderService> =
         web::Data::from(hotel_order_service_impl as Arc<dyn HotelOrderService>);
 
@@ -559,6 +592,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(train_query_service.clone())
             .app_data(dish_query_service.clone())
             .app_data(train_dish_application_service.clone())
+            .app_data(train_order_service.clone())
             .app_data(hotel_order_service.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`

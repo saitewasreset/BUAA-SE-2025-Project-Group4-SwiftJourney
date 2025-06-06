@@ -29,7 +29,7 @@ use crate::domain::model::order::{
     BaseOrder, DishOrder, HotelOrder, Order, OrderId, OrderStatus, OrderTimeInfo, PaymentInfo,
     TakeawayOrder, TrainOrder,
 };
-use crate::domain::model::personal_info::PersonalInfoId;
+use crate::domain::model::personal_info::{PersonalInfoId, PreferredSeatLocation};
 use crate::domain::model::station::StationId;
 use crate::domain::model::takeaway::TakeawayDishId;
 use crate::domain::model::train::{SeatType, SeatTypeId, SeatTypeName};
@@ -115,6 +115,19 @@ impl OrderDataConverter {
         );
         let personal_info_id = PersonalInfoId::from_db_value(train_order_do.person_info_id)?;
 
+        let order_seat_type_name = SeatTypeName::from_unchecked(train_order_do.order_seat_type);
+        let preferred_seat_location = train_order_do
+            .preferred_seat_location
+            .map(|x| {
+                x.chars()
+                    .next()
+                    .ok_or(anyhow!("preferred seat location should not be empty"))
+            })
+            .transpose()?
+            .map(PreferredSeatLocation::try_from)
+            .transpose()
+            .map_err(|e| anyhow!("invalid seat location: {}", e))?;
+
         let base = BaseOrder::new(
             Some(order_id),
             uuid,
@@ -136,54 +149,59 @@ impl OrderDataConverter {
         let seat_type = train_order_do_pack.seat_type;
         let seat_type_mapping = train_order_do_pack.seat_type_mapping;
 
-        let seat_type_do = seat_type
-            .get(&train_order_do.seat_type_id)
-            .context(format!(
+        let mut seat = None;
+
+        if let (Some(seat_type_id), Some(seat_id)) =
+            (train_order_do.seat_type_id, train_order_do.seat_id)
+        {
+            let seat_type_do = seat_type.get(&seat_type_id).context(format!(
                 "Inconsistent: cannot find seat type id: {}",
-                train_order_do.seat_type_id
+                seat_type_id
             ))?;
 
-        let seat_type = SeatType::new(
-            Some(SeatTypeId::try_from(seat_type_do.id)?),
-            SeatTypeName::from_unchecked(seat_type_do.type_name.clone()),
-            seat_type_do.capacity as u32,
-            seat_type_do.price,
-        );
+            let seat_type = SeatType::new(
+                Some(SeatTypeId::try_from(seat_type_do.id)?),
+                SeatTypeName::from_unchecked(seat_type_do.type_name.clone()),
+                seat_type_do.capacity as u32,
+                seat_type_do.price,
+            );
 
-        let seat_type_mapping_do = seat_type_mapping
-            .get(&train_order_do.seat_type_id)
-            .context(format!(
-                "Inconsistent: cannot find seat type mapping with seat type id: {}",
-                train_order_do.seat_type_id
-            ))?
-            .get(&(train_order_do.seat_id as i64))
-            .context(format!(
-                "Inconsistent: cannot find seat type mapping with seat id: {}",
-                train_order_do.seat_id
-            ))?;
+            let seat_type_mapping_do = seat_type_mapping
+                .get(&seat_type_id)
+                .context(format!(
+                    "Inconsistent: cannot find seat type mapping with seat type id: {}",
+                    seat_type_id
+                ))?
+                .get(&(seat_id as i64))
+                .context(format!(
+                    "Inconsistent: cannot find seat type mapping with seat id: {}",
+                    seat_id
+                ))?;
 
-        let seat_location_info = SeatLocationInfo {
-            carriage: seat_type_mapping_do.carriage,
-            row: seat_type_mapping_do.row,
-            location: seat_type_mapping_do
-                .location
-                .chars()
-                .next()
-                .expect("location should not be empty"),
-        };
+            let seat_location_info = SeatLocationInfo {
+                carriage: seat_type_mapping_do.carriage,
+                row: seat_type_mapping_do.row,
+                location: seat_type_mapping_do
+                    .location
+                    .chars()
+                    .next()
+                    .expect("location should not be empty"),
+            };
 
-        let seat = Seat::new(
-            SeatId::from_db_value(train_order_do.seat_type_id as i64)?,
-            seat_type,
-            seat_location_info,
-            SeatStatus::Occupied,
-        );
+            seat = Some(Seat::new(
+                SeatId::from_db_value(seat_type_id as i64)?,
+                seat_type,
+                seat_location_info,
+                SeatStatus::Occupied,
+            ));
+        }
 
         Ok(TrainOrder::new(
             base,
             train_schedule_id,
-            Some(seat),
-            None,
+            seat,
+            order_seat_type_name,
+            preferred_seat_location,
             station_range,
         ))
     }
@@ -213,25 +231,8 @@ impl OrderDataConverter {
             person_info_id: ActiveValue::Set(train_order.personal_info_id().to_db_value()),
 
             train_schedule_id: ActiveValue::Set(train_order.train_schedule_id().to_db_value()),
-            seat_type_id: ActiveValue::Set(
-                train_order
-                    .seat()
-                    .as_ref()
-                    .expect("seat should not be None")
-                    .seat_type()
-                    .get_id()
-                    .expect("seat type should have id")
-                    .to_db_value(),
-            ),
-            seat_id: ActiveValue::Set(
-                train_order
-                    .seat()
-                    .as_ref()
-                    .expect("seat should not be None")
-                    .get_id()
-                    .expect("seat should have id")
-                    .to_db_value() as i32,
-            ),
+            seat_type_id: ActiveValue::NotSet,
+            seat_id: ActiveValue::NotSet,
             begin_station_id: ActiveValue::Set(
                 train_order
                     .station_range()
@@ -243,6 +244,12 @@ impl OrderDataConverter {
                     .station_range()
                     .get_to_station_id()
                     .to_db_value(),
+            ),
+            order_seat_type: ActiveValue::Set(
+                train_order.order_seat_type_name().clone().to_string(),
+            ),
+            preferred_seat_location: ActiveValue::Set(
+                train_order.preferred_seat_location().map(|x| x.to_string()),
             ),
         };
 
@@ -256,6 +263,19 @@ impl OrderDataConverter {
 
         if let Some(id) = train_order.payment_info().refund_transaction_id() {
             model.refund_transaction_id = ActiveValue::Set(Some(id.to_db_value()));
+        }
+
+        if let Some(seat) = train_order.seat() {
+            model.seat_type_id = ActiveValue::Set(Some(
+                seat.seat_type()
+                    .get_id()
+                    .expect("seat type should have id")
+                    .to_db_value(),
+            ));
+
+            model.seat_id = ActiveValue::Set(Some(
+                seat.get_id().expect("seat should have id").to_db_value() as i32,
+            ));
         }
 
         model
@@ -1195,6 +1215,7 @@ impl TransactionRepositoryImpl {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn query_transaction(
         &self,
         builder: impl FnOnce(
@@ -1231,10 +1252,34 @@ impl TransactionRepositoryImpl {
             .await
             .context("Failed to query train schedule")?;
 
-        let train_type_id_map = train_schedules
+        let trains = crate::models::train::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to query trains: {}", e))
+            .context("Failed to query trains")?;
+
+        let train_schedule_id_to_train_id = train_schedules
             .into_iter()
             .map(|item| (item.id, item.train_id))
             .collect::<HashMap<_, _>>();
+
+        let train_id_to_train_type_id = trains
+            .into_iter()
+            .map(|item| (item.id, item.type_id))
+            .collect::<HashMap<_, _>>();
+
+        let mut train_schedule_id_to_train_type_id = HashMap::new();
+
+        for (train_schedule_id, train_id) in train_schedule_id_to_train_id {
+            let train_type_id = *train_id_to_train_type_id.get(&train_id).ok_or(
+                RepositoryError::InconsistentState(anyhow!(
+                    "no train type id for train id: {}",
+                    train_id
+                )),
+            )?;
+
+            train_schedule_id_to_train_type_id.insert(train_schedule_id, train_type_id);
+        }
 
         for model in seat_type_mapping {
             seat_type_mapping_all
@@ -1253,7 +1298,11 @@ impl TransactionRepositoryImpl {
                 .context("Failed to query order")?;
 
             let orders = order_do_pack
-                .into_order_pack(&train_type_id_map, &seat_type, &seat_type_mapping_all)
+                .into_order_pack(
+                    &train_schedule_id_to_train_type_id,
+                    &seat_type,
+                    &seat_type_mapping_all,
+                )
                 .map_err(RepositoryError::InconsistentState)?;
 
             let transaction_do_pack = TransactionDoPack {

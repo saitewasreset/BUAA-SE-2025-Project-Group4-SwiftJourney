@@ -116,6 +116,7 @@ mod ser_order {
         pub seat: Option<SeatDTO>,
         pub preferred_seat_location: Option<char>,
         pub station_range: StationRangeDTO,
+        pub order_seat_type: String,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -359,6 +360,7 @@ mod ser_order {
                 seat: order.seat().as_ref().map(|x| x.clone().into()),
                 preferred_seat_location: order.preferred_seat_location().map(|x| x.into()),
                 station_range: order.station_range().into(),
+                order_seat_type: order.order_seat_type_name().to_string(),
             }
         }
     }
@@ -372,6 +374,7 @@ mod ser_order {
                 base,
                 TrainScheduleId::from_db_value(dto.train_schedule_id)?,
                 dto.seat.map(Seat::try_from).transpose()?,
+                SeatTypeName::from_unchecked(dto.order_seat_type),
                 dto.preferred_seat_location
                     .map(PreferredSeatLocation::try_from)
                     .transpose()

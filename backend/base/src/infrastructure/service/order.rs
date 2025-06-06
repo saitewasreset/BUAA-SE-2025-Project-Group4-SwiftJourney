@@ -38,7 +38,7 @@ macro_rules! base_order_fields {
 
 pub fn calculate_can_cancel(order: &dyn Order) -> bool {
     let status = order.order_status();
-    !order.already_refund() && matches!(status, OrderStatus::Paid | OrderStatus::Ongoing)
+    !order.already_refund() && matches!(status, OrderStatus::Ongoing)
 }
 
 pub fn get_reason(status: OrderStatus, already_refund: bool) -> Option<String> {
@@ -47,11 +47,13 @@ pub fn get_reason(status: OrderStatus, already_refund: bool) -> Option<String> {
     }
 
     match status {
+        OrderStatus::Unpaid => Some("订单未支付".into()),
+        OrderStatus::Paid => Some("订单正在处理中".into()),
+        OrderStatus::Ongoing => None,
         OrderStatus::Active => Some("订单正在进行中".into()),
         OrderStatus::Completed => Some("订单已完成".into()),
         OrderStatus::Failed => Some("订单失败".into()),
         OrderStatus::Cancelled => Some("订单已取消".into()),
-        _ => None,
     }
 }
 
@@ -94,10 +96,7 @@ where
                 )
                 .await?;
 
-            let seat = train_order
-                .seat()
-                .as_ref()
-                .expect("train order should have a seat");
+            let seat = train_order.seat();
 
             let order_info_dto = TrainOrderDto {
                 base,
@@ -107,12 +106,12 @@ where
                 departure_time: related_info.departure_time,
                 terminal_time: related_info.terminal_time,
                 name: related_info.name,
-                seat: SeatLocationInfoDTO {
+                seat: seat.as_ref().map(|seat| SeatLocationInfoDTO {
                     carriage: seat.location_info().carriage,
                     row: seat.location_info().row,
                     location: String::from(seat.location_info().location),
                     type_name: seat.seat_type().name().to_string(),
-                },
+                }),
             };
 
             Ok(OrderInfoDto::Train(order_info_dto))
