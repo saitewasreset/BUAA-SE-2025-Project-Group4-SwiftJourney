@@ -182,6 +182,13 @@ async function getHotelDetailInfo() {
     })
 } 
 
+
+const capacityChangeTab = {
+    标准间: 1,
+    大床房: 2,
+    行政套房: 3,
+}
+
 async function getHotelOrderInfo() {
     let tepBeginDate = dayjs(selectedDateRange.value[0]).format('YYYY-MM-DD');
     let tepEndDate = dayjs(selectedDateRange.value[1]).format('YYYY-MM-DD');
@@ -205,8 +212,9 @@ async function getHotelOrderInfo() {
                 myMap.forEach((value, key) => {
                     let tepHotelRoomInfo: HotelRoomInfo = {
                         ...value,
-                        roomType: key,
+                        roomType: key as "标准间" | "大床房" | "行政套房",
                     }
+                    tepHotelRoomInfo.capacity = capacityChangeTab[tepHotelRoomInfo.roomType];
                     hotelRoomInfoList.value.push(tepHotelRoomInfo);
                 })
                 hotelRoomInfoList.value.sort((a, b) => {
@@ -270,7 +278,7 @@ import { useHotelOrderStore } from '@/stores/hotelOrder';
 const hotelOrderStore = useHotelOrderStore();
 
 const orderRoom = (room: HotelRoomInfo) => {
-    if(!hotelOrderStore.add(room, hotelDetailInfo.value)){
+    if(!hotelOrderStore.add(room, hotelDetailInfo.value, beginDate.value, endDate.value)){
         ElMessage.error('该酒店房型已在预订列表中');
     } else {
         ElMessage.success('加入预订列表成功，可在预定列表中修改数量');
@@ -653,6 +661,7 @@ function getdebugInfo() {
 }
 .RoomTable {
     margin-top: 20px;
+    resize: none;
 }
 
 .OrderInfo {
