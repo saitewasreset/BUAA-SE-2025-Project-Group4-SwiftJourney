@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 use crate::domain::Identifiable;
@@ -24,7 +24,9 @@ use crate::{
         service::{session::SessionManagerService, train_schedule::TrainScheduleService},
     },
 };
+use chrono::NaiveDateTime;
 use rust_decimal::prelude::ToPrimitive;
+use shared::utils::TimeMeter;
 use std::collections::HashMap;
 
 pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS>
@@ -95,6 +97,8 @@ where
         query: DishQueryDTO,
         session_id: String,
     ) -> Result<TrainDishInfoDTO, Box<dyn ApplicationError>> {
+        let mut meter = TimeMeter::new("query_dish");
+
         let session_id = SessionId::try_from(session_id.as_str())
             .map_err(|_| Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
@@ -108,6 +112,8 @@ where
             .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
         // 先假设车次经过了验证，然后查询是否存在，若不存在，则直接返回错误
+
+        meter.meter("verify session");
 
         let train_number = self
             .train_type_configuration_service
@@ -123,15 +129,27 @@ where
                 }
             })?;
 
+        let origin_departure_time =
+            NaiveDateTime::parse_from_str(&query.origin_departure_time, "%Y-%m-%d %H:%M:%S")
+                .map_err(|_for_super_earth| {
+                    GeneralError::BadRequest(format!(
+                        "invalid originDepartureTime: {}",
+                        query.origin_departure_time
+                    ))
+                })?;
+
+        meter.meter("verify train number");
+
         let terminal_arrival_time = self
             .train_schedule_service
-            .get_terminal_arrival_time(&query.train_number, &query.origin_departure_time)
+            .get_terminal_arrival_time(train_number.clone(), origin_departure_time)
             .await
             .map_err(|e| {
                 error!("Failed to get terminal arrival time: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-            })?
-            .ok_or(Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?;
+            })?;
+
+        meter.meter("get terminal arrival time");
 
         let dishes = self
             .dish_repository
@@ -141,6 +159,8 @@ where
                 error!("Failed to find dishes by train number: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
+
+        meter.meter("load dish");
 
         let dish_dtos = dishes
             .into_iter()
@@ -156,6 +176,8 @@ where
             })
             .collect::<Vec<_>>();
 
+        meter.meter("transform dish");
+
         let train = self
             .train_repository
             .find_by_train_number(train_number)
@@ -164,6 +186,8 @@ where
                 error!("Failed to find train by number: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
+
+        meter.meter("load train");
 
         let route_id = train.default_route_id();
 
@@ -176,12 +200,16 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        meter.meter("load takeaway shops");
+
         let mut takeaway_map = HashMap::new();
 
         let stations = self.station_service.get_stations().await.map_err(|e| {
             error!("Failed to get stations: {:?}", e);
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
+
+        meter.meter("load stations");
 
         let station_id_to_name = stations
             .into_iter()
@@ -223,15 +251,19 @@ where
             }
         }
 
+        meter.meter("calculate");
+
         // 不能预订的话，直接就返回错误了？
         let can_booking = true;
 
         let reason = None;
 
+        info!("{}", meter);
+
         Ok(TrainDishInfoDTO {
             train_number: query.train_number,
             origin_departure_time: query.origin_departure_time,
-            terminal_arrival_time,
+            terminal_arrival_time: terminal_arrival_time.to_rfc3339(),
             dishes: dish_dtos,
             takeaway: takeaway_map,
             can_booking,
