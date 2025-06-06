@@ -86,7 +86,9 @@
         >
           <template #suffixIcon></template>
         </a-time-range-picker>
-        <a-button class="reset-button" @click="ticketServiceStore.resetTimeRange('end')">重置</a-button>
+        <a-button class="reset-button" @click="ticketServiceStore.resetTimeRange('end')"
+          >重置</a-button
+        >
       </div>
       <a-slider
         range
@@ -124,24 +126,26 @@
         />
       </div>
       <a-divider />
-      <div class="type">
-        <div class="line">
-          <p>中转车站</p>
-          <a-checkbox
-            class="check-all"
-            :checked="checkGroups[CheckType.TransferStation].checkAll"
-            @change="ticketServiceStore.onCheckAllBoxChange(CheckType.TransferStation)"
-            :indeterminate="checkGroups[CheckType.TransferStation].indeterminate"
-          >
-            全选
-          </a-checkbox>
+      <div v-if="ticketServiceStore.queryMode === 'indirect'">
+        <div class="type">
+          <div class="line">
+            <p>中转车站</p>
+            <a-checkbox
+              class="check-all"
+              :checked="checkGroups[CheckType.TransferStation].checkAll"
+              @change="ticketServiceStore.onCheckAllBoxChange(CheckType.TransferStation)"
+              :indeterminate="checkGroups[CheckType.TransferStation].indeterminate"
+            >
+              全选
+            </a-checkbox>
+          </div>
+          <a-checkbox-group
+            v-model:value="checkGroups[CheckType.TransferStation].checkedList"
+            :options="checkGroups[CheckType.TransferStation].options"
+          />
         </div>
-        <a-checkbox-group
-          v-model:value="checkGroups[CheckType.TransferStation].checkedList"
-          :options="checkGroups[CheckType.TransferStation].options"
-        />
+        <a-divider />
       </div>
-      <a-divider />
       <div class="type">
         <div class="line">
           <p>到达车站</p>
