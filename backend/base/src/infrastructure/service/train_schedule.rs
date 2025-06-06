@@ -548,7 +548,7 @@ where
     //     Ok(result)
     // }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self, pairs))]
     async fn direct_schedules(
         &self,
         date: NaiveDate,
@@ -626,6 +626,7 @@ where
 
     // 原本的想法是「交集‑筛站法」，但时间复杂度较高，达到 O(N · L) （N 为站点对数，L 为列车时刻表长度）
     // 故改用Connection Scan Algorithm（CSA）算法。详见https://arxiv.org/abs/1703.05997
+    #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
         date: NaiveDate,
