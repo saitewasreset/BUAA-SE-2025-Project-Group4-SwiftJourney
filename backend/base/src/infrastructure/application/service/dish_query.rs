@@ -24,8 +24,8 @@ use crate::{
         service::{session::SessionManagerService, train_schedule::TrainScheduleService},
     },
 };
-use chrono::NaiveDateTime;
 use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::utils::TimeMeter;
 use std::collections::HashMap;
 
@@ -129,14 +129,15 @@ where
                 }
             })?;
 
-        let origin_departure_time =
-            NaiveDateTime::parse_from_str(&query.origin_departure_time, "%Y-%m-%d %H:%M:%S")
-                .map_err(|_for_super_earth| {
-                    GeneralError::BadRequest(format!(
-                        "invalid originDepartureTime: {}",
-                        query.origin_departure_time
-                    ))
-                })?;
+        let origin_departure_time = DateTimeWithTimeZone::parse_from_rfc3339(
+            &query.origin_departure_time,
+        )
+        .map_err(|_for_super_earth| {
+            GeneralError::BadRequest(format!(
+                "invalid originDepartureTime: {}",
+                query.origin_departure_time
+            ))
+        })?;
 
         meter.meter("verify train number");
 
@@ -262,7 +263,7 @@ where
 
         Ok(TrainDishInfoDTO {
             train_number: query.train_number,
-            origin_departure_time: query.origin_departure_time,
+            origin_departure_time: origin_departure_time.to_rfc3339(),
             terminal_arrival_time: terminal_arrival_time.to_rfc3339(),
             dishes: dish_dtos,
             takeaway: takeaway_map,
