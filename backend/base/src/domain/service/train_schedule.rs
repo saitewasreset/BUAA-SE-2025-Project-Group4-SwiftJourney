@@ -1,9 +1,11 @@
+use crate::Verified;
 use crate::domain::model::station::StationId;
-use crate::domain::model::train::TrainId;
+use crate::domain::model::train::{TrainId, TrainNumber};
 use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
+use sea_orm::prelude::DateTimeWithTimeZone;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -73,7 +75,7 @@ pub trait TrainScheduleService: 'static + Send + Sync {
 
     async fn get_terminal_arrival_time(
         &self,
-        train_number: &str,
-        origin_departure_time: &str,
-    ) -> Result<Option<String>, TrainScheduleServiceError>;
+        train_number: TrainNumber<Verified>,
+        origin_departure_time: NaiveDateTime,
+    ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError>;
 }

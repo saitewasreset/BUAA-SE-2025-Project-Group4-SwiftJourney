@@ -26,6 +26,7 @@
  * Become a Helldiver!
  */
 pub mod data;
+pub mod utils;
 
 use phf::{Set, phf_set};
 use regex::Regex;
