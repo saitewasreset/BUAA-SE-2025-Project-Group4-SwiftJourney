@@ -101,6 +101,8 @@ where
             Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
         };
 
+        info!("Found train order: {:?}", train_order);
+
         if train_order.order_status() != OrderStatus::Paid {
             return Err(TrainBookingServiceError::InvalidOrderStatus(
                 order_uuid,
@@ -230,6 +232,8 @@ where
             None => available_seats.first().unwrap(),
         };
 
+        info!("Selected seat: {:?}", selected_seat);
+
         let seat_location_info = selected_seat.1;
 
         let seat_availability_id =
@@ -256,6 +260,11 @@ where
 
         train_order.set_status(OrderStatus::Ongoing);
         train_order.set_seat(Some(seat.clone()));
+
+        self.order_repository
+            .update(Box::new(train_order))
+            .await
+            .map_err(|err| TrainBookingServiceError::InfrastructureError(err.into()))?;
 
         info!("Train order {} successfully booked with seat", order_uuid);
         Ok(())
