@@ -1,53 +1,61 @@
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-
+use crate::Verified;
 use crate::domain::model::route::{Route, RouteId};
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::{TrainId, TrainNumber};
 use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use crate::domain::{Identifiable, RepositoryError};
+use anyhow::anyhow;
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, NaiveDate, Timelike};
-use tracing::{error, info, instrument};
+use chrono::{FixedOffset, NaiveDate, NaiveDateTime, TimeDelta};
+use sea_orm::prelude::DateTimeWithTimeZone;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::{error, info, instrument, warn};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
-pub struct TrainScheduleServiceImpl<RS, TR, TSR>
+pub struct TrainScheduleServiceImpl<RS, TR, TSR, RR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
     route_service: Arc<RS>,
     train_repository: Arc<TR>,
     train_schedule_repository: Arc<TSR>,
+    route_repository: Arc<RR>,
     tz_offset_hour: i32,
 }
 
-impl<RS, TR, TSR> TrainScheduleServiceImpl<RS, TR, TSR>
+impl<RS, TR, TSR, RR> TrainScheduleServiceImpl<RS, TR, TSR, RR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     pub fn new(
         route_service: Arc<RS>,
         train_repository: Arc<TR>,
         train_schedule_repository: Arc<TSR>,
+        route_repository: Arc<RR>,
         tz_offset_hour: i32,
     ) -> Self {
         Self {
             route_service,
             train_repository,
             train_schedule_repository,
+            route_repository,
             tz_offset_hour,
         }
     }
@@ -123,11 +131,12 @@ fn build_outgoing_index(connections: &[Connection]) -> HashMap<StationId, Vec<us
 const MIN_TRANSFER_SEC: u32 = 10 * 60; // ≥10 分钟
 const MAX_TRANSFER_SEC: u32 = 3 * 60 * 60; // ≤3 小时
 
-impl<RS, TR, TSR> TrainScheduleServiceImpl<RS, TR, TSR>
+impl<RS, TR, TSR, RR> TrainScheduleServiceImpl<RS, TR, TSR, RR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     async fn load_daily_context(
         &self,
@@ -168,11 +177,12 @@ where
 }
 
 #[async_trait]
-impl<RS, TR, TSR> TrainScheduleService for TrainScheduleServiceImpl<RS, TR, TSR>
+impl<RS, TR, TSR, RR> TrainScheduleService for TrainScheduleServiceImpl<RS, TR, TSR, RR>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     #[instrument(skip(self))]
     async fn add_schedule(
@@ -446,7 +456,7 @@ where
     //     Ok(result)
     // }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self, pairs))]
     async fn direct_schedules(
         &self,
         date: NaiveDate,
@@ -529,6 +539,7 @@ where
     /// * 为保证性能：
     ///   1. 预先对 `Connection` 构建 **出发索引**（O(M) 内存，M≈连接数）。
     ///   2. 遍历时只访问与给定站点相关的连接，避免 O(N·M) 的暴力交叉。
+    #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
         date: NaiveDate,
@@ -676,71 +687,77 @@ where
         Ok(arrival_time)
     }
 
+    #[instrument(skip(self))]
     async fn get_terminal_arrival_time(
         &self,
-        train_number: &str,
-        origin_departure_time: &str,
-    ) -> Result<Option<String>, TrainScheduleServiceError> {
-        let origin_departure_time =
-            DateTime::parse_from_rfc3339(origin_departure_time).map_err(|_| {
-                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                    anyhow::anyhow!("Invalid origin departure time format"),
-                ))
+        train_number: TrainNumber<Verified>,
+        origin_departure_time: NaiveDateTime,
+    ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+        let train = self
+            .train_repository
+            .find_by_train_number(train_number.clone())
+            .await
+            .inspect_err(|e| error!("Failed to get train for verified train number: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
             })?;
 
-        let date = origin_departure_time.date_naive();
+        let train_id = train.get_id().expect("train should have id");
+        let origin_departure_date = origin_departure_time.date();
 
-        let schedules = self.get_schedules(date).await?;
-
-        let trains = self.train_repository.get_trains().await.map_err(|e| {
-            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                e.into(),
-            ))
-        })?;
-
-        let train_id_to_number: HashMap<_, _> = trains
-            .into_iter()
-            .map(|t| (t.get_id().unwrap(), t.number().to_string()))
-            .collect();
-
-        let schedule = match schedules.iter().find(|s| {
-            train_id_to_number
-                .get(&s.train_id())
-                .is_some_and(|num| num == train_number)
-                && s.origin_departure_time()
-                    == origin_departure_time.time().num_seconds_from_midnight() as i32
-        }) {
-            Some(s) => s,
-            None => return Ok(None),
-        };
-
-        let routes = self.route_service.get_routes().await.map_err(|e| {
-            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                e.into(),
-            ))
-        })?;
-
-        let route = routes
-            .into_iter()
-            .find(|r| r.get_id() == Some(schedule.route_id()))
+        let train_schedule = self
+            .train_schedule_repository
+            .find_by_id_and_date(train_id, origin_departure_date)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "Failed to get train schedule for train {} on date {}: {}",
+                    train_id, origin_departure_date, e
+                )
+            })
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?
             .ok_or_else(|| {
-                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                    anyhow::anyhow!("Route not found for train schedule"),
-                ))
+                warn!(
+                    "no train schedule found for train {} on date {}",
+                    train_id, origin_departure_date
+                );
+
+                TrainScheduleServiceError::InvalidTrainNumber(train_number.to_string())
             })?;
 
-        let terminal_stop = route.stops().last().ok_or_else(|| {
-            TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
-                anyhow::anyhow!("No stops found in route"),
-            ))
-        })?;
+        let route_id = train_schedule.route_id();
 
-        let terminal_station_id = terminal_stop.station_id();
+        let route = self
+            .route_repository
+            .find(route_id)
+            .await
+            .inspect_err(|e| error!("Failed to get route for train schedule: {}", e))
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+            })?
+            .ok_or(TrainScheduleServiceError::InfrastructureError(
+                ServiceError::RepositoryError(RepositoryError::InconsistentState(anyhow!(
+                    "no route found for route id: {}",
+                    route_id
+                ))),
+            ))?;
 
-        let arrival_time = self
-            .get_station_arrival_time(schedule.get_id().unwrap(), terminal_station_id)
-            .await?;
+        let terminal_stop = route
+            .stops()
+            .iter()
+            .max_by(|a, b| a.order().cmp(&b.order()))
+            .expect("route should have at least one stop");
 
-        Ok(Some(arrival_time.to_rfc3339()))
+        let terminal_arrival_offset = terminal_stop.arrival_time() as i64;
+
+        let arrival_time = origin_departure_time + TimeDelta::seconds(terminal_arrival_offset);
+
+        let arrival_time = arrival_time
+            .and_local_timezone(FixedOffset::east_opt(self.tz_offset_hour * 3600).unwrap())
+            .unwrap();
+
+        Ok(arrival_time)
     }
 }

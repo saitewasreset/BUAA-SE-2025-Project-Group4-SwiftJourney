@@ -397,6 +397,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&route_service_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&train_schedule_repository_impl),
+        Arc::clone(&route_repository_impl),
         tz_offset_hour,
     ));
 
@@ -407,6 +408,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&train_schedule_service_impl),
         Arc::clone(&train_type_configuration_service_impl),
+        Arc::clone(&station_service_impl),
     ));
 
     let train_dish_application_service_impl =
