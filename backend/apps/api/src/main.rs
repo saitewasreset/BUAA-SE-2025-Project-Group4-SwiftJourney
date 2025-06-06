@@ -432,6 +432,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&route_repository_impl),
         Arc::clone(&train_repository_impl),
+        tz_offset_hour,
     ));
 
     let train_order_service_impl = Arc::new(TrainOrderServiceImpl::new(
