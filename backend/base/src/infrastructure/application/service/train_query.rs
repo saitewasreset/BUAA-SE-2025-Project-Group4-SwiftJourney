@@ -44,10 +44,10 @@ use crate::application::service::train_query::{
     TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::repository::station::StationRepository;
 use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
 use crate::domain::repository::route::RouteRepository;
+use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::session::SessionManagerService;
@@ -55,6 +55,7 @@ use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, NaiveDateTime};
+use rust_decimal::prelude::ToPrimitive;
 use std::collections::HashMap;
 use tracing::{error, info, instrument};
 
@@ -666,14 +667,18 @@ where
 
                 GeneralError::InternalServerError
             })?;
+        let stations_count = stopping.len() - 1;
+
         let mut seat_info = HashMap::new();
         for seat in train.seats().values() {
+            let unit_price = seat.unit_price().to_f64().unwrap_or(0.0) as u32;
+            let total_price = unit_price * stations_count as u32;
             seat_info.insert(
                 seat.name().to_string(),
                 SeatInfoDTO {
                     seat_type: seat.name().to_string(),
                     left: seat.capacity(),
-                    price: seat.unit_price().to_string().parse().unwrap_or(0),
+                    price: total_price,
                 },
             );
         }
