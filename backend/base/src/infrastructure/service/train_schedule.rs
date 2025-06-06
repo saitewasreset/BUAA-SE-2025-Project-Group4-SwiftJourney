@@ -14,6 +14,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDate, NaiveDateTime, TimeDelta};
 use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::utils::TimeMeter;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -138,6 +139,7 @@ where
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
 {
+    #[instrument(skip(self))]
     async fn load_daily_context(
         &self,
         date: NaiveDate,
@@ -151,13 +153,20 @@ where
         ),
         TrainScheduleServiceError,
     > {
+        let mut meter = TimeMeter::new("load_daily_context");
+
         let schedules = self.get_schedules(date).await?;
+
+        meter.meter("get schedules");
 
         let routes = self.route_service.get_routes().await.map_err(|e| {
             TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
                 e.into(),
             ))
         })?;
+
+        meter.meter("get routes");
+
         let mut route_map = HashMap::with_capacity(routes.len());
         for r in routes {
             route_map.insert(r.get_id().unwrap(), r);
@@ -165,12 +174,21 @@ where
 
         let connections = build_connections(&schedules, &route_map);
 
+        meter.meter("build connections");
+
         let graph = self.route_service.get_route_map().await.map_err(|e| {
             TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
                 e.into(),
             ))
         })?;
+
+        meter.meter("get route graph");
+
         let index_map = build_station_index(&graph);
+
+        meter.meter("build station index");
+
+        info!("{}", meter);
 
         Ok((schedules, route_map, connections, graph, index_map))
     }
@@ -462,12 +480,11 @@ where
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-        let begin = std::time::Instant::now();
+        let mut meter = TimeMeter::new("direct_schedules");
 
         let schedules = self.get_schedules(date).await?;
 
-        let get_schedules_elapsed = begin.elapsed();
-        let get_routes_elapsed = begin.elapsed();
+        meter.meter("get schedules");
 
         let route_map_by_id = self
             .route_service
@@ -482,11 +499,13 @@ where
             .map(|r| (r.get_id().unwrap(), r))
             .collect::<HashMap<_, _>>();
 
+        meter.meter("get routes");
+
         let want: HashSet<_> = pairs.iter().copied().collect();
 
         let mut result = Vec::new();
 
-        let mut route_pos_cache: HashMap<RouteId, Arc<HashMap<StationId, usize>>> =
+        let mut route_pos_cache: HashMap<RouteId, HashMap<StationId, usize>> =
             HashMap::with_capacity(route_map_by_id.len());
 
         for schedule in &schedules {
@@ -497,14 +516,14 @@ where
                 None => continue,
             };
 
-            let pos_map: Arc<HashMap<StationId, usize>> = match route_pos_cache.entry(route_id) {
+            let pos_map: HashMap<StationId, usize> = match route_pos_cache.entry(route_id) {
                 Entry::Occupied(o) => o.get().clone(),
                 Entry::Vacant(v) => {
                     let mut m = HashMap::with_capacity(route.stops().len());
                     for (idx, stop) in route.stops().iter().enumerate() {
                         m.insert(stop.station_id(), idx);
                     }
-                    v.insert(Arc::new(m)).clone()
+                    v.insert(m).clone()
                 }
             };
 
@@ -518,14 +537,12 @@ where
             }
         }
 
-        let calc_elapsed = begin.elapsed();
-
-        info!(
-            "Direct schedules completed: get_schedules: {:?}, get_routes: {:?} calc: {:?}",
-            get_schedules_elapsed, get_routes_elapsed, calc_elapsed
-        );
-
         result.sort_by_key(|s| s.origin_departure_time());
+
+        meter.meter("calc");
+
+        info!("{}", meter);
+
         Ok(result)
     }
 
@@ -545,10 +562,16 @@ where
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError> {
+        let mut meter = TimeMeter::new("transfer_schedules");
+
         let (_, _, connections, _graph, _index_map) = self.load_daily_context(date).await?;
+
+        meter.meter("load daily context");
 
         // 站点 -> 出发 Connection 索引表
         let outgoing_index = build_outgoing_index(&connections);
+
+        meter.meter("build outgoing index");
 
         let mut all_solutions = Vec::<(Vec<TrainScheduleId>, Option<StationId>)>::new();
 
@@ -613,6 +636,10 @@ where
                 }
             }
         }
+
+        meter.meter("calc");
+
+        info!("{}", meter);
 
         Ok(all_solutions)
     }
