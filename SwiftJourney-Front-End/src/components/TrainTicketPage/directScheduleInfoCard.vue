@@ -53,9 +53,9 @@
       <!-- 车票信息 -->
       <div class="ticket-info">
         <!-- 座位 - 车票元素 -->
-        <div v-for="([seatType, seatInfo], index) in Object.entries(content.seatInfo)" :key="index">
+        <div v-for="(seatInfo, index) in sortedSeatInfo" :key="index">
           <!-- 座位类型 -->
-          <div class="seat-type-info">{{ seatType }}</div>
+          <div class="seat-type-info">{{ seatInfo.seatType }}</div>
           <!-- 价格 -->
           <div class="price-info">SC {{ seatInfo.price }}</div>
           <!-- 余票信息 -->
@@ -132,10 +132,10 @@ const props = withDefaults(
         },
       ] as stoppingStationInfo[],
       seatInfo: new Map<string, seatTypeInfo>([
-        ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
-        ['一等座', { capacity: 0, left: 0, price: 0.0 }],
-        ['二等座', { capacity: 0, left: 0, price: 0.0 }],
-        ['无座', { capacity: 0, left: 0, price: 0.0 }],
+        ['优选一等座', { seatType: '优选一等座', left: 0, price: 0.0 }],
+        ['一等座', { seatType: '一等座', left: 0, price: 0.0 }],
+        ['二等座', { seatType: '二等座', left: 0, price: 0.0 }],
+        ['无座', { seatType: '无座', left: 0, price: 0.0 }],
       ]),
     }),
   },
@@ -298,6 +298,12 @@ const processedRoute = computed(() => {
       ...station,
       rowStyle,
     }
+  })
+})
+// 处理座位信息
+const sortedSeatInfo = computed(() => {
+  return Object.values(props.content.seatInfo).sort((a: seatTypeInfo, b: seatTypeInfo) => {
+    return a.seatType.localeCompare(b.seatType)
   })
 })
 </script>
