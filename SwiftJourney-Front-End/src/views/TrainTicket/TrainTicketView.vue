@@ -122,12 +122,30 @@ watch(
 )
 </script>
 
-<style lang="css" scoped>
+<style lang="scss" scoped>
 .root {
-  display: block;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #fef3c7 75%, #fef7cd 100%);
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(120, 219, 226, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+  }
 }
 
 .train-ticket {
+  position: relative;
+  z-index: 1;
   margin: 0 auto;
   max-width: 1200px;
   display: grid;
@@ -138,7 +156,12 @@ watch(
 }
 
 .right-top-area {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .date-picker {
@@ -149,26 +172,31 @@ watch(
 .date-btn {
   flex: 1 1 0;
   text-align: center;
-  white-space: nowrap; /* 禁止文字换行 */
+  white-space: nowrap;
   padding-inline: 0;
   border-end-start-radius: 0;
   border-end-end-radius: 0;
+  border: none;
+  background: transparent;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.05);
+  }
 }
 
 .date-btn.ant-radio-button-wrapper-checked {
-  background-color: #eaf2fc;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .sort-part {
   display: flex;
   justify-content: space-around;
-  padding: 0.3rem 1rem;
-  border: 1px solid #d9d9d9;
+  padding: 16px 20px;
   font-size: 0.9rem;
-  border-end-start-radius: 6px;
-  border-end-end-radius: 6px;
-  margin-bottom: 1rem;
-  color: #333;
+  color: #64748b;
+  background: rgba(248, 250, 252, 0.8);
 }
 
 .sort-item {
@@ -178,16 +206,54 @@ watch(
   gap: 0.5rem;
   width: 30%;
   user-select: none;
-}
-
-.sort-item.sort-item-active {
-  color: #1677ff;
-  font-weight: bold;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.08);
+    color: #3b82f6;
+  }
+  
+  &.sort-item-active {
+    color: #3b82f6;
+    font-weight: 700;
+    background: rgba(59, 130, 246, 0.1);
+  }
 }
 
 .schedule-card {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+// 响应式设计
+@media (max-width: 1024px) {
+  .train-ticket {
+    grid-template-columns: 1fr;
+    max-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  .train-ticket {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .sort-part {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .sort-item {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>
