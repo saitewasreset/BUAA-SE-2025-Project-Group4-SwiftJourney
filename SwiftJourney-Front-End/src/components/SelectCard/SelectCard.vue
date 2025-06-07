@@ -98,6 +98,7 @@
 import { reactive, onMounted, ref, computed } from 'vue';
 import { useGeneralStore } from '@/stores/general';
 import { Search, Edit } from '@element-plus/icons-vue';
+import { pinyin } from 'pinyin-pro'
 
 const generalStore = useGeneralStore();
 
@@ -131,7 +132,7 @@ function calcModalPosition() {
     }
 }
 
-// 新增方法：获取搜索类型文本
+// 获取搜索类型文本
 function getSearchTypeText() {
     switch (props.type) {
         case 'city':
@@ -143,8 +144,6 @@ function getSearchTypeText() {
             return '城市或车站';
     }
 }
-
-import { pinyin } from 'pinyin-pro'
 
 const cityList = computed(() =>{ 
     if(props.type == 'city') {
@@ -173,104 +172,239 @@ function partTwoByCharacter(c: string) {
 
 const userInput = computed(() => props.input);
 
+// 优化后的搜索建议
 const updateSuggestions = computed(() => {
-    const chineseChars: string[] = [];
-    const otherChars: string[] = [];
-    const stringChars: string[] = [];
-    const suggestions: string[] = [];
+    const input = userInput.value.trim();
 
-    if(userInput.value.trim() == '') {
-        return []; // 返回空数组而不是 undefined
+    if(input === '') {
+        return [];
     }
 
-    for (const char of userInput.value) {
-        if (char >= '\u4e00' && char <= '\u9fff') { // 判断字符是否为汉字
-            chineseChars.push(char);
-            stringChars.push(pinyin(char, { toneType: 'none' }));
-            stringChars.push(" ");
-        } else if (char == '\'') {
-            otherChars.push(' ');
-            stringChars.push(' ');
-        } else {
-            otherChars.push(char);
-            stringChars.push(char);
-        }
-    }
+    const searchResults: Array<{name: string, score: number, type: string}> = [];
 
-    const chineseString = chineseChars.join('');
-    const otherString = otherChars.join('');
-    const stringString = stringChars.join('');
+    // 1. 精确匹配（最高优先级）
+    exactMatch(input, searchResults);
+    
+    // 2. 前缀匹配
+    prefixMatch(input, searchResults);
+    
+    // 3. 拼音匹配
+    pinyinMatch(input, searchResults);
+    
+    // 4. 模糊匹配
+    fuzzyMatch(input, searchResults);
+    
+    // 5. 包含匹配
+    containsMatch(input, searchResults);
 
-    if(props.type == 'both') {
-        suggestionsWithType(chineseString, otherString, stringString, suggestions, 'city');
-        suggestionsWithType(chineseString, otherString, stringString, suggestions, 'station');
-    } else {
-        suggestionsWithType(chineseString, otherString, stringString, suggestions, props.type as 'city' | 'station');
-    }
-
-    return suggestions.slice(0, 20);
+    // 按分数排序并去重
+    const uniqueResults = Array.from(new Map(
+        searchResults.map(item => [item.name, item])
+    ).values());
+    
+    return uniqueResults
+        .sort((a, b) => b.score - a.score) // 按分数降序排列
+        .slice(0, 20)
+        .map(item => item.name);
 });
 
-function suggestionsWithType(chineseString: string, otherString: string, stringString: string, suggestions: string[], type: 'city' | 'station') {
-    if(type == 'city') {
-        if(chineseString == '') {
-            pinyinCmp(generalStore.PinYinList, otherString, suggestions, generalStore.PinYinMapCity);
+// 1. 精确匹配
+function exactMatch(input: string, results: Array<{name: string, score: number, type: string}>) {
+    const searchData = getSearchData();
+    
+    searchData.forEach(item => {
+        if (item.name === input) {
+            results.push({
+                name: item.name,
+                score: 1000, // 最高分数
+                type: item.type
+            });
         }
-        else if(generalStore.CityMapPinYin[chineseString]) {
-            let pinyins = generalStore.CityMapPinYin[chineseString];
-            if(pinyins != null) {
-                pinyinCmp(pinyins, stringString, suggestions, generalStore.PinYinMapCity);
-            }
-        } else {
-            for(let i = 1; i <= chineseString.length; i++) {
-                let tep = chineseString.substring(i-1, i);
-                let pinyins = generalStore.CityMapPinYin[tep];
-                if(pinyins != null) {
-                    pinyinCmp(pinyins, stringString, suggestions, generalStore.PinYinMapCity);
-                }
-            }
-        }
-    } else {
-        if(chineseString == '') {
-            pinyinCmp(generalStore.PinYinListStation, otherString, suggestions, generalStore.PinYinMapStation);
-        }
-        else if(generalStore.StationMapPinYin[chineseString]) {
-            let pinyins = generalStore.StationMapPinYin[chineseString];
-            if(pinyins != null) {
-                pinyinCmp(pinyins, stringString, suggestions, generalStore.PinYinMapStation);
-            }
-        } else {
-            for(let i = 1; i <= chineseString.length; i++) {
-                let tep = chineseString.substring(i-1, i);
-                let pinyins = generalStore.StationMapPinYin[tep];
-                if(pinyins != null) {
-                    pinyinCmp(pinyins, stringString, suggestions, generalStore.PinYinMapStation);
-                }
-            }
-        }
-    }
+    });
 }
 
-function pinyinCmp(pinyins: string[], pinYin: string, suggestions: string[], pinYinMapCity: { [key: string]: string[] }) {
-    pinyins.forEach((value) => {
-        const templateParts = value.split(" ");
-        const testParts = pinYin.split(" ");
-        if (testParts.length <= templateParts.length) {
-            // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
-            for (let i = 0; i < testParts.length; i++) {
-                // 如果测试字符串的区域不是从模板字符串对应区域开头开始的子串，返回false
-                if (!templateParts[i].startsWith(testParts[i])) {
-                    return;
-                }
-            }
-            const cities = pinYinMapCity[value];
-            if(cities != null) {
-                cities.forEach((tep) => {
-                    suggestions.push(tep);
-                })
-            }
+// 2. 前缀匹配
+function prefixMatch(input: string, results: Array<{name: string, score: number, type: string}>) {
+    const searchData = getSearchData();
+    
+    searchData.forEach(item => {
+        // 中文前缀匹配
+        if (item.name.startsWith(input)) {
+            results.push({
+                name: item.name,
+                score: 900,
+                type: item.type
+            });
         }
-    })
+        
+        // 拼音前缀匹配
+        const fullPinyin = pinyin(item.name, { toneType: 'none', type: 'array' }).join('');
+        const firstLetters = pinyin(item.name, { pattern: 'first', toneType: 'none', type: 'array' }).join('');
+        
+        if (fullPinyin.toLowerCase().startsWith(input.toLowerCase()) ||
+            firstLetters.toLowerCase().startsWith(input.toLowerCase())) {
+            results.push({
+                name: item.name,
+                score: 850,
+                type: item.type
+            });
+        }
+    });
+}
+
+// 3. 增强的拼音匹配
+function pinyinMatch(input: string, results: Array<{name: string, score: number, type: string}>) {
+    const searchData = getSearchData();
+    
+    searchData.forEach(item => {
+        const score = calculatePinyinScore(input, item.name);
+        if (score > 0) {
+            results.push({
+                name: item.name,
+                score: score,
+                type: item.type
+            });
+        }
+    });
+}
+
+// 4. 模糊匹配
+function fuzzyMatch(input: string, results: Array<{name: string, score: number, type: string}>) {
+    const searchData = getSearchData();
+    
+    searchData.forEach(item => {
+        const score = calculateFuzzyScore(input, item.name);
+        if (score > 0.6) { // 相似度阈值
+            results.push({
+                name: item.name,
+                score: Math.floor(score * 600), // 转换为分数
+                type: item.type
+            });
+        }
+    });
+}
+
+// 5. 包含匹配
+function containsMatch(input: string, results: Array<{name: string, score: number, type: string}>) {
+    const searchData = getSearchData();
+    
+    searchData.forEach(item => {
+        if (item.name.includes(input)) {
+            results.push({
+                name: item.name,
+                score: 500,
+                type: item.type
+            });
+        }
+    });
+}
+
+// 获取搜索数据
+function getSearchData(): Array<{name: string, type: string}> {
+    const data: Array<{name: string, type: string}> = [];
+    
+    if (props.type === 'city' || props.type === 'both') {
+        generalStore.CityPinYinList?.forEach(item => {
+            data.push({ name: item.cityName, type: 'city' });
+        });
+    }
+    
+    if (props.type === 'station' || props.type === 'both') {
+        generalStore.StationPinYinList?.forEach(item => {
+            data.push({ name: item.cityName, type: 'station' });
+        });
+    }
+    
+    return data;
+}
+
+// 计算拼音匹配分数
+function calculatePinyinScore(input: string, cityName: string): number {
+    let score = 0;
+    const inputLower = input.toLowerCase();
+    
+    // 全拼匹配
+    const fullPinyin = pinyin(cityName, { toneType: 'none', type: 'array' }).join('').toLowerCase();
+    if (fullPinyin.includes(inputLower)) {
+        score += 700;
+        if (fullPinyin.startsWith(inputLower)) {
+            score += 100; // 前缀加分
+        }
+    }
+    
+    // 首字母匹配
+    const firstLetters = pinyin(cityName, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toLowerCase();
+    if (firstLetters.includes(inputLower)) {
+        score += 600;
+        if (firstLetters.startsWith(inputLower)) {
+            score += 100; // 前缀加分
+        }
+    }
+    
+    // 分段拼音匹配
+    const pinyinArray = pinyin(cityName, { toneType: 'none', type: 'array' });
+    for (let i = 0; i < pinyinArray.length; i++) {
+        if (pinyinArray[i].toLowerCase().startsWith(inputLower)) {
+            score += 650;
+            break;
+        }
+    }
+    
+    // 混合匹配（支持 "bj" 匹配 "北京"）
+    if (isValidPinyinAbbreviation(inputLower, cityName)) {
+        score += 750;
+    }
+    
+    return score;
+}
+
+// 验证是否为有效的拼音缩写
+function isValidPinyinAbbreviation(input: string, cityName: string): boolean {
+    const firstLetters = pinyin(cityName, { pattern: 'first', toneType: 'none', type: 'array' });
+    const inputChars = input.split('');
+    
+    if (inputChars.length > firstLetters.length) return false;
+    
+    for (let i = 0; i < inputChars.length; i++) {
+        if (firstLetters[i]?.toLowerCase() !== inputChars[i].toLowerCase()) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// 计算模糊匹配分数（编辑距离算法）
+function calculateFuzzyScore(input: string, target: string): number {
+    const distance = levenshteinDistance(input.toLowerCase(), target.toLowerCase());
+    const maxLength = Math.max(input.length, target.length);
+    return 1 - (distance / maxLength);
+}
+
+// 计算编辑距离
+function levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i++) {
+        matrix[0][i] = i;
+    }
+    
+    for (let j = 0; j <= str2.length; j++) {
+        matrix[j][0] = j;
+    }
+    
+    for (let j = 1; j <= str2.length; j++) {
+        for (let i = 1; i <= str1.length; i++) {
+            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1, // deletion
+                matrix[j - 1][i] + 1, // insertion
+                matrix[j - 1][i - 1] + indicator // substitution
+            );
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
 }
 
 onMounted(() => {
