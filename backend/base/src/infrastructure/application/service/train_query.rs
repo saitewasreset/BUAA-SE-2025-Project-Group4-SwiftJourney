@@ -838,18 +838,33 @@ where
         }
 
         // ——— 其余字段 ———
-        let dep_time = stopping
-            .first()
-            .unwrap()
+        let user_dep_station_name = user_departure_station
+            .and_then(|id| station_id_to_name.get(&id).cloned())
+            .unwrap();
+
+        let user_arr_station_name = user_arrival_station
+            .and_then(|id| station_id_to_name.get(&id).cloned())
+            .unwrap();
+
+        let user_dep_idx = stopping
+            .iter()
+            .position(|stop| stop.station_name == user_dep_station_name)
+            .expect("departure station should exist in stopping");
+
+        let user_arr_idx = stopping
+            .iter()
+            .position(|stop| stop.station_name == user_arr_station_name)
+            .expect("arrival station should exist in stopping");
+
+        let dep_time = stopping[user_dep_idx]
             .departure_time
             .as_ref()
-            .expect("departure time should exist for non-terminal stops");
-        let arr_time = stopping
-            .last()
-            .unwrap()
+            .expect("departure time should exist for user departure station");
+
+        let arr_time = stopping[user_arr_idx]
             .arrival_time
             .as_ref()
-            .expect("arrival time should exist for non-origin stops");
+            .expect("arrival time should exist for user arrival station");
         let dep_dt = DateTimeWithTimeZone::parse_from_rfc3339(dep_time).unwrap();
         let arr_dt = DateTimeWithTimeZone::parse_from_rfc3339(arr_time).unwrap();
 
