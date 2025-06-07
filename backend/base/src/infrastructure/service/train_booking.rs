@@ -9,7 +9,7 @@ use crate::domain::service::train_booking::{TrainBookingService, TrainBookingSer
 use crate::domain::service::train_seat::{TrainSeatService, TrainSeatServiceError};
 use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::service::transaction::TransactionService;
-use crate::domain::{DbId, Identifiable};
+use crate::domain::{DbId, Identifiable, RepositoryError};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use std::ops::Deref;
@@ -112,7 +112,8 @@ where
         let station_range = train_order.station_range();
         let train_schedule_id = train_order.train_schedule_id();
 
-        let train_schedule = match self.train_schedule_repository.find(train_schedule_id).await {
+        let mut train_schedule = match self.train_schedule_repository.find(train_schedule_id).await
+        {
             Ok(Some(schedule)) => schedule,
             Ok(None) => {
                 return Err(TrainBookingServiceError::InfrastructureError(
@@ -236,12 +237,15 @@ where
 
         let seat_location_info = selected_seat.1;
 
-        let seat_availability_id =
-            train_schedule.get_seat_availability_id(station_range, seat_type.clone());
-
         let seat = match self
             .train_seat_service
-            .reserve_seat(seat_availability_id, seat_location_info)
+            .reserve_seat(
+                &mut train_schedule,
+                station_range,
+                seat_type.clone(),
+                seat_location_info,
+                train_order.personal_info_id(),
+            )
             .await
         {
             Ok(seat) => seat,
@@ -266,10 +270,14 @@ where
             .await
             .map_err(|err| TrainBookingServiceError::InfrastructureError(err.into()))?;
 
-        info!("Train order {} successfully booked with seat", order_uuid);
+        info!(
+            "Train order {} successfully booked with seat: {:?}",
+            order_uuid, seat
+        );
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn cancel_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
         let mut train_order = match self
             .order_repository
@@ -280,6 +288,8 @@ where
             Ok(None) => return Err(TrainBookingServiceError::InvalidOrder(order_uuid)),
             Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
         };
+
+        info!("Cancelling train order: {:?}", train_order);
 
         let status = train_order.order_status();
         // 只有Unpaid（未支付）、Paid（已支付）、Ongoing（未出行）状态的订单可以取消
@@ -335,41 +345,6 @@ where
 
         train_order.set_status(OrderStatus::Cancelled);
 
-        if status == OrderStatus::Paid || status == OrderStatus::Ongoing {
-            if let Some(transaction_id) = train_order.payment_info().refund_transaction_id() {
-                let transaction = match self.transaction_repository.find(transaction_id).await {
-                    Ok(Some(transaction)) => transaction,
-                    Ok(None) => {
-                        return Err(TrainBookingServiceError::InfrastructureError(
-                            ServiceError::RelatedServiceError(anyhow!("Transaction not found")),
-                        ));
-                    }
-                    Err(err) => {
-                        return Err(TrainBookingServiceError::InfrastructureError(err.into()));
-                    }
-                };
-
-                let orders: Vec<Box<dyn Order>> = vec![Box::new(train_order.clone())];
-
-                if let Err(err) = self
-                    .transaction_server
-                    .refund_transaction(transaction.uuid(), &orders)
-                    .await
-                {
-                    return Err(TrainBookingServiceError::InfrastructureError(
-                        ServiceError::RelatedServiceError(anyhow!(
-                            "Failed to refund transaction: {}",
-                            err
-                        )),
-                    ));
-                }
-            } else {
-                return Err(TrainBookingServiceError::InfrastructureError(
-                    ServiceError::RelatedServiceError(anyhow!("Paid order without transaction ID")),
-                ));
-            }
-        }
-
         Ok(())
     }
 
@@ -383,11 +358,35 @@ where
 
         let mut successful_orders: Vec<TrainOrder> = Vec::new();
 
+        let mut failed_orders: Vec<TrainOrder> = Vec::new();
+
         for order_uuid in order_uuid_list.iter() {
+            let order = self
+                .order_repository
+                .find_train_order_by_uuid(*order_uuid)
+                .await
+                .inspect_err(|e| error!("Failed to find train order by uuid {}: {}", order_uuid, e))
+                .map_err(|e| {
+                    TrainBookingServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+                })?
+                .ok_or_else(|| {
+                    error!("Inconsistent: no order with uuid {}", order_uuid);
+
+                    TrainBookingServiceError::InfrastructureError(ServiceError::RepositoryError(
+                        RepositoryError::InconsistentState(anyhow!(
+                            "Inconsistent: no order with uuid {}",
+                            order_uuid
+                        )),
+                    ))
+                })?;
+
             let result = self.booking_ticket(*order_uuid).await;
 
             if let Err(err) = result {
                 error!("Failed to booking ticket {}: {}", order_uuid, err);
+
+                failed_orders.push(order);
+
                 if atomic {
                     for order in &successful_orders {
                         let _ = self.cancel_ticket(order.uuid()).await;
@@ -396,42 +395,11 @@ where
                 } else {
                     continue;
                 }
-            }
-
-            match self
-                .order_repository
-                .find_train_order_by_uuid(*order_uuid)
-                .await
-            {
-                Ok(Some(order)) => successful_orders.push(order),
-                Ok(None) => {
-                    if atomic {
-                        for order in &successful_orders {
-                            let _ = self.cancel_ticket(order.uuid()).await;
-                        }
-
-                        return Err(TrainBookingServiceError::InfrastructureError(
-                            ServiceError::RelatedServiceError(anyhow!(
-                                "Order booked but not found: {}",
-                                order_uuid
-                            )),
-                        ));
-                    }
-                }
-                Err(err) => {
-                    error!("Failed to get train order {}: {}", order_uuid, err);
-
-                    if atomic {
-                        for order in &successful_orders {
-                            let _ = self.cancel_ticket(order.uuid()).await;
-                        }
-
-                        return Err(TrainBookingServiceError::InfrastructureError(err.into()));
-                    }
-                }
+            } else {
+                successful_orders.push(order);
             }
         }
 
-        Ok(successful_orders)
+        Ok(failed_orders)
     }
 }
