@@ -2,11 +2,31 @@
     <div class="city_choose_wrap" :style="{ top: pos.top + 'px', left: pos.left + 'px' }">
         <div class="choose_right">
             <el-tabs v-model="activeTag" class="demo-tabs">
-                <el-tab-pane label="推荐" name="hotWelcomed">
-                    <div class="city_name" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <el-tab-pane label="搜索结果" name="hotWelcomed">
+                    <!-- 有搜索结果时显示 -->
+                    <div v-if="updateSuggestions && updateSuggestions.length > 0" class="city_name" style="display: flex; flex-wrap: wrap; gap: 10px;">
                         <p class="suggestion" v-for="item in updateSuggestions" :key="item" @click="handleCityClick(item)">
                             {{ item }}
                         </p>
+                    </div>
+                    <!-- 有输入但无搜索结果时显示 -->
+                    <div v-else-if="userInput.trim() !== ''" class="no-results">
+                        <div class="no-results-icon">
+                            <el-icon size="48"><Search /></el-icon>
+                        </div>
+                        <h3 class="no-results-title">暂无搜索结果</h3>
+                        <p class="no-results-subtitle">
+                            未找到包含 "<span class="search-keyword">{{ userInput }}</span>" 的{{ getSearchTypeText() }}
+                        </p>
+                        <p class="no-results-tip">请尝试使用其他关键词或检查拼写</p>
+                    </div>
+                    <!-- 无输入时显示提示 -->
+                    <div v-else class="search-hint">
+                        <div class="search-hint-icon">
+                            <el-icon size="40"><Edit /></el-icon>
+                        </div>
+                        <h4 class="search-hint-title">请输入{{ getSearchTypeText() }}名称</h4>
+                        <p class="search-hint-subtitle">支持中文名称或拼音搜索</p>
                     </div>
                 </el-tab-pane>
                 <el-tab-pane label="ABCDEF" name="ABCDEF">
@@ -77,6 +97,7 @@
 <script setup lang="ts">
 import { reactive, onMounted, ref, computed } from 'vue';
 import { useGeneralStore } from '@/stores/general';
+import { Search, Edit } from '@element-plus/icons-vue';
 
 const generalStore = useGeneralStore();
 
@@ -107,6 +128,19 @@ function calcModalPosition() {
     if (props.el) {
         pos.top = props.el.getBoundingClientRect().height + props.el.offsetTop + 20
         pos.left = props.el.offsetLeft
+    }
+}
+
+// 新增方法：获取搜索类型文本
+function getSearchTypeText() {
+    switch (props.type) {
+        case 'city':
+            return '城市';
+        case 'station':
+            return '车站';
+        case 'both':
+        default:
+            return '城市或车站';
     }
 }
 
@@ -146,7 +180,7 @@ const updateSuggestions = computed(() => {
     const suggestions: string[] = [];
 
     if(userInput.value.trim() == '') {
-        return;
+        return []; // 返回空数组而不是 undefined
     }
 
     for (const char of userInput.value) {
@@ -311,6 +345,104 @@ onMounted(() => {
 
     &:hover {
         color: #3d6cfe;
+    }
+}
+
+/* 新增样式：无搜索结果 */
+.no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    height: 200px;
+}
+
+.no-results-icon {
+    margin-bottom: 16px;
+    color: #9ca3af;
+}
+
+.no-results-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 8px 0;
+}
+
+.no-results-subtitle {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 8px 0;
+    line-height: 1.5;
+}
+
+.search-keyword {
+    color: #3d6cfe;
+    font-weight: 600;
+}
+
+.no-results-tip {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* 新增样式：搜索提示 */
+.search-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    height: 200px;
+}
+
+.search-hint-icon {
+    margin-bottom: 16px;
+    color: #d1d5db;
+}
+
+.search-hint-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0 0 8px 0;
+}
+
+.search-hint-subtitle {
+    font-size: 14px;
+    color: #9ca3af;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+    .city_choose_wrap {
+        max-width: 320px;
+    }
+    
+    .no-results,
+    .search-hint {
+        padding: 30px 15px;
+        height: 180px;
+    }
+    
+    .no-results-title {
+        font-size: 16px;
+    }
+    
+    .search-hint-title {
+        font-size: 14px;
+    }
+    
+    .no-results-subtitle,
+    .search-hint-subtitle {
+        font-size: 13px;
     }
 }
 </style>
