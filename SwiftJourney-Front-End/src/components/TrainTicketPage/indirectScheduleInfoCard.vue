@@ -22,6 +22,8 @@
                   :data-source="processedRouteFirstRide"
                   :pagination="false"
                   :customRow="handleCustomRow"
+                  :scroll="{ y: 200 }"
+                  style="width: 400px"
                 />
               </template>
               <div
@@ -67,6 +69,8 @@
                   :data-source="processedRouteSecondRide"
                   :pagination="false"
                   :customRow="handleCustomRow"
+                  :scroll="{ y: 200 }"
+                  style="width: 400px"
                 />
               </template>
               <div
@@ -104,23 +108,23 @@
             <div class="ride-title">第1程</div>
             <!-- 车票信息 -->
             <div
-              v-for="([seatType, seatInfo], index) in Object.entries(content.first_ride.seatInfo)"
+              v-for="(seatInfo, index) in sortedSeatInfoFirstRide"
               :key="index"
               class="seat-info"
             >
               <!-- 座位类型 -->
-              <div class="seat-type-info">{{ seatType }}</div>
+              <div class="seat-type-info">{{ seatInfo.seatType }}</div>
               <!-- 余票信息 -->
               <div
                 class="remain-count-info"
                 :class="{
-                  rich: getleftType(seatInfo.left, seatInfo.capacity) === 'rich',
-                  few: getleftType(seatInfo.left, seatInfo.capacity) === 'few',
-                  little: getleftType(seatInfo.left, seatInfo.capacity) === 'little',
-                  none: getleftType(seatInfo.left, seatInfo.capacity) === 'none',
+                  rich: getleftType(seatInfo.left) === 'rich',
+                  few: getleftType(seatInfo.left) === 'few',
+                  little: getleftType(seatInfo.left) === 'little',
+                  none: getleftType(seatInfo.left) === 'none',
                 }"
               >
-                {{ formatleft(getleftType(seatInfo.left, seatInfo.capacity), seatInfo.left) }}
+                {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
               </div>
             </div>
           </div>
@@ -129,23 +133,23 @@
             <div class="ride-title">第2程</div>
             <!-- 车票信息 -->
             <div
-              v-for="([seatType, seatInfo], index) in Object.entries(content.second_ride.seatInfo)"
+              v-for="(seatInfo, index) in sortedSeatInfoSecondRide"
               :key="index"
               class="seat-info"
             >
               <!-- 座位类型 -->
-              <div class="seat-type-info">{{ seatType }}</div>
+              <div class="seat-type-info">{{ seatInfo.seatType }}</div>
               <!-- 余票信息 -->
               <div
                 class="remain-count-info"
                 :class="{
-                  rich: getleftType(seatInfo.left, seatInfo.capacity) === 'rich',
-                  few: getleftType(seatInfo.left, seatInfo.capacity) === 'few',
-                  little: getleftType(seatInfo.left, seatInfo.capacity) === 'little',
-                  none: getleftType(seatInfo.left, seatInfo.capacity) === 'none',
+                  rich: getleftType(seatInfo.left) === 'rich',
+                  few: getleftType(seatInfo.left) === 'few',
+                  little: getleftType(seatInfo.left) === 'little',
+                  none: getleftType(seatInfo.left) === 'none',
                 }"
               >
-                {{ formatleft(getleftType(seatInfo.left, seatInfo.capacity), seatInfo.left) }}
+                {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
               </div>
             </div>
           </div>
@@ -215,10 +219,10 @@ const props = withDefaults(
           },
         ] as stoppingStationInfo[],
         seatInfo: new Map<string, seatTypeInfo>([
-          ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['一等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['二等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['无座', { capacity: 0, left: 0, price: 0.0 }],
+          ['优选一等座', { seatType: '优选一等座', left: 0, price: 0.0 }],
+          ['一等座', { seatType: '一等座', left: 0, price: 0.0 }],
+          ['二等座', { seatType: '二等座', left: 0, price: 0.0 }],
+          ['无座', { seatType: '无座', left: 0, price: 0.0 }],
         ]),
       },
       second_ride: {
@@ -259,10 +263,10 @@ const props = withDefaults(
           },
         ] as stoppingStationInfo[],
         seatInfo: new Map<string, seatTypeInfo>([
-          ['优选一等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['一等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['二等座', { capacity: 0, left: 0, price: 0.0 }],
-          ['无座', { capacity: 0, left: 0, price: 0.0 }],
+          ['优选一等座', { seatType: '优选一等座', left: 0, price: 0.0 }],
+          ['一等座', { seatType: '一等座', left: 0, price: 0.0 }],
+          ['二等座', { seatType: '二等座', left: 0, price: 0.0 }],
+          ['无座', { seatType: '无座', left: 0, price: 0.0 }],
         ]),
       },
       relaxing_time: 65 * 60,
@@ -359,7 +363,7 @@ const overDateFlag = computed(() => {
 })
 // -------------------- 余票判断逻辑 --------------------
 // 根据余票数量和总容量判断余票类型
-function getleftType(left: number, totalCount: number): leftType {
+function getleftType(left: number): leftType {
   if (left > 30) {
     return 'rich'
   } else if (left >= 10) {
@@ -483,6 +487,21 @@ const processedRouteSecondRide = computed(() => {
       rowStyle,
     }
   })
+})
+// 处理座位信息
+const sortedSeatInfoFirstRide = computed(() => {
+  return Object.values(props.content.first_ride.seatInfo).sort(
+    (a: seatTypeInfo, b: seatTypeInfo) => {
+      return a.seatType.localeCompare(b.seatType)
+    },
+  )
+})
+const sortedSeatInfoSecondRide = computed(() => {
+  return Object.values(props.content.second_ride.seatInfo).sort(
+    (a: seatTypeInfo, b: seatTypeInfo) => {
+      return a.seatType.localeCompare(b.seatType)
+    },
+  )
 })
 </script>
 

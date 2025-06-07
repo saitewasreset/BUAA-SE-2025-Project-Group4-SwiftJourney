@@ -3,12 +3,10 @@ use crate::domain::repository::order::OrderRepository;
 use crate::domain::repository::seat_availability::SeatAvailabilityRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
-use crate::domain::repository::transaction::TransactionRepository;
 use crate::domain::service::ServiceError;
 use crate::domain::service::train_booking::{TrainBookingService, TrainBookingServiceError};
 use crate::domain::service::train_seat::{TrainSeatService, TrainSeatServiceError};
 use crate::domain::service::train_type::TrainTypeConfigurationService;
-use crate::domain::service::transaction::TransactionService;
 use crate::domain::{DbId, Identifiable, RepositoryError};
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -17,12 +15,10 @@ use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-pub struct TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
+pub struct TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
-    TS: TransactionService,
-    TR: TransactionRepository,
     TRR: TrainRepository,
     OR: OrderRepository,
     SAR: SeatAvailabilityRepository,
@@ -30,21 +26,16 @@ where
 {
     train_schedule_repository: Arc<TSR>,
     train_seat_service: Arc<TSS>,
-    transaction_server: Arc<TS>,
-    transaction_repository: Arc<TR>,
     train_repository: Arc<TRR>,
     order_repository: Arc<OR>,
     seat_availability_repository: Arc<SAR>,
     train_type_configuration_service: Arc<TTCS>,
 }
 
-impl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
-    TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
+impl<TSR, TSS, TRR, OR, SAR, TTCS> TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
-    TS: TransactionService,
-    TR: TransactionRepository,
     TRR: TrainRepository,
     OR: OrderRepository,
     SAR: SeatAvailabilityRepository,
@@ -54,8 +45,6 @@ where
     pub fn new(
         train_schedule_repository: Arc<TSR>,
         train_seat_service: Arc<TSS>,
-        transaction_server: Arc<TS>,
-        transaction_repository: Arc<TR>,
         train_repository: Arc<TRR>,
         order_repository: Arc<OR>,
         seat_availability_repository: Arc<SAR>,
@@ -64,8 +53,6 @@ where
         Self {
             train_schedule_repository,
             train_seat_service,
-            transaction_server,
-            transaction_repository,
             train_repository,
             order_repository,
             seat_availability_repository,
@@ -75,13 +62,11 @@ where
 }
 
 #[async_trait]
-impl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS> TrainBookingService
-    for TrainBookingServiceImpl<TSR, TSS, TS, TR, TRR, OR, SAR, TTCS>
+impl<TSR, TSS, TRR, OR, SAR, TTCS> TrainBookingService
+    for TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
-    TS: TransactionService,
-    TR: TransactionRepository,
     TRR: TrainRepository,
     OR: OrderRepository,
     SAR: SeatAvailabilityRepository,
