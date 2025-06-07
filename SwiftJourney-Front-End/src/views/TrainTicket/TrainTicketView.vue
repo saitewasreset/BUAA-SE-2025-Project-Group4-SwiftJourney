@@ -72,14 +72,13 @@ import TicketSearch from '@/components/TicketSearch/TicketSearch.vue'
 import TrainFilter from '@/components/TrainTicketPage/TrainFilter.vue'
 import directScheduleInfoCard from '@/components/TrainTicketPage/directScheduleInfoCard.vue'
 import indirectScheduleInfoCard from '@/components/TrainTicketPage/indirectScheduleInfoCard.vue'
-import { computed, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { useTicketServiceStore } from '@/stores/ticketService'
 import {
   SortType,
   type directScheduleInfo,
   type indirectScheduleInfo,
 } from '@/interface/ticketServiceInterface'
-import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
 
 const ticketServiceStore = useTicketServiceStore()
 
@@ -106,18 +105,21 @@ const indirectResults = computed(() => {
   }
   return []
 })
-// only for test
-onMounted(async () => {
-  console.log('组件已挂载，开始查询车次信息...', ticketServiceStore.queryDate)
-  // ticketServiceStore.queryMode = 'indirect'
-  const response = await TicketServiceApi.queryDirectSchedule({
-    departureDate: ticketServiceStore.queryDate,
-    departureCity: '天津市',
-    arrivalCity: '南京市',
-  })
-  console.log('查询结果:', response.data)
-  ticketServiceStore.handleResponse(response.data)
-})
+
+// -------------------- 监听查询模式和日期变化 --------------------
+watch(
+  () => ticketServiceStore.queryMode,
+  async (newMode) => {
+    await ticketServiceStore.querySchedule()
+  },
+)
+
+watch(
+  () => ticketServiceStore.queryDate,
+  async (newDate) => {
+    await ticketServiceStore.querySchedule()
+  },
+)
 </script>
 
 <style lang="css" scoped>
