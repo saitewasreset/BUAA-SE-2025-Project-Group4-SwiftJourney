@@ -17,12 +17,12 @@
             <div class="search-container">
                 <!-- 城市选择区域 -->
                 <div class="city-selection-wrapper">
-                    <CitySelect 
+                    <!-- <CitySelect 
                         v-if="isCurChooseRefActive"
                         :el="inputRef"
                         @handleCityClick="handleCityClick"
-                    />
-                    
+                    /> -->
+                    <CitySelect v-if="isCurChooseRefActive" :el="inputRef" :input="cityInput"  @handleCityClick="handleCityClick"/>
                     <div class="city-selection">
                         <!-- 出发城市 -->
                         <div class="city-input-group departure">
@@ -96,10 +96,12 @@
 </template>
 
 <script setup lang="ts">
-    import { ref, h, nextTick } from 'vue';
+    import { ref, h, nextTick, computed } from 'vue';
     import { onMounted, onUnmounted } from 'vue';
     
     import { SwapOutlined, SearchOutlined } from '@ant-design/icons-vue';
+
+    import CitySelect from './CitySelect/CitySelect.vue'
     
     //-------------DatePicker----------------
 
@@ -137,6 +139,9 @@
 
     const departureCity = ref<string>('');
     const arrivalCity = ref<string>('');
+    const cityInput = computed(() => {
+        return selectedInputId.value === 'DepartureCityInput' ? departureCity.value : arrivalCity.value;
+    });
 
     function swapCitys() {
         const temp = departureCity.value;
@@ -147,8 +152,6 @@
     const inputRef = ref<HTMLElement | undefined>(undefined)
 
     const isCurChooseRefActive = ref<boolean>(false);
-
-    import CitySelect from './CitySelect/CitySelect.vue';
 
     const selectedInputId = ref<string>('');
 
