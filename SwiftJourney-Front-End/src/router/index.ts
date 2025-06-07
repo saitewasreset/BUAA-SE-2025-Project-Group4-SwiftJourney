@@ -58,7 +58,7 @@ const router = createRouter({
       }
     },
     {
-      path:'/transaction/train',
+      path:'/trainTransaction',
       name: 'trainTransaction',
       component: () => import('../views/TrainTicket/TrainTransaction.vue'),
     },
