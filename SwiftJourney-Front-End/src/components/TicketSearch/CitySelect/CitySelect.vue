@@ -176,7 +176,7 @@ const userInput = computed(() => props.input);
 
 // 优化后的搜索建议
 const updateSuggestions = computed(() => {
-    const input = userInput.value.trim();
+    const input = userInput.value.trim().replace(/[^\u4e00-\u9fa5a-zA-Z]/g, '');
 
     if(input === '') {
         return [];

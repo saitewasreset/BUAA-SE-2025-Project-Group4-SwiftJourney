@@ -53,6 +53,7 @@
                             </div>
 
                             <div class="UserButtonLine">
+                                <el-button link plain @click="goToTravelPlanPage">行程</el-button>
                                 <el-button link plain @click="goToTransactionRecordPage">交易记录</el-button>
                             </div>
                         </div>
@@ -137,6 +138,10 @@
         router.push({name: 'personalhomepage', params: { activeIndex: 'prefilledinformation' }});
     }
 
+    function goToTravelPlanPage() {
+        router.push({ name: 'personalhomepage', params: { activeIndex: 'travelplan' }});
+    }
+
     function goToTransactionRecordPage() {
         router.push({ name: 'personalhomepage', params: { activeIndex: 'transactionrecord' }});
     }
@@ -212,7 +217,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all cubic-bezier(0.4, 0, 0.2, 1);
     border-bottom: 1px solid rgba(226, 232, 240, 0.3);
 }
 
@@ -237,7 +242,7 @@
     color: #64748b;
     border-radius: 12px;
     margin: 0 4px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
@@ -252,7 +257,7 @@
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform cubic-bezier(0.4, 0, 0.2, 1);
     z-index: -1;
 }
 
@@ -268,9 +273,9 @@
 
 .el-menu :deep(.el-menu-item.is-active) {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
-    color: #667eea;
     font-weight: 600;
     border-bottom: 3px solid #667eea;
+    color: #9966ea !important;
 }
 
 .webside_title {
@@ -281,7 +286,7 @@
     padding: 8px 16px;
     border-radius: 16px;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .webside_title:hover {
@@ -318,7 +323,7 @@
     border-radius: 12px;
     font-weight: 600;
     font-size: 15px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -458,12 +463,18 @@
     position: relative;
 }
 
-.UserButtonLine:last-child {
+/* .UserButtonLine:last-child {
     grid-template-columns: 1fr;
     padding: 8px 16px 16px;
     border-top: 1px solid rgba(226, 232, 240, 0.15);
     margin-top: 4px !important;
-}
+} */
+/* .UserButtonLine {
+    grid-template-columns: 1fr;
+    padding: 8px 16px 16px;
+    border-top: 1px solid rgba(226, 232, 240, 0.15);
+    margin-top: 4px !important;
+} */
 
 .UserButtonLine .el-button {
     font-size: 11px !important;
@@ -473,7 +484,7 @@
     color: #64748b !important;
     background: rgba(248, 250, 252, 0.5) !important;
     border: 1px solid rgba(226, 232, 240, 0.3) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition: all cubic-bezier(0.4, 0, 0.2, 1) !important;
     width: 100% !important;
     text-align: center !important;
     justify-content: center !important;
@@ -494,7 +505,7 @@
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform cubic-bezier(0.4, 0, 0.2, 1);
     z-index: -1;
 }
 
@@ -612,6 +623,6 @@
 }
 
 :deep(.el-popover) {
-    animation: popoverFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: popoverFadeIn  cubic-bezier(0.4, 0, 0.2, 1);
 }
 </style>

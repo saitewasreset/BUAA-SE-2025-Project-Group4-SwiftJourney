@@ -479,7 +479,7 @@ where
         &self,
         date: NaiveDate,
         pairs: &[(StationId, StationId)],
-    ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+    ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
         let mut meter = TimeMeter::new("direct_schedules");
 
         let schedules = self.get_schedules(date).await?;
@@ -530,14 +530,22 @@ where
             for &(from, to) in &want {
                 if let (Some(&i_from), Some(&i_to)) = (pos_map.get(&from), pos_map.get(&to)) {
                     if i_from < i_to {
-                        result.push(schedule.clone());
-                        break;
+                        let stop = route.stops()[i_from];
+                        let departure_offset =
+                            stop.departure_time() + schedule.origin_departure_time() as u32;
+                        let departure_datetime = schedule.date().and_hms_opt(0, 0, 0).unwrap()
+                            + chrono::Duration::seconds(departure_offset as i64);
+
+                        if departure_datetime.date() == date {
+                            result.push((schedule.clone(), from, to));
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        result.sort_by_key(|s| s.origin_departure_time());
+        result.sort_by_key(|(s, _, _)| s.origin_departure_time());
 
         meter.meter("calc");
 
@@ -559,10 +567,22 @@ where
     #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
-        date: NaiveDate,
+        date: chrono::NaiveDate,
         pairs: &[(StationId, StationId)],
-    ) -> Result<Vec<(Vec<TrainScheduleId>, Option<StationId>)>, TrainScheduleServiceError> {
+    ) -> Result<
+        Vec<(
+            Vec<TrainScheduleId>,
+            StationId,
+            StationId,
+            Option<StationId>,
+        )>,
+        TrainScheduleServiceError,
+    > {
         let mut meter = TimeMeter::new("transfer_schedules");
+
+        let schedules = self.get_schedules(date).await?;
+
+        meter.meter("get schedules");
 
         let (_, _, connections, _graph, _index_map) = self.load_daily_context(date).await?;
 
@@ -573,7 +593,31 @@ where
 
         meter.meter("build outgoing index");
 
-        let mut all_solutions = Vec::<(Vec<TrainScheduleId>, Option<StationId>)>::new();
+        let schedule_map: HashMap<TrainScheduleId, &TrainSchedule> =
+            schedules.iter().map(|s| (s.get_id().unwrap(), s)).collect();
+
+        let route_map_by_id = self
+            .route_service
+            .get_routes()
+            .await
+            .map_err(|e| {
+                TrainScheduleServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
+            })?
+            .into_iter()
+            .map(|r| (r.get_id().unwrap(), r))
+            .collect::<HashMap<_, _>>();
+
+        let mut route_pos_cache: HashMap<RouteId, HashMap<StationId, usize>> =
+            HashMap::with_capacity(route_map_by_id.len());
+
+        let mut all_solutions = Vec::<(
+            Vec<TrainScheduleId>,
+            StationId,
+            StationId,
+            Option<StationId>,
+        )>::new();
 
         for &(origin, dest) in pairs {
             let Some(first_leg_indices) = outgoing_index.get(&origin) else {
@@ -585,6 +629,42 @@ where
 
             for &i in first_leg_indices {
                 let first = &connections[i];
+
+                let first_schedule = match schedule_map.get(&first.train_schedule_id) {
+                    Some(s) => *s,
+                    None => continue,
+                };
+
+                let first_route = match route_map_by_id.get(&first_schedule.route_id()) {
+                    Some(r) => r,
+                    None => continue,
+                };
+
+                let pos_map = match route_pos_cache.entry(first_schedule.route_id()) {
+                    Entry::Occupied(o) => o.get().clone(),
+                    Entry::Vacant(v) => {
+                        let mut m = HashMap::with_capacity(first_route.stops().len());
+                        for (idx, stop) in first_route.stops().iter().enumerate() {
+                            m.insert(stop.station_id(), idx);
+                        }
+                        v.insert(m).clone()
+                    }
+                };
+
+                let &origin_idx = match pos_map.get(&origin) {
+                    Some(idx) => idx,
+                    None => continue,
+                };
+
+                let stop = first_route.stops()[origin_idx];
+                let departure_offset =
+                    stop.departure_time() + first_schedule.origin_departure_time() as u32;
+                let departure_datetime = first_schedule.date().and_hms_opt(0, 0, 0).unwrap()
+                    + chrono::Duration::seconds(departure_offset as i64);
+
+                if departure_datetime.date() != date {
+                    continue;
+                }
 
                 let earliest_next_dep = first.arrival_time + MIN_TRANSFER_SEC;
                 let latest_next_dep = first.arrival_time + MAX_TRANSFER_SEC;
@@ -630,6 +710,8 @@ where
                     if seen.insert(key) {
                         all_solutions.push((
                             vec![first.train_schedule_id, second.train_schedule_id],
+                            origin,
+                            dest,
                             Some(mid_station),
                         ));
                     }
