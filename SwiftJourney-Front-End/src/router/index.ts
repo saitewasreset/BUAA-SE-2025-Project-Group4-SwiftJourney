@@ -26,6 +26,11 @@ const router = createRouter({
       component: () => import('../views/Hotel/HotelPageView.vue'),
     },
     {
+      path: '/meal',
+      name: 'meal',
+      component: () => import('../views/MealPage/MealPageView.vue'),
+    },
+    {
       path: '/hotel/:id',
       name: 'hotelDetail',
       component: () => import('../views/Hotel/HotelDetailPageView.vue'),
