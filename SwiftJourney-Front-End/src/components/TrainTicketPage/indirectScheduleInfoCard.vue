@@ -484,10 +484,6 @@ const processedRouteSecondRide = computed(() => {
     }
   })
 })
-
-onBeforeMount(() => {
-  console.log('组件挂载，内容:', props.content)
-})
 </script>
 
 <style lang="css" scoped>
