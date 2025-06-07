@@ -1,5 +1,5 @@
 <template>
-    <div class="hotel-search"  style="height: 90vh;">
+    <div class="hotel-search">
         <div class="search-card" :style="isHeadPage ? 'margin-top: 30vh;' : 'margin-top: 15px;'">
             <img class="background-hotel-image" src="../../assets/hotel-image.png" alt="background hotel image">
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
@@ -636,6 +636,7 @@ roomList.value.forEach((key, index) => {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    height: 100%;
 }
 
 .search-card {
