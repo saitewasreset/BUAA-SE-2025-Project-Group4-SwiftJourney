@@ -47,9 +47,8 @@
                         <el-table class="DishInfoTable" :data="info.dishes" border >
                             <el-table-column label="图片">
                                 <template #default="scope">
-                                    <div class="FoodImageContainer">
-                                        <img class="FoodImage" :src="scope.row.picture" alt="food-image">
-                                    </div>
+                                    <img class="FoodImage" :src="scope.row.picture" alt="food-image"
+                                    @click="showImage(scope.row.picture)">
                                 </template>
                             </el-table-column>
                             <el-table-column prop="name" label="餐品名称"></el-table-column>
@@ -263,6 +262,10 @@ const lunchChange = (time: ('lunch' | 'dinner')[]) => {
     return str;
 }
 
+const showImage = (src: string) => {
+    window.open(src, '_blank');
+}
+
 </script>
 
 <style scoped>
@@ -383,6 +386,10 @@ const lunchChange = (time: ('lunch' | 'dinner')[]) => {
 }
 ::v-deep(.el-table .el-table__cell) {
     text-align: center;
+    padding: 0;
+}
+::v-deep(.el-table .cell) {
+    padding: 0;
 }
 .DishInfoTable {
     resize: none;
@@ -391,20 +398,11 @@ const lunchChange = (time: ('lunch' | 'dinner')[]) => {
     font-weight: bold;
 }
 
-.FoodImageContainer {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100px; 
-    height: 100px;
-    border-radius: 8px;
-    overflow: hidden;
-    cursor: pointer;
-}
 .FoodImage { 
     width: 100%;
     height: 100%;
     object-fit: cover;
+    cursor: pointer;
     transition: transform 0.3s ease;
 }
 .FoodImage:hover {
