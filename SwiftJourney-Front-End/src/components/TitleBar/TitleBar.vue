@@ -15,7 +15,7 @@
             <el-menu-item index="homepage">首页</el-menu-item>
             <el-menu-item index="trainTicket">车票</el-menu-item>
             <el-menu-item index="hotel">酒店</el-menu-item>
-            <el-menu-item index="trainmeal">火车餐</el-menu-item>
+            <el-menu-item index="meal">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
             <div v-if="!user.isLogin">
