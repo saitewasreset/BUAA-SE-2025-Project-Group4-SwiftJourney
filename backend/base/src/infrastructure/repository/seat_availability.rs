@@ -20,6 +20,7 @@
 //! - `occupied_seat`: 已占用座位表
 //! - `seat_type`: 座位类型表
 //! - `seat_type_mapping`: 座位类型映射表
+use crate::Verified;
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::{SeatType, SeatTypeId, SeatTypeName};
@@ -43,6 +44,7 @@ use sea_orm::{
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tracing::error;
 
 impl_db_id_from_u64!(SeatAvailabilityId, i32, "seat availability");
 
@@ -403,14 +405,18 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
         )
         .exec(&self.db)
         .await
+        .inspect_err(|e| error!("failed to insert seat availability: {}", e))
         .context("failed to insert seat availability")?;
 
-        crate::models::occupied_seat::Entity::insert_many(
-            seat_availability_active_model_pack.occupied_seat,
-        )
-        .exec(&self.db)
-        .await
-        .context("failed to insert occupied seat for seat availability")?;
+        if !seat_availability_active_model_pack.occupied_seat.is_empty() {
+            crate::models::occupied_seat::Entity::insert_many(
+                seat_availability_active_model_pack.occupied_seat,
+            )
+            .exec(&self.db)
+            .await
+            .inspect_err(|e| error!("failed to insert seat availability: {}", e))
+            .context("failed to insert occupied seat for seat availability")?;
+        }
 
         txn.commit().await.context("failed to commit transaction")?;
 
@@ -442,6 +448,18 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
                     seat_availability_do.train_schedule_id
                 )))?;
 
+                let train = crate::models::train::Entity::find_by_id(train_schedule_do.train_id)
+                    .one(&self.db)
+                    .await
+                    .context(format!(
+                        "failed to find train with id: {}",
+                        train_schedule_do.train_id
+                    ))?
+                    .ok_or(RepositoryError::InconsistentState(anyhow!(
+                        "Inconsistent: cannot find train with id: {}",
+                        train_schedule_do.train_id
+                    )))?;
+
                 let occupied_seat_do_list = crate::models::occupied_seat::Entity::find()
                     .filter(
                         crate::models::occupied_seat::Column::SeatAvailabilityId
@@ -457,10 +475,7 @@ impl DbRepositorySupport<SeatAvailability> for SeatAvailabilityRepositoryImpl {
                     .context("failed to find seat type")?;
 
                 let seat_type_mapping_do_list = crate::models::seat_type_mapping::Entity::find()
-                    .filter(
-                        crate::models::seat_type_mapping::Column::TrainTypeId
-                            .eq(train_schedule_do.train_id),
-                    )
+                    .filter(crate::models::seat_type_mapping::Column::TrainTypeId.eq(train.type_id))
                     .all(&self.db)
                     .await
                     .context("failed to find seat type mapping")?;
@@ -686,5 +701,110 @@ WHERE "seat_availability"."train_schedule_id" = $1;"#,
         }
 
         Ok(result)
+    }
+
+    async fn find_by_schedule_seat_type_station_range(
+        &self,
+        train_schedule_id: TrainScheduleId,
+        seat_type_id: SeatTypeId,
+        station_range: StationRange<Verified>,
+    ) -> Result<Option<SeatAvailability>, RepositoryError> {
+        let model = crate::models::seat_availability::Entity::find()
+            .filter(
+                crate::models::seat_availability::Column::TrainScheduleId
+                    .eq(train_schedule_id.to_db_value())
+                    .and(
+                        crate::models::seat_availability::Column::SeatTypeId
+                            .eq(seat_type_id.to_db_value()),
+                    )
+                    .and(
+                        crate::models::seat_availability::Column::BeginStationId
+                            .eq(station_range.get_from_station_id().to_db_value()),
+                    )
+                    .and(
+                        crate::models::seat_availability::Column::EndStationId
+                            .eq(station_range.get_to_station_id().to_db_value()),
+                    ),
+            )
+            .one(&self.db)
+            .await
+            .inspect_err(|_for_super_earth| error!("failed to find seat availability for train schedule id: {}, seat type id: {}, station range: {:?}",
+                train_schedule_id, seat_type_id, station_range))
+            .context(format!(
+                "failed to find seat availability for train schedule id: {}, seat type id: {}, station range: {:?}",
+                train_schedule_id, seat_type_id, station_range
+            ))?;
+
+        if let Some(model) = model {
+            let train_schedule_do =
+                crate::models::train_schedule::Entity::find_by_id(model.train_schedule_id)
+                    .one(&self.db)
+                    .await
+                    .context(format!(
+                        "failed to find train schedule with id: {}",
+                        model.train_schedule_id
+                    ))?
+                    .ok_or(RepositoryError::InconsistentState(anyhow!(
+                        "Inconsistent: cannot find train schedule with id: {}",
+                        model.train_schedule_id
+                    )))?;
+
+            let train_do = crate::models::train::Entity::find_by_id(train_schedule_do.train_id)
+                .one(&self.db)
+                .await
+                .context(format!(
+                    "failed to find train with id: {}",
+                    train_schedule_do.train_id
+                ))?
+                .ok_or(RepositoryError::InconsistentState(anyhow!(
+                    "Inconsistent: cannot find train with id: {}",
+                    train_schedule_do.train_id
+                )))?;
+
+            let occupied_seat_do_list = crate::models::occupied_seat::Entity::find()
+                .filter(crate::models::occupied_seat::Column::SeatAvailabilityId.eq(model.id))
+                .all(&self.db)
+                .await
+                .context("failed to find occupied seat")?;
+
+            let seat_type_do_list = crate::models::seat_type::Entity::find()
+                .all(&self.db)
+                .await
+                .context("failed to find seat type")?;
+
+            let seat_type_mapping_do_list = crate::models::seat_type_mapping::Entity::find()
+                .filter(crate::models::seat_type_mapping::Column::TrainTypeId.eq(train_do.type_id))
+                .all(&self.db)
+                .await
+                .context("failed to find seat type mapping")?;
+
+            let seat_type_map = seat_type_do_list
+                .into_iter()
+                .map(|item| (item.id, item))
+                .collect::<HashMap<_, _>>();
+
+            let mut seat_type_mapping_map: HashMap<
+                i32,
+                HashMap<i64, crate::models::seat_type_mapping::Model>,
+            > = HashMap::new();
+
+            for item in seat_type_mapping_do_list {
+                seat_type_mapping_map
+                    .entry(item.seat_type_id)
+                    .or_default()
+                    .insert(item.seat_id, item);
+            }
+
+            Ok(Some(SeatAvailabilityDataConverter::make_from_do(
+                SeatAvailabilityDoPack {
+                    seat_availability: model,
+                    occupied_seat: occupied_seat_do_list,
+                    seat_type: seat_type_map,
+                    seat_type_mapping: seat_type_mapping_map,
+                },
+            )?))
+        } else {
+            Ok(None)
+        }
     }
 }

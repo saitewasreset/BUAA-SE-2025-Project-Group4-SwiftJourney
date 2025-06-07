@@ -1,4 +1,9 @@
-use crate::domain::model::train_schedule::{Seat, SeatAvailabilityId, SeatLocationInfo};
+use crate::Verified;
+use crate::domain::model::personal_info::PersonalInfoId;
+use crate::domain::model::train::SeatType;
+use crate::domain::model::train_schedule::{
+    Seat, SeatAvailabilityId, SeatLocationInfo, StationRange, TrainSchedule,
+};
 use crate::domain::service::ServiceError;
 use async_trait::async_trait;
 use thiserror::Error;
@@ -12,9 +17,7 @@ pub enum TrainSeatServiceError {
     NoAvailableSeat,
     #[error("seat hasn't been reserved")]
     UnreservedSeat,
-    #[error("specified seat not in seat availability {0}")]
-    InvalidSeat(SeatAvailabilityId),
-    #[error("seat availability id {0} not found")]
+    #[error("invalid seat availability id: {0}")]
     InvalidSeatAvailability(SeatAvailabilityId),
 }
 
@@ -35,8 +38,11 @@ pub trait TrainSeatService: 'static + Send + Sync {
     /// - 标记占用相关区间
     async fn reserve_seat(
         &self,
-        seat_availability_id: SeatAvailabilityId,
+        train_schedule: &mut TrainSchedule,
+        station_range: StationRange<Verified>,
+        seat_type: SeatType,
         seat_location_info: SeatLocationInfo,
+        personal_info_id: PersonalInfoId,
     ) -> Result<Seat, TrainSeatServiceError>;
 
     /// 移除座位占用记录
