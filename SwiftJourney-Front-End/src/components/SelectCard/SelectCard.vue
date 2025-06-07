@@ -254,7 +254,7 @@ function suggestionsWithType(chineseString: string, otherString: string, stringS
 function pinyinCmp(pinyins: string[], pinYin: string, suggestions: string[], pinYinMapCity: { [key: string]: string[] }) {
     pinyins.forEach((value) => {
         const templateParts = value.split(" ");
-        const testParts = pinYin.split(" ");
+        const testParts = pinYin.trim().split(" ");
         if (testParts.length <= templateParts.length) {
             let flag = true;
             // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
