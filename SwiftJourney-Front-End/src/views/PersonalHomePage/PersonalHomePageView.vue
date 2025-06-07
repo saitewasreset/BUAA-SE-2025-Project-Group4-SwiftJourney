@@ -40,6 +40,7 @@ import AccountSecurity from '@/components/PersonalHomeElMenu/AccountSecurity.vue
 import PersonalData from '@/components/PersonalHomeElMenu/PersonalData.vue';
 import PrefilledInformation from '@/components/PersonalHomeElMenu/PrefilledInformation.vue';
 import TransactionRecord from '@/components/PersonalHomeElMenu/TransactionRecord.vue';
+import TravelPlan from '@/components/PersonalHomeElMenu/TravelPlan.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -65,6 +66,7 @@ const items: ItemType[] = reactive([
   getItem('个人资料', 'personaldata',h(TeamOutlined)),
   getItem('账户安全', 'accountsecurity', h(LockOutlined)),
   getItem('预填信息', 'prefilledinformation', h(EditOutlined)),
+  getItem('行程', 'travelplan', h(MoneyCollectOutlined)),
   getItem('交易记录', 'transactionrecord', h(AuditOutlined))
 ]);
 
@@ -72,6 +74,7 @@ const pageRefs: Array<{ label: string; ref: Component }> = [
   {label: 'personaldata', ref: PersonalData},
   {label: 'accountsecurity', ref: AccountSecurity},
   {label: 'prefilledinformation', ref: PrefilledInformation},
+  {label: 'travelplan', ref: TravelPlan},
   {label: 'transactionrecord', ref: TransactionRecord}
 ];
 
@@ -101,6 +104,7 @@ const validTabs = [
   'personaldata',
   'accountsecurity',
   'prefilledinformation',
+  'travelplan',
   'transactionrecord'
 ];
 
@@ -138,6 +142,8 @@ watch(
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  /* 移除侧边栏弹出动画 */
+  /* animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1); */
 }
 
 .sidebar-container::before {
@@ -297,6 +303,8 @@ watch(
   overflow-y: auto;
   background: transparent;
   position: relative;
+  /* 保留内容区的向上淡入动画 */
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 滚动条样式 */
@@ -405,7 +413,8 @@ watch(
 }
 
 /* 动画效果 */
-@keyframes slideInLeft {
+/* 移除左侧弹出动画，但保留其他动画 */
+/* @keyframes slideInLeft {
   from {
     transform: translateX(-100%);
     opacity: 0;
@@ -414,7 +423,7 @@ watch(
     transform: translateX(0);
     opacity: 1;
   }
-}
+} */
 
 @keyframes fadeInUp {
   from {
@@ -427,22 +436,15 @@ watch(
   }
 }
 
-.sidebar-container {
-  animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.content-container {
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.custom-menu :deep(.ant-menu-item) {
+/* 移除菜单项的进入动画 */
+/* .custom-menu :deep(.ant-menu-item) {
   animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
+} */
 
-.custom-menu :deep(.ant-menu-item:nth-child(1)) { animation-delay: 0.1s; }
+/* .custom-menu :deep(.ant-menu-item:nth-child(1)) { animation-delay: 0.1s; }
 .custom-menu :deep(.ant-menu-item:nth-child(2)) { animation-delay: 0.15s; }
 .custom-menu :deep(.ant-menu-item:nth-child(3)) { animation-delay: 0.2s; }
-.custom-menu :deep(.ant-menu-item:nth-child(4)) { animation-delay: 0.25s; }
+.custom-menu :deep(.ant-menu-item:nth-child(4)) { animation-delay: 0.25s; } */
 
 /* 深色模式支持 */
 @media (prefers-color-scheme: dark) {
