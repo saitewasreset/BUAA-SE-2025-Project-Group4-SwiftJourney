@@ -158,22 +158,24 @@ where
             }
         }
 
-        let tx = self
-            .train_booking_service
-            .booking_group(to_booking_order_id_list, message_pack.atomic)
-            .await
-            .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
-
-        if !tx.is_empty() {
-            let tx_list_boxed = tx
-                .into_iter()
-                .map(|tx| Box::new(tx) as Box<dyn Order>)
-                .collect::<Vec<_>>();
-
-            self.transaction_service
-                .refund_transaction(message_pack.transaction_uuid, &tx_list_boxed)
+        if !to_booking_order_id_list.is_empty() {
+            let tx = self
+                .train_booking_service
+                .booking_group(to_booking_order_id_list, message_pack.atomic)
                 .await
                 .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
+
+            if !tx.is_empty() {
+                let tx_list_boxed = tx
+                    .into_iter()
+                    .map(|tx| Box::new(tx) as Box<dyn Order>)
+                    .collect::<Vec<_>>();
+
+                self.transaction_service
+                    .refund_transaction(message_pack.transaction_uuid, &tx_list_boxed)
+                    .await
+                    .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
+            }
         }
 
         for order_uuid in to_cancel_order_id_list {
