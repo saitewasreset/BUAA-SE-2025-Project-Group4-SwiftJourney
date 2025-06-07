@@ -713,17 +713,46 @@ impl TrainRepository for TrainRepositoryImpl {
                 e
             })?;
 
-        let r = crate::models::seat_type_in_train_type::Entity::find()
-            .find_with_related(crate::models::seat_type::Entity)
+        let seat_type_to_train_type_list = crate::models::seat_type_in_train_type::Entity::find()
             .all(&self.db)
             .await
-            .inspect_err(|e| error!("failed to query seat_type: {}", e))
+            .inspect_err(|e| error!("failed to query seat type mapping: {}", e))
+            .context("failed to query seat type mapping")?;
+
+        let seat_type_list = crate::models::seat_type::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("failed to query seat type: {}", e))
             .context("failed to query seat type")?;
 
-        let seat_type_map = r
+        let seat_type_id_to_model = seat_type_list
             .into_iter()
-            .map(|(x, seat_type_list)| (x.train_type_id, seat_type_list))
+            .map(|x| (x.id, x))
             .collect::<HashMap<_, _>>();
+
+        let mut seat_type_map: HashMap<i32, Vec<crate::models::seat_type::Model>> = HashMap::new();
+
+        for item in seat_type_to_train_type_list {
+            let seat_type_model = seat_type_id_to_model
+                .get(&item.seat_type_id)
+                .ok_or_else(|| {
+                    error!(
+                        "Inconsistent: no seat type for seat type id: {}",
+                        item.seat_type_id
+                    );
+
+                    RepositoryError::InconsistentState(anyhow!(
+                        "Inconsistent: no seat type for seat type id: {}",
+                        item.seat_type_id
+                    ))
+                })?
+                .clone();
+
+            seat_type_map
+                .entry(item.train_type_id)
+                .or_default()
+                .push(seat_type_model);
+        }
 
         self.query_trains_cached(|q| q, &train_type_map, &seat_type_map)
             .await
