@@ -1,7 +1,9 @@
 use crate::domain::RepositoryError;
 use crate::domain::model::order::Order;
+use crate::domain::model::user::UserId;
 use crate::domain::service::order::order_dto::OrderInfoDto;
 use async_trait::async_trait;
+use sea_orm::prelude::DateTimeWithTimeZone;
 
 pub mod order_dto {
     use serde::Serialize;
@@ -117,4 +119,11 @@ pub trait OrderService: 'static + Send + Sync {
         &self,
         order: Box<dyn Order>,
     ) -> Result<OrderInfoDto, RepositoryError>;
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_time: DateTimeWithTimeZone,
+    ) -> Result<bool, RepositoryError>;
 }
