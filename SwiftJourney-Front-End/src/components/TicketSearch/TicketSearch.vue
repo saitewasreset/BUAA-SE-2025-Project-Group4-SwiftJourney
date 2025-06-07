@@ -178,10 +178,11 @@ const cityInput = computed(() => {
   return selectedInputId.value === 'DepartureCityInput' ? departureCity.value : arrivalCity.value
 })
 
-function swapCitys() {
+async function swapCitys() {
   const temp = departureCity.value
   departureCity.value = arrivalCity.value
   arrivalCity.value = temp
+  await ticketServiceStore.querySchedule()
 }
 
 const inputRef = ref<HTMLElement | undefined>(undefined)
