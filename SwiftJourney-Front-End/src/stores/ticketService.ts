@@ -516,7 +516,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
               return []
             }),
           ),
-        )
+        ).sort()
         this.checkGroups[CheckType.SeatType].checkedList =
           this.checkGroups[CheckType.SeatType].options
         this.checkGroups[CheckType.SeatType].indeterminate = false
@@ -536,7 +536,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
               return []
             }),
           ),
-        )
+        ).sort()
         this.checkGroups[CheckType.DepartureStation].checkedList =
           this.checkGroups[CheckType.DepartureStation].options
         this.checkGroups[CheckType.DepartureStation].indeterminate = false
@@ -553,7 +553,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
                 return []
               }),
             ),
-          )
+          ).sort()
           this.checkGroups[CheckType.TransferStation].checkedList =
             this.checkGroups[CheckType.TransferStation].options
           this.checkGroups[CheckType.TransferStation].indeterminate = false
@@ -574,20 +574,20 @@ export const useTicketServiceStore = defineStore('ticketService', {
               return []
             }),
           ),
-        )
+        ).sort()
         this.checkGroups[CheckType.ArrivalStation].checkedList =
           this.checkGroups[CheckType.ArrivalStation].options
         this.checkGroups[CheckType.ArrivalStation].indeterminate = false
         this.checkGroups[CheckType.ArrivalStation].checkAll = true
         message.success('查询成功')
       } else if (res.code === 403) {
-        message.error('查询直达车次失败: 无效的 session_id')
+        message.error('查询失败: 无效的 session_id')
       } else if (res.code === 404) {
-        message.error('查询直达车次失败: 无效的城市或车站名称')
+        message.error('查询失败: 无效的城市或车站名称')
       } else if (res.code === 12001) {
-        message.error('查询直达车次失败: 查询字段不符合要求，请将问题报告给开发人员')
+        message.error('查询失败: 查询字段不符合要求，请将问题报告给开发人员')
       } else {
-        message.error(`查询直达车次失败: 未知错误`)
+        message.error(`查询失败: 未知错误`)
       }
     },
   },
