@@ -17,30 +17,35 @@
         </a-radio-group>
       </div>
 
-            <!-- 主要搜索区域 -->
-            <div class="search-container">
-                <!-- 城市选择区域 -->
-                <div class="city-selection-wrapper">
-                    <!-- <CitySelect 
+      <!-- 主要搜索区域 -->
+      <div class="search-container">
+        <!-- 城市选择区域 -->
+        <div class="city-selection-wrapper">
+          <!-- <CitySelect 
                         v-if="isCurChooseRefActive"
                         :el="inputRef"
                         @handleCityClick="handleCityClick"
                     /> -->
-                    <CitySelect v-if="isCurChooseRefActive" :el="inputRef" :input="cityInput"  @handleCityClick="handleCityClick"/>
-                    <div class="city-selection">
-                        <!-- 出发城市 -->
-                        <div class="city-input-group departure">
-                            <label class="city-label">出发城市</label>
-                            <a-input
-                                id="DepartureCityInput"
-                                @Focus="handleInputFocus('DepartureCityInput')"
-                                class="city-input"
-                                :bordered="false"
-                                size="large"
-                                v-model:value="departureCity"
-                                placeholder="请选择出发城市"
-                            />
-                        </div>
+          <CitySelect
+            v-if="isCurChooseRefActive"
+            :el="inputRef"
+            :input="cityInput"
+            @handleCityClick="handleCityClick"
+          />
+          <div class="city-selection">
+            <!-- 出发城市 -->
+            <div class="city-input-group departure">
+              <label class="city-label">出发城市</label>
+              <a-input
+                id="DepartureCityInput"
+                @Focus="handleInputFocus('DepartureCityInput')"
+                class="city-input"
+                :bordered="false"
+                size="large"
+                v-model:value="departureCity"
+                placeholder="请选择出发城市"
+              />
+            </div>
 
             <!-- 交换按钮 -->
             <div class="swap-button-wrapper">
@@ -169,9 +174,9 @@ const arrivalCity = computed({
     ticketServiceStore.queryArrivalText = value
   },
 })
-    const cityInput = computed(() => {
-        return selectedInputId.value === 'DepartureCityInput' ? departureCity.value : arrivalCity.value;
-    });
+const cityInput = computed(() => {
+  return selectedInputId.value === 'DepartureCityInput' ? departureCity.value : arrivalCity.value
+})
 
 function swapCitys() {
   const temp = departureCity.value
@@ -196,8 +201,7 @@ async function handleInputFocus(id: string) {
   isCurChooseRefActive.value = true
 }
 
-function handleCityClick(item: Object) {
-  const cityName: string = item.cityName
+function handleCityClick(cityName: string) {
   if (selectedInputId.value === 'DepartureCityInput') {
     departureCity.value = cityName
   } else if (selectedInputId.value === 'ArrivalCityInput') {
