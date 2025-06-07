@@ -11,6 +11,7 @@ export interface TransactionData {
 }
 
 export interface OrderInfo {
+  orders: any;
   orderId: string;
   status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "cancelled";
   unitPrice: number;

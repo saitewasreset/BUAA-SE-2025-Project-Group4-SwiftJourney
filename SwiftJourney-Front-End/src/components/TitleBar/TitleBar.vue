@@ -53,6 +53,7 @@
                             </div>
 
                             <div class="UserButtonLine">
+                                <el-button link plain @click="goToTravelPlanPage">行程</el-button>
                                 <el-button link plain @click="goToTransactionRecordPage">交易记录</el-button>
                             </div>
                         </div>
@@ -135,6 +136,10 @@
 
     function goToPrefilledIforPage() {
         router.push({name: 'personalhomepage', params: { activeIndex: 'prefilledinformation' }});
+    }
+
+    function goToTravelPlanPage() {
+        router.push({ name: 'personalhomepage', params: { activeIndex: 'travelplan' }});
     }
 
     function goToTransactionRecordPage() {
@@ -458,12 +463,18 @@
     position: relative;
 }
 
-.UserButtonLine:last-child {
+/* .UserButtonLine:last-child {
     grid-template-columns: 1fr;
     padding: 8px 16px 16px;
     border-top: 1px solid rgba(226, 232, 240, 0.15);
     margin-top: 4px !important;
-}
+} */
+/* .UserButtonLine {
+    grid-template-columns: 1fr;
+    padding: 8px 16px 16px;
+    border-top: 1px solid rgba(226, 232, 240, 0.15);
+    margin-top: 4px !important;
+} */
 
 .UserButtonLine .el-button {
     font-size: 11px !important;

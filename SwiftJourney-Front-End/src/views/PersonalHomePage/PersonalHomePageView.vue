@@ -40,6 +40,7 @@ import AccountSecurity from '@/components/PersonalHomeElMenu/AccountSecurity.vue
 import PersonalData from '@/components/PersonalHomeElMenu/PersonalData.vue';
 import PrefilledInformation from '@/components/PersonalHomeElMenu/PrefilledInformation.vue';
 import TransactionRecord from '@/components/PersonalHomeElMenu/TransactionRecord.vue';
+import TravelPlan from '@/components/PersonalHomeElMenu/TravelPlan.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -65,6 +66,7 @@ const items: ItemType[] = reactive([
   getItem('个人资料', 'personaldata',h(TeamOutlined)),
   getItem('账户安全', 'accountsecurity', h(LockOutlined)),
   getItem('预填信息', 'prefilledinformation', h(EditOutlined)),
+  getItem('行程', 'travelplan', h(MoneyCollectOutlined)),
   getItem('交易记录', 'transactionrecord', h(AuditOutlined))
 ]);
 
@@ -72,6 +74,7 @@ const pageRefs: Array<{ label: string; ref: Component }> = [
   {label: 'personaldata', ref: PersonalData},
   {label: 'accountsecurity', ref: AccountSecurity},
   {label: 'prefilledinformation', ref: PrefilledInformation},
+  {label: 'travelplan', ref: TravelPlan},
   {label: 'transactionrecord', ref: TransactionRecord}
 ];
 
@@ -101,6 +104,7 @@ const validTabs = [
   'personaldata',
   'accountsecurity',
   'prefilledinformation',
+  'travelplan',
   'transactionrecord'
 ];
 
