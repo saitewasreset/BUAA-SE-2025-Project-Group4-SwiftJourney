@@ -11,8 +11,9 @@ export interface TransactionData {
 }
 
 export interface OrderInfo {
+  orders: any;
   orderId: string;
-  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "canceled";
+  status: "unpaid" | "paid" | "ongoing" | "active" | "completed" | "failed" | "cancelled";
   unitPrice: number;
   amount: number;
   orderType: "train" | "hotel" | "dish" | "takeaway";
@@ -137,4 +138,10 @@ export interface FoodOrderDetail extends OrderDetail {
     station: string, //送餐车站(外卖)
     date: string, //日期
     time: string, //送餐时间
+}
+
+export interface TransactionInfo {
+  transactionId: string;
+  amount: number;
+  status: "unpaid" | "paid";
 }

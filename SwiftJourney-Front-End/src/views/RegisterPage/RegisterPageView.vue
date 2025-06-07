@@ -1,121 +1,172 @@
 <template>
   <div class="root">
     <div class="left-area">
-      <img src="../../assets/railway.svg" class="logo" />
-      <p class="title">风行旅途</p>
+      <div class="brand-section">
+        <div class="logo-container">
+          <img src="../../assets/railway.svg" class="logo" />
+          <div class="logo-glow"></div>
+        </div>
+        <h1 class="title">风行旅途</h1>
+        <p class="subtitle">开启您的专属旅程</p>
+      </div>
+      <div class="decorative-elements">
+        <div class="floating-circle circle-1"></div>
+        <div class="floating-circle circle-2"></div>
+        <div class="floating-circle circle-3"></div>
+      </div>
     </div>
-    <a-card class="card">
-      <div class="card-title">
-        <a-tooltip title="返回首页">
-          <ArrowLeftOutlined @click="goToHomePage" class="card-title icon" />
-        </a-tooltip>
-        <p class="card-title text">注册</p>
-      </div>
-      <div>
-        <a-input
-          v-model:value="inputPhone"
-          type="string"
-          :allowClear="true"
-          placeholder="手机号"
-          class="input"
-          :status="inputPhoneStatus"
-          @input="checkPhoneNumber"
-          @change="checkPhoneNumber"
-        >
-          <template #prefix>
-            <TabletOutlined class="icon" />
-          </template>
-        </a-input>
-        <p class="input-error" v-if="inputPhoneError">{{ phoneErrorMsg }}</p>
-        <a-input
-          v-model:value="inputNickName"
-          type="string"
-          :allowClear="true"
-          placeholder="用户名"
-          class="input"
-          :status="inputNickNameStatus"
-          @input="checkNickName"
-          @change="checkNickName"
-        >
-          <template #prefix>
-            <UserOutlined class="icon" />
-          </template>
-        </a-input>
-        <p class="input-error" v-if="inputNickNameError">{{ nickNameErrorMsg }}</p>
-        <a-tooltip
-          title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的两种，且不能包含空格"
-          placement="right"
-        >
-          <a-input-password
-            v-model:value="inputPassword"
-            type="string"
-            :allowClear="true"
-            placeholder="密码"
-            class="input"
-            @input="checkInput"
-            @change="checkInput"
-            :status="inputPasswordStatus"
-          >
-            <template #prefix>
-              <LockOutlined class="icon" />
-            </template>
-          </a-input-password>
-        </a-tooltip>
-        <p class="input-error" v-if="inputPasswordError">{{ passwordErrorMsg }}</p>
-        <a-input-password
-          v-model:value="inputConfirmPassword"
-          type="string"
-          :allowClear="true"
-          placeholder="确认密码"
-          class="input"
-          @input="checkInput"
-          @change="checkInput"
-          :status="inputConfirmPasswordStatus"
-        >
-          <template #prefix>
-            <LockOutlined class="icon" />
-          </template>
-        </a-input-password>
-        <p class="input-error" v-if="inputConfirmPasswordError">{{ confirmPasswordErrorMsg }}</p>
-        <a-input
-          v-model:value="inputName"
-          type="string"
-          :allowClear="true"
-          placeholder="真实姓名"
-          class="input"
-        >
-          <template #prefix>
-            <TagOutlined class="icon" />
-          </template>
-        </a-input>
-        <a-input
-          v-model:value="inputIdNumber"
-          type="string"
-          :allowClear="true"
-          placeholder="身份证号"
-          class="input"
-          :status="inputIdNumberStatus"
-          @input="checkIdNumber"
-          @change="checkIdNumber"
-        >
-          <template #prefix>
-            <IdcardOutlined class="icon" />
-          </template>
-        </a-input>
-        <p class="input-error" v-if="inputIdNumberError">{{ idNumberErrorMsg }}</p>
-      </div>
+    
+    <div class="right-area">
+      <a-card class="card">
+        <div class="card-header">
+          <h2 class="card-title">创建账户</h2>
+          <p class="card-subtitle">加入我们，开始您的旅行之旅</p>
+        </div>
+        
+        <div class="form-section">
+          <div class="input-group">
+            <label class="input-label">手机号</label>
+            <a-input
+              v-model:value="inputPhone"
+              type="string"
+              :allowClear="true"
+              placeholder="请输入手机号"
+              class="input"
+              size="large"
+              :status="inputPhoneStatus"
+              @input="checkPhoneNumber"
+              @change="checkPhoneNumber"
+            >
+              <template #prefix>
+                <TabletOutlined class="input-icon" />
+              </template>
+            </a-input>
+            <p class="input-error" v-if="inputPhoneError">{{ phoneErrorMsg }}</p>
+          </div>
+          
+          <div class="input-group">
+            <label class="input-label">用户名</label>
+            <a-input
+              v-model:value="inputNickName"
+              type="string"
+              :allowClear="true"
+              placeholder="请输入用户名"
+              class="input"
+              size="large"
+              :status="inputNickNameStatus"
+              @input="checkNickName"
+              @change="checkNickName"
+            >
+              <template #prefix>
+                <UserOutlined class="input-icon" />
+              </template>
+            </a-input>
+            <p class="input-error" v-if="inputNickNameError">{{ nickNameErrorMsg }}</p>
+          </div>
+          
+          <div class="input-group">
+            <label class="input-label">密码</label>
+            <a-tooltip
+              title="密码长度应在8-20位之间，至少包含大小写字母、数字或特殊符号中的两种，且不能包含空格"
+              placement="right"
+            >
+              <a-input-password
+                v-model:value="inputPassword"
+                type="string"
+                :allowClear="true"
+                placeholder="请输入密码"
+                class="input"
+                size="large"
+                @input="checkInput"
+                @change="checkInput"
+                :status="inputPasswordStatus"
+              >
+                <template #prefix>
+                  <LockOutlined class="input-icon" />
+                </template>
+              </a-input-password>
+            </a-tooltip>
+            <p class="input-error" v-if="inputPasswordError">{{ passwordErrorMsg }}</p>
+          </div>
+          
+          <div class="input-group">
+            <label class="input-label">确认密码</label>
+            <a-input-password
+              v-model:value="inputConfirmPassword"
+              type="string"
+              :allowClear="true"
+              placeholder="请再次输入密码"
+              class="input"
+              size="large"
+              @input="checkInput"
+              @change="checkInput"
+              :status="inputConfirmPasswordStatus"
+            >
+              <template #prefix>
+                <LockOutlined class="input-icon" />
+              </template>
+            </a-input-password>
+            <p class="input-error" v-if="inputConfirmPasswordError">{{ confirmPasswordErrorMsg }}</p>
+          </div>
+          
+          <div class="input-row">
+            <div class="input-group half-width">
+              <label class="input-label">真实姓名</label>
+              <a-input
+                v-model:value="inputName"
+                type="string"
+                :allowClear="true"
+                placeholder="请输入真实姓名"
+                class="input"
+                size="large"
+              >
+                <template #prefix>
+                  <TagOutlined class="input-icon" />
+                </template>
+              </a-input>
+            </div>
+            
+            <div class="input-group half-width">
+              <label class="input-label">身份证号</label>
+              <a-input
+                v-model:value="inputIdNumber"
+                type="string"
+                :allowClear="true"
+                placeholder="请输入身份证号"
+                class="input"
+                size="large"
+                :status="inputIdNumberStatus"
+                @input="checkIdNumber"
+                @change="checkIdNumber"
+              >
+                <template #prefix>
+                  <IdcardOutlined class="input-icon" />
+                </template>
+              </a-input>
+            </div>
+          </div>
+          <p class="input-error" v-if="inputIdNumberError">{{ idNumberErrorMsg }}</p>
+        </div>
 
-      <div>
-        <a-button @click="goToLoginPage" class="button left">登录</a-button>
-        <a-button
-          type="primary"
-          @click="postRegisterMsg"
-          class="button right"
-          :disabled="disableRegister"
-          >注册</a-button
-        >
-      </div>
-    </a-card>
+        <div class="button-section">
+          <a-button
+            type="primary"
+            @click="postRegisterMsg"
+            class="register-button"
+            size="large"
+            :disabled="disableRegister"
+            :loading="isLoading"
+          >
+            注册
+          </a-button>
+          
+          <div class="login-section">
+            <span class="login-text">已有账户？</span>
+            <a @click="goToLoginPage" class="login-link">立即登录</a>
+          </div>
+        </div>
+      </a-card>
+    </div>
   </div>
 </template>
 
@@ -140,6 +191,18 @@ const inputPassword = ref('')
 const inputConfirmPassword = ref('')
 const inputName = ref('')
 const inputIdNumber = ref('')
+const isLoading = ref(false)
+
+interface UpdatePersonalInfo {
+  // 姓名
+  name?: string;
+  // 身份证号
+  identityCardId: string;
+  // 偏好座位位置
+  preferredSeatLocation?: "A" | "B" | "C" | "D" | "F";
+  // 是否为默认个人资料，即，当前用户的身份
+  default?: boolean;
+}
 
 // -------------------- 使用 Vue Router 进行路由导航 --------------------
 
@@ -156,40 +219,54 @@ function goToLoginPage() {
 // -------------------- 处理注册逻辑 --------------------
 
 async function postRegisterMsg() {
-  console.log(
-    'post register message: ' +
-      inputPhone.value +
-      ' ' +
-      inputPassword.value +
-      ' ' +
-      inputConfirmPassword.value,
-  )
-  const params: Object = {
-    phone: inputPhone.value,
-    username: inputNickName.value,
-    // 明文密码
-    password: inputPassword.value,
-    // 姓名
-    name: inputName.value,
-    // 身份证号
-    identityCardId: inputIdNumber.value,
-  };
-  const res: UserApiResponseData = (await userApi.userRegister(params)).data;
-  if (res.code === 200) {
-    message.success('注册成功')
-    router.push({ name: 'login' })
-  } else if (res.code === 13001) {
-    message.error('身份证号格式错误')
-  } else if (res.code === 15001) {
-    message.error('该手机号对应的用户已经存在')
-  } else if (res.code === 15003) {
-    message.error('用户名格式错误')
-  } else if (res.code === 15004) {
-    message.error('密码格式错误')
-  } else if (res.code === 15005) {
-    message.error('姓名格式错误')
-  } else {
-    message.error('其他错误');
+  if (!inputPhone.value || !inputPassword.value || !inputConfirmPassword.value || 
+      !inputNickName.value || !inputIdNumber.value || !inputName.value) {
+    message.warning('请填写完整信息')
+    return
+  }
+  
+  isLoading.value = true
+  
+  try {
+    console.log(
+      'post register message: ' +
+        inputPhone.value +
+        ' ' +
+        inputPassword.value +
+        ' ' +
+        inputConfirmPassword.value,
+    )
+    const params: Object = {
+      phone: inputPhone.value,
+      username: inputNickName.value,
+      // 明文密码
+      password: inputPassword.value,
+      // 姓名
+      name: inputName.value,
+      // 身份证号
+      identityCardId: inputIdNumber.value,
+    };
+    const res: UserApiResponseData = (await userApi.userRegister(params)).data;
+    if (res.code === 200) {
+      message.success('注册成功');
+      router.push({ name: 'login' }) 
+    } else if (res.code === 13001) {
+      message.error('身份证号格式错误')
+    } else if (res.code === 15001) {
+      message.error('该手机号对应的用户已经存在')
+    } else if (res.code === 15003) {
+      message.error('用户名格式错误')
+    } else if (res.code === 15004) {
+      message.error('密码格式错误')
+    } else if (res.code === 15005) {
+      message.error('姓名格式错误')
+    } else {
+      message.error('其他错误');
+    }
+  } catch (error) {
+    message.error('网络错误，请稍后重试')
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -460,90 +537,382 @@ const disableRegister = computed(() => {
 })
 </script>
 
-<style lang="css" scoped>
-/* 整体背景颜色 */
-body {
-  background-color: #f0f2f5;
-}
+<style lang="scss" scoped>
+// 渐变色变量
+$primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+$secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+$card-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.8) 100%);
+
+// 颜色变量
+$primary-color: #667eea;
+$secondary-color: #764ba2;
+$text-primary: #2c3e50;
+$text-secondary: #7f8c8d;
+$border-color: #e1e8ed;
+$success-color: #27ae60;
+$error-color: #e74c3c;
 
 .root {
+  min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
-}
-
-/* 左侧元素样式 */
-.left-area {
-  align-self: center;
-  margin-left: 40%;
-}
-
-.logo {
-  width: 100px;
-  height: 100px;
-}
-
-.title {
-  font-size: 48px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 20px;
-}
-
-/* 卡片容器的样式 */
-.card {
-  width: 400px;
-  padding: 20px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  background-color: white;
-  margin-left: 5%;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.card-title.icon {
-  font-size: 16px;
-  margin-right: 12px;
-}
-
-.card-title.text {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-}
-
-/* 输入框和标签的样式 */
-.input {
-  width: 100%;
-  height: 40px;
-  font-size: 16px;
-  margin-bottom: 20px;
-  .icon {
-    margin-right: 8px;
+  background: $primary-gradient;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="0.5" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  :deep(.ant-card-body) {
+    padding: 0; // 去除默认内边距
+    overflow: hidden;
   }
 }
 
-.input-error {
-  color: #ff4d4f;
-  font-size: 10px;
-  margin-top: -16px;
-  margin-left: 10px;
+.left-area {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem; // 从 2rem 减少到 1.5rem
+  position: relative;
+  z-index: 2;
+  
+  .brand-section {
+    text-align: center;
+    
+    .logo-container {
+      position: relative;
+      margin-bottom: 2rem;
+      
+      .logo {
+        width: 120px;
+        height: 120px;
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+        transition: all 0.3s ease;
+        
+        &:hover {
+          transform: scale(1.05);
+        }
+      }
+      
+      .logo-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 140px;
+        height: 140px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+        border-radius: 50%;
+        animation: pulse 3s ease-in-out infinite;
+      }
+    }
+    
+    .title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: white;
+      margin: 0 0 1rem 0;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      letter-spacing: 2px;
+      background: linear-gradient(45deg, #fff, #f0f8ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.8);
+      margin: 0;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+  }
+  
+  .decorative-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    
+    .floating-circle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      animation: float 6s ease-in-out infinite;
+      
+      &.circle-1 {
+        width: 80px;
+        height: 80px;
+        top: 20%;
+        left: 20%;
+        animation-delay: 0s;
+      }
+      
+      &.circle-2 {
+        width: 60px;
+        height: 60px;
+        top: 60%;
+        right: 30%;
+        animation-delay: 2s;
+      }
+      
+      &.circle-3 {
+        width: 40px;
+        height: 40px;
+        bottom: 20%;
+        left: 10%;
+        animation-delay: 4s;
+      }
+    }
+  }
 }
 
-/* 设置按钮样式 */
-.button {
-  width: 45%;
-  height: 40px;
-  font-size: 16px;
-  margin-top: 16px;
+.right-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem; // 从 2rem 减少到 1.5rem
+  position: relative;
+  z-index: 2;
 }
-.button.left {
-  margin-right: 5%;
+
+.card {
+  width: 520px;
+  max-height: 90vh;
+  padding: 2rem 1.5rem; // 左右内边距从 2rem 减少到 1.5rem
+  border-radius: 24px;
+  background: $card-gradient;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 32px 64px rgba(0, 0, 0, 0.15),
+    0 16px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+      0 40px 80px rgba(0, 0, 0, 0.2),
+      0 20px 40px rgba(0, 0, 0, 0.15);
+  }
+  
+  .card-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    
+    .card-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: $text-primary;
+      margin: 0 0 0.3rem 0;
+      background: linear-gradient(135deg, $primary-color, $secondary-color);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .card-subtitle {
+      font-size: 0.95rem;
+      color: $text-secondary;
+      margin: 0;
+      font-weight: 400;
+    }
+  }
+  
+  .form-section {
+    .input-group {
+      margin-bottom: 1.2rem;
+      
+      &.half-width {
+        width: calc(50% - 0.5rem);
+      }
+      
+      .input-label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: 0.4rem;
+        letter-spacing: 0.5px;
+      }
+      
+      .input {
+        border-radius: 12px;
+        border: 2px solid $border-color;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.8);
+        
+        &:hover {
+          border-color: rgba($primary-color, 0.5);
+          box-shadow: 0 4px 12px rgba($primary-color, 0.1);
+        }
+        
+        &:focus-within {
+          border-color: $primary-color;
+          box-shadow: 0 0 0 4px rgba($primary-color, 0.1);
+          background: white;
+        }
+        
+        .input-icon {
+          color: $text-secondary;
+          transition: color 0.3s ease;
+        }
+        
+        &:focus-within .input-icon {
+          color: $primary-color;
+        }
+      }
+    }
+    
+    .input-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+    
+    .input-error {
+      color: $error-color;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      margin-left: 0.5rem;
+      font-weight: 500;
+    }
+  }
+  
+  .button-section {
+    margin-top: 1.5rem;
+    
+    .register-button {
+      width: 100%;
+      height: 48px;
+      border-radius: 12px;
+      background: $primary-gradient;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 16px rgba($primary-color, 0.3);
+      
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba($primary_color, 0.4);
+        background: linear-gradient(135deg, lighten($primary-color, 5%) 0%, lighten($secondary-color, 5%) 100%);
+      }
+      
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+      
+      &:disabled {
+        background: linear-gradient(135deg, #ccc 0%, #bbb 100%);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+    }
+    
+    .login-section {
+      text-align: center;
+      margin-top: 1.5rem;
+      
+      .login-text {
+        color: $text-secondary;
+        font-size: 0.9rem;
+        margin-right: 0.5rem;
+      }
+      
+      .login-link {
+        color: $primary-color;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        
+        &:hover {
+          color: $secondary-color;
+          text-decoration: underline;
+        }
+      }
+    }
+  }
 }
-.button.right {
-  margin-left: 5%;
+
+// 动画
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-20px) rotate(120deg);
+  }
+  66% {
+    transform: translateY(20px) rotate(240deg);
+  }
+}
+
+// 响应式设计
+@media (max-width: 1024px) {
+  .root {
+    grid-template-columns: 1fr;
+    
+    .left-area {
+      display: none;
+    }
+    
+    .right-area {
+      padding: 0.8rem; // 从 1rem 减少到 0.8rem
+    }
+    
+    .card {
+      width: 100%;
+      max-width: 480px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 2rem 1rem; // 左右内边距从 1.5rem 减少到 1rem
+    border-radius: 16px;
+    
+    .card-header .card-title {
+      font-size: 1.5rem;
+    }
+    
+    .form-section .input-row {
+      flex-direction: column;
+      gap: 0;
+      
+      .input-group.half-width {
+        width: 100%;
+      }
+    }
+  }
 }
 </style>

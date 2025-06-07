@@ -1,303 +1,592 @@
 <template>
-    <!-- TODO: 设置日期可以选择的时间 -->
-    <div class="TicketSearch">
-        <el-card shadow="always">
-            <div class="SelectTicketMode">
-                <a-radio-group :value="selectedTicketMode" @change="handleSelectTicketMode" class="ModeRadio">
-                    <a-radio value="OneWay">直达</a-radio>
-                    <a-radio value="Transfer">中转</a-radio>
-                </a-radio-group>
+  <div class="ticket-search">
+    <el-card shadow="hover" class="search-card">
+      <!-- 票务模式选择 -->
+      <div class="ticket-mode-section">
+        <a-radio-group
+          :value="selectedTicketMode"
+          @change="handleSelectTicketMode"
+          class="mode-radio"
+        >
+          <a-radio value="direct">
+            <span class="mode-text">直达</span>
+          </a-radio>
+          <a-radio value="indirect">
+            <span class="mode-text">中转</span>
+          </a-radio>
+        </a-radio-group>
+      </div>
+
+      <!-- 主要搜索区域 -->
+      <div class="search-container">
+        <!-- 城市选择区域 -->
+        <div class="city-selection-wrapper">
+          <!-- <CitySelect 
+                        v-if="isCurChooseRefActive"
+                        :el="inputRef"
+                        @handleCityClick="handleCityClick"
+                    /> -->
+          <SelectCard
+            v-if="isCurChooseRefActive"
+            :el="inputRef"
+            :input="cityInput"
+            @handleCityClick="handleCityClick"
+          />
+          <div class="city-selection">
+            <!-- 出发城市 -->
+            <div class="city-input-group departure">
+              <label class="city-label">出发城市</label>
+              <a-input
+                id="DepartureCityInput"
+                @Focus="handleInputFocus('DepartureCityInput')"
+                class="city-input"
+                :bordered="false"
+                size="large"
+                v-model:value="departureCity"
+                placeholder="请选择出发城市"
+                @compositionupdate="handleCompositionUpdate"
+                @input="handleCityInput"
+              />
             </div>
-            <div class="SelectContainer">
-                <div class="SelectCity">
-                    <CitySelect 
-                    v-if="isCurChooseRefActive" 
-                    :el="inputRef"
-                    @handleCityClick="handleCityClick"
-                    />
-                    <div class="DepartureCity">
-                        <p>出发城市</p>
-                        <a-input
-                            id="DepartureCityInput"
-                            @Focus="handleInputFocus('DepartureCityInput')"
-                            class="CityInput"
-                            :bordered="false"
-                            size="large"
-                            v-model:value="departureCity"
-                            placeholder="出发城市"
-                            style="background-color: transparent; width: 100%;">
-                        </a-input>
-                    </div>
-                    <div class="SwapButton">
-                        <a-button
-                            shape="circle"
-                            :icon="h(SwapOutlined)"
-                            @click="swapCitys"
-                            style="border: none;">
-                        </a-button>
-                    </div>
-                    <div class="ArrivalCity">
-                        <p>到达城市</p>
-                        <a-input
-                            id="ArrivalCityInput"
-                            @Focus="handleInputFocus('ArrivalCityInput')"
-                            class="CityInput"
-                            :bordered="false"
-                            size="large"
-                            v-model:value="arrivalCity"
-                            placeholder="到达城市"
-                            style="background-color: transparent; width: 100%; text-align: right;">
-                        </a-input>
-                    </div>
-                </div>
-                <div class="SelectDate">
-                    <p>出发日期</p>
-                    <a-date-picker
-                        suffix-icon=""
-                        id="DatePicker"
-                        size="large"
-                        :locale="locale"
-                        :format="dateFormat"
-                        :bordered="false"
-                        />
-                </div>
-                <div class="SearchButton">
-                    <a-button type="primary" size="large">
-                        <template #icon>
-                          <SearchOutlined />
-                        </template>
-                        查询
-                      </a-button>
-                </div>
+
+            <!-- 交换按钮 -->
+            <div class="swap-button-wrapper">
+              <a-button
+                class="swap-button"
+                shape="circle"
+                :icon="h(SwapOutlined)"
+                @click="swapCitys"
+              />
             </div>
-        </el-card>
-    </div>
+
+            <!-- 到达城市 -->
+            <div class="city-input-group arrival">
+              <label class="city-label">到达城市</label>
+              <a-input
+                id="ArrivalCityInput"
+                @Focus="handleInputFocus('ArrivalCityInput')"
+                class="city-input arrival-input"
+                :bordered="false"
+                size="large"
+                v-model:value="arrivalCity"
+                placeholder="请选择到达城市"
+                @compositionupdate="handleCompositionUpdate"
+                @input="handleCityInput"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 日期选择区域 -->
+        <div class="date-selection">
+          <label class="date-label">出发日期</label>
+          <a-date-picker
+            suffix-icon=""
+            id="DatePicker"
+            size="large"
+            :locale="locale"
+            :format="dateFormat"
+            :bordered="false"
+            class="date-picker"
+            placeholder="选择出发日期"
+            :disabledDate="disabledDate"
+            v-model:value="selectedDate"
+            :allowClear="false"
+          >
+          </a-date-picker>
+        </div>
+
+        <!-- 搜索按钮 -->
+        <div class="search-button-wrapper">
+          <a-button type="primary" size="large" class="search-button" @click="handleSearch">
+            <template #icon>
+              <SearchOutlined />
+            </template>
+            <span class="search-text">查询车票</span>
+          </a-button>
+        </div>
+      </div>
+    </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
-    import { ref, h, nextTick } from 'vue';
-    import { onMounted, onUnmounted } from 'vue';
-    
-    import { SwapOutlined, SearchOutlined } from '@ant-design/icons-vue';
-    
-    //-------------DatePicker----------------
+import { ref, h, nextTick, computed } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 
-    import locale from 'ant-design-vue/es/date-picker/locale/zh_CN';
-    import dayjs from 'dayjs';
-    import 'dayjs/locale/zh-cn';
+import { SwapOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { useTicketServiceStore } from '@/stores/ticketService'
+import { useGeneralStore } from '@/stores/general'
+import { useRouter } from 'vue-router'
 
-    dayjs.locale('zh-cn');
+const router = useRouter()
+const generalStore = useGeneralStore()
+const ticketServiceStore = useTicketServiceStore()
 
-    const dateFormat = 'YYYY-MM-DD     dddd';
+//-------------DatePicker----------------
 
-    // --------------------------------------
+import locale from 'ant-design-vue/es/date-picker/locale/zh_CN'
+import dayjs, { Dayjs } from 'dayjs'
+import 'dayjs/locale/zh-cn'
 
-    // ----------selectTicketMode------------
+dayjs.locale('zh-cn')
 
-    const selectedTicketMode = ref('OneWay');
+const dateFormat = 'YYYY-MM-DD     dddd'
 
-    function handleSelectTicketMode(e: Event) {
-        if(e.target)
-            selectedTicketMode.value = e.target.value;
-    }
+// 添加日期相关的响应式数据
+const selectedDate = computed({
+  get: () => dayjs(ticketServiceStore.queryDate),
+  set: (value: Dayjs) => {
+    ticketServiceStore.queryDate = value.format('YYYY-MM-DD')
+  },
+})
 
-    // --------------------------------------
+// 禁用过去日期的函数
+const disabledDate = (current: Dayjs) => {
+  // 禁用今天之前的所有日期
+  return current && current < dayjs().startOf('day')
+}
 
-    // -------------SelectCity---------------
+// --------------------------------------
 
-    const departureCity = ref<string>('');
-    const arrivalCity = ref<string>('');
+// ----------selectTicketMode------------
 
-    function swapCitys() {
-        const temp = departureCity.value;
-        departureCity.value = arrivalCity.value;
-        arrivalCity.value = temp;
-    }
+const selectedTicketMode = computed({
+  get: () => ticketServiceStore.queryMode as string,
+  set: (value: string) => {
+    ticketServiceStore.queryResult = []
+    ticketServiceStore.queryMode = value as 'direct' | 'indirect'
+  },
+})
 
-    const inputRef = ref<HTMLElement | undefined>(undefined)
+// 优化事件处理函数
+function handleSelectTicketMode(e: any) {
+  selectedTicketMode.value = e.target.value
+}
 
-    const isCurChooseRefActive = ref<boolean>(false);
+// --------------------------------------
 
-    import CitySelect from './CitySelect/CitySelect.vue';
+// -------------SelectCity---------------
 
-    const selectedInputId = ref<string>('');
+const departureCity = computed({
+  get: () => ticketServiceStore.queryDepartureText,
+  set: (value: string) => {
+    ticketServiceStore.queryDepartureText = value
+  },
+})
+const arrivalCity = computed({
+  get: () => ticketServiceStore.queryArrivalText,
+  set: (value: string) => {
+    ticketServiceStore.queryArrivalText = value
+  },
+})
+const pinyinInput = ref('');
+const cityInput = computed(() => {
+  return selectedInputId.value === 'DepartureCityInput' ? (departureCity.value + pinyinInput.value) : (arrivalCity.value + pinyinInput.value)
+})
 
-    const isSelectorFocused = ref<boolean>(false);
+async function swapCitys() {
+  const temp = departureCity.value
+  departureCity.value = arrivalCity.value
+  arrivalCity.value = temp
+  if (router.currentRoute.value.path === '/trainTicket') {
+    await ticketServiceStore.querySchedule()
+  }
+}
 
-    async function handleInputFocus(id: string) {
-        selectedInputId.value = id;
-        const inputElement = document.getElementById(id) as HTMLElement;
-        inputRef.value = inputElement;
-        isCurChooseRefActive.value = false;
-        await nextTick();
-        isCurChooseRefActive.value = true;
-    }
+const inputRef = ref<HTMLElement | undefined>(undefined)
 
-    function handleCityClick(item: Object) {
-        const cityName: string = item.cityName;
-        if(selectedInputId.value === 'DepartureCityInput') {
-            departureCity.value = cityName;
-        } else if(selectedInputId.value === 'ArrivalCityInput') {
-            arrivalCity.value = cityName;
-        }
-        isCurChooseRefActive.value = false;
-    };
+const isCurChooseRefActive = ref<boolean>(false)
 
+import SelectCard from '@/components/SelectCard/SelectCard.vue'
 
-    function handleGlobalClick(event: MouseEvent) {
-        const citySelectElement = document.querySelector('.city_choose_wrap');
-        const inputElement = inputRef.value;
+const selectedInputId = ref<string>('')
 
-        if (
-            citySelectElement &&
-            !citySelectElement.contains(event.target as Node) &&
-            inputElement &&
-            !inputElement.contains(event.target as Node)
-        ) {
-            isCurChooseRefActive.value = false;
-        }
-    }
+async function handleInputFocus(id: string) {
+  selectedInputId.value = id
+  const inputElement = document.getElementById(id) as HTMLElement
+  inputRef.value = inputElement
+  isCurChooseRefActive.value = false
+  await nextTick()
+  isCurChooseRefActive.value = true
+}
 
-    onMounted(() => {
-        document.addEventListener('click', handleGlobalClick);
-    });
+function handleCityClick(cityName: string) {
+  if (selectedInputId.value === 'DepartureCityInput') {
+    departureCity.value = cityName
+  } else if (selectedInputId.value === 'ArrivalCityInput') {
+    arrivalCity.value = cityName
+  }
+  isCurChooseRefActive.value = false
+}
 
-    onUnmounted(() => {
-        document.removeEventListener('click', handleGlobalClick);
-    });
+function handleGlobalClick(event: MouseEvent) {
+  const citySelectElement = document.querySelector('.city_choose_wrap')
+  const inputElement = inputRef.value
 
-    //------------------------------------------
+  if (
+    citySelectElement &&
+    !citySelectElement.contains(event.target as Node) &&
+    inputElement &&
+    !inputElement.contains(event.target as Node)
+  ) {
+    isCurChooseRefActive.value = false
+  }
+}
 
+function handleSearch() {
+  ticketServiceStore.querySchedule()
+  if (router.currentRoute.value.path !== '/trainTicket') {
+    router.push('/trainTicket')
+  }
+}
+
+const handleCompositionUpdate = (event: CompositionEvent) => {
+  pinyinInput.value = event.data.toLowerCase();
+};
+const handleCityInput = () => {
+  pinyinInput.value = '';
+}
+
+onMounted(() => {
+  generalStore.init()
+  document.addEventListener('click', handleGlobalClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleGlobalClick)
+})
 </script>
 
-<style lang="css" scoped>
-.TicketSearch {
-    width: 1035px;
-    height: 100%;
-    display: flex;
+<style lang="scss" scoped>
+.ticket-search {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* 搜索卡片 */
+.search-card {
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: visible; /* 确保内容可以溢出显示 */
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.search-card :deep(.el-card__body) {
+  padding: 32px 40px;
+  overflow: visible; /* 确保卡片内容可以溢出 */
+}
+
+/* 票务模式选择区域 */
+.ticket-mode-section {
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.mode-radio {
+  display: flex;
+  gap: 24px;
+
+  .mode-text {
+    font-size: 16px;
+    font-weight: 500;
+    color: #606266;
+    transition: color 0.2s ease; /* 减少过渡时间 */
+  }
+}
+
+.mode-radio :deep(.ant-radio-wrapper) {
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s ease; /* 减少过渡时间 */
+
+  &:hover {
+    background-color: rgba(64, 158, 255, 0.05);
+  }
+
+  &.ant-radio-wrapper-checked {
+    background-color: rgba(64, 158, 255, 0.1);
+
+    .mode-text {
+      color: #409eff;
+      font-weight: 600;
+    }
+  }
+}
+
+/* 主搜索容器 */
+.search-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: visible; /* 确保容器内容可以溢出 */
+}
+
+/* 城市选择区域 */
+.city-selection-wrapper {
+  flex: 1;
+  min-width: 400px;
+  position: relative;
+}
+
+.city-selection {
+  display: flex;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 24px 20px 20px;
+  position: relative;
+  transition: all 0.3s ease;
+  /* 移除可能的 overflow 限制 */
+
+  &:hover {
+    background: #f0f2f5;
+    transform: translateY(-1px);
+  }
+}
+
+.city-input-group {
+  flex: 1;
+
+  &.departure {
+    text-align: left;
+  }
+
+  &.arrival {
+    text-align: right;
+  }
+}
+
+.city-label {
+  display: block;
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.city-input {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+  background: transparent;
+
+  &.arrival-input :deep(.ant-input) {
+    text-align: right;
+  }
+
+  &:focus {
+    color: #409eff;
+  }
+}
+
+.city-input :deep(.ant-input) {
+  font-size: 18px;
+  font-weight: 600;
+  background: transparent;
+
+  &::placeholder {
+    color: #c0c4cc;
+    font-weight: 400;
+  }
+}
+
+/* 交换按钮 */
+.swap-button-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 16px;
+}
+
+.swap-button {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #e4e7ed;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  &:hover {
+    border-color: #409eff;
+    color: #409eff;
+    transform: rotate(180deg);
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+  }
+}
+
+/* 日期选择区域 */
+.date-selection {
+  min-width: 200px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 24px 20px 20px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #f0f2f5;
+    transform: translateY(-1px);
+  }
+}
+
+.date-label {
+  display: block;
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.date-picker {
+  width: 100%;
+  background: transparent;
+
+  :deep(.ant-picker-input) {
+    font-size: 16px;
+    font-weight: bolder;
+    color: #333230;
+
+    input::placeholder {
+      color: #c0c4cc;
+      font-weight: 400;
+    }
+
+    input {
+      font-weight: bolder;
+    }
+  }
+}
+
+
+/* 搜索按钮区域 */
+.search-button-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.search-button {
+  height: 88px;
+  width: 120px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+  border: none;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.3);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(64, 158, 255, 0.4);
+    background: linear-gradient(135deg, #337ecc 0%, #5daf34 100%);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.search-text {
+  margin-left: 8px;
+  font-weight: bolder;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .search-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .city-selection-wrapper {
+    min-width: unset;
+  }
+
+  .city-selection {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .city-input-group {
+    &.arrival {
+      text-align: center;
+    }
+  }
+
+  .city-input.arrival-input :deep(.ant-input) {
+    text-align: center;
+  }
+
+  .swap-button-wrapper {
+    order: 2;
+    margin: 0;
+  }
+
+  .swap-button {
+    transform: rotate(90deg);
+
+    &:hover {
+      transform: rotate(270deg);
+    }
+  }
+
+  .search-button-wrapper {
     justify-content: center;
-}
-.el-card {
-    height: 200px;
-    border-radius: 15px;
-}
-.el-card__body {
-    width: 100%;
-    height: 100%;
-    padding-left: 40px;
-    padding-top: 40px; 
-    padding-bottom: 40px;
+  }
+
+  .search-button {
+    width: 200px;
+  }
 }
 
-.SelectTicketMode {
-    display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    span {
-        font-size: large;
-        color: black;
-    }
+@media (max-width: 768px) {
+  .ticket-search {
+    padding: 16px;
+  }
+
+  .search-card :deep(.el-card__body) {
+    padding: 24px 20px;
+  }
+
+  .mode-radio {
+    justify-content: center;
+  }
 }
-
-:deep(.SelectTicketMode .ant-radio-wrapper-checked) {
-    span {
-        color: rgb(43,132,255);
-    }
-}
-.SelectContainer {
-    display: flex;
-    height: 10%;
-    width: 100%;
-    align-items: center;
-}
-
-.SelectCity {
-    background-color: rgb(248,248,248);
-    font-size: small;
-    display: flex;
-    border-radius: 8px;
-    padding: 20px;
-    padding-top: 18px;
-    padding-bottom: 12px;
-    p {
-        display: block;
-        color: rgb(189,190,194);
-        align-items: center;
-        margin-left: 10px;
-        margin-bottom: 0%;
-    }
-    .SwapButton {
-        align-items: center;
-        display: flex;
-    }
-    .CityInput {
-        display: block;
-        font-size: 1.25rem;
-        font-weight: bolder;
-    }
-    .ArrivalCity {
-        text-align: right;
-        p {
-            margin-left: 0%;
-            margin-right: 10px;
-        }
-    }
-}
-
-
-.SelectDate {
-    margin-left: 5%;
-    background-color: rgb(248,248,248);
-    display: block;
-    border-radius: 8px;
-    padding: 20px;
-    padding-top: 18px;
-    padding-bottom: 12px;
-    height: 10%;
-    p {
-        display: block;
-        font-size: small;
-        color: rgb(189,190,194);
-        align-items: center;
-        margin-left: 10px;
-        margin-bottom: 0%;
-    }
-}
-
-
-.SelectDate .ant-picker {
-    width: 100%;
-    background-color: rgb(248,248,248);
-    
-}
-
-::v-deep(#DatePicker) {
-    font-size: 1.25rem;
-    font-weight: bolder;
-}
-
-.SearchButton {
-    display: grid;
-    margin-right: 3%;
-    margin-left: 3%;
-    height: 90px;
-    width: 100px;
-    .ant-btn {
-        height: 100%;
-        width: 100%;
-    }
-}
-
 </style>
 
-<style lang="css">
-
-.SearchButton .ant-btn span {
-    font-size: 1.25rem;
-    font-weight: bolder;
-    margin-right: 10px;
+/* 为城市选择弹出框添加全局样式 */
+<style lang="scss">
+/* 全局样式覆盖 */
+.search-button .ant-btn-icon {
+  font-size: 18px;
 }
 
+.search-button:not(:disabled):hover {
+  background: linear-gradient(135deg, #337ecc 0%, #5daf34 100%) !important;
+}
+
+/* 确保城市选择弹出框有足够的层级 */
+.city_choose_wrap {
+  background: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25) !important; /* 更强的阴影 */
+  border: 1px solid #e4e7ed !important;
+}
 </style>
-  
