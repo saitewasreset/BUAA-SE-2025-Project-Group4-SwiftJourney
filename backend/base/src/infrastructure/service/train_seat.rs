@@ -1,7 +1,10 @@
+use crate::Verified;
+use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::route::Route;
-use crate::domain::model::train::SeatTypeName;
+use crate::domain::model::train::{SeatType, SeatTypeName};
 use crate::domain::model::train_schedule::{
-    Seat, SeatAvailabilityId, SeatLocationInfo, SeatStatus,
+    Seat, SeatAvailability, SeatAvailabilityId, SeatLocationInfo, SeatStatus, StationRange,
+    TrainSchedule,
 };
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::seat_availability::{
@@ -14,7 +17,7 @@ use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::{DbId, Identifiable, RepositoryError};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
@@ -251,34 +254,60 @@ where
     #[instrument(skip(self))]
     async fn reserve_seat(
         &self,
-        seat_availability_id: SeatAvailabilityId,
+        train_schedule: &mut TrainSchedule,
+        station_range: StationRange<Verified>,
+        seat_type: SeatType,
         seat_location_info: SeatLocationInfo,
+        personal_info_id: PersonalInfoId,
     ) -> Result<Seat, TrainSeatServiceError> {
-        info!(
-            "reserving seat for seat availability id: {}, seat location: {:?}",
-            seat_availability_id, seat_location_info
-        );
+        info!("reserving seat for seat location: {:?}", seat_location_info);
 
-        let mut seat_availability = self
+        let seat_availability = self
             .seat_availability_repository
-            .find(seat_availability_id)
+            .find_by_schedule_seat_type_station_range(
+                train_schedule
+                    .get_id()
+                    .expect("train schedule id should be present"),
+                seat_type.get_id().expect("seat type id should be present"),
+                station_range,
+            )
             .await
-            .inspect_err(|e| {
-                error!(
-                    "failed to find seat availability for id {}: {}",
-                    seat_availability_id, e
-                )
-            })
-            .context(format!(
-                "failed to find seat availability for id: {}",
-                seat_availability_id
-            ))
+            .inspect_err(|e| error!("failed to find seat availability: {}", e))
+            .context("failed to find seat availability".to_string())
             .map_err(|e| {
                 TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e.into()))
-            })?
-            .ok_or(TrainSeatServiceError::InvalidSeatAvailability(
-                seat_availability_id,
-            ))?;
+            })?;
+
+        let mut seat_availability = if let Some(seat_availability) = seat_availability {
+            seat_availability
+        } else {
+            let mut seat_availability = SeatAvailability::new(
+                None,
+                train_schedule
+                    .get_id()
+                    .expect("train schedule id should be present"),
+                seat_type.clone(),
+                station_range,
+            );
+
+            self.seat_availability_repository
+                .save(&mut seat_availability)
+                .await
+                .inspect_err(|e| error!("failed to save new seat availability {}", e))
+                .map_err(|e| {
+                    TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+                })?;
+
+            train_schedule.add_seat_availability(
+                station_range,
+                seat_type.clone(),
+                seat_availability
+                    .get_id()
+                    .expect("seat availability id should be present"),
+            );
+
+            seat_availability
+        };
 
         let train_schedule = self
             .train_schedule_repository
@@ -338,24 +367,14 @@ where
             )),
         )?;
 
-        let occupied_seat_id_set = seat_availability
-            .occupied_seat()
-            .keys()
-            .copied()
-            .collect::<HashSet<_>>();
-
-        let preferred_location = seat_location_info.location;
-
         let mut allocated_seat = None;
 
-        for (seat_id, seat_location_info) in seat_list {
-            if !occupied_seat_id_set.contains(seat_id)
-                && seat_location_info.location == preferred_location
-            {
+        for (seat_id, cur_seat_location_info) in seat_list {
+            if seat_location_info == *cur_seat_location_info {
                 let seat = Seat::new(
                     *seat_id,
                     seat_availability.seat_type().clone(),
-                    *seat_location_info,
+                    seat_location_info,
                     SeatStatus::Occupied,
                 );
 
@@ -364,32 +383,39 @@ where
             }
         }
 
-        info!(
-            "allocated seat: {:?} for seat availability id: {}",
-            allocated_seat, seat_availability_id
-        );
+        if let Some(allocated_seat) = allocated_seat {
+            info!(
+                "allocated seat: {:?} for seat availability id: {}",
+                allocated_seat,
+                seat_availability
+                    .get_id()
+                    .expect("seat availability id should be present")
+            );
 
-        self.seat_availability_repository
-            .save(&mut seat_availability)
-            .await
-            .inspect_err(|e| {
-                error!(
-                    "failed to save seat availability with id: {} {}",
-                    seat_availability_id, e
-                )
-            })
-            .map_err(|e| {
-                TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e))
-            })?;
+            seat_availability.add_occupied_seat(allocated_seat.clone(), personal_info_id);
 
-        allocated_seat.ok_or(TrainSeatServiceError::NoAvailableSeat)
+            self.seat_availability_repository
+                .save(&mut seat_availability)
+                .await
+                .inspect_err(|e| error!("failed to save seat availability with id:  {}", e))
+                .map_err(|e| {
+                    TrainSeatServiceError::InfrastructureError(ServiceError::RepositoryError(e))
+                })?;
+
+            Ok(allocated_seat)
+        } else {
+            Err(TrainSeatServiceError::NoAvailableSeat)
+        }
     }
 
+    #[instrument(skip(self))]
     async fn free_seat(
         &self,
         seat_availability_id: SeatAvailabilityId,
         seat: Seat,
     ) -> Result<(), TrainSeatServiceError> {
+        info!("Freeing seat: {:?}", seat);
+
         let mut seat_availability = self
             .seat_availability_repository
             .find(seat_availability_id)
