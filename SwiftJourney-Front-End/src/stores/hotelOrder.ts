@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import type { HotelOrderInfo, HotelRoomInfo, HotelDetailInfo } from "@/interface/hotelInterface";
 import { useUserStore } from "./user";
-import type { BadgeInstance } from "element-plus";
 const userStore = useUserStore();
 
 export const useHotelOrderStore = defineStore('hotelOrder', {
