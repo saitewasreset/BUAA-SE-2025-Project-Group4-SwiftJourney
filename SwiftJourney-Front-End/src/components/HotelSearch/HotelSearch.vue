@@ -1,13 +1,13 @@
 <template>
     <div class="hotel-search">
-        <div class="search-card">
+        <div class="search-card" :style="isHeadPage ? 'margin-top: 30vh;' : 'margin-top: 15px;'">
             <img class="background-hotel-image" src="../../assets/hotel-image.png" alt="background hotel image">
             <img class="background-hotel-text" src="../../assets/hotel-text.png" alt="background hotel text">
             <p class="background-hotel-order-text">预订酒店</p>
             <div class="SelectCity">
-                <SelectCard v-if="isChooseCity" :el="inputRef" :input="suggestions" @handleCityClick="handleCityClick"/>
+                <SelectCard v-if="isChooseCity" :el="inputRef" :input="cityInput"  @handleCityClick="handleCityClick"/>
                 <div class="TargetCity">
-                    <p>目的地城市</p>
+                    <p>目的地城市/车站</p>
                     <a-input class="CityInput" v-model:value="hotelQuery.target" id="CityInput"
                     :bordered="false" size="large" placeholder="目的地" @input="handleCityInput"
                     @Focus="handleInputFocus()"
@@ -44,7 +44,7 @@
                 </a-button>
             </div>
         </div>
-        <div class="Grid">
+        <div v-if="!isHeadPage" class="Grid">
             <div class="Selected">
                 <p class="title">筛选</p>
                 <p class="sub-title">最低价格 {{ moneyFormat(moneyValue) }}</p>
@@ -60,6 +60,10 @@
                 <el-slider class="rating-slider" v-model="ratingCountValue" :marks="ratingCountMarks" :show-tooltip="false" />
             </div>
             <el-scrollbar height="520px" class="HotelInfo">
+                <div v-if="hotelGInfoWRoom.length == 0" class="HotelUnFind">
+                    <img class="UnfindImage" src="../../assets/unfind.jpg" alt="unfind">
+                    <p style="text-align: center;">没有搜索到符合条件的酒店，请重新输入</p>
+                </div>
                 <div v-for="(info, index) in hotelGInfoWRoom" :key="index">
                     <el-card v-if="isCardShow(info.rating, moneyDisplays[index], info.ratingCount) && roomTypeDisplays[index] != ''" class="HotelInfoCard" shadow="always">
                         <div class="HotelImageContainer">
@@ -121,6 +125,10 @@ const hotelQuery = ref<HotelQuery> ({
     beginDate: formateDate(today),
     endDate: formateDate(nextday),
 });
+
+
+//---------------------------首页查询页切换-----------------
+const isHeadPage = ref(true);
 
 //---------------------------日期---------------------------
 const beginDate = ref(hotelQuery.value.beginDate);
@@ -190,11 +198,28 @@ onUnmounted(() => {
 });
 
 //---------------------------------------------------------
+import { useGeneralStore } from '@/stores/general';
+const generalStore = useGeneralStore();
+
 async function searchHotel() {
     if(!checkHotelQuery()) {
         return;
     }
-    await hotelApi.hotelQuery(hotelQuery.value)
+
+    let result = generalStore.checkInputString(hotelQuery.value.target);
+    if(result == undefined) {
+        ElMessage.error('请输入正确的城市名/站名');
+        return;
+    }
+
+    let postQuery: HotelQuery = {
+        beginDate: hotelQuery.value.beginDate,
+        endDate: hotelQuery.value.endDate,
+        target: result.target,
+        targetType: result.targetType,
+        search: hotelQuery.value.search,
+    };
+    await hotelApi.hotelQuery(postQuery)
     .then((res) => {
         if(res.status == 200){
             if(res.data.code == 200) {
@@ -216,8 +241,9 @@ async function searchHotel() {
 }
 
 function checkHotelQuery() {
+    hotelQuery.value.target = hotelQuery.value.target.trim();
     if(hotelQuery.value.target == '') {
-        ElMessage.error('目的地城市不能为空');
+        ElMessage.error('目的地不能为空');
         return false;
     }
     hotelQuery.value.target = hotelQuery.value.target;
@@ -264,6 +290,8 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
     roomList.value = [];
     roomSet.clear();
     roomMapIndex.clear();
+    isHeadPage.value = false;
+
     for(let tepInfo of hotelGeneralInfo) {
         let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
@@ -427,93 +455,23 @@ const moneyDisplays = computed(() =>{
 })
 //-----------------------------------roomOrder-------------------------------
 import HotelOrderCard from '@/components/HotelSearch/HotelOrderCard.vue';
+import { RefSymbol } from '@vue/reactivity';
+import { fa } from 'element-plus/es/locales.mjs';
 const isOrderShow = ref<boolean>(false);
 function showRoomOrder() {
     isOrderShow.value = !isOrderShow.value;
 }
 
 //----------------------------------城市拼音推荐-----------------------------
-import { pinyin } from 'pinyin-pro'
-import { useGeneralStore } from '@/stores/general';
-const generalStore = useGeneralStore();
-
-generalStore.init();
-
-const suggestions = ref<string[]>([]);
+const cityInput = ref('');
 
 const handleCityInput = () => {
-    updateSuggestions(hotelQuery.value.target);
+    cityInput.value = hotelQuery.value.target;
 };
 
 const handleCompositionUpdate = (event: CompositionEvent) => {
-    updateSuggestions(hotelQuery.value.target + event.data.toLowerCase());
+    cityInput.value = hotelQuery.value.target + event.data.toLowerCase();
 };
-
-const updateSuggestions = (userInput: string) => {
-    const chineseChars: string[] = [];
-    const otherChars: string[] = [];
-    const stringChars: string[] = [];
-    suggestions.value = [];
-
-    if(userInput.trim() == '') {
-        return;
-    }
-
-    for (const char of userInput) {
-        if (char >= '\u4e00' && char <= '\u9fff') { // 判断字符是否为汉字
-            chineseChars.push(char);
-            stringChars.push(pinyin(char, { toneType: 'none' }));
-            stringChars.push(" ");
-        } else {
-            otherChars.push(char);
-            stringChars.push(char);
-        }
-    }
-
-    const chineseString = chineseChars.join('');
-    const otherString = otherChars.join('');
-    const stringString = stringChars.join('');
-
-    if(chineseString == '') {
-        pinyinCmp(generalStore.PinYinList, otherString);
-    }
-    else if(generalStore.CityMapPinYin.has(chineseString)) {
-        let pinyins = generalStore.CityMapPinYin.get(chineseString);
-        if(pinyins != null) {
-            pinyinCmp(pinyins, stringString);
-        }
-    } else {
-        for(let i = 1; i <= chineseString.length; i++) {
-            let tep = chineseString.substring(i-1, i);
-            let pinyins = generalStore.CityMapPinYin.get(tep);
-            if(pinyins != null) {
-                pinyinCmp(pinyins, stringString);
-            }
-        }
-    }
-}
-
-function pinyinCmp(pinyins: string[], pinYin: string) {
-    pinyins.forEach((value) => {
-        const templateParts = value.split(" ");
-        const testParts = pinYin.split(" ");
-        if (testParts.length <= templateParts.length) {
-            // 遍历测试字符串的每个区域，检查是否是从模板字符串对应区域的开头开始的子串
-            for (let i = 0; i < testParts.length; i++) {
-                // 如果测试字符串的区域不是从模板字符串对应区域开头开始的子串，返回false
-                if (!templateParts[i].startsWith(testParts[i])) {
-                    return;
-                }
-            }
-            const cities = generalStore.PinYinMapCity.get(value);
-            if(cities != null) {
-                cities.forEach((tep) => {
-                    suggestions.value.push(tep);
-                })
-            }
-        }
-    })
-}
 
 
 
@@ -800,6 +758,14 @@ roomList.value.forEach((key, index) => {
 
 .HotelInfo {
     width: 730px;
+}
+
+.HotelUnFind {
+    width: 700px; 
+}
+.UnfindImage {
+    width: 700px;
+    height: auto;
 }
 
 .HotelInfoCard {
