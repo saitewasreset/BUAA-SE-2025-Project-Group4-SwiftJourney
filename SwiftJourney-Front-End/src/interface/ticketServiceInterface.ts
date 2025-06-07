@@ -90,3 +90,32 @@ export enum SortType {
 
 // -------------------- 查询相关 --------------------
 export type QueryMode = 'direct' | 'indirect';
+
+
+export interface TrainInfoQuery {
+  // 车次号，例如：“G53”
+  trainNumber: string;
+  // 离开“始发站”的日期
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+}
+
+// 站点停靠信息
+export interface StoppingStationInfo {
+  stationName: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  departureTime?: string;
+}
+
+export interface TrainScheduleInfo {
+  originStation: string;
+  originDepartureTime: string;
+  terminalStation: string;
+  terminalArrivalTime: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+  // 车次经停车站信息
+  route: StoppingStationInfo[];
+}
