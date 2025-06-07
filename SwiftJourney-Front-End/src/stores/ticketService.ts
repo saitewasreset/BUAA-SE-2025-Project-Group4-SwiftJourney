@@ -468,9 +468,24 @@ export const useTicketServiceStore = defineStore('ticketService', {
       const params: scheduleRequest = {
         departureDate: this.queryDate,
       }
-      // 根据文本判断城市/站点 - 调用 GeneralStore 的方法
-      // TODO
-
+      // 根据文本判断城市/站点
+      const checkDepartureText = generalStore.checkInputString(this.queryDepartureText)
+      const checkArrivalText = generalStore.checkInputString(this.queryArrivalText)
+      if (checkDepartureText === undefined || checkArrivalText === undefined) {
+        message.error('出发地点或到达地点格式不正确，请检查输入')
+        return
+      }
+      if (checkDepartureText.targetType === 'city') {
+        params.departureCity = checkDepartureText.target
+      } else if (checkDepartureText.targetType === 'station') {
+        params.departureStation = checkDepartureText.target
+      }
+      if (checkArrivalText.targetType === 'city') {
+        params.arrivalCity = checkArrivalText.target
+      } else if (checkArrivalText.targetType === 'station') {
+        params.arrivalStation = checkArrivalText.target
+      }
+      // 根据查询模式选择查询方法
       if (this.queryMode === 'direct') {
         try {
           const response = await TicketServiceApi.queryDirectSchedule(params)
