@@ -455,7 +455,6 @@ const moneyDisplays = computed(() =>{
 })
 //-----------------------------------roomOrder-------------------------------
 import HotelOrderCard from '@/components/HotelSearch/HotelOrderCard.vue';
-import { fa } from 'element-plus/es/locales.mjs';
 const isOrderShow = ref<boolean>(false);
 function showRoomOrder() {
     isOrderShow.value = !isOrderShow.value;

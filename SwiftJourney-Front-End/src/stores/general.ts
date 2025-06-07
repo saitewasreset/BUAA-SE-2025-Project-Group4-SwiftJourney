@@ -80,6 +80,8 @@ export const useGeneralStore = defineStore('general', {
                         this.PinYinListStation = result.pinYinList;
                         this.StationSet = result.set;
 
+                        successGetStation = true;
+
                     } else {
                         throw new Error(ress.data.message);
                     }
