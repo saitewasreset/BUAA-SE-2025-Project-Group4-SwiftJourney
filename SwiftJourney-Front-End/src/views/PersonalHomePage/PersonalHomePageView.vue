@@ -125,7 +125,22 @@ watch(
 .page-container {
   display: flex;
   height: calc(100vh - 60px);
-  background: linear-gradient(135deg, #f0f4f8 0%, #e6f3ff 100%);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #fef3c7 75%, #fef7cd 100%);
+  position: relative;
+}
+
+.page-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 219, 226, 0.1) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 /* 侧边栏容器 */
@@ -142,8 +157,7 @@ watch(
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  /* 移除侧边栏弹出动画 */
-  /* animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1); */
+  z-index: 1;
 }
 
 .sidebar-container::before {
@@ -153,13 +167,13 @@ watch(
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
 }
 
 /* 侧边栏头部 */
 .sidebar-header {
   padding: 32px 24px 24px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(30, 64, 175, 0.05) 100%);
   border-bottom: 1px solid rgba(226, 232, 240, 0.5);
 }
 
@@ -172,20 +186,20 @@ watch(
 .user-avatar {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-size: 20px;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-avatar:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
 }
 
 .user-info {
@@ -244,7 +258,7 @@ watch(
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
   transition: left 0.6s;
 }
 
@@ -253,18 +267,18 @@ watch(
 }
 
 .custom-menu :deep(.ant-menu-item:hover) {
-  background: rgba(102, 126, 234, 0.08) !important;
-  border-color: rgba(102, 126, 234, 0.2) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
   transform: translateX(4px);
-  color: #667eea !important;
+  color: #3b82f6 !important;
 }
 
 .custom-menu :deep(.ant-menu-item-selected) {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
-  border-color: #667eea !important;
-  color: #667eea !important;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(30, 64, 175, 0.15) 100%) !important;
+  border-color: #3b82f6 !important;
+  color: #3b82f6 !important;
   font-weight: 600 !important;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
 }
 
 .custom-menu :deep(.ant-menu-item-selected::after) {
@@ -275,7 +289,7 @@ watch(
   transform: translateY(-50%);
   width: 4px;
   height: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   border-radius: 2px;
 }
 
@@ -286,7 +300,7 @@ watch(
 }
 
 .custom-menu :deep(.ant-menu-item-selected .anticon) {
-  color: #667eea !important;
+  color: #3b82f6 !important;
   transform: scale(1.1);
 }
 
@@ -303,7 +317,7 @@ watch(
   overflow-y: auto;
   background: transparent;
   position: relative;
-  /* 保留内容区的向上淡入动画 */
+  z-index: 1;
   animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -321,14 +335,14 @@ watch(
 
 .menu-wrapper::-webkit-scrollbar-thumb,
 .content-container::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3);
+  background: rgba(59, 130, 246, 0.3);
   border-radius: 3px;
   transition: background 0.3s;
 }
 
 .menu-wrapper::-webkit-scrollbar-thumb:hover,
 .content-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.5);
+  background: rgba(59, 130, 246, 0.5);
 }
 
 /* 响应式设计 */
@@ -413,18 +427,6 @@ watch(
 }
 
 /* 动画效果 */
-/* 移除左侧弹出动画，但保留其他动画 */
-/* @keyframes slideInLeft {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-} */
-
 @keyframes fadeInUp {
   from {
     transform: translateY(20px);
@@ -436,20 +438,17 @@ watch(
   }
 }
 
-/* 移除菜单项的进入动画 */
-/* .custom-menu :deep(.ant-menu-item) {
-  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-} */
-
-/* .custom-menu :deep(.ant-menu-item:nth-child(1)) { animation-delay: 0.1s; }
-.custom-menu :deep(.ant-menu-item:nth-child(2)) { animation-delay: 0.15s; }
-.custom-menu :deep(.ant-menu-item:nth-child(3)) { animation-delay: 0.2s; }
-.custom-menu :deep(.ant-menu-item:nth-child(4)) { animation-delay: 0.25s; } */
-
 /* 深色模式支持 */
 @media (prefers-color-scheme: dark) {
   .page-container {
     background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  }
+  
+  .page-container::before {
+    background: 
+      radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(30, 64, 175, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(96, 165, 250, 0.1) 0%, transparent 50%);
   }
   
   .sidebar-container {
@@ -470,13 +469,13 @@ watch(
   }
   
   .custom-menu :deep(.ant-menu-item:hover) {
-    background: rgba(102, 126, 234, 0.15) !important;
-    color: #90cdf4 !important;
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
   }
   
   .custom-menu :deep(.ant-menu-item-selected) {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%) !important;
-    color: #90cdf4 !important;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(30, 64, 175, 0.25) 100%) !important;
+    color: #93c5fd !important;
   }
 }
 </style>

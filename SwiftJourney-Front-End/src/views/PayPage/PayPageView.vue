@@ -282,12 +282,27 @@ function checkInput() {
 <style scoped>
 /* 容器样式 */
 .pay-container {
-    min-height: 80vh;
+    min-height: calc(100vh - 60px);
     padding: 40px 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #fef3c7 75%, #fef7cd 100%);
+    position: relative;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 226, 0.1) 0%, transparent 50%);
+        pointer-events: none;
+    }
 }
 
 /* 支付卡片 */
@@ -302,6 +317,8 @@ function checkInput() {
         0 0 0 1px rgba(255, 255, 255, 0.2);
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 1;
 }
 
 .pay-card:hover {
@@ -317,7 +334,7 @@ function checkInput() {
     justify-content: space-between;
     align-items: center;
     padding: 40px 40px 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     color: white;
 }
 
@@ -391,7 +408,7 @@ function checkInput() {
 }
 
 .info-value.amount {
-    color: #667eea;
+    color: #3b82f6;
     font-size: 24px;
     font-weight: 700;
 }
@@ -432,7 +449,7 @@ function checkInput() {
 }
 
 .radio-content:hover {
-    border-color: #667eea;
+    border-color: #3b82f6;
     background: #fff;
 }
 
@@ -442,12 +459,12 @@ function checkInput() {
 }
 
 :deep(.el-radio.is-checked .radio-content) {
-    border-color: #667eea;
-    background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #3b82f610 0%, #1e40af10 100%);
 }
 
 :deep(.el-radio.is-checked .radio-icon) {
-    color: #667eea;
+    color: #3b82f6;
 }
 
 /* 密码输入区域 */
@@ -483,9 +500,9 @@ function checkInput() {
 }
 
 .custom-input.is-focused :deep(.el-input__wrapper) {
-    border-color: #667eea;
+    border-color: #3b82f6;
     background-color: #fff;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
 /* 支付密码输入框 */
@@ -509,9 +526,9 @@ function checkInput() {
 }
 
 .digit-input:focus {
-    border-color: #667eea;
+    border-color: #3b82f6;
     background: #fff;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
 .digit-input:hover {
@@ -536,16 +553,16 @@ function checkInput() {
     border-radius: 12px;
     font-weight: 600;
     font-size: 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     border: none;
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     min-width: 200px;
 }
 
 .confirm-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
 }
 
 /* 支付成功卡片 */
@@ -560,6 +577,8 @@ function checkInput() {
         0 0 0 1px rgba(255, 255, 255, 0.2);
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 1;
 }
 
 .success-card:hover {

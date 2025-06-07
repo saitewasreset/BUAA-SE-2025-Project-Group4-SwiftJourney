@@ -91,7 +91,9 @@
             placeholder="选择出发日期"
             :disabledDate="disabledDate"
             v-model:value="selectedDate"
-          />
+            :allowClear="false"
+          >
+          </a-date-picker>
         </div>
 
         <!-- 搜索按钮 -->
@@ -457,15 +459,20 @@ onUnmounted(() => {
 
   :deep(.ant-picker-input) {
     font-size: 16px;
-    font-weight: 600;
-    color: #303133;
+    font-weight: bolder;
+    color: #333230;
 
     input::placeholder {
       color: #c0c4cc;
       font-weight: 400;
     }
+
+    input {
+      font-weight: bolder;
+    }
   }
 }
+
 
 /* 搜索按钮区域 */
 .search-button-wrapper {
@@ -497,6 +504,7 @@ onUnmounted(() => {
 
 .search-text {
   margin-left: 8px;
+  font-weight: bolder;
 }
 
 /* 响应式设计 */
