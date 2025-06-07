@@ -2,6 +2,7 @@ import type { DefineComponent } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { message } from 'ant-design-vue';
+import { nextTick } from 'vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,22 +46,28 @@ const router = createRouter({
       path: '/personalhomepage/:activeIndex',
       name: 'personalhomepage',
       component: () => import('../views/PersonalHomePage/PersonalHomePageView.vue'),
-      props: true
+      // 添加 meta 信息来标识需要强制刷新的路由
+      meta: { 
+        requiresAuth: true,
+        forceRefresh: true 
+      }
     },
     {
       path: '/paytransaction/:transactionId',
       name: 'paypage',
       component: () => import('../views/PayPage/PayPageView.vue'),
-      props: true
+      props: route => ({
+        transactionId: route.params.transactionId,
+        money: route.query.money
+      })
     }
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
-  //const isLogin: Boolean = true;
+  
   if (!isLogin) {
-    // 未登录，跳转到登录页
     if (to.path !== '/login' && to.path !== '/register') {
       message.warning('请先登录');
       next({ path: '/login', query: { redirect: to.fullPath } });
@@ -71,8 +78,12 @@ router.beforeEach((to, from, next) => {
     if (to.path === '/login' || to.path === '/register') {
       message.info('您已登录');
       next({ path: '/homepage' });
-    } else {
+    } else if(to.path === '/personalhomepage/personaldata') {
+      await useUserStore().restoreUserFromCookie(router);
       next();
+    } else {
+        await nextTick();
+        next();
     }
   }
 })

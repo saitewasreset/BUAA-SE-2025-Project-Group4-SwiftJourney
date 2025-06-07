@@ -210,7 +210,8 @@ const user = useUserStore();
     computed: {
       desensitizeName() {
         const prefix = user.name.substring(0, 1);
-        return `${prefix}**`;
+        // return `${prefix}**`;
+        return user.name;
       },
       desensitizeEmail() {
         if(user.email == null) {
