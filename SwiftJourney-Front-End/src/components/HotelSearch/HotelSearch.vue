@@ -296,7 +296,7 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
         let map = await hotelDetailRoom(tepInfo.hotelId)
         let tepInfoWRoom: HotelGInfoWRoom = {
             ...tepInfo,
-            roomTypeMap: map,
+            roomTypeMap: map || new Map<string, HotelRoomDetailInfo>(),
         }
         hotelGInfoWRoom.value.push(tepInfoWRoom);
         roomSet.forEach((key) => {
@@ -455,7 +455,6 @@ const moneyDisplays = computed(() =>{
 })
 //-----------------------------------roomOrder-------------------------------
 import HotelOrderCard from '@/components/HotelSearch/HotelOrderCard.vue';
-import { RefSymbol } from '@vue/reactivity';
 import { fa } from 'element-plus/es/locales.mjs';
 const isOrderShow = ref<boolean>(false);
 function showRoomOrder() {
@@ -464,6 +463,14 @@ function showRoomOrder() {
 
 //----------------------------------城市拼音推荐-----------------------------
 const cityInput = ref('');
+
+watch(() => hotelQuery.value.target, (newValue) => {
+    if (newValue) {
+        cityInput.value = newValue;
+    } else {
+        cityInput.value = '';
+    }
+});
 
 const handleCityInput = () => {
     cityInput.value = hotelQuery.value.target;
