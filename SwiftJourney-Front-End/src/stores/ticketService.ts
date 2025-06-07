@@ -73,7 +73,12 @@ export const useTicketServiceStore = defineStore('ticketService', {
     // -------------------- 查询相关 --------------------
     // 查询日期
     // 默认查询今天的日期
-    queryDate: new Date().toISOString().split('T')[0],
+    queryDate:
+      new Date().getFullYear() +
+      '-' +
+      (new Date().getMonth() + 1).toString().padStart(2, '0') +
+      '-' +
+      new Date().getDate().toString().padStart(2, '0'),
     // 查询城市/站点
     queryDepartureText: '',
     queryArrivalText: '',
@@ -81,6 +86,8 @@ export const useTicketServiceStore = defineStore('ticketService', {
     queryMode: 'direct' as QueryMode,
     // 查询结果
     queryResult: [] as directScheduleInfo[] | indirectScheduleInfo[],
+    // -------------------- 订单相关 --------------------
+    preOrderSchedule: null as directScheduleInfo | indirectScheduleInfo | null,
   }),
   getters: {
     // -------------------- 时间相关 --------------------
@@ -92,9 +99,10 @@ export const useTicketServiceStore = defineStore('ticketService', {
       for (let i = 0; i < 14; i++) {
         const date = new Date()
         date.setDate(today.getDate() + i)
-
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        const day = date.getDate().toString().padStart(2, '0')
         days.push({
-          date: date.toISOString().split('T')[0], // YYYY-MM-DD格式
+          date: `${date.getFullYear()}-${month}-${day}`, // YYYY-MM-DD格式
           display: `${date.getMonth() + 1}-${date.getDate()}`, // M-D格式
         })
       }
@@ -487,7 +495,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         return
       }
       if (this.queryDepartureText === '' || this.queryArrivalText === '') {
-        message.error('请填写出发地点和到达地点')
+        message.error('请填写出发地点和到达地点' + this.queryDate)
         return
       }
       const params: scheduleRequest = {
@@ -631,5 +639,6 @@ export const useTicketServiceStore = defineStore('ticketService', {
         message.error(`查询失败: 未知错误`)
       }
     },
+    // ---------------------- 订单相关 --------------------
   },
 })
