@@ -26,7 +26,7 @@
                         :el="inputRef"
                         @handleCityClick="handleCityClick"
                     /> -->
-          <CitySelect
+          <SelectCard
             v-if="isCurChooseRefActive"
             :el="inputRef"
             :input="cityInput"
@@ -194,7 +194,7 @@ const inputRef = ref<HTMLElement | undefined>(undefined)
 
 const isCurChooseRefActive = ref<boolean>(false)
 
-import CitySelect from './CitySelect/CitySelect.vue'
+import SelectCard from '@/components/SelectCard/SelectCard.vue'
 
 const selectedInputId = ref<string>('')
 
