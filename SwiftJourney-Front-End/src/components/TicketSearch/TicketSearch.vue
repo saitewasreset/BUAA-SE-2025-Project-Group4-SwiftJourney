@@ -44,6 +44,8 @@
                 size="large"
                 v-model:value="departureCity"
                 placeholder="请选择出发城市"
+                @compositionupdate="handleCompositionUpdate"
+                @input="handleCityInput"
               />
             </div>
 
@@ -68,6 +70,8 @@
                 size="large"
                 v-model:value="arrivalCity"
                 placeholder="请选择到达城市"
+                @compositionupdate="handleCompositionUpdate"
+                @input="handleCityInput"
               />
             </div>
           </div>
@@ -174,8 +178,9 @@ const arrivalCity = computed({
     ticketServiceStore.queryArrivalText = value
   },
 })
+const pinyinInput = ref('');
 const cityInput = computed(() => {
-  return selectedInputId.value === 'DepartureCityInput' ? departureCity.value : arrivalCity.value
+  return selectedInputId.value === 'DepartureCityInput' ? (departureCity.value + pinyinInput.value) : (arrivalCity.value + pinyinInput.value)
 })
 
 async function swapCitys() {
@@ -230,6 +235,13 @@ function handleSearch() {
   if (router.currentRoute.value.path !== '/trainTicket') {
     router.push('/trainTicket')
   }
+}
+
+const handleCompositionUpdate = (event: CompositionEvent) => {
+  pinyinInput.value = event.data.toLowerCase();
+};
+const handleCityInput = () => {
+  pinyinInput.value = '';
 }
 
 onMounted(() => {
