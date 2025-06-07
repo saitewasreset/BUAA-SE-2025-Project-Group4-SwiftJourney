@@ -482,14 +482,7 @@ where
     ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
         let mut meter = TimeMeter::new("direct_schedules");
 
-        let yesterday = date.checked_sub_days(chrono::Days::new(1)).unwrap_or(date);
-
-        let schedules_today = self.get_schedules(date).await?;
-        let schedules_yesterday = self.get_schedules(yesterday).await?;
-
-        let mut schedules = Vec::with_capacity(schedules_today.len() + schedules_yesterday.len());
-        schedules.extend(schedules_today);
-        schedules.extend(schedules_yesterday);
+        let schedules = self.get_schedules(date).await?;
 
         meter.meter("get schedules");
 
@@ -587,14 +580,7 @@ where
     > {
         let mut meter = TimeMeter::new("transfer_schedules");
 
-        let yesterday = date.checked_sub_days(chrono::Days::new(1)).unwrap_or(date);
-
-        let schedules_today = self.get_schedules(date).await?;
-        let schedules_yesterday = self.get_schedules(yesterday).await?;
-
-        let mut schedules = Vec::with_capacity(schedules_today.len() + schedules_yesterday.len());
-        schedules.extend(schedules_today);
-        schedules.extend(schedules_yesterday);
+        let schedules = self.get_schedules(date).await?;
 
         meter.meter("get schedules");
 
