@@ -181,7 +181,7 @@ where
                 name: dish.name().to_string(),
                 dish_type: dish.dish_type().to_string(),
                 picture: format!(
-                    "/resource/dish/image/{}",
+                    "/resource/dish/images/{}",
                     dish.images().first().unwrap_or(&Uuid::nil())
                 ),
                 price: dish.unit_price().to_f64().unwrap_or(0.0),
@@ -244,7 +244,7 @@ where
                         .map(|dish| TakeawayDishInfoDTO {
                             name: dish.name().to_string(),
                             picture: format!(
-                                "/resource/takeaway/image/{}",
+                                "/resource/takeaway/images/{}",
                                 dish.images().first().unwrap_or(&Uuid::nil())
                             ),
                             price: dish.unit_price().to_f64().unwrap_or(0.0),
@@ -276,16 +276,17 @@ where
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
 
+        meter.meter("load transaction details");
+
         let mut can_booking = false;
         let mut reason = Some("您尚未购买此车次的火车票，无法预订餐食".to_string());
 
         'outer: for transaction in &transaction_detail_list {
             for order in &transaction.orders {
                 if let OrderInfoDto::Train(train_order) = order {
-                    if train_order.train_number == query.train_number &&
-                           train_order.departure_time ==
-                           query.origin_departure_time &&
-                           train_order.base.status != "canceled"
+                    if train_order.train_number == query.train_number
+                        && train_order.departure_time == query.origin_departure_time
+                        && train_order.base.status != "canceled"
                     {
                         can_booking = true;
                         reason = None;
