@@ -126,11 +126,13 @@ onMounted(async () => {
 }
 
 .train-ticket {
+  margin: 0 auto;
+  max-width: 1200px;
   display: grid;
   grid-template-columns: 2fr 4fr;
   grid-template-rows: auto;
   gap: 20px;
-  padding: 20px 0;
+  padding: 20px;
 }
 
 .right-top-area {
