@@ -906,4 +906,43 @@ WHERE "takeaway_order"."id" = $1"#,
 
         Ok(result)
     }
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_date: NaiveDate,
+        origin_departure_time_second: i32,
+    ) -> Result<bool, RepositoryError> {
+        let order = crate::models::train_order::Entity::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT * FROM "train_order"
+    INNER JOIN "train_schedule"
+        ON "train_order"."train_schedule_id" = "train_schedule"."id"
+    INNER JOIN "train"
+        ON "train_schedule"."train_id" = "train"."id"
+    INNER JOIN "transaction"
+        ON "train_order"."pay_transaction_id" = "transaction"."id"
+    INNER JOIN "user"
+        ON "transaction"."user_id" = "user"."id"
+         WHERE "transaction"."user_id" = $1
+           AND "train"."number" = $2
+           AND "train_schedule"."departure_date" = $3
+           AND "train_schedule"."origin_departure_time" = $4
+           AND "train_order"."status" IN ('paid', 'ongoing', 'active')"#,
+                [
+                    user_id.to_db_value().into(),
+                    train_number.into(),
+                    origin_departure_date.into(),
+                    origin_departure_time_second.into(),
+                ],
+            ))
+            .one(&self.db)
+            .await
+            .inspect_err(|e| error!("failed to verify train order: {}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(order.is_some())
+    }
 }

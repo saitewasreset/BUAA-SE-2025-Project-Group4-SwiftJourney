@@ -202,4 +202,12 @@ pub trait OrderRepository: 'static + Send + Sync {
         train_order_id: OrderId,
         tz_offset_hour: i32,
     ) -> Result<TakeawayOrderRelatedData, RepositoryError>;
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_date: NaiveDate,
+        origin_departure_time_second: i32,
+    ) -> Result<bool, RepositoryError>;
 }
