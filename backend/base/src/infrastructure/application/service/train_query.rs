@@ -100,6 +100,7 @@ where
     TR: TrainRepository,
     SR: StationRepository,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         train_schedule_service: Arc<T>,
         station_service: Arc<U>,
@@ -150,7 +151,7 @@ where
                     .await
                     .map_err(|e| {
                         error!("Failed to get stations by city name: {:?}", e);
-                        GeneralError::InternalServerError
+                        TrainQueryServiceError::InvalidCityId
                     })?;
                 Ok(stations.into_iter().filter_map(|st| st.get_id()).collect())
             }
@@ -394,7 +395,6 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to get direct schedules: {:?}", e);
-
                 GeneralError::InternalServerError
             })?;
 
@@ -443,7 +443,7 @@ where
             .map(|t| (t.get_id().expect("Train should have id"), t))
             .collect::<HashMap<_, _>>();
 
-        for sch in schedules {
+        for (sch, from_station, to_station) in schedules {
             let train = train_id_to_train
                 .get(&sch.train_id())
                 .cloned()
@@ -452,7 +452,6 @@ where
                         "Inconsistent: No train found for schedule id: {}",
                         sch.get_id().unwrap()
                     );
-
                     GeneralError::InternalServerError
                 })?;
 
@@ -463,12 +462,27 @@ where
                     &routes,
                     &station_id_to_name,
                     cmd.departure_time,
+                    Some(from_station),
+                    Some(to_station),
                 )
                 .await?,
             );
         }
 
         meter.meter("build train info DTOs");
+
+        // infos.sort_by(|a, b| {
+        //     let a_time = DateTimeWithTimeZone::parse_from_rfc3339(&a.departure_time).unwrap();
+        //     let b_time = DateTimeWithTimeZone::parse_from_rfc3339(&b.departure_time).unwrap();
+        //     a_time.cmp(&b_time)
+        // });
+
+        // // 限制结果数量为50个，应前端要求
+        // if infos.len() > 50 {
+        //     infos.truncate(50);
+        // }
+
+        // meter.meter("sort and limit results");
 
         info!("{}", meter);
 
@@ -569,7 +583,7 @@ where
             .collect::<HashMap<_, _>>();
 
         let mut solutions = Vec::new();
-        for (schedule_ids, mid_station_opt) in transfer_solutions {
+        for (schedule_ids, from_station, to_station, mid_station_opt) in transfer_solutions {
             if schedule_ids.len() != 2 || mid_station_opt.is_none() {
                 continue;
             }
@@ -607,6 +621,8 @@ where
                     &routes,
                     &station_id_to_name,
                     cmd.departure_time,
+                    Some(from_station),
+                    Some(mid_station),
                 )
                 .await
             {
@@ -626,6 +642,8 @@ where
                     &routes,
                     &station_id_to_name,
                     cmd.departure_time,
+                    Some(mid_station),
+                    Some(to_station),
                 )
                 .await
             {
@@ -648,7 +666,7 @@ where
                 .clone()
                 .expect("missing arrival time");
 
-            first_dto.route.truncate(first_mid_idx + 1);
+            // first_dto.route.truncate(first_mid_idx + 1);
 
             let first_dep_dt =
                 DateTimeWithTimeZone::parse_from_rfc3339(&first_dto.departure_time).unwrap();
@@ -673,7 +691,7 @@ where
                 .clone()
                 .expect("missing departure time");
 
-            second_dto.route = second_dto.route[second_mid_idx..].to_vec();
+            // second_dto.route = second_dto.route[second_mid_idx..].to_vec();
 
             let second_dep_dt =
                 DateTimeWithTimeZone::parse_from_rfc3339(&second_dto.departure_time).unwrap();
@@ -697,6 +715,21 @@ where
 
         meter.meter("build transfer solutions");
 
+        solutions.sort_by(|a, b| {
+            let a_total_time =
+                a.first_ride.travel_time + a.relaxing_time + a.second_ride.travel_time;
+            let b_total_time =
+                b.first_ride.travel_time + b.relaxing_time + b.second_ride.travel_time;
+            a_total_time.cmp(&b_total_time)
+        });
+
+        // 限制结果数量为50个，应前端要求
+        if solutions.len() > 50 {
+            solutions.truncate(50);
+        }
+
+        meter.meter("sort and limit results");
+
         info!("{}", meter);
 
         Ok(TransferTrainQueryDTO { solutions })
@@ -713,6 +746,7 @@ where
     TR: TrainRepository,
     SR: StationRepository,
 {
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip(self, routes, station_id_to_name))]
     async fn build_dto(
         &self,
@@ -721,6 +755,8 @@ where
         routes: &[crate::domain::model::route::Route],
         station_id_to_name: &HashMap<StationId, String>,
         date: NaiveDate,
+        user_departure_station: Option<StationId>,
+        user_arrival_station: Option<StationId>,
     ) -> Result<TrainInfoDTO, Box<dyn ApplicationError>> {
         // ——— 路线、停站 ———
         let route = routes
@@ -802,25 +838,44 @@ where
         }
 
         // ——— 其余字段 ———
-        let dep_time = stopping
-            .first()
-            .unwrap()
+        let user_dep_station_name = user_departure_station
+            .and_then(|id| station_id_to_name.get(&id).cloned())
+            .unwrap();
+
+        let user_arr_station_name = user_arrival_station
+            .and_then(|id| station_id_to_name.get(&id).cloned())
+            .unwrap();
+
+        let user_dep_idx = stopping
+            .iter()
+            .position(|stop| stop.station_name == user_dep_station_name)
+            .expect("departure station should exist in stopping");
+
+        let user_arr_idx = stopping
+            .iter()
+            .position(|stop| stop.station_name == user_arr_station_name)
+            .expect("arrival station should exist in stopping");
+
+        let dep_time = stopping[user_dep_idx]
             .departure_time
             .as_ref()
-            .expect("departure time should exist for non-terminal stops");
-        let arr_time = stopping
-            .last()
-            .unwrap()
+            .expect("departure time should exist for user departure station");
+
+        let arr_time = stopping[user_arr_idx]
             .arrival_time
             .as_ref()
-            .expect("arrival time should exist for non-origin stops");
+            .expect("arrival time should exist for user arrival station");
         let dep_dt = DateTimeWithTimeZone::parse_from_rfc3339(dep_time).unwrap();
         let arr_dt = DateTimeWithTimeZone::parse_from_rfc3339(arr_time).unwrap();
 
         Ok(TrainInfoDTO {
-            departure_station: stopping.first().unwrap().station_name.clone(),
+            departure_station: user_departure_station
+                .and_then(|id| station_id_to_name.get(&id).cloned())
+                .unwrap(),
             departure_time: dep_time.clone(),
-            arrival_station: stopping.last().unwrap().station_name.clone(),
+            arrival_station: user_arrival_station
+                .and_then(|id| station_id_to_name.get(&id).cloned())
+                .unwrap(),
             arrival_time: arr_time.clone(),
             origin_station: stopping.first().unwrap().station_name.clone(),
             origin_departure_time: stopping
