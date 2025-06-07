@@ -187,7 +187,9 @@ async function swapCitys() {
   const temp = departureCity.value
   departureCity.value = arrivalCity.value
   arrivalCity.value = temp
-  await ticketServiceStore.querySchedule()
+  if (router.currentRoute.value.path === '/trainTicket') {
+    await ticketServiceStore.querySchedule()
+  }
 }
 
 const inputRef = ref<HTMLElement | undefined>(undefined)
