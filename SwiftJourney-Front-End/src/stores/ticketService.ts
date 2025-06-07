@@ -455,6 +455,31 @@ export const useTicketServiceStore = defineStore('ticketService', {
       }
     },
     // ---------------------- 查询相关 --------------------
+    // 重置相关状态
+    resetSpecificState() {
+      this.onlyShowAvailable = false
+      this.checkGroups[CheckType.SeatType].options = ['加载中...']
+      this.checkGroups[CheckType.SeatType].checkedList = ['加载中...']
+      this.checkGroups[CheckType.SeatType].indeterminate = false
+      this.checkGroups[CheckType.SeatType].checkAll = true
+      this.checkGroups[CheckType.DepartureStation].options = ['加载中...']
+      this.checkGroups[CheckType.DepartureStation].checkedList = ['加载中...']
+      this.checkGroups[CheckType.DepartureStation].indeterminate = false
+      this.checkGroups[CheckType.DepartureStation].checkAll = true
+      this.checkGroups[CheckType.TransferStation].options = ['加载中...']
+      this.checkGroups[CheckType.TransferStation].checkedList = ['加载中...']
+      this.checkGroups[CheckType.TransferStation].indeterminate = false
+      this.checkGroups[CheckType.TransferStation].checkAll = true
+      this.checkGroups[CheckType.ArrivalStation].options = ['加载中...']
+      this.checkGroups[CheckType.ArrivalStation].checkedList = ['加载中...']
+      this.checkGroups[CheckType.ArrivalStation].indeterminate = false
+      this.checkGroups[CheckType.ArrivalStation].checkAll = true
+      this.resetTimeRange('start')
+      this.resetTimeRange('end')
+      this.sortType = SortType.DepartureTime
+      this.sortOrderAsc = true
+      this.queryResult = []
+    },
     // 查询方法封装
     async querySchedule() {
       if (this.queryDate === '') {
@@ -485,6 +510,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
       } else if (checkArrivalText.targetType === 'station') {
         params.arrivalStation = checkArrivalText.target
       }
+      this.resetSpecificState()
       // 根据查询模式选择查询方法
       if (this.queryMode === 'direct') {
         try {

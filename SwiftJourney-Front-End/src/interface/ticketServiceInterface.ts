@@ -22,8 +22,7 @@ export interface stoppingStationInfo {
 }
 
 export interface seatTypeInfo {
-  // 该类型座位总计容量
-  capacity: number
+  seatType: string
   // 该类型座位剩余量
   left: number
   // 这种座位的价格
