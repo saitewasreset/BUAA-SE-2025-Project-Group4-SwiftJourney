@@ -298,17 +298,19 @@ onMounted(() => {
 </script>
 
 <style lang="css" scoped>
+:deep(.city_choose_wrap) {
+    z-index: 10000;
+}
 .city_choose_wrap {
     position: absolute;
     background: #fff;
     box-shadow: 0px 0px 12px #ccc;
     border-radius: 8px;
-    overflow: hidden;
     display: flex;
     height: 300px;
     width: auto;
     max-width: 477px;
-    z-index: 999;
+    
 
     .choose_right {
         background: #fff;

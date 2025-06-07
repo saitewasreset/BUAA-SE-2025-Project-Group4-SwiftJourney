@@ -5,17 +5,16 @@
         class="el-menu"
         mode="horizontal"
         :ellipsis="false"
-        router
         >
-            <div class="webside_title">
+            <div class="webside_title" @click="goToHomePage">
                 <img src="@/assets/railway.svg" width="30" height="30" />
                 <p style="font-size: larger">风行旅途</p>
             </div>
             <div style="border-left: 1px solid #ccc; height: 24px; margin: auto 10px;"></div>
-            <el-menu-item index="homepage">首页</el-menu-item>
-            <el-menu-item index="trainTicket">车票</el-menu-item>
-            <el-menu-item index="hotel">酒店</el-menu-item>
-            <el-menu-item index="meal">火车餐</el-menu-item>
+            <el-menu-item index="homepage" @click="goToHomePage">首页</el-menu-item>
+            <el-menu-item index="trainTicket" @click="goToTrainTicketPage">车票</el-menu-item>
+            <el-menu-item index="hotel" @click="goToHotelPage">酒店</el-menu-item>
+            <el-menu-item index="meal" @click="goToMealPage">火车餐</el-menu-item>
         </el-menu>
         <div class="TitleBarButton">
             <div v-if="!user.isLogin">
@@ -108,15 +107,33 @@
     import { useRouter, useRoute } from 'vue-router';
 
     const user = useUserStore();
-    //import { useDebugUserStore } from '@/stores/user';
-    //const user = useDebugUserStore();
-
     const router = useRouter();
     const route = useRoute();
 
     const activeIndex = computed(() => {
+        // 处理酒店详情页的激活状态
+        if (route.name === 'hotelDetail') {
+            return 'hotel';
+        }
         return route.name;
     });
+
+    // 添加明确的导航方法
+    function goToHomePage() {
+        router.push({ name: 'homepage' });
+    }
+
+    function goToTrainTicketPage() {
+        router.push({ name: 'trainTicket' });
+    }
+
+    function goToHotelPage() {
+        router.push({ name: 'hotel' });
+    }
+
+    function goToMealPage() {
+        router.push({ name: 'meal' });
+    }
 
     function goToLoginPage() {
         router.push({ name: 'login' });
