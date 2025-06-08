@@ -51,10 +51,20 @@ pub mod order_dto {
         pub base: BaseOrderDto,
         // 特有字段
         pub train_number: String,
+        // 起始站
         pub departure_station: String,
-        pub terminal_station: String,
+        // 到达站
+        pub arrival_station: String,
         pub departure_time: String,
-        pub terminal_time: String,
+        pub arrival_time: String,
+
+        // 始发站
+        pub origin_station: String,
+        // 终到站
+        pub terminal_station: String,
+        pub origin_departure_time: String,
+        pub terminal_arrival_time: String,
+
         pub name: String,
         pub seat: Option<SeatLocationInfoDTO>,
     }
