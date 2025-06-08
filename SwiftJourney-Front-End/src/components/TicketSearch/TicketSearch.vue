@@ -21,21 +21,21 @@
       <div class="search-container">
         <!-- 城市选择区域 -->
         <div class="city-selection-wrapper">
-          <!-- <CitySelect 
-                        v-if="isCurChooseRefActive"
-                        :el="inputRef"
-                        @handleCityClick="handleCityClick"
-                    /> -->
-          <SelectCard
-            v-if="isCurChooseRefActive"
-            :el="inputRef"
-            :input="cityInput"
-            @handleCityClick="handleCityClick"
-          />
+          <!-- 使用 Teleport 将 SelectCard 渲染到 body -->
+          <Teleport to="body">
+            <SelectCard
+              v-if="isCurChooseRefActive"
+              :el="inputRef"
+              :input="cityInput"
+              @handleCityClick="handleCityClick"
+              :style="selectCardStyle"
+            />
+          </Teleport>
+          
           <div class="city-selection">
-            <!-- 出发城市 -->
+            <!-- 出发地点 -->
             <div class="city-input-group departure">
-              <label class="city-label">出发城市</label>
+              <label class="city-label">出发地点</label>
               <a-input
                 id="DepartureCityInput"
                 @Focus="handleInputFocus('DepartureCityInput')"
@@ -43,7 +43,7 @@
                 :bordered="false"
                 size="large"
                 v-model:value="departureCity"
-                placeholder="请选择出发城市"
+                placeholder="请选择出发地点"
                 @compositionupdate="handleCompositionUpdate"
                 @input="handleCityInput"
               />
@@ -59,9 +59,9 @@
               />
             </div>
 
-            <!-- 到达城市 -->
+            <!-- 到达地点 -->
             <div class="city-input-group arrival">
-              <label class="city-label">到达城市</label>
+              <label class="city-label">到达地点</label>
               <a-input
                 id="ArrivalCityInput"
                 @Focus="handleInputFocus('ArrivalCityInput')"
@@ -69,7 +69,7 @@
                 :bordered="false"
                 size="large"
                 v-model:value="arrivalCity"
-                placeholder="请选择到达城市"
+                placeholder="请选择到达地点"
                 @compositionupdate="handleCompositionUpdate"
                 @input="handleCityInput"
               />
@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, nextTick, computed } from 'vue'
+import { ref, h, nextTick, computed, Teleport } from 'vue'
 import { onMounted, onUnmounted } from 'vue'
 
 import { SwapOutlined, SearchOutlined } from '@ant-design/icons-vue'
@@ -144,7 +144,7 @@ const selectedDate = computed({
 // 禁用过去日期的函数
 const disabledDate = (current: Dayjs) => {
   // 禁用今天之前的所有日期
-  return current && current < dayjs().startOf('day')
+  return current && (current < dayjs().startOf('day') || current > dayjs().add(13, 'day'))
 }
 
 // --------------------------------------
@@ -195,8 +195,8 @@ async function swapCitys() {
 }
 
 const inputRef = ref<HTMLElement | undefined>(undefined)
-
 const isCurChooseRefActive = ref<boolean>(false)
+const selectCardStyle = ref({})
 
 import SelectCard from '@/components/SelectCard/SelectCard.vue'
 
@@ -206,6 +206,24 @@ async function handleInputFocus(id: string) {
   selectedInputId.value = id
   const inputElement = document.getElementById(id) as HTMLElement
   inputRef.value = inputElement
+  
+  // 计算弹出框位置
+  if (inputElement) {
+    const rect = inputElement.getBoundingClientRect()
+    selectCardStyle.value = {
+      position: 'fixed',
+      top: `${rect.bottom + 8}px`,
+      left: `${rect.left}px`,
+      zIndex: 10000,
+      background: 'white',
+      borderRadius: '8px',
+      boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25)',
+      border: '1px solid #e4e7ed',
+      maxHeight: '300px',
+      overflow: 'auto'
+    }
+  }
+  
   isCurChooseRefActive.value = false
   await nextTick()
   isCurChooseRefActive.value = true

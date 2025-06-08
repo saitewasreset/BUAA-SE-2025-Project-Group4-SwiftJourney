@@ -58,6 +58,11 @@ const router = createRouter({
       }
     },
     {
+      path:'/trainTransaction',
+      name: 'trainTransaction',
+      component: () => import('../views/TrainTicket/TrainTransaction.vue'),
+    },
+    {
       path: '/paytransaction/:transactionId',
       name: 'paypage',
       component: () => import('../views/PayPage/PayPageView.vue'),
