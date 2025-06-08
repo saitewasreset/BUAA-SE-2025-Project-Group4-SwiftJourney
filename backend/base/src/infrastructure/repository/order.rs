@@ -31,6 +31,10 @@ struct TrainOrderQueryResult {
     pub departure_time: i32,
     /// 旅客姓名
     pub name: String,
+    /// 起始站
+    pub begin_station_id: i32,
+    /// 达到站
+    pub end_station_id: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, FromQueryResult)]
@@ -595,6 +599,8 @@ FROM "takeaway_order"
 
         Ok((train_schedule.departure_date, result))
     }
+
+    #[instrument(skip(self))]
     async fn get_train_order_related_data(
         &self,
         order_id: OrderId,
@@ -606,7 +612,9 @@ FROM "takeaway_order"
                 DatabaseBackend::Postgres,
                 r#"SELECT "train"."number" AS "train_number",
 "route"."departure_time" AS "departure_time",
-"person_info"."name" AS "name"
+"person_info"."name" AS "name",
+"train_order"."begin_station_id" AS "begin_station_id",
+"train_order"."end_station_id" AS "end_station_id"
 FROM "train_order"
     INNER JOIN "train_schedule"
         ON "train_schedule"."id" =  "train_order"."train_schedule_id"
@@ -621,6 +629,7 @@ FROM "train_order"
             ))
             .one(&self.db)
             .await
+            .inspect_err(|e| error!("Failed to query related train order data: {}", e))
             .context("failed to query related train order data")?
             .ok_or(RepositoryError::InconsistentState(anyhow!(
                 "no related data for train order id: {}",
@@ -638,11 +647,41 @@ FROM "train_order"
             );
         }
 
-        let departure_station = route_info_list[0].station_name.clone();
-        let terminal_station = route_info_list.last().unwrap().station_name.clone();
+        let station_id_to_route_info = route_info_list
+            .iter()
+            .map(|item| (item.station_id, item.clone()))
+            .collect::<HashMap<_, _>>();
 
-        let departure_time_sec = route_info_list[0].departure_time;
-        let terminal_time_sec = route_info_list.last().unwrap().arrival_time;
+        let departure_station_info = station_id_to_route_info.get(&query_result.begin_station_id).ok_or_else(|| {
+            error!("Inconsistent: begin station id {} not found in route info list for order id: {}", query_result.begin_station_id, order_id.to_db_value());
+
+            RepositoryError::InconsistentState(anyhow!("Inconsistent: begin station id {} not found in route info list for order id: {}", query_result.begin_station_id, order_id.to_db_value()))
+        })?;
+
+        let arrival_station_info = station_id_to_route_info
+            .get(&query_result.end_station_id)
+            .ok_or_else(|| {
+                error!(
+                    "Inconsistent: end station id {} not found in route info list for order id: {}",
+                    query_result.end_station_id,
+                    order_id.to_db_value()
+                );
+
+                RepositoryError::InconsistentState(anyhow!(
+                    "Inconsistent: end station id {} not found in route info list for order id: {}",
+                    query_result.end_station_id,
+                    order_id.to_db_value()
+                ))
+            })?;
+
+        let origin_station_info = &route_info_list[0];
+        let terminal_station_info = &route_info_list[route_info_list.len() - 1];
+
+        let departure_time_sec = departure_station_info.departure_time;
+        let terminal_time_sec = arrival_station_info.arrival_time;
+
+        let origin_departure_time_sec = origin_station_info.departure_time;
+        let terminal_arrival_time_sec = terminal_station_info.arrival_time;
 
         let tz = FixedOffset::east_opt(tz_offset_hour * 3600).unwrap();
 
@@ -661,12 +700,34 @@ FROM "train_order"
             .and_local_timezone(tz)
             .unwrap();
 
+        let origin_departure_time = departure_date
+            .and_time(
+                NaiveTime::from_num_seconds_from_midnight_opt(origin_departure_time_sec as u32, 0)
+                    .unwrap(),
+            )
+            .and_local_timezone(tz)
+            .unwrap();
+
+        let terminal_arrival_time = departure_date
+            .and_time(
+                NaiveTime::from_num_seconds_from_midnight_opt(terminal_arrival_time_sec as u32, 0)
+                    .unwrap(),
+            )
+            .and_local_timezone(tz)
+            .unwrap();
+
         let result = TrainOrderRelatedData {
             train_number: query_result.train_number,
-            departure_station,
-            terminal_station,
+            departure_station: departure_station_info.station_name.clone(),
+            arrival_station: arrival_station_info.station_name.clone(),
             departure_time: departure_time.to_rfc3339(),
-            terminal_time: terminal_time.to_rfc3339(),
+            arrival_time: terminal_time.to_rfc3339(),
+
+            origin_station: origin_station_info.station_name.clone(),
+            terminal_station: terminal_station_info.station_name.clone(),
+            origin_departure_time: origin_departure_time.to_rfc3339(),
+            terminal_arrival_time: terminal_arrival_time.to_rfc3339(),
+
             name: query_result.name,
         };
 
@@ -905,5 +966,44 @@ WHERE "takeaway_order"."id" = $1"#,
         };
 
         Ok(result)
+    }
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_date: NaiveDate,
+        origin_departure_time_second: i32,
+    ) -> Result<bool, RepositoryError> {
+        let order = crate::models::train_order::Entity::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT * FROM "train_order"
+    INNER JOIN "train_schedule"
+        ON "train_order"."train_schedule_id" = "train_schedule"."id"
+    INNER JOIN "train"
+        ON "train_schedule"."train_id" = "train"."id"
+    INNER JOIN "transaction"
+        ON "train_order"."pay_transaction_id" = "transaction"."id"
+    INNER JOIN "user"
+        ON "transaction"."user_id" = "user"."id"
+         WHERE "transaction"."user_id" = $1
+           AND "train"."number" = $2
+           AND "train_schedule"."departure_date" = $3
+           AND "train_schedule"."origin_departure_time" = $4
+           AND "train_order"."status" IN ('paid', 'ongoing', 'active')"#,
+                [
+                    user_id.to_db_value().into(),
+                    train_number.into(),
+                    origin_departure_date.into(),
+                    origin_departure_time_second.into(),
+                ],
+            ))
+            .one(&self.db)
+            .await
+            .inspect_err(|e| error!("failed to verify train order: {}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(order.is_some())
     }
 }
