@@ -1,0 +1,45 @@
+<!-- 完整的SVG文件内容 -->
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- 渐变定义 -->
+  <defs>
+    <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e2e8f0"/>
+      <stop offset="100%" style="stop-color:#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="trainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- 轨道 -->
+  <rect x="10" y="55" width="100" height="4" rx="2" fill="url(#trackGradient)" opacity="0.6"/>
+  <rect x="10" y="65" width="100" height="4" rx="2" fill="url(#trackGradient)" opacity="0.6"/>
+  
+  <!-- 火车车厢轮廓 -->
+  <rect x="30" y="35" width="60" height="25" rx="8" fill="none" stroke="url(#trainGradient)" stroke-width="2" stroke-dasharray="4,4" opacity="0.4"/>
+  
+  <!-- 车轮 -->
+  <circle cx="40" cy="68" r="6" fill="none" stroke="url(#trainGradient)" stroke-width="2" opacity="0.3"/>
+  <circle cx="80" cy="68" r="6" fill="none" stroke="url(#trainGradient)" stroke-width="2" opacity="0.3"/>
+  
+  <!-- 问号装饰 -->
+  <circle cx="60" cy="47" r="3" fill="url(#trainGradient)" opacity="0.5"/>
+  <rect x="58" y="52" width="4" height="2" rx="1" fill="url(#trainGradient)" opacity="0.5"/>
+  
+  <!-- SVG内的装饰点（使用circle代替div） -->
+  <circle cx="25" cy="25" r="2" fill="#3b82f6" opacity="0.6">
+    <animate attributeName="cy" values="25;15;25" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0.8;0.6" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="95" cy="30" r="2" fill="#8b5cf6" opacity="0.6">
+    <animate attributeName="cy" values="30;20;30" dur="4s" begin="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0.8;0.6" dur="4s" begin="1.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="30" cy="85" r="2" fill="#3b82f6" opacity="0.6">
+    <animate attributeName="cy" values="85;75;85" dur="4s" begin="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0.8;0.6" dur="4s" begin="3s" repeatCount="indefinite"/>
+  </circle>
+</svg>
