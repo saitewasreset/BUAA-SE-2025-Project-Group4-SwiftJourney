@@ -326,8 +326,19 @@
           <!-- 左侧：添加乘车人表单 -->
           <div class="passenger-form-section">
             <div class="form-header">
-              <h2 class="form-title">添加乘车人</h2>
-              <p class="form-subtitle">请填写乘车人信息</p>
+              <div class="header-left">
+                <h2 class="form-title">添加乘车人</h2>
+                <p class="form-subtitle">请填写乘车人信息</p>
+              </div>
+              <div class="header-right">
+                <el-button
+                  class="import-btn"
+                  :icon="Download"
+                  @click="showImportDialog"
+                >
+                  从预填信息导入
+                </el-button>
+              </div>
             </div>
 
             <div class="passenger-form">
@@ -589,6 +600,64 @@
         </div>
       </div>
     </div>
+
+    <!-- 预填信息导入对话框 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="选择预填信息"
+      width="500px"
+      class="import-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="import-content">
+        <div v-if="prefilledInfos.length === 0" class="empty-import-state">
+          <div class="empty-icon">
+            <el-icon size="48"><User /></el-icon>
+          </div>
+          <p class="empty-text">暂无预填信息</p>
+          <p class="empty-subtext">请先在个人中心添加预填信息</p>
+        </div>
+
+        <div v-else class="prefilled-list">
+          <div
+            v-for="(info, index) in prefilledInfos"
+            :key="info.personalId"
+            class="prefilled-item"
+            :class="{ selected: selectedPrefilledInfo?.personalId === info.personalId }"
+            @click="selectPrefilledInfo(info)"
+          >
+            <div class="prefilled-info">
+              <div class="name-section">
+                <span class="prefilled-name">{{ info.name }}</span>
+                <span v-if="info.default" class="self-badge">本人</span>
+              </div>
+              <div class="prefilled-id">{{ desensitizeIdCard(info.identityCardId) }}</div>
+              <div class="prefilled-seat">
+                偏好座位: {{ getSeatLocationText(info.preferredSeatLocation) }}
+              </div>
+            </div>
+            <div class="selection-indicator">
+              <el-icon v-if="selectedPrefilledInfo?.personalId === info.personalId" class="check-icon">
+                <Check />
+              </el-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="import-dialog-footer">
+          <el-button @click="importDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :disabled="!selectedPrefilledInfo"
+            @click="importPrefilledInfo"
+          >
+            导入选中信息
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -599,9 +668,10 @@ import type {
   stoppingStationInfo,
 } from '@/interface/ticketServiceInterface'
 import { useTicketServiceStore } from '@/stores/ticketService'
-import { computed, ref, reactive } from 'vue'
-import { Delete, User } from '@element-plus/icons-vue'
+import { computed, ref, reactive, onMounted } from 'vue'
+import { Delete, User, Download, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { userApi } from '@/api/UserApi/userApi'
 
 const ticketServiceStore = useTicketServiceStore()
 
@@ -1105,6 +1175,81 @@ function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
   }
   return locationMap[location]
 }
+
+// 预填信息相关数据
+interface PrefilledInfo {
+  personalId: string
+  name: string
+  identityCardId: string
+  preferredSeatLocation?: 'A' | 'B' | 'C' | 'D' | 'F'
+  default: boolean
+}
+
+const prefilledInfos = ref<PrefilledInfo[]>([])
+const importDialogVisible = ref(false)
+const selectedPrefilledInfo = ref<PrefilledInfo | null>(null)
+
+// 加载预填信息列表
+async function loadPrefilledInfos() {
+  try {
+    const response = await userApi.queryPersonalInfo()
+    if (response.data.code === 200) {
+      prefilledInfos.value = response.data.data
+    } else {
+      console.error('获取预填信息失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('获取预填信息失败:', error)
+  }
+}
+
+// 显示导入对话框
+function showImportDialog() {
+  selectedPrefilledInfo.value = null
+  importDialogVisible.value = true
+  loadPrefilledInfos()
+}
+
+// 选择预填信息
+function selectPrefilledInfo(info: PrefilledInfo) {
+  selectedPrefilledInfo.value = info
+}
+
+// 导入预填信息到表单
+function importPrefilledInfo() {
+  if (!selectedPrefilledInfo.value) {
+    ElMessage.error('请选择要导入的预填信息')
+    return
+  }
+
+  const selectedInfo = selectedPrefilledInfo.value
+
+  // 检查是否已存在相同身份证号的乘车人
+  if (passengers.value.some((p) => p.identityCardId === selectedInfo.identityCardId)) {
+    ElMessage.error('该身份证号已存在于乘车人列表中')
+    return
+  }
+
+  // 填充表单数据
+  passengerForm.name = selectedInfo.name
+  passengerForm.identityCardId = selectedInfo.identityCardId
+  passengerForm.preferredSeatLocation = selectedInfo.preferredSeatLocation
+
+  // 重置验证状态
+  identityCardIdError.value = false
+  identityCardIdErrorMsg.value = ''
+
+  // 关闭对话框
+  importDialogVisible.value = false
+  selectedPrefilledInfo.value = null
+
+  ElMessage.success('预填信息导入成功')
+}
+
+// 在组件挂载时加载预填信息
+onMounted(() => {
+  loadPrefilledInfos()
+})
 </script>
 
 <style lang="css" scoped>
@@ -1488,7 +1633,35 @@ function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
 }
 
 .form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.header-right {
+  margin-left: 20px;
+}
+
+.import-btn {
+  background: #f8fafc;
+  color: #667eea;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.import-btn:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
 .form-title {
@@ -1937,6 +2110,158 @@ function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
   font-weight: 500;
 }
 
+/* 导入对话框样式 */
+.import-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.import-dialog :deep(.el-dialog__header) {
+  padding: 24px 24px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.import-dialog :deep(.el-dialog__title) {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.import-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.import-content {
+  min-height: 200px;
+}
+
+/* 空状态样式 */
+.empty-import-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-import-state .empty-icon {
+  margin-bottom: 16px;
+}
+
+.empty-import-state .empty-text {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.empty-import-state .empty-subtext {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 预填信息列表样式 */
+.prefilled-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prefilled-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prefilled-item:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.02);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.prefilled-item.selected {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.prefilled-info {
+  flex: 1;
+}
+
+.name-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.prefilled-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.self-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+
+.prefilled-id {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.prefilled-seat {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.selection-indicator {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.check-icon {
+  color: #10b981;
+  font-size: 18px;
+}
+
+/* 导入对话框底部 */
+.import-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px 24px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.import-dialog-footer .el-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
 /* 响应式设计 */
 @media (max-width: 1024px) {
   .passenger-management-container {
@@ -1960,6 +2285,14 @@ function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
 
   .seat-type-selection {
     grid-template-columns: 1fr;
+  }
+
+  .import-dialog-footer {
+    flex-direction: column-reverse;
+  }
+
+  .import-dialog-footer .el-button {
+       width: 100%;
   }
 }
 </style>
