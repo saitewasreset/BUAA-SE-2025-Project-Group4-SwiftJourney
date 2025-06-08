@@ -416,10 +416,13 @@ impl Transaction {
             return Err(RefundError::AlreadyFulfilled(fulfilled_order_list));
         }
 
-        if !refunded_order_list.is_empty() {
-            return Err(RefundError::AlreadyRefunded(refunded_order_list));
-        }
+        let refunded_order_uuid_set = refunded_order_list.iter().copied().collect::<HashSet<_>>();
 
+        for order in to_refund_orders {
+            if refunded_order_uuid_set.contains(&order.uuid()) {
+                return Err(RefundError::AlreadyRefunded(refunded_order_list));
+            }
+        }
         let refund_amount_abs = to_refund_orders
             .iter()
             .map(|order| order.unit_price() * order.amount())
