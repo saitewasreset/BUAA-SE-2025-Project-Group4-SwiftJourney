@@ -107,7 +107,7 @@
         </div>
 
         <!-- 详细信息区域 -->
-        <div class="details-section">
+        <div class="details-section" id="details-section">
             <div class="details-container">
                 <!-- 标签页内容 -->
                 <div class="tabs-container">
@@ -515,6 +515,10 @@ function formatCommentTime(timeStr: string): string {
 const tabActiveName = ref<string>('room');
 function goToRoom() {
     tabActiveName.value = 'room';
+    const detailsSection = document.getElementById('details-section');
+    if (detailsSection) {
+        detailsSection.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // 日期选择器相关
