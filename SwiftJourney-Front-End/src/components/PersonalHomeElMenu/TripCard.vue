@@ -170,7 +170,7 @@ const emit = defineEmits<{
 
 // Methods
 const getStatusClass = (status: string) => {
-  const statusClasses = {
+  const statusClasses: { [key: string]: string } = {
     '未出行': 'status-upcoming',
     '行程中': 'status-active',
     '已完成': 'status-completed',
