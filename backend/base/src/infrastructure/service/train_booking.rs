@@ -330,6 +330,11 @@ where
 
         train_order.set_status(OrderStatus::Cancelled);
 
+        self.order_repository
+            .update(Box::new(train_order))
+            .await
+            .map_err(|err| TrainBookingServiceError::InfrastructureError(err.into()))?;
+
         Ok(())
     }
 
