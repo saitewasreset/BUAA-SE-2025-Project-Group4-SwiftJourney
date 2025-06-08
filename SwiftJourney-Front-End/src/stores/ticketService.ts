@@ -494,7 +494,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         return
       }
       if (this.queryDepartureText === '' || this.queryArrivalText === '') {
-        message.error('请填写出发地点和到达地点' + this.queryDate)
+        message.error('请填写出发地点和到达地点')
         return
       }
       const params: scheduleRequest = {
