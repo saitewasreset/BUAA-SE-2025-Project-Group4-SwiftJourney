@@ -9,13 +9,11 @@ import type {
 } from '@/interface/ticketServiceInterface'
 import { CheckType, SortType } from '@/interface/ticketServiceInterface'
 import dayjs, { Dayjs } from 'dayjs'
-import { useUserStore } from './user'
 import { useGeneralStore } from './general'
 import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
 import { message } from 'ant-design-vue'
 
 const generalStore = useGeneralStore()
-const userStore = useUserStore()
 
 export const useTicketServiceStore = defineStore('ticketService', {
   state: () => ({

@@ -319,6 +319,275 @@
           </div>
         </div>
       </div>
+
+      <!-- 乘车人管理卡片 -->
+      <div class="passenger-management-card">
+        <div class="passenger-management-container">
+          <!-- 左侧：添加乘车人表单 -->
+          <div class="passenger-form-section">
+            <div class="form-header">
+              <h2 class="form-title">添加乘车人</h2>
+              <p class="form-subtitle">请填写乘车人信息</p>
+            </div>
+
+            <div class="passenger-form">
+              <div class="form-grid">
+                <div class="form-item">
+                  <label class="form-label">姓名 <span class="required">*</span></label>
+                  <el-input
+                    v-model="passengerForm.name"
+                    placeholder="请输入真实姓名"
+                    maxlength="20"
+                    clearable
+                  />
+                </div>
+
+                <div class="form-item">
+                  <label class="form-label">身份证号 <span class="required">*</span></label>
+                  <el-input
+                    v-model="passengerForm.identityCardId"
+                    placeholder="请输入18位身份证号"
+                    maxlength="18"
+                    :class="{ 'error-input': identityCardIdError }"
+                    clearable
+                    @input="checkIdentityCardId"
+                    @change="checkIdentityCardId"
+                  />
+                  <div v-if="identityCardIdError" class="error-message">
+                    {{ identityCardIdErrorMsg }}
+                  </div>
+                </div>
+
+                <!-- 直达模式座位选择 -->
+                <div v-if="ticketServiceStore.queryMode === 'direct'" class="form-item full-width">
+                  <label class="form-label">座位类型 <span class="required">*</span></label>
+                  <div class="seat-type-selection">
+                    <div
+                      v-for="(seatInfo, index) in sortedDirectSeatInfo"
+                      :key="index"
+                      class="seat-type-option"
+                      :class="{ selected: passengerForm.seatType === seatInfo.seatType }"
+                      @click="passengerForm.seatType = seatInfo.seatType"
+                    >
+                      <div class="seat-type-name">{{ seatInfo.seatType }}</div>
+                      <div class="seat-type-price">¥{{ seatInfo.price }}</div>
+                      <div
+                        class="seat-availability"
+                        :class="{
+                          rich: getleftType(seatInfo.left) === 'rich',
+                          few: getleftType(seatInfo.left) === 'few',
+                          little: getleftType(seatInfo.left) === 'little',
+                          none: getleftType(seatInfo.left) === 'none',
+                        }"
+                      >
+                        {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 中转模式座位选择 -->
+                <div v-else class="form-item full-width">
+                  <label class="form-label">第一程座位类型 <span class="required">*</span></label>
+                  <div class="seat-type-selection">
+                    <div
+                      v-for="(seatInfo, index) in sortedFirstRideSeatInfo"
+                      :key="index"
+                      class="seat-type-option"
+                      :class="{ selected: passengerForm.firstRideSeatType === seatInfo.seatType }"
+                      @click="passengerForm.firstRideSeatType = seatInfo.seatType"
+                    >
+                      <div class="seat-type-name">{{ seatInfo.seatType }}</div>
+                      <div class="seat-type-price">¥{{ seatInfo.price }}</div>
+                      <div
+                        class="seat-availability"
+                        :class="{
+                          rich: getleftType(seatInfo.left) === 'rich',
+                          few: getleftType(seatInfo.left) === 'few',
+                          little: getleftType(seatInfo.left) === 'little',
+                          none: getleftType(seatInfo.left) === 'none',
+                        }"
+                      >
+                        {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <label class="form-label" style="margin-top: 20px"
+                    >第二程座位类型 <span class="required">*</span></label
+                  >
+                  <div class="seat-type-selection">
+                    <div
+                      v-for="(seatInfo, index) in sortedSecondRideSeatInfo"
+                      :key="index"
+                      class="seat-type-option"
+                      :class="{ selected: passengerForm.secondRideSeatType === seatInfo.seatType }"
+                      @click="passengerForm.secondRideSeatType = seatInfo.seatType"
+                    >
+                      <div class="seat-type-name">{{ seatInfo.seatType }}</div>
+                      <div class="seat-type-price">¥{{ seatInfo.price }}</div>
+                      <div
+                        class="seat-availability"
+                        :class="{
+                          rich: getleftType(seatInfo.left) === 'rich',
+                          few: getleftType(seatInfo.left) === 'few',
+                          little: getleftType(seatInfo.left) === 'little',
+                          none: getleftType(seatInfo.left) === 'none',
+                        }"
+                      >
+                        {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 偏好座位选择 -->
+                <div class="form-item full-width">
+                  <label class="form-label">偏好座位 (可选)</label>
+                  <div class="seat-preference-selection">
+                    <div class="seat-row">
+                      <div
+                        v-for="seat in ['A', 'B', 'C']"
+                        :key="seat"
+                        class="seat clickable"
+                        :class="{
+                          selected: passengerForm.preferredSeatLocation === seat,
+                          window: seat === 'A',
+                          aisle: seat === 'C',
+                        }"
+                        @click="
+                          passengerForm.preferredSeatLocation = seat as 'A' | 'B' | 'C' | 'D' | 'F'
+                        "
+                      >
+                        {{ seat }}
+                      </div>
+                      <!-- 过道间距 -->
+                      <div class="aisle-gap"></div>
+                      <div
+                        v-for="seat in ['D', 'F']"
+                        :key="seat"
+                        class="seat clickable"
+                        :class="{
+                          selected: passengerForm.preferredSeatLocation === seat,
+                          window: seat === 'F',
+                          aisle: seat === 'D',
+                        }"
+                        @click="
+                          passengerForm.preferredSeatLocation = seat as 'A' | 'B' | 'C' | 'D' | 'F'
+                        "
+                      >
+                        {{ seat }}
+                      </div>
+                    </div>
+                    <div class="seat-description">
+                      <div class="desc-item">
+                        <span class="seat-type window-type">窗</span>
+                        <span class="desc-text">靠窗 (A, F)</span>
+                      </div>
+                      <div class="desc-item">
+                        <span class="seat-type aisle-type">道</span>
+                        <span class="desc-text">靠过道 (C, D)</span>
+                      </div>
+                      <div class="desc-item">
+                        <span class="seat-type middle-type">中</span>
+                        <span class="desc-text">中间 (B)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <el-button class="add-passenger-btn" type="primary" @click="addPassenger">
+                  添加乘车人
+                </el-button>
+                <el-button class="clear-form-btn" @click="clearForm"> 清空表单 </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧：乘车人列表 -->
+          <div class="passenger-list-section">
+            <div class="list-header">
+              <h2 class="list-title">乘车人列表</h2>
+              <span class="passenger-count">{{ passengers.length }} 人</span>
+            </div>
+
+            <div v-if="passengers.length === 0" class="empty-passenger-list">
+              <div class="empty-icon">
+                <el-icon size="48"><User /></el-icon>
+              </div>
+              <p class="empty-text">暂无乘车人</p>
+              <p class="empty-subtext">请在左侧添加乘车人信息</p>
+            </div>
+
+            <div
+              v-else
+              class="passenger-list"
+              :class="{ transfer: ticketServiceStore.queryMode === 'indirect' }"
+            >
+              <div v-for="(passenger, index) in passengers" :key="index" class="passenger-item">
+                <div class="passenger-info">
+                  <div class="passenger-name">{{ passenger.name }}</div>
+                  <div class="passenger-id">{{ desensitizeIdCard(passenger.identityCardId) }}</div>
+
+                  <!-- 直达模式显示 -->
+                  <div v-if="ticketServiceStore.queryMode === 'direct'" class="seat-info">
+                    <div class="seat-type-tag">{{ passenger.seatType }}</div>
+                    <div v-if="passenger.preferredSeatLocation" class="preferred-seat">
+                      偏好: {{ getSeatLocationText(passenger.preferredSeatLocation) }}
+                    </div>
+                  </div>
+
+                  <!-- 中转模式显示 -->
+                  <div v-else class="seat-info transfer">
+                    <div class="transfer-seat-info">
+                      <span class="transfer-label">第1程:</span>
+                      <div class="seat-type-tag">{{ passenger.firstRideSeatType }}</div>
+                    </div>
+                    <div class="transfer-seat-info">
+                      <span class="transfer-label">第2程:</span>
+                      <div class="seat-type-tag">{{ passenger.secondRideSeatType }}</div>
+                    </div>
+                    <div v-if="passenger.preferredSeatLocation" class="preferred-seat">
+                      偏好: {{ getSeatLocationText(passenger.preferredSeatLocation) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="passenger-actions">
+                  <el-button
+                    class="delete-passenger-btn"
+                    :icon="Delete"
+                    size="small"
+                    text
+                    @click="removePassenger(index)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 总价显示 -->
+            <div v-if="passengers.length > 0" class="total-price-section">
+              <div class="price-breakdown">
+                <div class="price-item">
+                  <span class="price-label">乘车人数</span>
+                  <span class="price-value">{{ passengers.length }} 人</span>
+                </div>
+                <div class="price-item total">
+                  <span class="price-label">预估总价</span>
+                  <span class="price-value">¥{{ calculateTotalPrice() }}</span>
+                </div>
+              </div>
+              <el-button class="proceed-btn" type="primary" size="large">
+                继续预订 ({{ passengers.length }}人)
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -330,7 +599,9 @@ import type {
   stoppingStationInfo,
 } from '@/interface/ticketServiceInterface'
 import { useTicketServiceStore } from '@/stores/ticketService'
-import { computed } from 'vue'
+import { computed, ref, reactive } from 'vue'
+import { Delete, User } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const ticketServiceStore = useTicketServiceStore()
 
@@ -662,6 +933,178 @@ const processedSecondRideRoute = computed(() => {
     }
   })
 })
+
+// 乘车人相关数据
+interface PassengerInfo {
+  name: string
+  identityCardId: string
+  seatType?: string
+  firstRideSeatType?: string
+  secondRideSeatType?: string
+  preferredSeatLocation?: 'A' | 'B' | 'C' | 'D' | 'F'
+}
+
+const passengers = ref<PassengerInfo[]>([])
+
+const passengerForm = reactive<PassengerInfo>({
+  name: '',
+  identityCardId: '',
+  seatType: '',
+  firstRideSeatType: '',
+  secondRideSeatType: '',
+  preferredSeatLocation: undefined,
+})
+
+// 身份证号验证
+const identityCardIdError = ref(false)
+const identityCardIdErrorMsg = ref('')
+
+// 身份证号检测
+function checkIdentityCardId() {
+  identityCardIdError.value = false
+  identityCardIdErrorMsg.value = ''
+
+  if (passengerForm.identityCardId === '') {
+    return
+  }
+
+  const weight = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+  const checkCode = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+
+  if (passengerForm.identityCardId.length !== 18) {
+    identityCardIdError.value = true
+    identityCardIdErrorMsg.value = '身份证号码长度应为18位'
+    return
+  }
+
+  let sum = 0
+  for (let i = 0; i < 17; i++) {
+    if (!/\d/.test(passengerForm.identityCardId[i])) {
+      identityCardIdError.value = true
+      identityCardIdErrorMsg.value = '身份证号码前17位应全部为数字'
+      return
+    }
+    sum += parseInt(passengerForm.identityCardId[i], 10) * weight[i]
+  }
+
+  const mod = sum % 11
+  const expectedCheckCode = checkCode[mod].toUpperCase()
+  const actualCheckCode = passengerForm.identityCardId[17].toUpperCase()
+
+  if (actualCheckCode !== expectedCheckCode) {
+    identityCardIdError.value = true
+    identityCardIdErrorMsg.value = '身份证号码校验失败'
+  }
+}
+
+// 添加乘车人
+function addPassenger() {
+  console.log('添加乘车人', passengerForm)
+  if (!validatePassengerForm()) {
+    return
+  }
+
+  // 检查是否已存在相同身份证号的乘车人
+  if (passengers.value.some((p) => p.identityCardId === passengerForm.identityCardId)) {
+    ElMessage.error('该身份证号已存在')
+    return
+  }
+
+  passengers.value.push({ ...passengerForm })
+  ElMessage.success('添加乘车人成功')
+  clearForm()
+}
+
+// 删除乘车人
+function removePassenger(index: number) {
+  passengers.value.splice(index, 1)
+  ElMessage.success('删除乘车人成功')
+}
+
+// 清空表单
+function clearForm() {
+  passengerForm.name = ''
+  passengerForm.identityCardId = ''
+  passengerForm.seatType = ''
+  passengerForm.firstRideSeatType = ''
+  passengerForm.secondRideSeatType = ''
+  passengerForm.preferredSeatLocation = undefined
+  identityCardIdError.value = false
+  identityCardIdErrorMsg.value = ''
+}
+
+// 验证表单
+function validatePassengerForm(): boolean {
+  if (!passengerForm.name.trim()) {
+    ElMessage.error('请输入姓名')
+    return false
+  }
+
+  if (!passengerForm.identityCardId.trim()) {
+    ElMessage.error('请输入身份证号')
+    return false
+  }
+
+  checkIdentityCardId()
+  if (identityCardIdError.value) {
+    ElMessage.error(identityCardIdErrorMsg.value)
+    return false
+  }
+
+  if (ticketServiceStore.queryMode === 'direct') {
+    if (!passengerForm.seatType) {
+      ElMessage.error('请选择座位类型')
+      return false
+    }
+  } else {
+    if (!passengerForm.firstRideSeatType) {
+      ElMessage.error('请选择第一程座位类型')
+      return false
+    }
+    if (!passengerForm.secondRideSeatType) {
+      ElMessage.error('请选择第二程座位类型')
+      return false
+    }
+  }
+
+  return true
+}
+
+// 计算总价
+function calculateTotalPrice(): number {
+  return passengers.value.reduce((total, passenger) => {
+    if (ticketServiceStore.queryMode === 'direct') {
+      const seatInfo = sortedDirectSeatInfo.value.find((s) => s.seatType === passenger.seatType)
+      return total + (seatInfo?.price || 0)
+    } else {
+      const firstSeatInfo = sortedFirstRideSeatInfo.value.find(
+        (s) => s.seatType === passenger.firstRideSeatType,
+      )
+      const secondSeatInfo = sortedSecondRideSeatInfo.value.find(
+        (s) => s.seatType === passenger.secondRideSeatType,
+      )
+      return total + (firstSeatInfo?.price || 0) + (secondSeatInfo?.price || 0)
+    }
+  }, 0)
+}
+
+// 身份证号脱敏
+function desensitizeIdCard(idCard: string): string {
+  if (!idCard || idCard.length < 8) return idCard
+  return idCard.slice(0, 4) + '****' + idCard.slice(-4)
+}
+
+// 获取座位位置文字描述
+function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
+  const locationMap = {
+    A: '靠窗 (A)',
+    B: '中间 (B)',
+    C: '靠过道 (C)',
+    D: '靠过道 (D)',
+    F: '靠窗 (F)',
+  }
+  return locationMap[location]
+}
 </script>
 
 <style lang="css" scoped>
@@ -1015,5 +1458,508 @@ const processedSecondRideRoute = computed(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+}
+
+/* 乘车人管理卡片 */
+.passenger-management-card {
+  width: 100%;
+  max-width: 1200px;
+  margin: 20px auto 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.passenger-management-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: #e2e8f0;
+}
+
+/* 左侧表单区域 */
+.passenger-form-section {
+  background: #fff;
+  padding: 30px;
+}
+
+.form-header {
+  margin-bottom: 24px;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 8px 0;
+}
+
+.form-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.passenger-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.required {
+  color: #dc2626;
+}
+
+/* 座位类型选择 */
+.seat-type-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.seat-type-option {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.seat-type-option:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.seat-type-option.selected {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.seat-type-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f97316;
+  margin-bottom: 4px;
+}
+
+/* 偏好座位选择 */
+.seat-preference-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.seat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.seat.clickable {
+  width: 48px;
+  height: 48px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.seat.clickable:hover {
+  transform: scale(1.05);
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.seat.window {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.seat.aisle {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.seat.selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+  color: white;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.aisle-gap {
+  width: 24px;
+  height: 2px;
+  background: #d1d5db;
+  margin: 0 8px;
+  border-radius: 1px;
+}
+
+.seat-description {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 12px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.desc-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seat-type {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.window-type {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #3b82f6;
+}
+
+.aisle-type {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #10b981;
+}
+
+.middle-type {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.desc-text {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 表单操作按钮 */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.add-passenger-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.clear-form-btn {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* 右侧乘车人列表 */
+.passenger-list-section {
+  background: #f8fafc;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.list-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.passenger-count {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 空状态 */
+.empty-passenger-list {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-icon {
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.empty-subtext {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 乘车人列表 */
+.passenger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-grow: 1;
+  overflow: auto;
+  max-height: 390px;
+}
+
+.passenger-list.transfer {
+  max-height: 565px;
+}
+
+.passenger-item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  transition: all 0.2s;
+}
+
+.passenger-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.passenger-info {
+  flex: 1;
+}
+
+.passenger-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 8px;
+}
+
+.passenger-id {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.seat-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.seat-info.transfer {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.transfer-seat-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.seat-type-tag {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.preferred-seat {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.passenger-actions {
+  margin-left: 16px;
+}
+
+.delete-passenger-btn {
+  color: #dc2626;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.delete-passenger-btn:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* 总价区域 */
+.total-price-section {
+  border-top: 2px solid #e2e8f0;
+  padding-top: 20px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.price-breakdown {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.price-item.total {
+  border-top: 1px solid #f1f5f9;
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.price-label {
+  color: #6b7280;
+}
+
+.price-value {
+  color: #1a202c;
+  font-weight: 600;
+}
+
+.price-item.total .price-value {
+  color: #f97316;
+  font-size: 18px;
+}
+
+.proceed-btn {
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* 错误样式 */
+.error-input :deep(.el-input__wrapper) {
+  border-color: #f56565 !important;
+  box-shadow: 0 0 0 2px rgba(245, 101, 101, 0.2) !important;
+}
+
+.error-message {
+  color: #f56565;
+  font-size: 12px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .passenger-management-container {
+    grid-template-columns: 1fr;
+  }
+
+  .seat-type-selection {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .passenger-form-section,
+  .passenger-list-section {
+    padding: 20px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .seat-type-selection {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
