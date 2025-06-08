@@ -1,6 +1,6 @@
 import { getRequest, postRequest } from '../axios'
 import type {
-  scheduleRequest,
+  scheduleRequest, TrainInfoQuery
 } from '@/interface/ticketServiceInterface'
 
 export const TicketServiceApi = {
@@ -13,4 +13,8 @@ export const TicketServiceApi = {
   queryIndirectSchedule: (params: scheduleRequest) => {
     return postRequest('/api/train/schedule/query_indirect', params)
   },
+
+  trainSchedule: (params: TrainInfoQuery) => {
+    return postRequest('/api/train/schedule/', params);
+  }
 }
