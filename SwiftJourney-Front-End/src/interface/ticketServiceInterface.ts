@@ -66,13 +66,13 @@ export interface indirectScheduleInfo {
 
 export type trainTransactionRequest = OrderPack[];
 
-interface OrderPack {
+export interface OrderPack {
   // 原子操作，若为 true，则`orderList`中任意订单失败将回滚已成功的订单
   atomic: boolean;
   orderList: TrainOrderRequest[];
 }
 
-interface TrainOrderRequest {
+export interface TrainOrderRequest {
   // 车次号，例如：“G53”
   trainNumber: string;
   // 离开“始发站”的日期时间
