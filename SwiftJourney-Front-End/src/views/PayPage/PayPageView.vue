@@ -215,7 +215,7 @@ async function apiPay() {
         payment.paymentPassword = payPassword.value;
     }
     await paymentApi.pay(transactionId, payment)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200) {
             //成功支付
             if(res.data.code == 200) {
@@ -235,7 +235,7 @@ async function apiPay() {
                 throw new Error(res.statusText);
             }
         }
-    }).catch((err) => {
+    }).catch((err: any) => {
         ElMessage.error(err)
     })
 }
