@@ -51,10 +51,11 @@ use sea_orm::{
     QueryFilter, Select, Statement, TransactionTrait,
 };
 use sea_orm::{ColumnTrait, FromQueryResult};
+use shared::utils::TimeMeter;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 impl_db_id_from_u64!(OrderId, i32, "order id");
@@ -1222,20 +1223,28 @@ impl TransactionRepositoryImpl {
             Select<crate::models::transaction::Entity>,
         ) -> Select<crate::models::transaction::Entity>,
     ) -> Result<Vec<Transaction>, RepositoryError> {
+        let mut meter = TimeMeter::new("query_transaction");
+
         let transaction_dos = builder(crate::models::transaction::Entity::find())
             .all(&self.db)
             .await
             .context("Failed to query transaction")?;
+
+        meter.meter("load transaction do");
 
         let seat_type = crate::models::seat_type::Entity::find()
             .all(&self.db)
             .await
             .context("Failed to query seat type")?;
 
+        meter.meter("load seat type");
+
         let seat_type_mapping = crate::models::seat_type_mapping::Entity::find()
             .all(&self.db)
             .await
             .context("Failed to query seat type mapping")?;
+
+        meter.meter("load seat type mapping");
 
         let seat_type = seat_type
             .into_iter()
@@ -1247,16 +1256,22 @@ impl TransactionRepositoryImpl {
             HashMap<i32, HashMap<i64, crate::models::seat_type_mapping::Model>>,
         > = HashMap::new();
 
+        meter.meter("transform seat type mapping");
+
         let train_schedules = crate::models::train_schedule::Entity::find()
             .all(&self.db)
             .await
             .context("Failed to query train schedule")?;
+
+        meter.meter("load train schedule do");
 
         let trains = crate::models::train::Entity::find()
             .all(&self.db)
             .await
             .inspect_err(|e| error!("Failed to query trains: {}", e))
             .context("Failed to query trains")?;
+
+        meter.meter("load train do");
 
         let train_schedule_id_to_train_id = train_schedules
             .into_iter()
@@ -1290,6 +1305,8 @@ impl TransactionRepositoryImpl {
                 .insert(model.seat_id, model);
         }
 
+        meter.meter("transform train");
+
         let mut transactions = Vec::new();
 
         for transaction_do in transaction_dos {
@@ -1314,6 +1331,10 @@ impl TransactionRepositoryImpl {
 
             transactions.push(transaction);
         }
+
+        meter.meter("transform transaction do");
+
+        info!("{}", meter);
 
         Ok(transactions)
     }
