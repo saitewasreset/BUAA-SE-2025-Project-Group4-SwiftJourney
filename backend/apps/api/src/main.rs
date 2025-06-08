@@ -616,6 +616,7 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/hotel").configure(api::hotel::scoped_config)) // Congratulations! You have finished Task 1.2.1D!
                     .service(web::scope("/dish").configure(api::dish::scoped_config)),
             )
+            .service(actix_files::Files::new("/", "/static").index_file("index.html"))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
