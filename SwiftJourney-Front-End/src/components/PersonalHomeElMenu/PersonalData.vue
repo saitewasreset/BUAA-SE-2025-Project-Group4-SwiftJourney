@@ -360,9 +360,13 @@ const user = useUserStore();
         }
         if(this.isSetAge) {
           formPostData.age = parseInt(this.formTepData.age);
+        } else {
+          formPostData.age = user.age;
         }
         if(this.isSetGender) {
           formPostData.gender = this.formTepData.gender == '男' ? 'male' : 'female';
+        } else {
+          formPostData.gender = user.gender;
         }
 
         await userApi.setUserInfo(formPostData)

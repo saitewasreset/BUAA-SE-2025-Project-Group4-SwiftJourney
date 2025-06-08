@@ -185,6 +185,10 @@
     }
 
     function checkRechargeAmount() {
+        if(rechargeAmount.value > 10000000000) {
+            message.warning('充值金额过大');
+            rechargeAmount.value = 0;
+        }
         if (rechargeAmount.value < 0) {
             message.warning('充值金额必须大于0');
             rechargeAmount.value = 0;
@@ -194,6 +198,10 @@
     async function handleUserRecharge() {
         if(rechargeAmount.value === 0) {
             message.warning('充值金额不能为0');
+            return;
+        }
+        else if(rechargeAmount.value > 10000000000) {
+            message.warning('充值金额过大');
             return;
         }
         else if(rechargeAmount.value === null) {
@@ -210,8 +218,11 @@
                 message.success('充值成功');
             else {
                 message.error('登录信息过期，请重新登录');
+                goToLoginPage();
             }
             await user.restoreUserFromCookie(router);
+            rechargeModalVisible.value = false;
+            rechargeAmount.value = 0;
         } catch(error) {
             console.log(error);
         }
