@@ -672,7 +672,7 @@ export default {
                                 id: trainOrderInfo.orderId,
                                 name: trainOrderInfo.name,
                                 depatureStation: trainOrderInfo.departureStation,
-                                reachStation: trainOrderInfo.terminalStation,
+                                reachStation: trainOrderInfo.arrivalStation,
                                 trainNumber: trainOrderInfo.trainNumber,
                                 date: trainOrderInfo.departureTime.substring(0, 10),
                                 depatureTime: trainOrderInfo.departureTime.substring(11),
@@ -1536,16 +1536,6 @@ export default {
   background: linear-gradient(90deg, #3b82f6, #8b5cf6);
   border-radius: 1px;
   position: relative;
-}
-
-.route-line::after {
-  content: '→';
-  position: absolute;
-  right: -8px;
-  top: -6px;
-  color: #8b5cf6;
-  font-size: 14px;
-  font-weight: bold;
 }
 
 .passenger-info {

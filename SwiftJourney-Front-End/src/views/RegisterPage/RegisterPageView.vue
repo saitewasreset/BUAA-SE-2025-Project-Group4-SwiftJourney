@@ -808,10 +808,10 @@ $error-color: #e74c3c;
       transition: all 0.3s ease;
       box-shadow: 0 8px 16px rgba($primary-color, 0.3);
       
-      &:hover:not(:disabled) {
+      &:hover {
         transform: translateY(-2px);
-        box-shadow: 0 12px 24px rgba($primary_color, 0.4);
-        background: linear-gradient(135deg, lighten($primary-color, 5%) 0%, lighten($secondary-color, 5%) 100%);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(135deg, #7c8ef0 0%, #8557a8 100%);
       }
       
       &:active:not(:disabled) {
