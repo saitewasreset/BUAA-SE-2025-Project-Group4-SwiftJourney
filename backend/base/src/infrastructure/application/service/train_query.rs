@@ -53,7 +53,7 @@ use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
-use crate::domain::service::train_schedule::TrainScheduleService;
+use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
 use async_trait::async_trait;
 use chrono::{Duration, FixedOffset, NaiveDate};
 use rust_decimal::prelude::ToPrimitive;
@@ -209,8 +209,16 @@ where
             .train_schedule_service
             .get_schedule_by_train_number_and_date(cmd.train_number.clone(), departure_date)
             .await
-            .inspect_err(|e| error!("Failed to get schedule by train number and date: {:?}", e))
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .map_err(|e| match e {
+                TrainScheduleServiceError::InvalidTrainNumber(_for_super_earth) => {
+                    GeneralError::NotFound
+                }
+                x => {
+                    error!("Failed to get train schedule: {}", x);
+
+                    GeneralError::InternalServerError
+                }
+            })?
             .ok_or(GeneralError::BadRequest(format!(
                 "invalid train: {} {}",
                 cmd.train_number, cmd.departure_date
