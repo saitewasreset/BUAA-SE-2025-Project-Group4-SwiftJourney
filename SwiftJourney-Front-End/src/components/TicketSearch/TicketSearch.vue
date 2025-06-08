@@ -21,17 +21,17 @@
       <div class="search-container">
         <!-- 城市选择区域 -->
         <div class="city-selection-wrapper">
-          <!-- <CitySelect 
-                        v-if="isCurChooseRefActive"
-                        :el="inputRef"
-                        @handleCityClick="handleCityClick"
-                    /> -->
-          <SelectCard
-            v-if="isCurChooseRefActive"
-            :el="inputRef"
-            :input="cityInput"
-            @handleCityClick="handleCityClick"
-          />
+          <!-- 使用 Teleport 将 SelectCard 渲染到 body -->
+          <Teleport to="body">
+            <SelectCard
+              v-if="isCurChooseRefActive"
+              :el="inputRef"
+              :input="cityInput"
+              @handleCityClick="handleCityClick"
+              :style="selectCardStyle"
+            />
+          </Teleport>
+          
           <div class="city-selection">
             <!-- 出发城市 -->
             <div class="city-input-group departure">
@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, nextTick, computed } from 'vue'
+import { ref, h, nextTick, computed, Teleport } from 'vue'
 import { onMounted, onUnmounted } from 'vue'
 
 import { SwapOutlined, SearchOutlined } from '@ant-design/icons-vue'
@@ -195,8 +195,8 @@ async function swapCitys() {
 }
 
 const inputRef = ref<HTMLElement | undefined>(undefined)
-
 const isCurChooseRefActive = ref<boolean>(false)
+const selectCardStyle = ref({})
 
 import SelectCard from '@/components/SelectCard/SelectCard.vue'
 
@@ -206,6 +206,24 @@ async function handleInputFocus(id: string) {
   selectedInputId.value = id
   const inputElement = document.getElementById(id) as HTMLElement
   inputRef.value = inputElement
+  
+  // 计算弹出框位置
+  if (inputElement) {
+    const rect = inputElement.getBoundingClientRect()
+    selectCardStyle.value = {
+      position: 'fixed',
+      top: `${rect.bottom + 8}px`,
+      left: `${rect.left}px`,
+      zIndex: 10000,
+      background: 'white',
+      borderRadius: '8px',
+      boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25)',
+      border: '1px solid #e4e7ed',
+      maxHeight: '300px',
+      overflow: 'auto'
+    }
+  }
+  
   isCurChooseRefActive.value = false
   await nextTick()
   isCurChooseRefActive.value = true
