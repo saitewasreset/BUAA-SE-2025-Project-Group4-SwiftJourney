@@ -130,7 +130,6 @@ import { ref, nextTick, reactive, computed, watch, Teleport } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import type { HotelQuery, HotelGeneralInfo, HotelGInfoWRoom, HotelOrderQuery, HotelRoomDetailInfo } from '@/interface/hotelInterface';
 import SelectCard from '../SelectCard/SelectCard.vue'
-import CitySelect from '../TicketSearch/CitySelect/CitySelect.vue';
 import { SearchOutlined } from '@ant-design/icons-vue';
 import locale from 'ant-design-vue/es/date-picker/locale/zh_CN';
 import dayjs from 'dayjs';

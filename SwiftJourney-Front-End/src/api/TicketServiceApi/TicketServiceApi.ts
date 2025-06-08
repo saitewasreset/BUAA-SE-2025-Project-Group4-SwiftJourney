@@ -1,6 +1,6 @@
 import { getRequest, postRequest } from '../axios'
 import type {
-  scheduleRequest, TrainInfoQuery
+  scheduleRequest, trainTransactionRequest
 } from '@/interface/ticketServiceInterface'
 
 export const TicketServiceApi = {
@@ -14,7 +14,8 @@ export const TicketServiceApi = {
     return postRequest('/api/train/schedule/query_indirect', params)
   },
 
-  trainSchedule: (params: TrainInfoQuery) => {
-    return postRequest('/api/train/schedule/', params);
-  }
+  // 提交订单
+  submitOrder: (params: trainTransactionRequest) => {
+    return postRequest('/api/train/order/new', params)
+  },
 }
