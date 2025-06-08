@@ -294,7 +294,7 @@ async function searchHotel() {
         search: hotelQuery.value.search,
     };
     await hotelApi.hotelQuery(postQuery)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200){
             if(res.data.code == 200) {
                 successSearchHotel(res.data.data);
@@ -308,7 +308,7 @@ async function searchHotel() {
                 throw new Error(res.data.message);
             }
         }
-    }) .catch ((error) => {
+    }) .catch ((error: any) => {
         ElMessage.error(error);
         console.error(error);
     })
@@ -409,7 +409,7 @@ async function successSearchHotel(hotelGeneralInfo: HotelGeneralInfo[]) {
 async function hotelDetailRoom(id: string) {
     return hotelApi.hotelOrderInfo({
         hotelId: id, beginDate: hotelQuery.value.beginDate, endDate: hotelQuery.value.endDate} as HotelOrderQuery
-    ).then((res) => {
+    ).then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 let myMap = new Map(Object.entries(res.data.data as { [key: string]: HotelRoomDetailInfo }));
@@ -421,7 +421,7 @@ async function hotelDetailRoom(id: string) {
                 throw new Error(res.data.message);
             }
         }
-    }).catch((error) => {
+    }).catch((error: any) => {
         ElMessage.error(error);
         return new Map<string, HotelRoomDetailInfo>();
     })
