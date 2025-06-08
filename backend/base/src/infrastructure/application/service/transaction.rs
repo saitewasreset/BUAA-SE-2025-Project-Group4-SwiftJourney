@@ -20,8 +20,9 @@ use crate::domain::service::user::{UserService, UserServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use shared::utils::TimeMeter;
 use std::sync::Arc;
-use tracing::{error, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 pub struct TransactionApplicationServiceImpl<S, T, R, U, UR>
 where
@@ -306,6 +307,8 @@ where
         &self,
         query: TransactionDetailQuery,
     ) -> Result<Vec<TransactionDataDto>, Box<dyn ApplicationError>> {
+        let mut meter = TimeMeter::new("query_transaction_details");
+
         let user_id = self.get_user_id_by_session_id(&query.session_id).await?;
 
         let transaction_list = self
@@ -318,6 +321,8 @@ where
 
                 GeneralError::InternalServerError
             })?;
+
+        meter.meter("load transaction list");
 
         let mut result = Vec::with_capacity(transaction_list.len());
 
@@ -337,6 +342,10 @@ where
                     })?,
             )
         }
+
+        meter.meter("convert transactions to DTO");
+
+        info!("{}", meter);
 
         Ok(result)
     }
