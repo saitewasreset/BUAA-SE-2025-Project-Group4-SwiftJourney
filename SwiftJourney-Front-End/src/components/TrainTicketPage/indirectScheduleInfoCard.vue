@@ -159,7 +159,13 @@
       <div class="function-area">
         <!-- 最低价格 -->
         <div class="price-info">SC {{ content.first_ride.price + content.second_ride.price }}</div>
-        <a-button :disable="!checkBookable" type="primary" class="book-btn">订票</a-button>
+        <a-button
+          :disable="!checkBookable"
+          type="primary"
+          class="book-btn"
+          @click="onClickBookTicket"
+          >订票</a-button
+        >
       </div>
     </div>
   </div>
@@ -173,6 +179,11 @@ import type {
   stoppingStationInfo,
   seatTypeInfo,
 } from '@/interface/ticketServiceInterface'
+import { useTicketServiceStore } from '@/stores/ticketService'
+import { useRouter } from 'vue-router'
+
+const ticketServiceStore = useTicketServiceStore()
+const router = useRouter()
 
 // -------------------- 接口数据类型 --------------------
 const props = withDefaults(
@@ -503,6 +514,13 @@ const sortedSeatInfoSecondRide = computed(() => {
     },
   )
 })
+// -------------------- 订票按钮逻辑 --------------------
+function onClickBookTicket() {
+  // 设置预订车次信息
+  ticketServiceStore.preOrderSchedule = props.content
+  // 跳转到订单页面
+  router.push('/trainTransaction')
+}
 </script>
 
 <style lang="css" scoped>
