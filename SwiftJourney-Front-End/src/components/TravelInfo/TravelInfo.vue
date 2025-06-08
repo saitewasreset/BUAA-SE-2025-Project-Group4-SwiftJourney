@@ -1,27 +1,30 @@
 <template>
-    <el-card class="TravelInfoCard" shadow="never">
+    <!-- 只在有火车票订单时显示 -->
+    <el-card v-if="hasTrainOrder" class="TravelInfoCard" shadow="never">
         <div class="TravelInfo">
             <div class="TravelDate">
-                <p>2023年10月1日</p>
+                <p>{{ formatDate(orderDetails.date) }}</p>
             </div>
             <div class="TravelStatus">
-                <el-tag type="success" size="large" round>待出发</el-tag>
+                <el-tag :type="getStatusType(orderDetails.status)" size="large" round>
+                    {{ orderDetails.status }}
+                </el-tag>
             </div>
         </div>
         <div class="TicketInfo">
             <div class="RouteSection">
                 <div class="Departure">
                     <div class="Time">
-                        <span>09:12</span>
+                        <span>{{ orderDetails.departureTime }}</span>
                     </div>
                     <div class="City">
-                        <span>北京</span>
+                        <span>{{ orderDetails.departureStation }}</span>
                     </div>
                 </div>
                 <div class="Arrow">
                     <div class="TrainInfo">
-                        <span class="TrainNumber">G1</span>
-                        <span class="Duration">1 小时 20 分钟</span>
+                        <span class="TrainNumber">{{ orderDetails.trainNumber }}</span>
+                        <span class="Duration">{{ orderDetails.duration }}</span>
                     </div>
                     <div class="ArrowLine">
                         <div class="Line"></div>
@@ -32,21 +35,21 @@
                 </div>
                 <div class="Arrival">
                     <div class="Time">
-                        <span>11:30</span>
+                        <span>{{ orderDetails.arrivalTime }}</span>
                     </div>
                     <div class="City">
-                        <span>上海</span>
+                        <span>{{ orderDetails.arrivalStation }}</span>
                     </div>
                 </div>
             </div>
             <div class="SeatInfo">
                 <div class="SeatDetails">
                     <div class="SeatNumberGroup">
-                        <span class="CarNumber">07车</span>
-                        <span class="SeatNumber">12C</span>
+                        <span class="CarNumber">{{ orderDetails.carNumber }}</span>
+                        <span class="SeatNumber">{{ orderDetails.seatNumber }}</span>
                     </div>
                     <div class="SeatType">
-                        <el-tag type="info" size="large">二等座</el-tag>
+                        <el-tag type="info" size="large">{{ orderDetails.seatType }}</el-tag>
                     </div>
                 </div>
             </div>
@@ -55,7 +58,190 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import dayjs from 'dayjs';
+import { orderApi } from "@/api/orderApi/orderApi";
+import type { 
+  ResponseData, 
+  TrainOrderInfo, 
+  SeatLocationInfo 
+} from '@/interface/interface';
+import { ElMessage } from 'element-plus';
+import { useUserStore } from '@/stores/user';
 
+// 状态映射
+const statusChangeTab = {
+  unpaid: "未支付",
+  paid: "已支付", 
+  ongoing: "未出行",
+  active: "行程中",
+  completed: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+// 响应式数据
+const orderList = ref<TrainOrderInfo[]>([]);
+const loading = ref(false);
+
+const user = useUserStore();
+
+// 订单详情接口
+interface OrderDetails {
+  id: string;
+  status: string;
+  trainNumber: string;
+  departureStation: string;
+  arrivalStation: string;
+  departureTime: string;
+  arrivalTime: string;
+  date: string;
+  duration: string;
+  carNumber: string;
+  seatNumber: string;
+  seatType: string;
+  name: string;
+}
+
+// 计算属性
+const hasTrainOrder = computed(() => {
+  return orderList.value.length > 0;
+});
+
+// 获取最近的火车票订单详情
+const orderDetails = computed((): OrderDetails => {
+  if (orderList.value.length === 0) {
+    return {} as OrderDetails;
+  }
+
+  const nearestOrder = orderList.value[0];
+  const departureTime = dayjs(nearestOrder.departureTime);
+  const arrivalTime = dayjs(nearestOrder.arrivalTime);
+  
+  // 计算行程时长
+  const duration = calculateDuration(nearestOrder.departureTime, nearestOrder.arrivalTime);
+  
+  // 格式化座位信息
+  const seatInfo = formatSeatInfo(nearestOrder.seat);
+
+  return {
+    id: nearestOrder.orderId,
+    status: statusChangeTab[nearestOrder.status],
+    trainNumber: nearestOrder.trainNumber,
+    departureStation: nearestOrder.departureStation,
+    arrivalStation: nearestOrder.arrivalStation,
+    departureTime: departureTime.format('HH:mm'),
+    arrivalTime: arrivalTime.format('HH:mm'),
+    date: departureTime.format('YYYY-MM-DD'),
+    duration: duration,
+    carNumber: seatInfo.carNumber,
+    seatNumber: seatInfo.seatNumber,
+    seatType: seatInfo.seatType,
+    name: nearestOrder.name
+  };
+});
+
+// 方法
+const formatDate = (dateStr: string): string => {
+  return dayjs(dateStr).format('YYYY年MM月DD日');
+};
+
+const getStatusType = (status: string): string => {
+  const statusTypeMap: { [key: string]: string } = {
+    '未支付': 'warning',
+    '已支付': 'info',
+    '未出行': 'success',
+    '行程中': 'primary',
+    '已完成': 'success',
+    '失败': 'danger',
+    '已取消': 'info'
+  };
+  return statusTypeMap[status] || 'info';
+};
+
+const calculateDuration = (departureTime: string, arrivalTime: string): string => {
+  const departure = dayjs(departureTime);
+  const arrival = dayjs(arrivalTime);
+  const diffMinutes = arrival.diff(departure, 'minute');
+  
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+  
+  if (hours > 0) {
+    return `${hours} 小时 ${minutes} 分钟`;
+  }
+  return `${minutes} 分钟`;
+};
+
+const formatSeatInfo = (seat: SeatLocationInfo) => {
+  const carNumber = seat.carriage < 10 ? `0${seat.carriage}车` : `${seat.carriage}车`;
+  const seatNumber = `${seat.row}${seat.location}`;
+  const seatType = seat.type;
+  
+  return {
+    carNumber,
+    seatNumber,
+    seatType
+  };
+};
+
+const initOrderList = async () => {
+  try {
+    loading.value = true;
+    const res = await orderApi.orderList();
+    
+    if (res.status === 200 && res.data.code === 200) {
+      const resData: ResponseData = res.data.data;
+      processTrainOrders(resData);
+    } else {
+      throw new Error(res.statusText);
+    }
+  } catch (error) {
+    console.error('获取订单列表失败:', error);
+    ElMessage.error('获取行程信息失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const processTrainOrders = (resData: ResponseData) => {
+  const trainOrders: TrainOrderInfo[] = [];
+  const now = dayjs();
+  
+  for (const transactionData of resData) {
+    for (const orderInfo of transactionData.orders) {
+      // 只处理火车票订单，且状态不是未支付或已取消
+      if (orderInfo.orderType === 'train' && 
+          orderInfo.status !== 'unpaid' && 
+          orderInfo.status !== 'cancelled') {
+        
+        const trainOrder = orderInfo as TrainOrderInfo;
+        
+        // 只添加属于当前用户的订单
+        if (trainOrder.name === user.name) {
+          const departureTime = dayjs(trainOrder.departureTime);
+          
+          // 只显示未来的行程或当天的行程
+          if (departureTime.isAfter(now) || departureTime.isSame(now, 'day')) {
+            trainOrders.push(trainOrder);
+          }
+        }
+      }
+    }
+  }
+
+  // 按出发时间排序，最近的在前
+  trainOrders.sort((a, b) => {
+    return dayjs(a.departureTime).valueOf() - dayjs(b.departureTime).valueOf();
+  });
+
+  orderList.value = trainOrders;
+};
+
+// 生命周期
+onMounted(() => {
+  initOrderList();
+});
 </script>
 
 <style lang="scss" scoped>

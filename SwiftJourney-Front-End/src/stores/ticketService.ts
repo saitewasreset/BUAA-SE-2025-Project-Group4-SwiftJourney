@@ -9,19 +9,18 @@ import type {
 } from '@/interface/ticketServiceInterface'
 import { CheckType, SortType } from '@/interface/ticketServiceInterface'
 import dayjs, { Dayjs } from 'dayjs'
-import { useUserStore } from './user'
 import { useGeneralStore } from './general'
 import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
 import { message } from 'ant-design-vue'
 
 const generalStore = useGeneralStore()
-const userStore = useUserStore()
 
 export const useTicketServiceStore = defineStore('ticketService', {
   state: () => ({
     // -------------------- 筛选相关 --------------------
     // 只显示有票的车次
     onlyShowAvailable: false,
+    isLoading: false,
     checkGroups: [
       // 车次类型
       {
@@ -30,7 +29,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         indeterminate: false,
         checkAll: true,
       },
-      // 座位类型
+      // 座席类别
       {
         options: ['加载中...'],
         checkedList: ['加载中...'],
@@ -73,7 +72,12 @@ export const useTicketServiceStore = defineStore('ticketService', {
     // -------------------- 查询相关 --------------------
     // 查询日期
     // 默认查询今天的日期
-    queryDate: new Date().toISOString().split('T')[0],
+    queryDate:
+      new Date().getFullYear() +
+      '-' +
+      (new Date().getMonth() + 1).toString().padStart(2, '0') +
+      '-' +
+      new Date().getDate().toString().padStart(2, '0'),
     // 查询城市/站点
     queryDepartureText: '',
     queryArrivalText: '',
@@ -81,6 +85,8 @@ export const useTicketServiceStore = defineStore('ticketService', {
     queryMode: 'direct' as QueryMode,
     // 查询结果
     queryResult: [] as directScheduleInfo[] | indirectScheduleInfo[],
+    // -------------------- 订单相关 --------------------
+    preOrderSchedule: null as directScheduleInfo | indirectScheduleInfo | null,
   }),
   getters: {
     // -------------------- 时间相关 --------------------
@@ -92,9 +98,10 @@ export const useTicketServiceStore = defineStore('ticketService', {
       for (let i = 0; i < 14; i++) {
         const date = new Date()
         date.setDate(today.getDate() + i)
-
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        const day = date.getDate().toString().padStart(2, '0')
         days.push({
-          date: date.toISOString().split('T')[0], // YYYY-MM-DD格式
+          date: `${date.getFullYear()}-${month}-${day}`, // YYYY-MM-DD格式
           display: `${date.getMonth() + 1}-${date.getDate()}`, // M-D格式
         })
       }
@@ -195,7 +202,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         }
       }
 
-      // 3. 座位类型筛选
+      // 3. 座席类别筛选
       const seatTypeChecked = this.checkGroups[CheckType.SeatType].checkedList
       if (
         seatTypeChecked.length < this.checkGroups[CheckType.SeatType].options.length &&
@@ -287,6 +294,20 @@ export const useTicketServiceStore = defineStore('ticketService', {
           const departureTime = directSchedule.departureTime
           const departureDate = new Date(departureTime)
           const departureTimeNumber = departureDate.getHours() * 60 + departureDate.getMinutes()
+          
+          // 检查是否是今天，如果是今天，还需要检查发车时间是否在当前时间5分钟之后
+          const today = new Date()
+          const queryDateObj = new Date(this.queryDate)
+          const isToday = today.toDateString() === queryDateObj.toDateString()
+          
+          if (isToday) {
+            const currentTimeNumber = today.getHours() * 60 + today.getMinutes()
+            const minDepartureTime = currentTimeNumber + 5
+            if (departureTimeNumber < minDepartureTime) {
+              return false
+            }
+          }
+          
           return (
             departureTimeNumber >= this.startTimeRangeNumber[0] &&
             departureTimeNumber <= this.startTimeRangeNumber[1]
@@ -297,6 +318,20 @@ export const useTicketServiceStore = defineStore('ticketService', {
           const firstDepartureDate = new Date(firstDepartureTime)
           const firstDepartureTimeNumber =
             firstDepartureDate.getHours() * 60 + firstDepartureDate.getMinutes()
+          
+          // 检查是否是今天，如果是今天，还需要检查发车时间是否在当前时间5分钟之后
+          const today = new Date()
+          const queryDateObj = new Date(this.queryDate)
+          const isToday = today.toDateString() === queryDateObj.toDateString()
+          
+          if (isToday) {
+            const currentTimeNumber = today.getHours() * 60 + today.getMinutes()
+            const minDepartureTime = currentTimeNumber + 5
+            if (firstDepartureTimeNumber < minDepartureTime) {
+              return false
+            }
+          }
+          
           return (
             firstDepartureTimeNumber >= this.startTimeRangeNumber[0] &&
             firstDepartureTimeNumber <= this.startTimeRangeNumber[1]
@@ -511,6 +546,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         params.arrivalStation = checkArrivalText.target
       }
       this.resetSpecificState()
+      this.isLoading = true
       // 根据查询模式选择查询方法
       if (this.queryMode === 'direct') {
         try {
@@ -533,13 +569,14 @@ export const useTicketServiceStore = defineStore('ticketService', {
       } else {
         message.error('查询模式不正确，请选择直达或中转')
       }
+      this.isLoading = false
     },
     // 处理查询结果
     handleResponse(res: any) {
       if (res.code === 200) {
         this.queryResult = res.data.solutions
         // 更新筛选选项
-        // 座位类型
+        // 座席类别
         this.checkGroups[CheckType.SeatType].options = Array.from(
           new Set(
             this.queryResult.flatMap((schedule: any) => {
@@ -631,5 +668,6 @@ export const useTicketServiceStore = defineStore('ticketService', {
         message.error(`查询失败: 未知错误`)
       }
     },
+    // ---------------------- 订单相关 --------------------
   },
 })
