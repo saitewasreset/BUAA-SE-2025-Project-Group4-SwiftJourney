@@ -67,6 +67,7 @@ import type {
   SeatLocationInfo 
 } from '@/interface/interface';
 import { ElMessage } from 'element-plus';
+import { useUserStore } from '@/stores/user';
 
 // 状态映射
 const statusChangeTab = {
@@ -82,6 +83,8 @@ const statusChangeTab = {
 // 响应式数据
 const orderList = ref<TrainOrderInfo[]>([]);
 const loading = ref(false);
+
+const user = useUserStore();
 
 // 订单详情接口
 interface OrderDetails {
@@ -126,7 +129,7 @@ const orderDetails = computed((): OrderDetails => {
     status: statusChangeTab[nearestOrder.status],
     trainNumber: nearestOrder.trainNumber,
     departureStation: nearestOrder.departureStation,
-    arrivalStation: nearestOrder.terminalStation,
+    arrivalStation: nearestOrder.arrivalStation,
     departureTime: departureTime.format('HH:mm'),
     arrivalTime: arrivalTime.format('HH:mm'),
     date: departureTime.format('YYYY-MM-DD'),
@@ -213,11 +216,15 @@ const processTrainOrders = (resData: ResponseData) => {
           orderInfo.status !== 'cancelled') {
         
         const trainOrder = orderInfo as TrainOrderInfo;
-        const departureTime = dayjs(trainOrder.departureTime);
         
-        // 只显示未来的行程或当天的行程
-        if (departureTime.isAfter(now) || departureTime.isSame(now, 'day')) {
-          trainOrders.push(trainOrder);
+        // 只添加属于当前用户的订单
+        if (trainOrder.name === user.name) {
+          const departureTime = dayjs(trainOrder.departureTime);
+          
+          // 只显示未来的行程或当天的行程
+          if (departureTime.isAfter(now) || departureTime.isSame(now, 'day')) {
+            trainOrders.push(trainOrder);
+          }
         }
       }
     }

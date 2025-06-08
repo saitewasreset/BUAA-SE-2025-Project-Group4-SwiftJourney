@@ -391,12 +391,18 @@ const processOrderData = (resData: ResponseData) => {
           order.details = {
             trainNumber: trainOrder.trainNumber,
             departureStation: trainOrder.departureStation,
-            terminalStation: trainOrder.terminalStation,
+            arrivalStation: trainOrder.arrivalStation,
             seat: getSeat(trainOrder.seat),
             name: trainOrder.name,
             date: dayjs(trainOrder.departureTime).format("YYYY-MM-DD"),
-            time: dayjs(trainOrder.departureTime).format("HH:mm")
+            time: dayjs(trainOrder.departureTime).format("HH:mm"),
+            arrivalDate: dayjs(trainOrder.arrivalTime).format("YYYY-MM-DD"),
+            arrivalTime: dayjs(trainOrder.arrivalTime).format("HH:mm")
           };
+          // 只添加属于当前用户的订单
+          if (trainOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "hotel":
@@ -410,6 +416,10 @@ const processOrderData = (resData: ResponseData) => {
             name: hotelOrder.name,
             amount: hotelOrder.amount
           };
+          // 只添加属于当前用户的订单
+          if (hotelOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "dish":
@@ -422,6 +432,10 @@ const processOrderData = (resData: ResponseData) => {
             name: dishOrder.name,
             date: dayjs(dishOrder.depatureTime).format("YYYY-MM-DD")
           };
+          // 只添加属于当前用户的订单
+          if (dishOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "takeaway":
@@ -436,10 +450,12 @@ const processOrderData = (resData: ResponseData) => {
             name: takeawayOrder.name,
             date: dayjs(takeawayOrder.depatureTime).format("YYYY-MM-DD")
           };
+          // 只添加属于当前用户的订单
+          if (takeawayOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
       }
-
-      orders.push(order);
     }
   }
 

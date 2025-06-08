@@ -10,64 +10,61 @@
     </div>
 
     <!-- 订单列表区域 -->
-    <el-scrollbar height="320px" class="order-list-container">
-      <div v-if="mealOrderStore.mealOrderInfoList.length === 0" class="empty-state">
-        <div class="empty-icon">🍽️</div>
-        <p class="empty-text">您还没有选择任何餐品</p>
-        <p class="empty-hint">选择心仪的餐食开始您的美味之旅</p>
-      </div>
-
-      <div v-else class="order-items">
-        <div
-          v-for="(item, index) in mealOrderStore.mealOrderInfoList"
-          :key="index"
-          class="order-item-container"
-          @mouseenter="showDeleteIcon(index)"
-          @mouseleave="hideDeleteIcon(index)"
-        >
-          <div class="order-item-card">
-            <!-- 餐品信息 -->
-            <div class="item-info">
-              <div class="shop-badge">{{ item.shopName }}</div>
-              <h4 class="item-name">{{ item.name }}</h4>
-              <div class="item-details">
-                <span v-if="item.dishTime" class="meal-time">
-                  {{ lunchChangeTab[item.dishTime] }}
-                </span>
-                <span class="item-price">SC {{ item.price }}/份</span>
-              </div>
+    <div v-if="mealOrderStore.mealOrderInfoList.length === 0" class="empty-state">
+      <div class="empty-icon">🍽️</div>
+      <p class="empty-text">您还没有选择任何餐品</p>
+      <p class="empty-hint">选择心仪的餐食开始您的美味之旅</p>
+    </div>
+    <div v-else class="order-items">
+      <div
+        v-for="(item, index) in mealOrderStore.mealOrderInfoList"
+        :key="index"
+        class="order-item-container"
+        @mouseenter="showDeleteIcon(index)"
+        @mouseleave="hideDeleteIcon(index)"
+      >
+        <div class="order-item-card">
+          <!-- 餐品信息 -->
+          <div class="item-info">
+            <div class="shop-badge">{{ item.shopName }}</div>
+            <h4 class="item-name">{{ item.name }}</h4>
+            <div class="item-details">
+              <span v-if="item.dishTime" class="meal-time">
+                {{ lunchChangeTab[item.dishTime] }}
+              </span>
+              <span class="item-price">SC {{ item.price }}/份</span>
             </div>
+          </div>
 
-            <!-- 数量控制 -->
-            <div class="quantity-control">
-              <el-input-number
-                v-model="item.amount"
-                :min="1"
-                :max="10"
-                size="small"
-                class="quantity-input"
-              />
-            </div>
+          <!-- 数量控制 -->
+          <div class="quantity-control">
+            <el-input-number
+              v-model="item.amount"
+              :min="1"
+              :max="10"
+              size="small"
+              class="quantity-input"
+            />
+          </div>
 
-            <!-- 总价显示 -->
-            <div class="item-total">
-              <span class="total-price">SC{{ item.amount * item.price }}</span>
-            </div>
+          <!-- 总价显示 -->
+          <div class="item-total">
+            <span class="total-price">SC{{ item.amount * item.price }}</span>
+          </div>
 
-            <!-- 删除按钮 -->
-            <div
-              v-if="deleteIconsVisible[index]"
-              class="delete-button"
-              @click="deleteRoomFromOrder(item.shopName, item.name, item.dishTime)"
-            >
-              <el-icon class="delete-icon">
-                <CircleCloseFilled />
-              </el-icon>
-            </div>
+          <!-- 删除按钮 -->
+          <div
+            v-if="deleteIconsVisible[index]"
+            class="delete-button"
+            @click="deleteRoomFromOrder(item.shopName, item.name, item.dishTime)"
+          >
+            <el-icon class="delete-icon">
+              <CircleCloseFilled />
+            </el-icon>
           </div>
         </div>
       </div>
-    </el-scrollbar>
+    </div>
 
     <!-- 底部操作区域 -->
     <div class="card-footer">
@@ -299,9 +296,10 @@ function goToPay(transactionId: string, money: string) {
 
 /* 订单列表容器 */
 .order-list-container {
-  flex: 1;
+  flex-grow: 1;
   padding: 16px 20px 0;
   background: rgba(248, 250, 252, 0.5);
+  overflow: auto;
 }
 
 .order-list-container :deep(.el-scrollbar__view) {
@@ -344,6 +342,9 @@ function goToPay(transactionId: string, money: string) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: auto;
+  padding: 1rem;
+  gap: 0.5em;
 }
 
 .order-item-container {
@@ -485,6 +486,7 @@ function goToPay(transactionId: string, money: string) {
   padding: 16px 20px 20px;
   background: rgba(248, 250, 252, 0.8);
   border-top: 1px solid rgba(64, 158, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .footer-summary {
@@ -568,6 +570,8 @@ function goToPay(transactionId: string, money: string) {
   .order-info-card {
     width: 100%;
     margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
   }
 
   .order-item-card {
