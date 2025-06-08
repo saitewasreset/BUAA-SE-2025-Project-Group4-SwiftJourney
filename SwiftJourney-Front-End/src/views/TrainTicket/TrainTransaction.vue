@@ -592,7 +592,12 @@
                   <span class="price-value">¥{{ calculateTotalPrice() }}</span>
                 </div>
               </div>
-              <el-button class="proceed-btn" type="primary" size="large">
+              <el-button 
+                class="proceed-btn" 
+                type="primary" 
+                size="large"
+                @click="proceedToOrder"
+              >
                 继续预订 ({{ passengers.length }}人)
               </el-button>
             </div>
@@ -670,10 +675,15 @@ import type {
 import { useTicketServiceStore } from '@/stores/ticketService'
 import { computed, ref, reactive, onMounted } from 'vue'
 import { Delete, User, Download, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { userApi } from '@/api/UserApi/userApi'
+import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
+import type { TrainOrderRequest, trainTransactionRequest } from '@/interface/ticketServiceInterface'
+import type { TransactionInfo } from '@/interface/interface'
+import { useRouter } from 'vue-router'
 
 const ticketServiceStore = useTicketServiceStore()
+const router = useRouter()
 
 const directPreOrderSchedule = computed(() => {
   return ticketServiceStore.preOrderSchedule as directScheduleInfo
@@ -1314,10 +1324,124 @@ function removePassenger(index: number) {
   ElMessage.success('删除乘车人成功')
 }
 
-// 在组件挂载时加载预填信息
-onMounted(() => {
-  loadPrefilledInfos()
-})
+// 继续预订功能
+function proceedToOrder() {
+  ElMessageBox.confirm(
+    `您选择的车票总价为 ¥${calculateTotalPrice()}，乘车人数 ${passengers.value.length} 人，核对无误后请点击确定`,
+    '确认生成订单',
+    {
+      confirmButtonText: '确定生成',
+      cancelButtonText: '再看看',
+      type: 'info'
+    }
+  )
+  .then(() => {
+    confirmCreateOrder()
+  })
+}
+
+async function confirmCreateOrder() {
+  try {
+    // 构建订单请求数据
+    const orderList: TrainOrderRequest[] = []
+
+    passengers.value.forEach((passenger) => {
+      if (ticketServiceStore.queryMode === 'direct') {
+        // 直达模式：创建一个订单
+        const order: TrainOrderRequest = {
+          trainNumber: directPreOrderSchedule.value.trainNumber,
+          originDepartureTime: directPreOrderSchedule.value.originDepartureTime,
+          departureStation: directPreOrderSchedule.value.departureStation,
+          arrivalStation: directPreOrderSchedule.value.arrivalStation,
+          personalId: passenger.personalId,
+          seatType: passenger.seatType!
+        }
+        orderList.push(order)
+      } else {
+        // 中转模式：创建两个订单（第一程和第二程）
+        const firstRideOrder: TrainOrderRequest = {
+          trainNumber: indirectPreOrderSchedule.value.first_ride.trainNumber,
+          originDepartureTime: indirectPreOrderSchedule.value.first_ride.originDepartureTime,
+          departureStation: indirectPreOrderSchedule.value.first_ride.departureStation,
+          arrivalStation: indirectPreOrderSchedule.value.first_ride.arrivalStation,
+          personalId: passenger.personalId,
+          seatType: passenger.firstRideSeatType!
+        }
+        
+        const secondRideOrder: TrainOrderRequest = {
+          trainNumber: indirectPreOrderSchedule.value.second_ride.trainNumber,
+          originDepartureTime: indirectPreOrderSchedule.value.second_ride.originDepartureTime,
+          departureStation: indirectPreOrderSchedule.value.second_ride.departureStation,
+          arrivalStation: indirectPreOrderSchedule.value.second_ride.arrivalStation,
+          personalId: passenger.personalId,
+          seatType: passenger.secondRideSeatType!
+        }
+        
+        orderList.push(firstRideOrder, secondRideOrder)
+      }
+    })
+
+    // 构建完整的订单请求，根据查询模式设置atomic属性
+    const orderPack = {
+      // 中转模式需要原子操作确保两程票都能成功，直达模式不需要原子操作
+      atomic: ticketServiceStore.queryMode === 'indirect',
+      orderList: orderList
+    }
+
+    const transactionRequest: trainTransactionRequest = [orderPack]
+
+    // 调用API提交订单
+    const response = await TicketServiceApi.submitOrder(transactionRequest)
+    
+    if (response.status === 200) {
+      if (response.data.code === 200) {
+        successCreateOrder(response.data.data as TransactionInfo)
+      } else {
+        throw new Error(response.data.message || '订单创建失败')
+      }
+    } else {
+      throw new Error('网络请求失败')
+    }
+  } catch (error) {
+    console.error('创建订单失败:', error)
+    ElMessage.error('生成订单失败：' + (error as Error).message)
+  }
+}
+
+function successCreateOrder(transactionInfo: TransactionInfo) {
+  // 清空乘车人列表（订单创建成功后）
+  passengers.value = []
+  
+  ElMessageBox.confirm(
+    `您的订单号为 ${transactionInfo.transactionId}，总价 ¥${transactionInfo.amount}，可在订单系统中查看具体信息，是否立即支付？`,
+    '订单生成成功',
+    {
+      confirmButtonText: '立即支付',
+      cancelButtonText: '稍后支付',
+      type: 'success',
+    }
+  ).then(() => {
+    // 跳转到支付页面
+    goToPay(transactionInfo.transactionId, transactionInfo.amount.toString())
+  }).catch(() => {
+    // 用户选择稍后支付，可以跳转到订单列表页面
+    ElMessage.info('订单已创建，您可以稍后在订单中心进行支付')
+    // 可选择跳转到订单列表或首页
+    // router.push('/orders')
+  })
+}
+
+function goToPay(transactionId: string, amount: string) {
+  router.push({
+    name: 'paypage',
+    params: { transactionId: transactionId },
+    query: {
+      money: '¥' + amount,
+    }
+  })
+}
+
+// ...existing code...
 </script>
 
 <style lang="css" scoped>
@@ -2093,6 +2217,7 @@ onMounted(() => {
   background: #f3f4f6;
   padding: 4px 8px;
   border-radius: 6px;
+  display: inline-block;
 }
 
 .passenger-actions {
