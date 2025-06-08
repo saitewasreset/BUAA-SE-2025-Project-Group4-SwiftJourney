@@ -68,8 +68,8 @@
 
     <!-- 结果展示区域 -->
     <div v-if="!isHeadPage" class="Grid">
-      <div class="order-card-container"><SelectCard /></div>
-      <el-scrollbar height="550px" class="DishInfo">
+      <div class="order-card-container" id="details-section"><SelectCard /></div>
+      <el-scrollbar height="600px" class="DishInfo">
         <div v-if="false" class="HotelUnFind">
           <img class="UnfindImage" src="../../assets/unfind.jpg" alt="unfind" />
           <p style="text-align: center">没有搜索到符合条件的餐食，请重新输入</p>
@@ -110,7 +110,7 @@
               ></el-table-column>
               <el-table-column prop="price" label="价格" sortable width="80">
                 <template #default="scope">
-                  <div class="price-tag">¥{{ scope.row.price }}</div>
+                  <div class="price-tag">SC {{ scope.row.price }}</div>
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="80">
@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { h, ref } from 'vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { mealApi } from '@/api/MealApi/mealApi'
 import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
@@ -188,7 +188,7 @@ async function getTrainInfo() {
     trainNumber: trainNumber.value.trim(),
     departureDate: originDepartureTime.value.format('YYYY-MM-DD'),
   })
-    .then((res) => {
+    .then((res: any) => {
       if (res.status == 200) {
         if (res.data.code == 200) {
           getMail(res.data.data)
@@ -199,7 +199,7 @@ async function getTrainInfo() {
         }
       }
     })
-    .catch((err) => {
+    .catch((err: any) => {
       ElMessage.error(err)
     })
 }
@@ -233,7 +233,7 @@ async function getMail(trainInfo: TrainScheduleInfo) {
       trainNumber: trainNumber.value.trim(),
       originDepartureTime: departureTime.value,
     })
-    .then((res) => {
+    .then((res: any) => {
       if (res.status == 200) {
         if (res.data.code == 200) {
           successGetMeal(res.data.data)
@@ -244,7 +244,7 @@ async function getMail(trainInfo: TrainScheduleInfo) {
         }
       }
     })
-    .catch((err) => {
+    .catch((err: any) => {
       ElMessage.error(err)
     })
 }
@@ -278,6 +278,10 @@ function successGetMeal(trainDishInfo: TrainDishInfo) {
   mealOrderStore.deleteAll()
   dishInfo.value = tepInfo
   isHeadPage.value = false
+  const detailsSection = document.getElementById('details-section');
+  if (detailsSection) {
+    detailsSection.scrollIntoView({ behavior: 'smooth' });
+  }
 }
 
 const orderDish = (shopName: string, food: TakeawayDishInfo) => {
