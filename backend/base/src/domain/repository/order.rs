@@ -36,10 +36,17 @@ pub struct RouteInfo {
 pub struct TrainOrderRelatedData {
     /// 车次号
     pub train_number: String,
+
     pub departure_station: String,
-    pub terminal_station: String,
+    pub arrival_station: String,
     pub departure_time: String,
-    pub terminal_time: String,
+    pub arrival_time: String,
+
+    pub origin_station: String,
+    pub terminal_station: String,
+    pub origin_departure_time: String,
+    pub terminal_arrival_time: String,
+
     /// 旅客姓名
     pub name: String,
 }

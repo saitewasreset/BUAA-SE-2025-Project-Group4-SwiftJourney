@@ -105,9 +105,15 @@ where
                 base,
                 train_number: related_info.train_number,
                 departure_station: related_info.departure_station,
-                terminal_station: related_info.terminal_station,
+                arrival_station: related_info.arrival_station,
                 departure_time: related_info.departure_time,
-                terminal_time: related_info.terminal_time,
+                arrival_time: related_info.arrival_time,
+
+                origin_station: related_info.origin_station,
+                terminal_station: related_info.terminal_station,
+                origin_departure_time: related_info.origin_departure_time,
+                terminal_arrival_time: related_info.terminal_arrival_time,
+
                 name: related_info.name,
                 seat: seat.as_ref().map(|seat| SeatLocationInfoDTO {
                     carriage: seat.location_info().carriage,
