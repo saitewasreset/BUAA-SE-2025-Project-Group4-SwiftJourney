@@ -527,7 +527,7 @@ export default {
 
         async apiOrderCancel(id: string) {
             await orderApi.orderCancel(id)
-            .then((res) => {
+            .then((res: any) => {
                 if(res.status == 200) {
                     if(res.data.code == 200) {
                         this.cancelOrderSuccess();
@@ -541,7 +541,7 @@ export default {
                         ElMessage.error('订单不满足取消条件');
                     }
                 }
-            }).catch((error) => {
+            }).catch((error: any) => {
                 ElMessage.error(error);
             })
         },
@@ -627,7 +627,7 @@ export default {
             try {
                 this.loading = true; // 开始加载
                 await orderApi.orderList()
-                .then((res) => {
+                .then((res: any) => {
                     if(res.status == 200){
                         if(res.data.code == 200) {
                             const resData: ResponseData = res.data.data;
@@ -637,7 +637,7 @@ export default {
                         }
                     }
                 })
-                .catch((error) => {
+                .catch((error: any) => {
                     console.error(error);
                 })
             } finally {
