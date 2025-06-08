@@ -1436,7 +1436,7 @@ function goToPay(transactionId: string, amount: string) {
     name: 'paypage',
     params: { transactionId: transactionId },
     query: {
-      money: amount,
+      money: 'SC ' + amount,
     }
   })
 }
