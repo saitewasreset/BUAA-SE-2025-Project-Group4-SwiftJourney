@@ -6,8 +6,11 @@ use crate::domain::repository::order::OrderRepository;
 use crate::domain::service::order::OrderService;
 use crate::domain::service::order::order_dto::*;
 
+use crate::domain::model::user::UserId;
 use async_trait::async_trait;
+use chrono::Timelike;
 use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 
@@ -102,9 +105,15 @@ where
                 base,
                 train_number: related_info.train_number,
                 departure_station: related_info.departure_station,
-                terminal_station: related_info.terminal_station,
+                arrival_station: related_info.arrival_station,
                 departure_time: related_info.departure_time,
-                terminal_time: related_info.terminal_time,
+                arrival_time: related_info.arrival_time,
+
+                origin_station: related_info.origin_station,
+                terminal_station: related_info.terminal_station,
+                origin_departure_time: related_info.origin_departure_time,
+                terminal_arrival_time: related_info.terminal_arrival_time,
+
                 name: related_info.name,
                 seat: seat.as_ref().map(|seat| SeatLocationInfoDTO {
                     carriage: seat.location_info().carriage,
@@ -188,5 +197,21 @@ where
         } else {
             panic!("Unknown order type")
         }
+    }
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_time: DateTimeWithTimeZone,
+    ) -> Result<bool, RepositoryError> {
+        self.order_repository
+            .verify_train_order(
+                user_id,
+                train_number,
+                origin_departure_time.date_naive(),
+                origin_departure_time.time().num_seconds_from_midnight() as i32,
+            )
+            .await
     }
 }

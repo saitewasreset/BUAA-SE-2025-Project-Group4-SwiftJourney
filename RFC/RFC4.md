@@ -1,9 +1,11 @@
 # Request For Comments 4: API 文档
 
-Version: 18 (2025-06-03 20:00:00)
+Version: 19 (2025-06-08 12:55:00)
 
 最近变更：
 
+- Version 19：
+  - 订单列表、订单详情：对于火车票订单，现在同时返回始发站、终到站、起始站、到达站的信息
 - Version 18
   - 取消订单：对于不满足取消条件的订单，现在统一返回 11005 错误
   - 酒店查询：修改拼写错误
@@ -1072,14 +1074,25 @@ interface SeatLocationInfo {
 interface TrainOrderInfo extends OrderInfo {
   // 车次，例如：“G53”
   trainNumber: string;
-  // 始发站
+  // 起始站
   departureStation: string;
-  // 终到站
-  terminalStation: string;
+  // 到达站
+  arrivalStation: string;
   // 离开始发站日期时间
   departureTime: string;
   // 到达终到站的日期时间
-  terminalTime: string;
+  arrivalTime: string;
+
+  // 始发站
+  originStation: string;
+  // 终到站
+  terminalStation: string;
+
+  // 离开始发站日期时间
+  originDepartureTime: string;
+  // 到达终到站日期时间
+  terminalArrivalTime: string;
+
   // 乘车人姓名
   name: string;
   // 人类可读的座位号

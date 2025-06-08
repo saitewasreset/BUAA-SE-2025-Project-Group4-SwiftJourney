@@ -1,7 +1,9 @@
 use crate::domain::RepositoryError;
 use crate::domain::model::order::Order;
+use crate::domain::model::user::UserId;
 use crate::domain::service::order::order_dto::OrderInfoDto;
 use async_trait::async_trait;
+use sea_orm::prelude::DateTimeWithTimeZone;
 
 pub mod order_dto {
     use serde::Serialize;
@@ -49,10 +51,20 @@ pub mod order_dto {
         pub base: BaseOrderDto,
         // 特有字段
         pub train_number: String,
+        // 起始站
         pub departure_station: String,
-        pub terminal_station: String,
+        // 到达站
+        pub arrival_station: String,
         pub departure_time: String,
-        pub terminal_time: String,
+        pub arrival_time: String,
+
+        // 始发站
+        pub origin_station: String,
+        // 终到站
+        pub terminal_station: String,
+        pub origin_departure_time: String,
+        pub terminal_arrival_time: String,
+
         pub name: String,
         pub seat: Option<SeatLocationInfoDTO>,
     }
@@ -117,4 +129,11 @@ pub trait OrderService: 'static + Send + Sync {
         &self,
         order: Box<dyn Order>,
     ) -> Result<OrderInfoDto, RepositoryError>;
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_time: DateTimeWithTimeZone,
+    ) -> Result<bool, RepositoryError>;
 }

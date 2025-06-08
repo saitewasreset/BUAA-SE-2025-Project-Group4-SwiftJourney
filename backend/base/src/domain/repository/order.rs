@@ -36,10 +36,17 @@ pub struct RouteInfo {
 pub struct TrainOrderRelatedData {
     /// 车次号
     pub train_number: String,
+
     pub departure_station: String,
-    pub terminal_station: String,
+    pub arrival_station: String,
     pub departure_time: String,
-    pub terminal_time: String,
+    pub arrival_time: String,
+
+    pub origin_station: String,
+    pub terminal_station: String,
+    pub origin_departure_time: String,
+    pub terminal_arrival_time: String,
+
     /// 旅客姓名
     pub name: String,
 }
@@ -202,4 +209,12 @@ pub trait OrderRepository: 'static + Send + Sync {
         train_order_id: OrderId,
         tz_offset_hour: i32,
     ) -> Result<TakeawayOrderRelatedData, RepositoryError>;
+
+    async fn verify_train_order(
+        &self,
+        user_id: UserId,
+        train_number: String,
+        origin_departure_date: NaiveDate,
+        origin_departure_time_second: i32,
+    ) -> Result<bool, RepositoryError>;
 }
