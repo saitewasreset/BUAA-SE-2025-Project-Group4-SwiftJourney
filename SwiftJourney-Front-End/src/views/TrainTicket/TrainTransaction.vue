@@ -599,65 +599,65 @@
           </div>
         </div>
       </div>
+
+      <!-- 预填信息导入对话框 -->
+      <el-dialog
+        v-model="importDialogVisible"
+        title="选择预填信息"
+        width="500px"
+        class="import-dialog"
+        :close-on-click-modal="false"
+      >
+        <div class="import-content">
+          <div v-if="prefilledInfos.length === 0" class="empty-import-state">
+            <div class="empty-icon">
+              <el-icon size="48"><User /></el-icon>
+            </div>
+            <p class="empty-text">暂无预填信息</p>
+            <p class="empty-subtext">请先在个人中心添加预填信息</p>
+          </div>
+
+          <div v-else class="prefilled-list">
+            <div
+              v-for="(info, index) in prefilledInfos"
+              :key="info.personalId"
+              class="prefilled-item"
+              :class="{ selected: selectedPrefilledInfo?.personalId === info.personalId }"
+              @click="selectPrefilledInfo(info)"
+            >
+              <div class="prefilled-info">
+                <div class="name-section">
+                  <span class="prefilled-name">{{ info.name }}</span>
+                  <span v-if="info.default" class="self-badge">本人</span>
+                </div>
+                <div class="prefilled-id">{{ desensitizeIdCard(info.identityCardId) }}</div>
+                <div class="prefilled-seat">
+                  偏好座位: {{ getSeatLocationText(info.preferredSeatLocation) }}
+                </div>
+              </div>
+              <div class="selection-indicator">
+                <el-icon v-if="selectedPrefilledInfo?.personalId === info.personalId" class="check-icon">
+                  <Check />
+                </el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="import-dialog-footer">
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button
+              type="primary"
+              :disabled="!selectedPrefilledInfo"
+              @click="importPrefilledInfo"
+            >
+              导入选中信息
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
     </div>
-
-    <!-- 预填信息导入对话框 -->
-    <el-dialog
-      v-model="importDialogVisible"
-      title="选择预填信息"
-      width="500px"
-      class="import-dialog"
-      :close-on-click-modal="false"
-    >
-      <div class="import-content">
-        <div v-if="prefilledInfos.length === 0" class="empty-import-state">
-          <div class="empty-icon">
-            <el-icon size="48"><User /></el-icon>
-          </div>
-          <p class="empty-text">暂无预填信息</p>
-          <p class="empty-subtext">请先在个人中心添加预填信息</p>
-        </div>
-
-        <div v-else class="prefilled-list">
-          <div
-            v-for="(info, index) in prefilledInfos"
-            :key="info.personalId"
-            class="prefilled-item"
-            :class="{ selected: selectedPrefilledInfo?.personalId === info.personalId }"
-            @click="selectPrefilledInfo(info)"
-          >
-            <div class="prefilled-info">
-              <div class="name-section">
-                <span class="prefilled-name">{{ info.name }}</span>
-                <span v-if="info.default" class="self-badge">本人</span>
-              </div>
-              <div class="prefilled-id">{{ desensitizeIdCard(info.identityCardId) }}</div>
-              <div class="prefilled-seat">
-                偏好座位: {{ getSeatLocationText(info.preferredSeatLocation) }}
-              </div>
-            </div>
-            <div class="selection-indicator">
-              <el-icon v-if="selectedPrefilledInfo?.personalId === info.personalId" class="check-icon">
-                <Check />
-              </el-icon>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="import-dialog-footer">
-          <el-button @click="importDialogVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            :disabled="!selectedPrefilledInfo"
-            @click="importPrefilledInfo"
-          >
-            导入选中信息
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -1006,6 +1006,7 @@ const processedSecondRideRoute = computed(() => {
 
 // 乘车人相关数据
 interface PassengerInfo {
+  personalId: string // 必须包含预填信息的personalId
   name: string
   identityCardId: string
   seatType?: string
@@ -1023,6 +1024,7 @@ const passengerForm = reactive<PassengerInfo>({
   firstRideSeatType: '',
   secondRideSeatType: '',
   preferredSeatLocation: undefined,
+  personalId: '', // 预填信息的personalId
 })
 
 // 身份证号验证
@@ -1068,7 +1070,7 @@ function checkIdentityCardId() {
 }
 
 // 添加乘车人
-function addPassenger() {
+async function addPassenger() {
   console.log('添加乘车人', passengerForm)
   if (!validatePassengerForm()) {
     return
@@ -1080,15 +1082,74 @@ function addPassenger() {
     return
   }
 
-  passengers.value.push({ ...passengerForm })
-  ElMessage.success('添加乘车人成功')
-  clearForm()
+  try {
+    // 在预填信息中查找匹配的乘车人（完全匹配姓名和身份证号）
+    let matchedPrefilledInfo = prefilledInfos.value.find(
+      (info) => info.name === passengerForm.name && info.identityCardId === passengerForm.identityCardId
+    )
+
+    // 如果没有找到匹配的预填信息，则创建新的预填信息
+    if (!matchedPrefilledInfo) {
+      await createPrefilledInfo()
+      // 重新加载预填信息列表以获取新创建的信息
+      await loadPrefilledInfos()
+      // 再次查找匹配的预填信息
+      matchedPrefilledInfo = prefilledInfos.value.find(
+        (info) => info.name === passengerForm.name && info.identityCardId === passengerForm.identityCardId
+      )
+    }
+
+    // 确保找到了对应的预填信息
+    if (!matchedPrefilledInfo) {
+      ElMessage.error('无法获取乘车人预填信息，请重试')
+      return
+    }
+
+    // 创建包含personalId的乘车人信息
+    const newPassenger: PassengerInfo = {
+      personalId: matchedPrefilledInfo.personalId,
+      name: passengerForm.name,
+      identityCardId: passengerForm.identityCardId,
+      preferredSeatLocation: passengerForm.preferredSeatLocation,
+    }
+
+    // 根据查询模式添加座位类型信息
+    if (ticketServiceStore.queryMode === 'direct') {
+      newPassenger.seatType = passengerForm.seatType
+    } else {
+      newPassenger.firstRideSeatType = passengerForm.firstRideSeatType
+      newPassenger.secondRideSeatType = passengerForm.secondRideSeatType
+    }
+
+    passengers.value.push(newPassenger)
+    ElMessage.success('添加乘车人成功')
+    clearForm()
+  } catch (error) {
+    console.error('添加乘车人失败:', error)
+    ElMessage.error('添加乘车人失败，请重试')
+  }
 }
 
-// 删除乘车人
-function removePassenger(index: number) {
-  passengers.value.splice(index, 1)
-  ElMessage.success('删除乘车人成功')
+// 创建新的预填信息
+async function createPrefilledInfo() {
+  try {
+    const newPrefilledInfo = {
+      name: passengerForm.name,
+      identityCardId: passengerForm.identityCardId,
+      preferredSeatLocation: passengerForm.preferredSeatLocation || 'A', // 如果没有选择偏好座位，默认为A
+      default: false, // 新创建的预填信息不是默认信息
+    }
+
+    const response = await userApi.setPersonalInfo(newPrefilledInfo)
+    if (response.data.code === 200) {
+      ElMessage.success('已自动创建预填信息')
+    } else {
+      throw new Error('创建预填信息失败: ' + response.data.message)
+    }
+  } catch (error) {
+    console.error('创建预填信息失败:', error)
+    throw error
+  }
 }
 
 // 清空表单
@@ -1165,7 +1226,8 @@ function desensitizeIdCard(idCard: string): string {
 }
 
 // 获取座位位置文字描述
-function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F'): string {
+function getSeatLocationText(location: 'A' | 'B' | 'C' | 'D' | 'F' | undefined): string {
+  if (!location) return '无偏好'
   const locationMap = {
     A: '靠窗 (A)',
     B: '中间 (B)',
@@ -1244,6 +1306,12 @@ function importPrefilledInfo() {
   selectedPrefilledInfo.value = null
 
   ElMessage.success('预填信息导入成功')
+}
+
+// 删除乘车人
+function removePassenger(index: number) {
+  passengers.value.splice(index, 1)
+  ElMessage.success('删除乘车人成功')
 }
 
 // 在组件挂载时加载预填信息
