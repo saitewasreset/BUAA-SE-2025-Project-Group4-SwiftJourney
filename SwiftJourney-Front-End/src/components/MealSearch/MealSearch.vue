@@ -55,14 +55,17 @@
     <!-- 站点筛选区域 -->
     <div v-if="!isHeadPage" class="StationSelected">
       <div class="station-filters">
-        <el-checkbox
+        <div 
           v-for="(station, index) in stations"
           :key="index"
+          class="station-checkbox-container">
+        <el-checkbox
           v-model="stationsShow[station]"
           class="station-checkbox"
         >
           {{ station }}{{ station == '餐车' ? '' : '站' }}
         </el-checkbox>
+        </div>
       </div>
     </div>
 
@@ -367,6 +370,7 @@ const showImage = (src: string) => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
+  padding-top: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -599,15 +603,22 @@ const showImage = (src: string) => {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 5px;
 }
 
+
+.station-checkbox-container {
+  width: 150px;
+  display: flex;
+  justify-content: center;
+}
 .station-checkbox {
   background: rgba(64, 158, 255, 0.08);
   padding: 10px 16px;
   border-radius: 20px;
   border: 1px solid rgba(64, 158, 255, 0.2);
   transition: all 0.3s ease;
+  width: 120px;
 }
 
 .station-checkbox:hover {
