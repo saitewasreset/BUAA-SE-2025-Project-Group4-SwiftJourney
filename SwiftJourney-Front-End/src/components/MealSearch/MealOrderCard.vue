@@ -10,7 +10,8 @@
     </div>
 
     <!-- 订单列表区域 -->
-    <el-scrollbar height="320px" class="order-list-container">
+    <el-scrollbar ref="scrollbar" height="320px" class="order-list-container">
+      <div ref="innerRef">
       <div v-if="mealOrderStore.mealOrderInfoList.length === 0" class="empty-state">
         <div class="empty-icon">🍽️</div>
         <p class="empty-text">您还没有选择任何餐品</p>
@@ -66,6 +67,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </el-scrollbar>
 
@@ -165,7 +167,7 @@ async function confirmCreateTransaction() {
     dishes: [],
   }
 
-  mealOrderStore.mealOrderInfoList.forEach((value) => {
+  mealOrderStore.mealOrderInfoList.forEach((value: any) => {
     if (value.shopName == '餐车') {
       const tepInfo: DishOrder = {
         name: value.name,
@@ -188,7 +190,7 @@ async function confirmCreateTransaction() {
 
   await mealApi
     .dishOrder(trainDishOrderRequest)
-    .then((res) => {
+    .then((res: any) => {
       if (res.status == 200) {
         if (res.data.code == 200) {
           successCreateTransaction(res.data.data as TransactionInfo)
@@ -201,7 +203,7 @@ async function confirmCreateTransaction() {
         }
       }
     })
-    .catch((error) => {
+    .catch((error: any) => {
       ElMessage.error('生成订单失败 ' + error)
     })
 }
@@ -237,6 +239,22 @@ function goToPay(transactionId: string, money: string) {
     },
   })
 }
+
+import type { ScrollbarInstance } from 'element-plus'
+import { watch, nextTick } from 'vue'
+// 滚动条组件的引用
+const innerRef = ref<HTMLDivElement>()
+const scrollbar = ref<ScrollbarInstance>()
+// 获取 hotelOrderInfoList
+const hotelOrderInfoListLength = computed(() => mealOrderStore.mealOrderInfoList.length);
+// 监听 hotelOrderInfoList 的长度变化
+watch(hotelOrderInfoListLength, (newLength: number, oldLength: number) => {
+    if (newLength > oldLength) {
+        nextTick(() => {
+            scrollbar.value!.scrollTo({ top: innerRef.value!.clientHeight, behavior: 'smooth' });
+        });
+    }
+});
 </script>
 
 <style scoped>
@@ -257,7 +275,7 @@ function goToPay(transactionId: string, money: string) {
 
 .order-info-card :deep(.el-card__body) {
   padding: 0;
-  height: 500px;
+  height: 600px;
   display: flex;
   flex-direction: column;
 }
