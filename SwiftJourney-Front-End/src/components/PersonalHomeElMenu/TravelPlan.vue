@@ -153,6 +153,9 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 import { orderApi } from "@/api/orderApi/orderApi";
 import type { 
   ResponseData, 
@@ -318,7 +321,7 @@ const cancelOrder = async (orderId: string, canCancel: boolean, reason: string) 
 };
 
 const handleApiError = (code: number) => {
-  const errorMessages = {
+  const errorMessages: { [key: number]: string } = {
     403: '会话无效',
     404: '订单号不存在，或没有权限访问该订单',
     14001: '订单已被取消',
