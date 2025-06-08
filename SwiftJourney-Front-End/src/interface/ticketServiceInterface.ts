@@ -49,7 +49,7 @@ export interface directScheduleInfo {
   price: number
   // 车次经停车站信息
   route: stoppingStationInfo[]
-  // 座位类型，如：二等座 -> SeatTypeInfo
+  // 座席类别，如：二等座 -> SeatTypeInfo
   seatInfo: Map<string, seatTypeInfo>
 }
 

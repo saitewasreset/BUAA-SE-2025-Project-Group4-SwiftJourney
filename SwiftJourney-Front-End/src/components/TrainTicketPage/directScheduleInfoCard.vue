@@ -59,7 +59,7 @@
       <div class="ticket-info">
         <!-- 座位 - 车票元素 -->
         <div v-for="(seatInfo, index) in sortedSeatInfo" :key="index" class="seat-card">
-          <!-- 座位类型 -->
+          <!-- 座席类别 -->
           <div class="seat-type-info">{{ seatInfo.seatType }}</div>
           <!-- 价格 -->
           <div class="price-info">SC {{ seatInfo.price }}</div>
@@ -259,7 +259,7 @@ function getleftType(left: number): leftType {
 }
 // 订票检查
 const checkBookable = computed(() => {
-  // 检查是否有任何座位类型还有余票（left > 0）
+  // 检查是否有任何座席类别还有余票（left > 0）
   return Object.values(props.content.seatInfo).some((seatInfo) => seatInfo.left > 0)
 })
 // -------------------- 车次信息表格 --------------------
