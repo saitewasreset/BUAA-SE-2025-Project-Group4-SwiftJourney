@@ -108,7 +108,7 @@ async function confirmCreateTransaction() {
         dishes: [],
     };
 
-    mealOrderStore.mealOrderInfoList.forEach((value) => {
+    mealOrderStore.mealOrderInfoList.forEach((value: any) => {
         if(value.shopName == '餐车') {
             const tepInfo: DishOrder = {
                 name: value.name,
@@ -130,7 +130,7 @@ async function confirmCreateTransaction() {
     });
 
     await mealApi.dishOrder(trainDishOrderRequest)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 successCreateTransaction(res.data.data as TransactionInfo);
@@ -141,7 +141,7 @@ async function confirmCreateTransaction() {
                 throw new Error(res.data.message);
             }
         }
-    }) .catch ((error) => {
+    }) .catch ((error: any) => {
         ElMessage.error('生成订单失败 ' + error);
     })
 }

@@ -89,7 +89,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import { ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus';
 import type { TrainDishInfo, MealInfo, Takeaway, TakeawayDishInfo } from '@/interface/mealInterface';
-import type { TrainScheduleInfo } from '@/interface/ticketServiceInterface';
+import type { TrainScheduleInfo, StoppingStationInfo } from '@/interface/ticketServiceInterface';
 import SelectCard from './MealOrderCard.vue'
 import { useMealOrderStore } from '@/stores/mealOrder';
 
@@ -115,7 +115,7 @@ async function getTrainInfo() {
     await TicketServiceApi.trainSchedule({
         trainNumber: trainNumber.value.trim(),
         departureDate: originDepartureTime.value.format('YYYY-MM-DD'),
-    }).then((res) => {
+    }).then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 getMail(res.data.data);
@@ -125,7 +125,7 @@ async function getTrainInfo() {
                 ElMessage.error('会话无效');
             }
         }
-    }).catch((err) => {
+    }).catch((err: any) => {
         ElMessage.error(err);
     })
 }
@@ -146,7 +146,7 @@ async function getMail(trainInfo: TrainScheduleInfo) {
     departureTime.value = trainInfo.originDepartureTime;
     const tepStations: string[] = [];
     const tepStationsMap: {[stations: string]: boolean} = {};
-    trainInfo.route.forEach((value) => {
+    trainInfo.route.forEach((value: StoppingStationInfo) => {
         tepStations.push(value.stationName);
         tepStationsMap[value.stationName] = true;
     })
@@ -158,7 +158,7 @@ async function getMail(trainInfo: TrainScheduleInfo) {
     await mealApi.dishQuery({
         trainNumber: trainNumber.value.trim(),
         originDepartureTime: departureTime.value,
-    }).then((res) => {
+    }).then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 successGetMeal(res.data.data);
@@ -168,7 +168,7 @@ async function getMail(trainInfo: TrainScheduleInfo) {
                 ElMessage.error('会话无效');
             }
         }
-    }).catch((err) => {
+    }).catch((err: any) => {
         ElMessage.error(err);
     })
 

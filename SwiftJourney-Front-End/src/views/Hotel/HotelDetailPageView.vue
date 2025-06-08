@@ -423,7 +423,7 @@ onBeforeMount(async () => {
 
 async function getHotelDetailInfo() {
     hotelApi.hotelInfo(hotelId)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 hotelDetailInfo.value = res.data.data;
@@ -432,7 +432,7 @@ async function getHotelDetailInfo() {
                 throw new Error(res.data.message);
             }
         }
-    }).catch((error) => {
+    }).catch((error: any) => {
         ElMessage.error(error);
         console.error(error);
     })
@@ -458,7 +458,7 @@ async function getHotelOrderInfo() {
         endDate: tepEndDate,
     }
     hotelApi.hotelOrderInfo(hotelOrderQuery)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 hotelRoomInfoList.value = [];
@@ -486,7 +486,7 @@ async function getHotelOrderInfo() {
                 throw new Error(res.data.message);
             }
         }
-    }) .catch((error) => {
+    }) .catch((error: any) => {
         ElMessage.error(error);
         console.error(error);
     })
@@ -568,7 +568,7 @@ async function sendComment() {
     }
     if(hotelCommentQuota.value == undefined) {
         await hotelApi.hotelQuota(hotelId)
-        .then((res) => {
+        .then((res: any) => {
             if(res.status == 200) {
                 if(res.data.code == 200) {
                     hotelCommentQuota.value =  res.data.data as HotelCommentQuota;
@@ -576,7 +576,7 @@ async function sendComment() {
                     throw new Error(res.data.message);
                 }
             }
-        }) .catch((err) => {
+        }) .catch((err: any) => {
             ElMessage.error(err);
         })
     }
@@ -597,7 +597,7 @@ async function realySendComment() {
         comment: commentTextarea.value,
     }
     await hotelApi.hotelComment(newComment)
-    .then((res)=> {
+    .then((res: any)=> {
         if(res.status == 200){
             if(res.data.code == 200) {
                 getHotelDetailInfo();
@@ -608,7 +608,7 @@ async function realySendComment() {
                 throw new Error(res.data.message);
             }
         } 
-    }).catch((err) => {
+    }).catch((err: any) => {
         ElMessage.error(err);
     })
 }

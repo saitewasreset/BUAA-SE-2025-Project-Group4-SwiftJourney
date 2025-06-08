@@ -209,7 +209,7 @@ function createTransaction() {
 
 async function confirmCreateTransaction() {
     let hotelOrderRequestList: HotelOrderRequest[] = [];
-    hotelOrderStore.hotelOrderInfoList.forEach((key) => {
+    hotelOrderStore.hotelOrderInfoList.forEach((key: any) => {
         let hotelOrderRequest: HotelOrderRequest = {
             hotelId: key.hotelId,
             roomType: key.roomType,
@@ -221,7 +221,7 @@ async function confirmCreateTransaction() {
         hotelOrderRequestList.push(hotelOrderRequest);
     })
     await hotelApi.hotelOrder(hotelOrderRequestList)
-    .then((res) => {
+    .then((res: any) => {
         if(res.status == 200) {
             if(res.data.code == 200) {
                 successCreateTransaction(res.data.data as TransactionInfo);
@@ -229,7 +229,7 @@ async function confirmCreateTransaction() {
                 throw new Error(res.data.message);
             }
         }
-    }) .catch ((error) => {
+    }) .catch ((error: any) => {
         ElMessage.error('生成订单失败 ' + error);
     })
 }
