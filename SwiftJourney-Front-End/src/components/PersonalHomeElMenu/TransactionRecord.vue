@@ -56,7 +56,7 @@
         <div v-if="loading" class="loading-state">
           <div class="skeleton-transactions">
             <div 
-              v-for="n in pageSize" 
+              v-for="n in 3" 
               :key="n" 
               class="skeleton-transaction-card"
               :style="{ animationDelay: `${(n - 1) * 0.1}s` }"
@@ -1177,6 +1177,137 @@ export default {
 .custom-pagination :deep(.el-input__inner) {
   font-size: 13px;
   line-height: 1.2;
+}
+
+/* 骨架屏样式 */
+.loading-state {
+  padding: 20px 0;
+}
+
+.skeleton-transactions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-transaction-card {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+.skeleton-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.skeleton-transaction-info {
+  flex: 1;
+}
+
+.skeleton-id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skeleton-status {
+  display: flex;
+  align-items: center;
+}
+
+.skeleton-badge {
+  width: 60px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-details {
+  padding: 12px 20px;
+}
+
+.skeleton-detail-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.skeleton-detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.skeleton-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skeleton-text {
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-id-label {
+  width: 60px;
+  height: 12px;
+}
+
+.skeleton-id-value {
+  width: 120px;
+  height: 16px;
+}
+
+.skeleton-detail-label {
+  width: 50px;
+  height: 12px;
+}
+
+.skeleton-detail-value {
+  width: 80px;
+  height: 14px;
+}
+
+.skeleton-detail-value.skeleton-amount {
+  width: 100px;
+  height: 18px;
+}
+
+/* 骨架屏动画 */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 响应式骨架屏 */
+@media (max-width: 768px) {
+  .skeleton-detail-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .skeleton-header {
+    padding: 12px 16px;
+  }
+  
+  .skeleton-details {
+    padding: 8px 16px;
+  }
 }
 
 /* 保持其他样式不变 */
