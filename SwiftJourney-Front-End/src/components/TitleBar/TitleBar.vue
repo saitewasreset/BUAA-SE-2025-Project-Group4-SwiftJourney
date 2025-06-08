@@ -463,13 +463,6 @@
     align-items: center;
 }
 
-.PopoverContent .RemainingMoney .Money::before {
-    content: '¥';
-    font-size: 11px;
-    margin-right: 1px;
-    opacity: 0.8;
-}
-
 /* 功能按钮区域 - 改为网格布局 */
 .UserButtonLine {
     display: grid;

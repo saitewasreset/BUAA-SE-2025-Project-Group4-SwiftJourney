@@ -86,9 +86,9 @@
                 </div>
               </div>
             </div>
-            <!-- 右侧：座席类别信息 -->
+            <!-- 右侧：座位类型信息 -->
             <div class="seat-types-section-inline">
-              <div class="seat-types-title-inline">座席类别</div>
+              <div class="seat-types-title-inline">座位类型</div>
               <div class="seat-types-grid-inline">
                 <div
                   v-for="(seatInfo, index) in sortedDirectSeatInfo"
@@ -186,9 +186,9 @@
                   </div>
                 </div>
               </div>
-              <!-- 右侧：座席类别信息 -->
+              <!-- 右侧：座位类型信息 -->
               <div class="seat-types-section-inline">
-                <div class="seat-types-title-inline">第1程座席类别</div>
+                <div class="seat-types-title-inline">第1程座位类型</div>
                 <div class="seat-types-grid-inline">
                   <div
                     v-for="(seatInfo, index) in sortedFirstRideSeatInfo"
@@ -288,9 +288,9 @@
                   </div>
                 </div>
               </div>
-              <!-- 右侧：座席类别信息 -->
+              <!-- 右侧：座位类型信息 -->
               <div class="seat-types-section-inline">
-                <div class="seat-types-title-inline">第2程座席类别</div>
+                <div class="seat-types-title-inline">第2程座位类型</div>
                 <div class="seat-types-grid-inline">
                   <div
                     v-for="(seatInfo, index) in sortedSecondRideSeatInfo"
@@ -371,7 +371,7 @@
 
                 <!-- 直达模式座位选择 -->
                 <div v-if="ticketServiceStore.queryMode === 'direct'" class="form-item full-width">
-                  <label class="form-label">座席类别 <span class="required">*</span></label>
+                  <label class="form-label">座位类型 <span class="required">*</span></label>
                   <div class="seat-type-selection">
                     <div
                       v-for="(seatInfo, index) in sortedDirectSeatInfo"
@@ -399,7 +399,7 @@
 
                 <!-- 中转模式座位选择 -->
                 <div v-else class="form-item full-width">
-                  <label class="form-label">第一程座席类别 <span class="required">*</span></label>
+                  <label class="form-label">第一程座位类型 <span class="required">*</span></label>
                   <div class="seat-type-selection">
                     <div
                       v-for="(seatInfo, index) in sortedFirstRideSeatInfo"
@@ -425,7 +425,7 @@
                   </div>
 
                   <label class="form-label" style="margin-top: 20px"
-                    >第二程座席类别 <span class="required">*</span></label
+                    >第二程座位类型 <span class="required">*</span></label
                   >
                   <div class="seat-type-selection">
                     <div
@@ -1123,7 +1123,7 @@ async function addPassenger() {
       preferredSeatLocation: passengerForm.preferredSeatLocation,
     }
 
-    // 根据查询模式添加座席类别信息
+    // 根据查询模式添加座位类型信息
     if (ticketServiceStore.queryMode === 'direct') {
       newPassenger.seatType = passengerForm.seatType
     } else {
@@ -1191,19 +1191,19 @@ function validatePassengerForm(): boolean {
     ElMessage.error(identityCardIdErrorMsg.value)
     return false
   }
-
+  console.log(passengerForm);
   if (ticketServiceStore.queryMode === 'direct') {
     if (!passengerForm.seatType) {
-      ElMessage.error('请选择座席类别')
+      ElMessage.error('请选择座位类型')
       return false
     }
   } else {
     if (!passengerForm.firstRideSeatType) {
-      ElMessage.error('请选择第一程座席类别')
+      ElMessage.error('请选择第一程座位类型')
       return false
     }
     if (!passengerForm.secondRideSeatType) {
-      ElMessage.error('请选择第二程座席类别')
+      ElMessage.error('请选择第二程座位类型')
       return false
     }
   }
@@ -1436,7 +1436,7 @@ function goToPay(transactionId: string, amount: string) {
     name: 'paypage',
     params: { transactionId: transactionId },
     query: {
-      money: '¥' + amount,
+      money: amount,
     }
   })
 }
@@ -1900,7 +1900,7 @@ function goToPay(transactionId: string, amount: string) {
   color: #dc2626;
 }
 
-/* 座席类别选择 */
+/* 座位类型选择 */
 .seat-type-selection {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
