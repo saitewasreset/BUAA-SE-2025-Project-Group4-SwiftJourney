@@ -1440,8 +1440,6 @@ function goToPay(transactionId: string, amount: string) {
     }
   })
 }
-
-// ...existing code...
 </script>
 
 <style lang="css" scoped>
