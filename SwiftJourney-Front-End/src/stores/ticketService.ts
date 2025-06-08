@@ -294,6 +294,20 @@ export const useTicketServiceStore = defineStore('ticketService', {
           const departureTime = directSchedule.departureTime
           const departureDate = new Date(departureTime)
           const departureTimeNumber = departureDate.getHours() * 60 + departureDate.getMinutes()
+          
+          // 检查是否是今天，如果是今天，还需要检查发车时间是否在当前时间5分钟之后
+          const today = new Date()
+          const queryDateObj = new Date(this.queryDate)
+          const isToday = today.toDateString() === queryDateObj.toDateString()
+          
+          if (isToday) {
+            const currentTimeNumber = today.getHours() * 60 + today.getMinutes()
+            const minDepartureTime = currentTimeNumber + 5
+            if (departureTimeNumber < minDepartureTime) {
+              return false
+            }
+          }
+          
           return (
             departureTimeNumber >= this.startTimeRangeNumber[0] &&
             departureTimeNumber <= this.startTimeRangeNumber[1]
@@ -304,6 +318,20 @@ export const useTicketServiceStore = defineStore('ticketService', {
           const firstDepartureDate = new Date(firstDepartureTime)
           const firstDepartureTimeNumber =
             firstDepartureDate.getHours() * 60 + firstDepartureDate.getMinutes()
+          
+          // 检查是否是今天，如果是今天，还需要检查发车时间是否在当前时间5分钟之后
+          const today = new Date()
+          const queryDateObj = new Date(this.queryDate)
+          const isToday = today.toDateString() === queryDateObj.toDateString()
+          
+          if (isToday) {
+            const currentTimeNumber = today.getHours() * 60 + today.getMinutes()
+            const minDepartureTime = currentTimeNumber + 5
+            if (firstDepartureTimeNumber < minDepartureTime) {
+              return false
+            }
+          }
+          
           return (
             firstDepartureTimeNumber >= this.startTimeRangeNumber[0] &&
             firstDepartureTimeNumber <= this.startTimeRangeNumber[1]
