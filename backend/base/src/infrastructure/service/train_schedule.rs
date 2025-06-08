@@ -312,7 +312,7 @@ where
 
         info!("current latest schedule date: {}", latest_date);
 
-        let days = days - ((latest_date - begin_date).num_days() as i32);
+        let days = days - ((latest_date - begin_date).num_days() as i32) - 1;
 
         info!("days to update: {}", days);
 
