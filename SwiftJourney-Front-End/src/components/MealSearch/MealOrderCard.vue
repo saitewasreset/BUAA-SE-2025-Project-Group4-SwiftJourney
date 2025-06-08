@@ -1,7 +1,8 @@
 <template>
     <el-card class="OrderInfo">
         <p class="title">已选餐品</p>
-        <el-scrollbar height="320px" style="display: flex; justify-content: center;">
+        <el-scrollbar ref="scrollbar" height="320px" style="display: flex; justify-content: center;">
+            <div ref="innerRef">
             <div v-for="(key, index) in mealOrderStore.mealOrderInfoList" :key="index">
                 <div class="OrderInfoCardContainer">
                     <el-descriptions class="OrderInfoCard" border :column="1" size="default"
@@ -22,6 +23,7 @@
             </div>
             <div v-if="mealOrderStore.mealOrderInfoList.length == 0">
                 {{ '您还没有选择任何餐品' }}
+            </div>
             </div>
         </el-scrollbar>
         <el-button class="OrderOkButton" type="success" :disabled="mealOrderStore.mealOrderInfoList.length == 0"
@@ -173,6 +175,22 @@ function goToPay(transactionId: string, money: string) {
         }
     });
 }
+
+import type { ScrollbarInstance } from 'element-plus'
+import { watch, nextTick } from 'vue'
+// 滚动条组件的引用
+const innerRef = ref<HTMLDivElement>()
+const scrollbar = ref<ScrollbarInstance>()
+// 获取 hotelOrderInfoList
+const hotelOrderInfoListLength = computed(() => mealOrderStore.mealOrderInfoList.length);
+// 监听 hotelOrderInfoList 的长度变化
+watch(hotelOrderInfoListLength, (newLength: number, oldLength: number) => {
+    if (newLength > oldLength) {
+        nextTick(() => {
+            scrollbar.value!.scrollTo({ top: innerRef.value!.clientHeight - 320, behavior: 'smooth' });
+        });
+    }
+});
 
 </script>
 
