@@ -105,14 +105,11 @@
         <div v-else-if="ticketServiceStore.queryResult.length === 0" class="schedule-card">
           <div class="empty-container">
             <div class="empty-content">
-              <div class="empty-icon">
-                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                  <circle cx="40" cy="40" r="35" fill="rgba(59, 130, 246, 0.1)"/>
-                  <path d="M25 40h30M40 25v30" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
-                </svg>
+              <div class="empty-text">
+                <h3 class="empty-title">暂无车次信息</h3>
+                <p class="empty-subtitle">请在上方搜索框中输入出发地和目的地进行查询</p>
+                <img style="width: 300px; height: 300px" src="./EmptyTrain.svg" alt="暂无车次" class="empty-svg" />
               </div>
-              <div class="empty-title">暂无车次信息</div>
-              <div class="empty-subtitle">请先在上方搜索框中输入出发地和目的地进行查询</div>
             </div>
           </div>
         </div>
@@ -495,6 +492,15 @@ watch(
     font-size: 12px;
     min-height: 44px;
   }
+}
+
+.empty-text {
+  // display: flex;
+  // justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: 20px;
+  margin-top: 40px;
 }
 
 .sort-part {

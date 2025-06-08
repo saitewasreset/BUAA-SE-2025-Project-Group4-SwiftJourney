@@ -371,16 +371,6 @@ const handleCancel = () => {
   position: relative;
 }
 
-.line::after {
-  content: '→';
-  position: absolute;
-  right: -8px;
-  top: -6px;
-  color: #8b5cf6;
-  font-size: 14px;
-  font-weight: bold;
-}
-
 /* 酒店行程 */
 .hotel-main-info {
   display: flex;
