@@ -29,7 +29,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         indeterminate: false,
         checkAll: true,
       },
-      // 座位类型
+      // 座席类别
       {
         options: ['加载中...'],
         checkedList: ['加载中...'],
@@ -202,7 +202,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         }
       }
 
-      // 3. 座位类型筛选
+      // 3. 座席类别筛选
       const seatTypeChecked = this.checkGroups[CheckType.SeatType].checkedList
       if (
         seatTypeChecked.length < this.checkGroups[CheckType.SeatType].options.length &&
@@ -576,7 +576,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
       if (res.code === 200) {
         this.queryResult = res.data.solutions
         // 更新筛选选项
-        // 座位类型
+        // 座席类别
         this.checkGroups[CheckType.SeatType].options = Array.from(
           new Set(
             this.queryResult.flatMap((schedule: any) => {

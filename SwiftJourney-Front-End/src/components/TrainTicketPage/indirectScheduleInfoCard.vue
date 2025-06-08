@@ -123,7 +123,7 @@
                 :key="index"
                 class="seat-card"
               >
-                <!-- 座位类型 -->
+                <!-- 座席类别 -->
                 <div class="seat-type-info">{{ seatInfo.seatType }}</div>
                 <!-- 余票信息 -->
                 <div
@@ -150,7 +150,7 @@
                 :key="index"
                 class="seat-card"
               >
-                <!-- 座位类型 -->
+                <!-- 座席类别 -->
                 <div class="seat-type-info">{{ seatInfo.seatType }}</div>
                 <!-- 余票信息 -->
                 <div
