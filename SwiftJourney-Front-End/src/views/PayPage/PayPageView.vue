@@ -27,7 +27,7 @@
                     </div>
                     <div class="info-item">
                         <span class="info-label">订单金额</span>
-                        <span class="info-value amount">¥{{ money }}</span>
+                        <span class="info-value amount">{{ money }}</span>
                     </div>
                 </div>
             </div>
@@ -89,6 +89,7 @@
                             v-model="digits[index]" 
                             @input="onInput(index)" 
                             @keydown="onKeyDown"
+                            @focus="onFocus(index)"
                         />
                     </div>
                 </div>
@@ -170,18 +171,56 @@ function startCountdown() {
     }, 1000);
 }
 
+// 修复支付密码输入框焦点控制
+function onFocus(index) {
+    // 找到第一个为空的输入框位置
+    const firstEmptyIndex = digits.value.findIndex(digit => digit === '');
+    
+    // 如果点击的不是第一个空位，则强制聚焦到第一个空位
+    if (firstEmptyIndex !== -1 && index !== firstEmptyIndex) {
+        setTimeout(() => {
+            const inputs = document.querySelectorAll('.digit-input');
+            if (inputs[firstEmptyIndex]) {
+                inputs[firstEmptyIndex].focus();
+            }
+        }, 0);
+    }
+}
+
 function onInput(index: number) {
-    if (index < digits.value.length - 1 && digits.value[index].length === 1) {
-        (document.querySelectorAll('.digit-input')[index + 1] as HTMLElement).focus();
+    // 确保输入的是数字
+    const value = digits.value[index];
+    if (value && !/^\d$/.test(value)) {
+        digits.value[index] = '';
+        return;
+    }
+
+    // 输入完成后自动跳转到下一格
+    if (index < digits.value.length - 1 && value.length === 1) {
+        setTimeout(() => {
+            const inputs = document.querySelectorAll('.digit-input');
+            inputs[index + 1].focus();
+        }, 0);
     }
 }
 
 function onKeyDown(event: any) {
-    if (event.key === 'Backspace' && event.target.value === '') {
-        const index = Array.from(document.querySelectorAll('.digit-input')).indexOf(event.target);
-        if (index > 0) {
-            (document.querySelectorAll('.digit-input')[index - 1] as HTMLElement).focus();
+    const index = Array.from(document.querySelectorAll('.digit-input')).indexOf(event.target);
+    
+    // 处理退格键
+    if (event.key === 'Backspace') {
+        if (digits.value[index] === '' && index > 0) {
+            // 如果当前格为空且不是第一格，则删除前一格的内容并聚焦到前一格
+            digits.value[index - 1] = '';
+            setTimeout(() => {
+                const inputs = document.querySelectorAll('.digit-input');
+                inputs[index - 1].focus();
+            }, 0);
         }
+    }
+    // 阻止非数字键的输入
+    else if (!/\d/.test(event.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
     }
 }
 
