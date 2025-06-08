@@ -37,8 +37,8 @@
             <div class="line"></div>
           </div>
           <div class="station arrival">
-            <div class="station-name">{{ order.details.terminalStation }}</div>
-            <div class="station-time">预计到达</div>
+            <div class="station-name">{{ order.details.arrivalStation }}</div>
+            <div class="station-time">{{ order.details.arrivalTime }} 到达</div>
           </div>
         </div>
         <div class="trip-details">
@@ -170,7 +170,7 @@ const emit = defineEmits<{
 
 // Methods
 const getStatusClass = (status: string) => {
-  const statusClasses = {
+  const statusClasses: { [key: string]: string } = {
     '未出行': 'status-upcoming',
     '行程中': 'status-active',
     '已完成': 'status-completed',
@@ -369,16 +369,6 @@ const handleCancel = () => {
   background: linear-gradient(90deg, #3b82f6, #8b5cf6);
   border-radius: 1px;
   position: relative;
-}
-
-.line::after {
-  content: '→';
-  position: absolute;
-  right: -8px;
-  top: -6px;
-  color: #8b5cf6;
-  font-size: 14px;
-  font-weight: bold;
 }
 
 /* 酒店行程 */

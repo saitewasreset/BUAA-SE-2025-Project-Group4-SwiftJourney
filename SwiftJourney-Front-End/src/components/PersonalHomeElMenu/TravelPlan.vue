@@ -153,6 +153,9 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 import { orderApi } from "@/api/orderApi/orderApi";
 import type { 
   ResponseData, 
@@ -318,7 +321,7 @@ const cancelOrder = async (orderId: string, canCancel: boolean, reason: string) 
 };
 
 const handleApiError = (code: number) => {
-  const errorMessages = {
+  const errorMessages: { [key: number]: string } = {
     403: '会话无效',
     404: '订单号不存在，或没有权限访问该订单',
     14001: '订单已被取消',
@@ -388,12 +391,18 @@ const processOrderData = (resData: ResponseData) => {
           order.details = {
             trainNumber: trainOrder.trainNumber,
             departureStation: trainOrder.departureStation,
-            terminalStation: trainOrder.terminalStation,
+            arrivalStation: trainOrder.arrivalStation,
             seat: getSeat(trainOrder.seat),
             name: trainOrder.name,
             date: dayjs(trainOrder.departureTime).format("YYYY-MM-DD"),
-            time: dayjs(trainOrder.departureTime).format("HH:mm")
+            time: dayjs(trainOrder.departureTime).format("HH:mm"),
+            arrivalDate: dayjs(trainOrder.arrivalTime).format("YYYY-MM-DD"),
+            arrivalTime: dayjs(trainOrder.arrivalTime).format("HH:mm")
           };
+          // 只添加属于当前用户的订单
+          if (trainOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "hotel":
@@ -407,6 +416,10 @@ const processOrderData = (resData: ResponseData) => {
             name: hotelOrder.name,
             amount: hotelOrder.amount
           };
+          // 只添加属于当前用户的订单
+          if (hotelOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "dish":
@@ -419,6 +432,10 @@ const processOrderData = (resData: ResponseData) => {
             name: dishOrder.name,
             date: dayjs(dishOrder.depatureTime).format("YYYY-MM-DD")
           };
+          // 只添加属于当前用户的订单
+          if (dishOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
 
         case "takeaway":
@@ -433,10 +450,12 @@ const processOrderData = (resData: ResponseData) => {
             name: takeawayOrder.name,
             date: dayjs(takeawayOrder.depatureTime).format("YYYY-MM-DD")
           };
+          // 只添加属于当前用户的订单
+          if (takeawayOrder.name === user.name) {
+            orders.push(order);
+          }
           break;
       }
-
-      orders.push(order);
     }
   }
 

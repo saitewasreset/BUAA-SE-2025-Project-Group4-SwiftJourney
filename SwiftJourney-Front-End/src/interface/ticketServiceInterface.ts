@@ -49,7 +49,7 @@ export interface directScheduleInfo {
   price: number
   // 车次经停车站信息
   route: stoppingStationInfo[]
-  // 座位类型，如：二等座 -> SeatTypeInfo
+  // 座席类别，如：二等座 -> SeatTypeInfo
   seatInfo: Map<string, seatTypeInfo>
 }
 
@@ -62,6 +62,31 @@ export interface indirectScheduleInfo {
   second_ride: directScheduleInfo;
   // 中间换乘可用的时间，单位：秒
   relaxing_time: number;
+}
+
+export type trainTransactionRequest = OrderPack[];
+
+export interface OrderPack {
+  // 原子操作，若为 true，则`orderList`中任意订单失败将回滚已成功的订单
+  atomic: boolean;
+  orderList: TrainOrderRequest[];
+}
+
+export interface TrainOrderRequest {
+  // 车次号，例如：“G53”
+  trainNumber: string;
+  // 离开“始发站”的日期时间
+  originDepartureTime: string;
+
+  // 起始站
+  departureStation: string;
+  // 到达站
+  arrivalStation: string;
+
+  // 乘车人 Id（见`PersonalInfo`）
+  personalId: string;
+  // 座位类别，如：二等座
+  seatType: string;
 }
 
 // -------------------- Type 定义 --------------------
@@ -90,3 +115,32 @@ export enum SortType {
 
 // -------------------- 查询相关 --------------------
 export type QueryMode = 'direct' | 'indirect';
+
+
+export interface TrainInfoQuery {
+  // 车次号，例如：“G53”
+  trainNumber: string;
+  // 离开“始发站”的日期
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+}
+
+// 站点停靠信息
+export interface StoppingStationInfo {
+  stationName: string;
+  // 到达该站点的日期时间，若为始发站，不包含该属性
+  arrivalTime?: string;
+  // 离开该站点的日期时间，若为终到站，不包含该属性
+  departureTime?: string;
+}
+
+export interface TrainScheduleInfo {
+  originStation: string;
+  originDepartureTime: string;
+  terminalStation: string;
+  terminalArrivalTime: string;
+  // departureDate：YYYY-MM-DD
+  departureDate: string;
+  // 车次经停车站信息
+  route: StoppingStationInfo[];
+}

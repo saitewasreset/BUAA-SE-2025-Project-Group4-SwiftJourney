@@ -29,6 +29,8 @@ export interface SeatLocationInfo {
 }
 
 export interface TrainOrderInfo extends OrderInfo {
+  arrivalTime: string;
+  arrivalStation: string;
   // 车次，例如：“G53”
   trainNumber: string;
   // 始发站
