@@ -7,7 +7,7 @@
                     <h2 class="page-title">已选房间</h2>
                     <p class="page-subtitle">
                         <span v-if="hotelOrderStore.hotelOrderInfoList.length > 0">
-                            共 {{ hotelOrderStore.hotelOrderInfoList.length }} 间房
+                            共 {{ hotelOrderStore.hotelOrderInfoList.length }} 种房型
                         </span>
                         <span v-else>暂无选择</span>
                     </p>
@@ -23,7 +23,8 @@
 
             <!-- 订单内容 -->
             <div class="order-content">
-                <el-scrollbar height="320px" class="order-scrollbar">
+                <el-scrollbar ref="scrollbar" height="320px" class="order-scrollbar">
+                    <div ref="innerRef">
                     <!-- 空状态 -->
                     <div v-if="hotelOrderStore.hotelOrderInfoList.length === 0" class="empty-state">
                         <div class="empty-icon">
@@ -92,6 +93,7 @@
                             </div>
                         </div>
                     </div>
+                    </div>
                 </el-scrollbar>
             </div>
 
@@ -117,11 +119,26 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeMount, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus';
+import type { ScrollbarInstance } from 'element-plus'
 import { useHotelOrderStore } from '@/stores/hotelOrder';
 import { useRouter } from 'vue-router';
-import { House, Close, ShoppingCart } from '@element-plus/icons-vue';
 
 const hotelOrderStore = useHotelOrderStore();
+
+import { watch, nextTick } from 'vue'
+// 滚动条组件的引用
+const innerRef = ref<HTMLDivElement>()
+const scrollbar = ref<ScrollbarInstance>()
+// 获取 hotelOrderInfoList
+const hotelOrderInfoListLength = computed(() => hotelOrderStore.hotelOrderInfoList.length);
+// 监听 hotelOrderInfoList 的长度变化
+watch(hotelOrderInfoListLength, (newLength: number, oldLength: number) => {
+    if (newLength > oldLength) {
+        nextTick(() => { 
+            scrollbar.value!.scrollTo({ top: innerRef.value!.clientHeight - 320, behavior: 'smooth' });
+        });
+    }
+});
 
 onBeforeMount(() => {
     hotelOrderStore.loadFromLocalStorage();
@@ -655,18 +672,6 @@ function goToPay(transactionId: string, money: string) {
     .date-separator {
         transform: rotate(90deg);
         margin: 4px 0;
-    }
-}
-
-/* 动画效果 */
-@keyframes slideInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
     }
 }
 
