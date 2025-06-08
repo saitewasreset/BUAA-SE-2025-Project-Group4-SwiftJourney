@@ -258,7 +258,7 @@ async function apiPay() {
   }
   await paymentApi
     .pay(transactionId, payment)
-    .then((res) => {
+    .then((res: any) => {
       if (res.status == 200) {
         //成功支付
         if (res.data.code == 200) {
@@ -279,7 +279,7 @@ async function apiPay() {
         }
       }
     })
-    .catch((err) => {
+    .catch((err: any) => {
       ElMessage.error(err)
     })
 }
