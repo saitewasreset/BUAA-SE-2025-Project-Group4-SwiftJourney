@@ -234,7 +234,7 @@ export default{
                     else if (res.data.code == 403) {
                         ElMessage.error('会话无效');
                     } else if (res.data.code == 15002) {
-                        ElMessage.error('密码错误');
+                        ElMessage.error('原密码错误');
                     }
                 }
             }) .catch ((error) => {
@@ -242,42 +242,55 @@ export default{
             })
         },
         successUpdatePassword() {
+            ElMessage.success('密码修改成功');
             this.isSetPassword = false;
             this.passwordFormData.originPassword = "";
             this.passwordFormData.newPassword = "";
             this.passwordFormData.confirmPassword = "";
         },
         checkPassword(){
+            // 检查新密码是否包含空格
             if(this.passwordFormData.newPassword.includes(' ')){
                 ElMessage.error('密码不能包含空格');
                 return false;
             }
+            
+            // 检查密码长度
             if(this.passwordFormData.newPassword.length < 8 || this.passwordFormData.newPassword.length > 20){
                 ElMessage.error('密码长度应在 8 - 20 位之间');
                 return false;
             }
-            let matchedTypes = 0
-            if (/[a-z]/.test(this.passwordFormData.newPassword)) {
-                matchedTypes += 1
+            
+            // 检查密码复杂度 - 与注册页面保持一致
+            let matchedTypes = 0;
+            
+            // 检查是否包含字母（大小写）
+            if (/[A-Za-z]/.test(this.passwordFormData.newPassword)) {
+                matchedTypes += 1;
             }
-            if (/[A-Z]/.test(this.passwordFormData.newPassword)) {
-                matchedTypes += 1
-            }
+            
+            // 检查是否包含数字
             if (/\d/.test(this.passwordFormData.newPassword)) {
-                matchedTypes += 1
+                matchedTypes += 1;
             }
-            // 特殊符号的正则表达式
+            
+            // 检查是否包含特殊符号
             if (/[\W_]/.test(this.passwordFormData.newPassword)) {
-                matchedTypes += 1
-             }
-            if (matchedTypes < 3) {
-                ElMessage.error('密码必须包含大小写字母、数字或特殊符号至少三种');
+                matchedTypes += 1;
+            }
+            
+            // 至少包含两种类型
+            if (matchedTypes < 2) {
+                ElMessage.error('密码必须至少包含大小写字母、数字或特殊符号中的两种');
                 return false;
             }
+            
+            // 检查两次输入的密码是否一致
             if (this.passwordFormData.newPassword != this.passwordFormData.confirmPassword) {
                 ElMessage.error('两次输入的密码不一致');
                 return false;
             }
+            
             return true;
         },
         isSetPayPasswordCancel() {
@@ -311,7 +324,7 @@ export default{
                     } else if(res.data.code == 403) {
                         ElMessage.error('会话无效');
                     } else if(res.data.code == 11002) {
-                        ElMessage.error('用户密码错误');
+                        ElMessage.error('用户原密码错误');
                     } else if(res.data.code == 11007) {
                         ElMessage.error('支付密码格式错误');
                     }

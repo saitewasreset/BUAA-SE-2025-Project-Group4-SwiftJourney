@@ -33,9 +33,9 @@
           </Teleport>
           
           <div class="city-selection">
-            <!-- 出发城市 -->
+            <!-- 出发地点 -->
             <div class="city-input-group departure">
-              <label class="city-label">出发城市</label>
+              <label class="city-label">出发地点</label>
               <a-input
                 id="DepartureCityInput"
                 @Focus="handleInputFocus('DepartureCityInput')"
@@ -43,7 +43,7 @@
                 :bordered="false"
                 size="large"
                 v-model:value="departureCity"
-                placeholder="请选择出发城市"
+                placeholder="请选择出发地点"
                 @compositionupdate="handleCompositionUpdate"
                 @input="handleCityInput"
               />
@@ -59,9 +59,9 @@
               />
             </div>
 
-            <!-- 到达城市 -->
+            <!-- 到达地点 -->
             <div class="city-input-group arrival">
-              <label class="city-label">到达城市</label>
+              <label class="city-label">到达地点</label>
               <a-input
                 id="ArrivalCityInput"
                 @Focus="handleInputFocus('ArrivalCityInput')"
@@ -69,7 +69,7 @@
                 :bordered="false"
                 size="large"
                 v-model:value="arrivalCity"
-                placeholder="请选择到达城市"
+                placeholder="请选择到达地点"
                 @compositionupdate="handleCompositionUpdate"
                 @input="handleCityInput"
               />
@@ -144,7 +144,7 @@ const selectedDate = computed({
 // 禁用过去日期的函数
 const disabledDate = (current: Dayjs) => {
   // 禁用今天之前的所有日期
-  return current && current < dayjs().startOf('day')
+  return current && (current < dayjs().startOf('day') || current > dayjs().add(13, 'day'))
 }
 
 // --------------------------------------

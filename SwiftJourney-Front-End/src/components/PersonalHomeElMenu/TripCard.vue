@@ -37,8 +37,8 @@
             <div class="line"></div>
           </div>
           <div class="station arrival">
-            <div class="station-name">{{ order.details.terminalStation }}</div>
-            <div class="station-time">预计到达</div>
+            <div class="station-name">{{ order.details.arrivalStation }}</div>
+            <div class="station-time">{{ order.details.arrivalTime }} 到达</div>
           </div>
         </div>
         <div class="trip-details">
