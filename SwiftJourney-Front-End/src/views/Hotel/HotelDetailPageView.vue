@@ -17,7 +17,7 @@
                                     <div class="image-indicator">
                                         <span class="current">{{ index + 1 }}</span>
                                         <span class="divider">/</span>
-                                        <span class="total">{{ hotelDetailInfo.picture.length }}</span>
+                                        <span class="total">{{ hotelDetailInfo.picture?.length || 0 }}</span>
                                     </div>
                                 </div>
                             </div>
