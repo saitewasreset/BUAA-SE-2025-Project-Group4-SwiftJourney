@@ -366,7 +366,7 @@ const user = useUserStore();
         }
 
         await userApi.setUserInfo(formPostData)
-          .then((res) =>{
+          .then((res: any) =>{
             if(res.status == 200) {
               if(res.data.code == 200) {
                 ElMessage.success('设置成功');
@@ -398,7 +398,7 @@ const user = useUserStore();
               }
             }
           })
-          .catch((error) => {
+          .catch((error: any) => {
             ElMessage.error(error);
           })
       },
