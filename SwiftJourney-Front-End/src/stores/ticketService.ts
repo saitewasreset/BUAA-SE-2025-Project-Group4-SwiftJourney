@@ -20,6 +20,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
     // -------------------- 筛选相关 --------------------
     // 只显示有票的车次
     onlyShowAvailable: false,
+    isLoading: false,
     checkGroups: [
       // 车次类型
       {
@@ -493,7 +494,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         return
       }
       if (this.queryDepartureText === '' || this.queryArrivalText === '') {
-        message.error('请填写出发地点和到达地点' + this.queryDate)
+        message.error('请填写出发地点和到达地点')
         return
       }
       const params: scheduleRequest = {
@@ -517,6 +518,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
         params.arrivalStation = checkArrivalText.target
       }
       this.resetSpecificState()
+      this.isLoading = true
       // 根据查询模式选择查询方法
       if (this.queryMode === 'direct') {
         try {
@@ -539,6 +541,7 @@ export const useTicketServiceStore = defineStore('ticketService', {
       } else {
         message.error('查询模式不正确，请选择直达或中转')
       }
+      this.isLoading = false
     },
     // 处理查询结果
     handleResponse(res: any) {

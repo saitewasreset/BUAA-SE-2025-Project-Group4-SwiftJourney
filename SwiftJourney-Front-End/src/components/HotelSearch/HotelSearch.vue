@@ -128,6 +128,7 @@
 <script setup lang="ts">
 import { ref, nextTick, reactive, computed, watch, Teleport } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router'; // 添加这行
 import type { HotelQuery, HotelGeneralInfo, HotelGInfoWRoom, HotelOrderQuery, HotelRoomDetailInfo } from '@/interface/hotelInterface';
 import SelectCard from '../SelectCard/SelectCard.vue'
 import { SearchOutlined } from '@ant-design/icons-vue';
@@ -140,15 +141,24 @@ import { useRouter } from 'vue-router';
 
 dayjs.locale('zh-cn');
 
+const route = useRoute(); // 添加这行
 const today = dayjs();
 const nextday = today.add(1, 'day');
-const hotelQuery = ref<HotelQuery> ({
-    target: '',
-    targetType: "city",
-    beginDate: formateDate(today),
-    endDate: formateDate(nextday),
-});
 
+// 修改初始化逻辑，从路由参数获取数据
+const initHotelQuery = () => {
+  const query = route.query;
+  const targetType = query.targetType as string;
+  return {
+    target: (query.target as string) || '',
+    targetType: (targetType === "station" ? "station" : "city") as "city" | "station",
+    beginDate: (query.beginDate as string) || formateDate(today),
+    endDate: (query.endDate as string) || formateDate(nextday),
+    search: (query.search as string) || '',
+  };
+};
+
+const hotelQuery = ref<HotelQuery>(initHotelQuery());
 
 //---------------------------首页查询页切换-----------------
 const isHeadPage = ref(true);
@@ -158,9 +168,28 @@ const beginDate = ref(hotelQuery.value.beginDate);
 const endDate = ref(hotelQuery.value.endDate);
 
 const dateFormat = 'YYYY-MM-DD(dddd)';
-const selectedDateRange = ref([today, nextday]);
 
-const dateRangeNum = ref<number>(1);
+// 修改日期选择器初始值
+const initDateRange = () => {
+  if (hotelQuery.value.beginDate && hotelQuery.value.endDate) {
+    return [dayjs(hotelQuery.value.beginDate), dayjs(hotelQuery.value.endDate)];
+  }
+  return [today, nextday];
+};
+
+const selectedDateRange = ref(initDateRange());
+
+// 计算初始住宿天数
+const initDateRangeNum = () => {
+  if (hotelQuery.value.beginDate && hotelQuery.value.endDate) {
+    const start = dayjs(hotelQuery.value.beginDate);
+    const end = dayjs(hotelQuery.value.endDate);
+    return end.diff(start, 'day');
+  }
+  return 1;
+};
+
+const dateRangeNum = ref<number>(initDateRangeNum());
 
 function disabledDate(current: any) {
     return current && current < dayjs().startOf('day');
@@ -232,8 +261,10 @@ function handleGlobalClick(event: MouseEvent) {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     document.addEventListener('click', handleGlobalClick);
+    await generalStore.init();
+    await checkAndAutoSearch();
 });
 
 onUnmounted(() => {
@@ -300,6 +331,27 @@ function checkHotelQuery() {
     }
     return true;
 }
+
+//---------------------------添加自动搜索逻辑---------------------------
+const checkAndAutoSearch = async () => {
+  // 检查是否有查询参数，如果有则自动执行搜索
+  const query = route.query;
+  if (query.target) {
+    
+    // 等待组件完全挂载后再执行搜索
+    await nextTick();
+    
+    // 直接调用搜索函数
+    try {
+      await searchHotel();
+      console.log('自动搜索执行完成');
+    } catch (error) {
+      console.error('自动搜索失败:', error);
+    }
+  } else {
+    console.log('没有检测到查询参数，跳过自动搜索');
+  }
+};
 
 //---------------------------------显示结果-----------------------------------
 const hotelGInfoWRoom = ref<HotelGInfoWRoom[]>([]);
@@ -798,11 +850,11 @@ roomList.value.forEach((key, index) => {
 
 /* 美化筛选面板 - 减小宽度并去除滚动 */
 .Selected {
-    width: 200px;
+    width: 300px;
     flex-shrink: 0;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 248, 255, 0.95));
     border-radius: 12px;
-    padding: 12px;
+    padding: 20px;
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
     border: 2px solid rgba(147, 197, 253, 0.3);
     height: 500px;
@@ -861,7 +913,7 @@ roomList.value.forEach((key, index) => {
 }
 
 .rating-slider {
-    width: 100%;
+    width: 90%;
     margin: 6px 0 10px 0;
 }
 

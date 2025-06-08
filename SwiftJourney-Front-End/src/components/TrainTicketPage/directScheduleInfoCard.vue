@@ -31,7 +31,12 @@
           </a-popover>
           <!-- 箭头 -->
           <div class="schedule-arrow">
-            <img src="@/assets/TicketArrowGrey.svg" />
+            <div class="arrow-line">
+              <div class="line"></div>
+              <svg class="arrow-icon" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
           </div>
           <!-- 运行时间 -->
           <div class="travel-time">{{ formatTravelTime(content.travelTime) }}</div>
@@ -46,14 +51,14 @@
           </div>
           <!-- 过夜标志 -->
           <div class="over-date-flag">
-            <div v-if="overDateFlag">+{{ overDateNum }}</div>
+            <div v-if="overDateFlag" class="over-date-badge">+{{ overDateNum }}</div>
           </div>
         </div>
       </div>
       <!-- 车票信息 -->
       <div class="ticket-info">
         <!-- 座位 - 车票元素 -->
-        <div v-for="(seatInfo, index) in sortedSeatInfo" :key="index">
+        <div v-for="(seatInfo, index) in sortedSeatInfo" :key="index" class="seat-card">
           <!-- 座位类型 -->
           <div class="seat-type-info">{{ seatInfo.seatType }}</div>
           <!-- 价格 -->
@@ -326,136 +331,281 @@ function onClickBookTicket() {
 }
 </script>
 
-<style lang="css" scoped>
+<style lang="scss" scoped>
 .direct-schedule-info-card {
-  padding: 1rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 0.5rem;
-  background-color: #fff;
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem; // 从 1.5rem 减少到 1rem
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+  }
 }
 
 .direct-root {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem; // 从 2rem 减少到 1.5rem
 }
 
 .direct-schedule-info {
   display: flex;
   flex-direction: row;
-  gap: 0.5rem;
+  gap: 0.8rem; // 从 1rem 减少到 0.8rem
   align-items: center;
   text-align: center;
-  margin-right: 0.5rem;
+  margin-right: 1rem;
+}
+
+.departure-info, .arrival-info-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .schedule-time {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #333;
-  margin-top: -0.3rem;
+  font-size: 1.6rem; // 从 2rem 减少到 1.6rem
+  font-weight: 700;
+  margin-bottom: 2px; // 从 4px 减少到 2px
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
 }
 
 .schedule-station {
-  font-size: 1rem;
-  margin-top: -0.3rem;
-  color: #333;
+  font-size: 0.9rem; // 从 1rem 减少到 0.9rem
+  color: #5a6c7d;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 .schedule-process {
   display: flex;
   flex-direction: column;
-  width: 100px;
+  align-items: center;
+  width: 100px; // 从 120px 减少到 100px
+  gap: 6px; // 从 8px 减少到 6px
 }
 
 .train-number {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #555;
-}
-.train-number:hover {
-  color: #1677ff;
+  font-size: 1.1rem; // 从 1.3rem 减少到 1.1rem
+  font-weight: 700;
+  background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   cursor: pointer;
-}
-.train-number.small {
-  font-size: 0.9rem;
-}
-
-.travel-time {
-  font-size: 0.8rem;
-  color: #888;
+  transition: all 0.2s ease;
+  padding: 2px 6px; // 从 4px 8px 减少到 2px 6px
+  border-radius: 8px;
+  
+  &:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #27ae60 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transform: scale(1.05);
+  }
+  
+  &.small {
+    font-size: 0.9rem; // 从 1rem 减少到 0.9rem
+  }
 }
 
 .schedule-arrow {
   display: flex;
   align-items: center;
-  margin-top: -0.05rem;
-  margin-bottom: 0.05rem;
+  margin: 4px 0; // 从 8px 0 减少到 4px 0
+}
+
+.arrow-line {
+  display: flex;
+  align-items: center;
+  width: 80px; // 从 100px 减少到 80px
+  
+  .line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 1px;
+  }
+  
+  .arrow-icon {
+    width: 16px; // 从 18px 减少到 16px
+    height: 16px; // 从 18px 减少到 16px
+    color: #2ecc71;
+    margin-left: 6px;
+  }
+}
+
+.travel-time {
+  font-size: 0.8rem; // 从 0.85rem 减少到 0.8rem
+  color: #95a5a6;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 .arrival-info {
   display: flex;
   flex-direction: row;
-}
-
-.arrival-info-main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
 }
 
 .over-date-flag {
-  padding-top: 0.1rem;
-  color: #1677ff;
-  font-size: 0.9rem;
-  font-weight: bold;
-  text-align: left;
-  width: 25px;
+  margin-left: 6px; // 从 8px 减少到 6px
+  padding-top: 2px; // 从 4px 减少到 2px
+}
+
+.over-date-badge {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 0.8rem; // 从 0.9rem 减少到 0.8rem
+  font-weight: 700;
+  padding: 1px 4px; // 从 2px 6px 减少到 1px 4px
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
 }
 
 .ticket-info {
   display: flex;
   flex-direction: row;
-  gap: 1rem;
+  gap: 1rem; // 从 1.5rem 减少到 1rem
+  padding: 0 0.8rem; // 从 0 1rem 减少到 0 0.8rem
+}
+
+.seat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px; // 从 12px 16px 减少到 8px 12px
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  min-width: 70px; // 从 80px 减少到 70px
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 }
 
 .seat-type-info {
-  font-size: 0.9rem;
-  font-weight: bold;
-  color: #333;
+  font-size: 0.85rem; // 从 0.9rem 减少到 0.85rem
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 3px; // 从 4px 减少到 3px
+  letter-spacing: 0.2px;
 }
 
 .price-info {
-  font-size: 0.7rem;
-  color: #f94d00;
+  font-size: 0.7rem; // 从 0.75rem 减少到 0.7rem
+  font-weight: 700;
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px; // 从 6px 减少到 4px
 }
 
 .remain-count-info {
-  font-size: 1rem;
-}
-
-.remain-count-info.rich {
-  color: #45b787;
-  font-weight: bold;
-}
-.remain-count-info.few {
-  color: #333;
-}
-.remain-count-info.little {
-  color: #ff4d4f;
-  font-weight: bold;
-}
-.remain-count-info.none {
-  color: #bbb;
+  font-size: 0.8rem; // 从 0.9rem 减少到 0.8rem
+  font-weight: 600;
+  padding: 3px 6px; // 从 4px 8px 减少到 3px 6px
+  border-radius: 8px;
+  letter-spacing: 0.1px;
+  
+  &.rich {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), rgba(46, 204, 113, 0.1));
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.2);
+  }
+  
+  &.few {
+    background: linear-gradient(135deg, rgba(52, 73, 94, 0.1), rgba(44, 62, 80, 0.1));
+    color: #34495e;
+    border: 1px solid rgba(52, 73, 94, 0.2);
+  }
+  
+  &.little {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.1), rgba(192, 57, 43, 0.1));
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.2);
+  }
+  
+  &.none {
+    background: linear-gradient(135deg, rgba(149, 165, 166, 0.1), rgba(127, 140, 141, 0.1));
+    color: #95a5a6;
+    border: 1px solid rgba(149, 165, 166, 0.2);
+  }
 }
 
 .function-area {
   display: flex;
   align-items: center;
-  position: right;
   margin-left: auto;
+}
+
+.book-btn {
+  padding: 8px 24px; // 从 12px 32px 减少到 8px 24px
+  height: auto;
+  font-size: 0.9rem; // 从 1rem 减少到 0.9rem
+  font-weight: 600;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
+  }
+  
+  &:disabled {
+    background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .direct-schedule-info-card {
+    padding: 0.8rem; // 从 1rem 减少到 0.8rem
+  }
+  
+  .direct-root {
+    gap: 1rem; // 从 1rem 保持不变，已经比较小了
+  }
+  
+  .schedule-process {
+    width: 80px; // 从 100px 减少到 80px
+  }
+  
+  .arrow-line {
+    width: 60px; // 从 80px 减少到 60px
+  }
+  
+  .ticket-info {
+    gap: 0.8rem; // 从 1rem 减少到 0.8rem
+    padding: 0 0.5rem;
+  }
+  
+  .seat-card {
+    min-width: 60px; // 从 70px 减少到 60px
+    padding: 6px 10px; // 从 10px 12px 减少到 6px 10px
+  }
 }
 </style>
