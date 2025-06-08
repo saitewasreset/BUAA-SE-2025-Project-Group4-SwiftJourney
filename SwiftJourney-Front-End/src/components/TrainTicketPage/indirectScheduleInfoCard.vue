@@ -35,15 +35,20 @@
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
-              <img src="@/assets/TicketArrowGrey.svg" />
+              <div class="arrow-line">
+                <div class="line"></div>
+                <svg class="arrow-icon" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
             </div>
             <!-- 到达时间 -->
             <div class="travel-time">{{ formatTime(content.first_ride.arrivalTime) }} 到达</div>
           </div>
           <!-- 中转信息 -->
-          <div>
+          <div class="transfer-info">
             <!-- 全程运行时间 -->
-            <div class="travel-time">
+            <div class="travel-time-total">
               全程
               {{
                 formatTravelTime(
@@ -54,9 +59,9 @@
               }}
             </div>
             <!-- 中转站 -->
-            <div class="schedule-station-mid">{{ content.first_ride.arrivalStation }}</div>
+            <div class="transfer-station">{{ content.first_ride.arrivalStation }}</div>
             <!-- 换乘时间 -->
-            <div class="travel-time">中转换乘 {{ formatTravelTime(content.relaxing_time) }}</div>
+            <div class="transfer-time">中转换乘 {{ formatTravelTime(content.relaxing_time) }}</div>
           </div>
           <!-- 过程信息 2 -->
           <div class="schedule-process">
@@ -82,7 +87,12 @@
             </a-popover>
             <!-- 箭头 -->
             <div class="schedule-arrow">
-              <img src="@/assets/TicketArrowGrey.svg" />
+              <div class="arrow-line">
+                <div class="line"></div>
+                <svg class="arrow-icon" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
             </div>
             <!-- 出发时间 -->
             <div class="travel-time">{{ formatTime(content.second_ride.departureTime) }} 出发</div>
@@ -97,7 +107,7 @@
             </div>
             <!-- 过夜标志 -->
             <div class="over-date-flag">
-              <div v-if="overDateFlag">+{{ overDateNum }}</div>
+              <div v-if="overDateFlag" class="over-date-badge">+{{ overDateNum }}</div>
             </div>
           </div>
         </div>
@@ -107,24 +117,26 @@
           <div class="ticket-info-ride">
             <div class="ride-title">第1程</div>
             <!-- 车票信息 -->
-            <div
-              v-for="(seatInfo, index) in sortedSeatInfoFirstRide"
-              :key="index"
-              class="seat-info"
-            >
-              <!-- 座位类型 -->
-              <div class="seat-type-info">{{ seatInfo.seatType }}</div>
-              <!-- 余票信息 -->
+            <div class="seat-cards">
               <div
-                class="remain-count-info"
-                :class="{
-                  rich: getleftType(seatInfo.left) === 'rich',
-                  few: getleftType(seatInfo.left) === 'few',
-                  little: getleftType(seatInfo.left) === 'little',
-                  none: getleftType(seatInfo.left) === 'none',
-                }"
+                v-for="(seatInfo, index) in sortedSeatInfoFirstRide"
+                :key="index"
+                class="seat-card"
               >
-                {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                <!-- 座位类型 -->
+                <div class="seat-type-info">{{ seatInfo.seatType }}</div>
+                <!-- 余票信息 -->
+                <div
+                  class="remain-count-info"
+                  :class="{
+                    rich: getleftType(seatInfo.left) === 'rich',
+                    few: getleftType(seatInfo.left) === 'few',
+                    little: getleftType(seatInfo.left) === 'little',
+                    none: getleftType(seatInfo.left) === 'none',
+                  }"
+                >
+                  {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                </div>
               </div>
             </div>
           </div>
@@ -132,24 +144,26 @@
           <div class="ticket-info-ride">
             <div class="ride-title">第2程</div>
             <!-- 车票信息 -->
-            <div
-              v-for="(seatInfo, index) in sortedSeatInfoSecondRide"
-              :key="index"
-              class="seat-info"
-            >
-              <!-- 座位类型 -->
-              <div class="seat-type-info">{{ seatInfo.seatType }}</div>
-              <!-- 余票信息 -->
+            <div class="seat-cards">
               <div
-                class="remain-count-info"
-                :class="{
-                  rich: getleftType(seatInfo.left) === 'rich',
-                  few: getleftType(seatInfo.left) === 'few',
-                  little: getleftType(seatInfo.left) === 'little',
-                  none: getleftType(seatInfo.left) === 'none',
-                }"
+                v-for="(seatInfo, index) in sortedSeatInfoSecondRide"
+                :key="index"
+                class="seat-card"
               >
-                {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                <!-- 座位类型 -->
+                <div class="seat-type-info">{{ seatInfo.seatType }}</div>
+                <!-- 余票信息 -->
+                <div
+                  class="remain-count-info"
+                  :class="{
+                    rich: getleftType(seatInfo.left) === 'rich',
+                    few: getleftType(seatInfo.left) === 'few',
+                    little: getleftType(seatInfo.left) === 'little',
+                    none: getleftType(seatInfo.left) === 'none',
+                  }"
+                >
+                  {{ formatleft(getleftType(seatInfo.left), seatInfo.left) }}
+                </div>
               </div>
             </div>
           </div>
@@ -158,7 +172,7 @@
       <!-- 功能区 -->
       <div class="function-area">
         <!-- 最低价格 -->
-        <div class="price-info">SC {{ content.first_ride.price + content.second_ride.price }}</div>
+        <div class="total-price">SC {{ content.first_ride.price + content.second_ride.price }}</div>
         <a-button
           :disable="!checkBookable"
           type="primary"
@@ -523,181 +537,367 @@ function onClickBookTicket() {
 }
 </script>
 
-<style lang="css" scoped>
+<style lang="scss" scoped>
 .indirect-schedule-info-card {
   padding: 1rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 0.5rem;
-  background-color: #fff;
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+  }
 }
 
 .indirect-root {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  gap: 1rem;
+  align-items: flex-start;
+  gap: 1.5rem;
 }
 
 .indirect-main-info {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.8rem;
+  flex: 1;
 }
 
 .indirect-schedule-info {
   display: flex;
   flex-direction: row;
-  gap: 0.5rem;
+  gap: 0.6rem;
   align-items: center;
   text-align: center;
-  margin-right: 0.5rem;
+}
+
+.departure-info, .arrival-info-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .schedule-time {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #333;
-  margin-top: -0.3rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
 }
 
 .schedule-station {
-  font-size: 1rem;
-  margin-top: -0.3rem;
-  color: #333;
-}
-
-.schedule-station-mid {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #333;
-  text-align: center;
-  margin-top: -0.2rem;
-  margin-bottom: -0.2rem;
+  font-size: 0.9rem;
+  color: #5a6c7d;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 .schedule-process {
   display: flex;
   flex-direction: column;
-  width: 100px;
+  align-items: center;
+  width: 90px;
+  gap: 4px;
 }
 
 .train-number {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #555;
-}
-.train-number:hover {
-  color: #1677ff;
+  font-size: 1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   cursor: pointer;
-}
-.train-number.small {
-  font-size: 0.9rem;
-}
-
-.travel-time {
-  font-size: 0.8rem;
-  color: #888;
+  transition: all 0.2s ease;
+  padding: 2px 6px;
+  border-radius: 8px;
+  
+  &:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #27ae60 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transform: scale(1.05);
+  }
+  
+  &.small {
+    font-size: 0.85rem;
+  }
 }
 
 .schedule-arrow {
   display: flex;
   align-items: center;
-  margin-top: -0.05rem;
-  margin-bottom: 0.05rem;
+  margin: 2px 0;
+}
+
+.arrow-line {
+  display: flex;
+  align-items: center;
+  width: 70px;
+  
+  .line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 1px;
+  }
+  
+  .arrow-icon {
+    width: 14px;
+    height: 14px;
+    color: #2ecc71;
+    margin-left: 4px;
+  }
+}
+
+.travel-time {
+  font-size: 0.75rem;
+  color: #95a5a6;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.transfer-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100px;
+  gap: 2px;
+}
+
+.travel-time-total {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.transfer-station {
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e67e22 0%, #f39c12 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.3px;
+  margin: 2px 0;
+}
+
+.transfer-time {
+  font-size: 0.75rem;
+  color: #95a5a6;
+  font-weight: 500;
+  letter-spacing: 0.1px;
 }
 
 .arrival-info {
   display: flex;
   flex-direction: row;
-}
-
-.arrival-info-main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
 }
 
 .over-date-flag {
-  padding-top: 0.1rem;
-  color: #1677ff;
-  font-size: 0.9rem;
-  font-weight: bold;
-  text-align: left;
-  width: 25px;
+  margin-left: 6px;
+  padding-top: 2px;
+}
+
+.over-date-badge {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
 }
 
 .ticket-info {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .ticket-info-ride {
   display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  align-items: center;
-}
-
-.ride-title {
-  font-size: 1rem;
-  font-weight: bold;
-  color: #1677ff;
-}
-
-.seat-info {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.seat-type-info {
+.ride-title {
   font-size: 0.9rem;
-  font-weight: bold;
-  color: #333;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.3px;
+}
+
+.seat-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.seat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  min-width: 60px;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.seat-type-info {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 2px;
+  letter-spacing: 0.2px;
 }
 
 .remain-count-info {
-  font-size: 1rem;
-}
-
-.remain-count-info.rich {
-  color: #45b787;
-  font-weight: bold;
-}
-.remain-count-info.few {
-  color: #333;
-}
-.remain-count-info.little {
-  color: #ff4d4f;
-  font-weight: bold;
-}
-.remain-count-info.none {
-  color: #bbb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 6px;
+  letter-spacing: 0.1px;
+  
+  &.rich {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), rgba(46, 204, 113, 0.1));
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.2);
+  }
+  
+  &.few {
+    background: linear-gradient(135deg, rgba(52, 73, 94, 0.1), rgba(44, 62, 80, 0.1));
+    color: #34495e;
+    border: 1px solid rgba(52, 73, 94, 0.2);
+  }
+  
+  &.little {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.1), rgba(192, 57, 43, 0.1));
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.2);
+  }
+  
+  &.none {
+    background: linear-gradient(135deg, rgba(149, 165, 166, 0.1), rgba(127, 140, 141, 0.1));
+    color: #95a5a6;
+    border: 1px solid rgba(149, 165, 166, 0.2);
+  }
 }
 
 .function-area {
   display: flex;
-  align-items: center;
   flex-direction: column;
-  position: right;
+  align-items: center;
+  gap: 0.8rem;
   margin-left: auto;
-  gap: 1.3rem;
 }
 
-.price-info {
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: #f94d00;
+.total-price {
+  font-size: 1.3rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
 }
 
 .book-btn {
-  display: flex;
-  align-items: center;
-  position: right;
-  margin-left: auto;
+  padding: 8px 24px;
+  height: auto;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
+  }
+  
+  &:disabled {
+    background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .indirect-schedule-info-card {
+    padding: 0.8rem;
+  }
+  
+  .indirect-root {
+    gap: 1rem;
+    flex-direction: column;
+  }
+  
+  .indirect-schedule-info {
+    gap: 0.4rem;
+  }
+  
+  .schedule-process {
+    width: 70px;
+  }
+  
+  .arrow-line {
+    width: 50px;
+  }
+  
+  .transfer-info {
+    width: 80px;
+  }
+  
+  .ticket-info {
+    padding: 0.6rem;
+  }
+  
+  .seat-cards {
+    gap: 0.5rem;
+  }
+  
+  .seat-card {
+    min-width: 50px;
+    padding: 4px 8px;
+  }
+  
+  .function-area {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
 }
 </style>
