@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, ref } from 'vue'
+import { h, ref, nextTick } from 'vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { mealApi } from '@/api/MealApi/mealApi'
 import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
@@ -278,10 +278,12 @@ function successGetMeal(trainDishInfo: TrainDishInfo) {
   mealOrderStore.deleteAll()
   dishInfo.value = tepInfo
   isHeadPage.value = false
-  const detailsSection = document.getElementById('details-section');
-  if (detailsSection) {
-    detailsSection.scrollIntoView({ behavior: 'smooth' });
-  }
+  nextTick(() => {
+    const detailsSection = document.getElementById('details-section');
+    if (detailsSection) {
+      detailsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
 }
 
 const orderDish = (shopName: string, food: TakeawayDishInfo) => {
