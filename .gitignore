@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-SwiftJourney-Front-End/node_modules
+frontend/node_modules
 .DS_Store
 dist
 dist-ssr
@@ -16,8 +16,8 @@ coverage
 *.local
 
 # Removed the specific paths for cypress videos and screenshots
-SwiftJourney-Front-End/cypress/videos/
-SwiftJourney-Front-End/cypress/screenshots/
+frontend/cypress/videos/
+frontend/cypress/screenshots/
 
 # Editor directories and files
 .vscode/*
@@ -30,3 +30,5 @@ SwiftJourney-Front-End/cypress/screenshots/
 *.sw?
 
 *.tsbuildinfo
+
+package/*
