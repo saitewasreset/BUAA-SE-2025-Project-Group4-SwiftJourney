@@ -1,4 +1,4 @@
-# SwiftJourney-Front-End
+# frontend
 
 Areka: when you write one new vue text, you should use this template.
 
