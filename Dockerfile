@@ -1,6 +1,6 @@
 # backend
 
-FROM rust AS chef 
+FROM rust AS chef
 WORKDIR /app
 RUN apt-get update
 RUN apt-get -y install libpq-dev lld
@@ -8,9 +8,9 @@ RUN apt-get -y install libpq-dev lld
 RUN apt-get -y install binutils
 RUN wget https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
 RUN tar -xf upx-4.2.4-amd64_linux.tar.xz
-# We only pay the installation cost once, 
+# We only pay the installation cost once,
 # it will be cached from the second build onwards
-RUN cargo install cargo-chef 
+RUN cargo install cargo-chef
 
 FROM chef AS planner
 COPY ./backend ./
@@ -30,14 +30,14 @@ RUN ./upx-4.2.4-amd64_linux/upx --best target/release/api
 # frontend
 
 # build stage
-FROM node:alpine as build-deps
+FROM node:alpine AS build-deps
 WORKDIR /app
 RUN --mount=type=bind,source=./SwiftJourney-Front-End/package.json,target=package.json \
     --mount=type=bind,source=./SwiftJourney-Front-End/package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
     npm ci
 
-FROM build-deps as fbuild
+FROM build-deps AS fbuild
 
 COPY ./SwiftJourney-Front-End ./
 RUN npm run build

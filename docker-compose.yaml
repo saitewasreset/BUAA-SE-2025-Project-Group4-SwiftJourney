@@ -70,7 +70,9 @@ services:
     restart: on-failure
 
   backend:
-    build: .
+    build:
+      context: .
+      network: host
     volumes:
       - backend_data:/instance
       - ./data:/init_data
