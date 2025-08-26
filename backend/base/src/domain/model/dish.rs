@@ -6,40 +6,6 @@
 //! - `DishTimeError`: 枚举类型，表示转换餐点时间时可能出现的错误。
 //! - `Dish`: 结构体，表示火车上的餐点实体，包含餐点的唯一标识符、所属列车标识符、餐点类型、餐点时间、名称、单价以及图片列表。
 //!
-//! ## Examples
-//!
-//! ```rust
-//! use base::domain::model::train::TrainId;
-//! use base::domain::model::dish::{Dish, DishTime};
-//! use rust_decimal::Decimal;
-//! use uuid::Uuid;
-//!
-//! let train_id = TrainId::from(1);
-//! let dish = Dish::new(
-//!     None,
-//!     train_id,
-//!     "Main Course".to_string(),
-//!     DishTime::Lunch,
-//!     "Grilled Salmon".to_string(),
-//!     Decimal::new(3500, 2), // 35.00
-//!     vec![Uuid::from("2cb2e067-37e5-4a7b-9ca1-347bd0f6b4c0"), Uuid::from("3e59d2ea-cbc8-4f4c-ab18-d68a52ae6204")],
-//! );
-//!
-//! assert_eq!(dish.name(), "Grilled Salmon");
-//! assert_eq!(dish.dish_time(), DishTime::Lunch);
-//! assert_eq!(dish.unit_price(), Decimal::new(3500, 2));
-//! ```
-//!
-//! ## Errors
-//!
-//! 当尝试将无效字符串转换为 `DishTime` 枚举类型时，会返回 `DishTimeError::InvalidDishTime` 错误。
-//!
-//! ```rust
-//! use base::domain::model::dish::{DishTime, DishTimeError};
-//!
-//! let result: Result<DishTime, DishTimeError> = "breakfast".try_into();
-//! assert!(result.is_err());
-//! ```
 use crate::domain::model::train::TrainId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
 use id_macro::define_id_type;
