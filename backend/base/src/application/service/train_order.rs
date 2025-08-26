@@ -92,3 +92,120 @@ pub trait TrainOrderService: 'static + Send + Sync {
         order_packs: Vec<OrderPackDTO>,
     ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>>;
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use uuid::Uuid;
+
+    // 简单 MockError 用于模拟失败
+    #[derive(Debug)]
+    struct MockError;
+    impl std::fmt::Display for MockError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Mock error")
+        }
+    }
+    impl std::error::Error for MockError {}
+    impl ApplicationError for MockError {
+        fn error_code(&self) -> u32 { 9999 }
+        fn error_message(&self) -> String { "Mock error".to_string() }
+    }
+
+    // 模拟服务实现
+    struct TestTrainOrderService {
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl TrainOrderService for TestTrainOrderService {
+        async fn process_train_order_packs(
+            &self,
+            _session_id: String,
+            _order_packs: Vec<OrderPackDTO>,
+        ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>> {
+            if self.fail {
+                Err(Box::new(MockError))
+            } else {
+                Ok(TransactionInfoDTO {
+                    transaction_id: Uuid::new_v4(),
+                    amount: 100f64,
+                    status: "success".to_string(),
+                })
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_train_order_packs_success() {
+        let service = TestTrainOrderService { fail: false };
+        let orders = vec![OrderPackDTO {
+            atomic: true,
+            order_list: vec![TrainOrderRequestDTO {
+                train_number: "G53".into(),
+                origin_departure_time: "2025-08-26T08:00:00Z".into(),
+                departure_station: "StationA".into(),
+                arrival_station: "StationB".into(),
+                personal_id: Uuid::new_v4().to_string(),
+                seat_type: "SecondClass".into(),
+            }],
+        }];
+
+        let result = service.process_train_order_packs("session123".into(), orders).await;
+        assert!(result.is_ok());
+        let tx = result.unwrap();
+        assert!(tx.amount > 0f64);
+    }
+
+    #[tokio::test]
+    async fn test_process_train_order_packs_failure() {
+        let service = TestTrainOrderService { fail: true };
+        let orders = vec![];
+
+        let result = service.process_train_order_packs("session123".into(), orders).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.error_code(), 9999);
+        assert_eq!(err.error_message(), "Mock error");
+    }
+
+    // 测试 TrainOrderServiceError 的 error_code 和 error_message
+    #[test]
+    fn test_train_order_service_error_codes() {
+        let e1 = TrainOrderServiceError::InfrastructureError(ServiceError::RelatedServiceError(anyhow::Error::new(MockError)));
+        assert_eq!(e1.error_code(), 500);
+
+        let e2 = TrainOrderServiceError::InvalidSessionId;
+        assert_eq!(e2.error_code(), 403);
+
+        let e3 = TrainOrderServiceError::InvalidTrainNumber;
+        assert_eq!(e3.error_code(), 404);
+
+        let e4 = TrainOrderServiceError::InvalidStationId;
+        assert_eq!(e4.error_code(), 404);
+
+        let e5 = TrainOrderServiceError::InvalidPassengerId;
+        assert_eq!(e5.error_code(), 404);
+    }
+
+    #[test]
+    fn test_train_order_service_error_messages() {
+        let e1 = TrainOrderServiceError::InfrastructureError(ServiceError::RelatedServiceError(anyhow::Error::new(MockError)));
+        assert!(e1.error_message().contains("a related service returned an error"));
+
+        let e2 = TrainOrderServiceError::InvalidSessionId;
+        assert!(e2.error_message().contains("invalid session"));
+
+        let e3 = TrainOrderServiceError::InvalidTrainNumber;
+        assert!(e3.error_message().contains("invalid train number"));
+
+        let e4 = TrainOrderServiceError::InvalidStationId;
+        assert!(e4.error_message().contains("invalid station id"));
+
+        let e5 = TrainOrderServiceError::InvalidPassengerId;
+        assert!(e5.error_message().contains("invalid passenger id"));
+    }
+}
