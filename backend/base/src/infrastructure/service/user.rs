@@ -73,6 +73,8 @@ where
     /// # Errors
     /// * `UserExists` - 手机号或身份证号已注册
     /// * `InfrastructureError` - 密码哈希失败或存储错误
+
+    #[tracing::instrument(skip(self))]
     async fn register(
         &self,
         username: Username,
@@ -87,7 +89,7 @@ where
             .await?
             .is_some()
         {
-            return Err(UserServiceError::UserExists(phone.into(), "".into()));
+            return Err(UserServiceError::PhoneExists(phone.into()));
         }
 
         if self
@@ -96,8 +98,7 @@ where
             .await?
             .is_some()
         {
-            return Err(UserServiceError::UserExists(
-                "".into(),
+            return Err(UserServiceError::IdentityCardExists(
                 identity_card_id.into(),
             ));
         }
@@ -467,11 +468,40 @@ mod tests {
                 RawPassword::try_from("".to_owned()).unwrap(),
                 default_user.user_info().name.to_owned(),
                 default_user.user_info().phone.clone(),
-                default_user.user_info().identity_card_id.clone(),
+                "611024199111226579".to_string().try_into().unwrap(),
             )
             .await;
 
-        assert!(matches!(result, Err(UserServiceError::UserExists(_, _))));
+        assert!(matches!(result, Err(UserServiceError::PhoneExists(_))));
+    }
+
+    #[tokio::test]
+    async fn register_identity_card_exists() {
+        let mut repo = MockRepo::new();
+
+        repo.expect_find().returning(|_| Ok(None));
+        repo.expect_find_by_phone().returning(|_| Ok(None));
+        repo.expect_find_by_identity_card_id()
+            .returning(|_| Ok(Some(default_test_user())));
+
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
+
+        let default_user = default_test_user();
+
+        let result = service
+            .register(
+                Username::try_from(default_user.username().to_owned()).unwrap(),
+                RawPassword::try_from("".to_owned()).unwrap(),
+                default_user.user_info().name.to_owned(),
+                default_user.user_info().phone.clone(),
+                "611024199111226579".to_string().try_into().unwrap(),
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(UserServiceError::IdentityCardExists(_))
+        ));
     }
 
     // 删除用户测试
