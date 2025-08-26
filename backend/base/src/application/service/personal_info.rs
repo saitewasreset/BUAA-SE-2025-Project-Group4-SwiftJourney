@@ -125,3 +125,148 @@ impl ApplicationError for PersonalInfoError {
         self.to_string()
     }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use uuid::Uuid;
+    use crate::domain::model::personal_info::PreferredSeatLocation;
+
+    #[test]
+    fn test_personal_info_dto_from_real_with_seat() {
+        let personal_info = PersonalInfo::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            "Alice".to_string().try_into().unwrap(),
+            "11010519491231002X".to_string().try_into().unwrap(),
+            Some(PreferredSeatLocation::A.try_into().unwrap()),
+            1u64.into(),
+        );
+
+        let dto: PersonalInfoDTO = PersonalInfoDTO::from(personal_info);
+        assert_eq!(dto.name, "Alice");
+        assert_eq!(dto.preferred_seat_location.unwrap(), "A");
+    }
+
+    #[test]
+    fn test_personal_info_dto_from_real_no_seat() {
+        let personal_info = PersonalInfo::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            "Bob".to_string().try_into().unwrap(),
+            "11010519491231002X".to_string().try_into().unwrap(),
+            None,
+            1u64.into(),
+        );
+
+        let dto: PersonalInfoDTO = PersonalInfoDTO::from(personal_info);
+        assert_eq!(dto.name, "Bob");
+        assert!(dto.preferred_seat_location.is_none());
+    }
+
+    // -------- 测试 PersonalInfoService --------
+    struct TestPersonalInfoService {
+        fail_get: bool,
+        fail_set: bool,
+    }
+
+    #[async_trait]
+    impl PersonalInfoService for TestPersonalInfoService {
+        async fn get_personal_info(
+            &self,
+            _query: PersonalInfoQuery,
+        ) -> Result<Vec<PersonalInfoDTO>, Box<dyn ApplicationError>> {
+            if self.fail_get {
+                Err(Box::new(PersonalInfoError::InvalidIdentityCardId))
+            } else {
+                Ok(vec![PersonalInfoDTO {
+                    personal_id: Uuid::new_v4().to_string(),
+                    name: "Alice".into(),
+                    identity_card_id: "123456789012345678".into(),
+                    preferred_seat_location: Some("Window".into()),
+                    default: true,
+                }])
+            }
+        }
+
+        async fn set_personal_info(
+            &self,
+            _command: SetPersonalInfoCommand,
+        ) -> Result<(), Box<dyn ApplicationError>> {
+            if self.fail_set {
+                Err(Box::new(PersonalInfoError::InvalidPreferredSeatLocation))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_personal_info_success() {
+        let service = TestPersonalInfoService { fail_get: false, fail_set: false };
+        let query = PersonalInfoQuery { session_id: "s1".into() };
+        let res = service.get_personal_info(query).await.unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].name, "Alice");
+    }
+
+    #[tokio::test]
+    async fn test_get_personal_info_failure() {
+        let service = TestPersonalInfoService { fail_get: true, fail_set: false };
+        let query = PersonalInfoQuery { session_id: "s2".into() };
+        let res = service.get_personal_info(query).await;
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.error_code(), 13002);
+        assert_eq!(err.error_message(), "Invalid identity card id");
+    }
+
+    #[tokio::test]
+    async fn test_set_personal_info_success() {
+        let service = TestPersonalInfoService { fail_get: false, fail_set: false };
+        let command = SetPersonalInfoCommand {
+            session_id: "s1".into(),
+            name: Some("Bob".into()),
+            identity_card_id: "987654321098765432".into(),
+            preferred_seat_location: Some("Aisle".into()),
+            default: Some(false),
+        };
+        let res = service.set_personal_info(command).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_personal_info_failure() {
+        let service = TestPersonalInfoService { fail_get: false, fail_set: true };
+        let command = SetPersonalInfoCommand {
+            session_id: "s1".into(),
+            name: Some("Bob".into()),
+            identity_card_id: "987654321098765432".into(),
+            preferred_seat_location: Some("InvalidSeat".into()),
+            default: Some(false),
+        };
+        let res = service.set_personal_info(command).await;
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.error_code(), 13003);
+        assert_eq!(err.error_message(), "Invalid preferred seat location");
+    }
+
+    // -------- 测试 PersonalInfoError --------
+    #[test]
+    fn test_personal_info_error_code() {
+        assert_eq!(PersonalInfoError::InvalidIdentityCardIdFormat.error_code(), 13001);
+        assert_eq!(PersonalInfoError::InvalidIdentityCardId.error_code(), 13002);
+        assert_eq!(PersonalInfoError::InvalidPreferredSeatLocation.error_code(), 13003);
+    }
+
+    #[test]
+    fn test_personal_info_error_message() {
+        assert_eq!(PersonalInfoError::InvalidIdentityCardIdFormat.error_message(), "Identity card id format");
+        assert_eq!(PersonalInfoError::InvalidIdentityCardId.error_message(), "Invalid identity card id");
+        assert_eq!(PersonalInfoError::InvalidPreferredSeatLocation.error_message(), "Invalid preferred seat location");
+    }
+}
