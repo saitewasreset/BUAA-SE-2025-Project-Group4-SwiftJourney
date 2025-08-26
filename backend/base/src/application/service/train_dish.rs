@@ -104,3 +104,144 @@ pub trait TrainDishApplicationService: 'static + Send + Sync {
         command: OrderTrainDishCommand,
     ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>>;
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_error_code() {
+        let e1 = TrainDishApplicationServiceError::InvalidDishName("Sushi".into());
+        assert_eq!(e1.error_code(), 22001);
+
+        let e2 = TrainDishApplicationServiceError::InvalidAmount;
+        assert_eq!(e2.error_code(), 22002);
+
+        let e3 = TrainDishApplicationServiceError::InvalidTakeawayStation("StationX".into());
+        assert_eq!(e3.error_code(), 22003);
+
+        let e4 = TrainDishApplicationServiceError::InvalidTakeawayShopName("ShopY".into());
+        assert_eq!(e4.error_code(), 22004);
+
+        let e5 = TrainDishApplicationServiceError::InvalidTakeawayName("Burger".into());
+        assert_eq!(e5.error_code(), 22005);
+
+        let e6 = TrainDishApplicationServiceError::NoRelatedTrainOrder;
+        assert_eq!(e6.error_code(), 22006);
+    }
+
+    #[test]
+    fn test_error_message() {
+        let e1 = TrainDishApplicationServiceError::InvalidDishName("Sushi".into());
+        assert!(e1.error_message().contains("Sushi"));
+
+        let e2 = TrainDishApplicationServiceError::InvalidAmount;
+        assert!(e2.error_message().contains("Invalid dish name"));
+
+        let e3 = TrainDishApplicationServiceError::InvalidTakeawayStation("StationX".into());
+        assert!(e3.error_message().contains("StationX"));
+
+        let e4 = TrainDishApplicationServiceError::InvalidTakeawayShopName("ShopY".into());
+        assert!(e4.error_message().contains("ShopY"));
+
+        let e5 = TrainDishApplicationServiceError::InvalidTakeawayName("Burger".into());
+        assert!(e5.error_message().contains("Burger"));
+
+        let e6 = TrainDishApplicationServiceError::NoRelatedTrainOrder;
+        assert_eq!(e6.error_message(), "No related train order found");
+    }
+
+    #[derive(Debug)]
+    struct MockError;
+
+    impl std::fmt::Display for MockError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Mock error")
+        }
+    }
+    impl std::error::Error for MockError {}
+    impl ApplicationError for MockError {
+        fn error_code(&self) -> u32 { 9999 }
+        fn error_message(&self) -> String { "Mock error".to_string() }
+    }
+
+    struct TestTrainDishService {
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl TrainDishApplicationService for TestTrainDishService {
+        async fn order_dish(
+            &self,
+            _command: OrderTrainDishCommand,
+        ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>> {
+            if self.fail {
+                Err(Box::new(MockError))
+            } else {
+                Ok(TransactionInfoDTO {
+                    transaction_id: Uuid::new_v4(),
+                    amount: 100.0f64,
+                    status: "success".into(),
+                })
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_order_dish_success() {
+        let service = TestTrainDishService { fail: false };
+
+        let command = OrderTrainDishCommand {
+            session_id: "session1".into(),
+            info: TrainDishOrderRequestDTO {
+                train_number: "G123".into(),
+                origin_departure_time: "2025-08-26T08:00:00Z".into(),
+                dishes: vec![
+                    DishOrderRequestDTO {
+                        name: "Beef Noodles".into(),
+                        personal_id: Uuid::new_v4(),
+                        amount: 2,
+                        dish_time: "2025-08-26T12:00:00Z".into(),
+                    }
+                ],
+                takeaway: vec![
+                    TakeawayOrderRequestDTO {
+                        station: "StationA".into(),
+                        shop_name: "ShopX".into(),
+                        name: "Burger".into(),
+                        personal_id: Uuid::new_v4(),
+                        amount: 1,
+                    }
+                ],
+            }
+        };
+        let result = service.order_dish(command).await;
+        assert!(result.is_ok());
+        let tx = result.unwrap();
+        assert!(tx.amount > 0.0f64);
+    }
+
+    #[tokio::test]
+    async fn test_order_dish_failure() {
+        let service = TestTrainDishService { fail: true };
+
+        let command = OrderTrainDishCommand {
+            session_id: "session1".into(),
+            info: TrainDishOrderRequestDTO {
+                train_number: "G123".into(),
+                origin_departure_time: "2025-08-26T08:00:00Z".into(),
+                dishes: vec![],
+                takeaway: vec![],
+            }
+        };
+
+        let result = service.order_dish(command).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.error_code(), 9999);
+        assert_eq!(err.error_message(), "Mock error");
+    }
+}
