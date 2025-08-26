@@ -1,4 +1,4 @@
-import { getRequest, postRequest } from '../axios'
+import { postRequest } from '../axios'
 import type {
   scheduleRequest,
   trainTransactionRequest,
