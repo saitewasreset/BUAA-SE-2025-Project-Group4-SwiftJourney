@@ -66,3 +66,71 @@ impl SetUserProfileCommand {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::service::user_profile::SetUserProfileDTO;
+
+    // ------------------------------
+    // SetUserProfileCommand::from_session_id_and_dto 测试
+    // ------------------------------
+
+    #[test]
+    fn test_from_session_id_and_dto_positive() {
+        let dto = SetUserProfileDTO {
+            username: "张三".to_string(),
+            gender: Some("男".to_string()),
+            age: Some(28),
+            email: "zhangsan@example.com".to_string(),
+        };
+
+        let cmd = SetUserProfileCommand::from_session_id_and_dto("session123".to_string(), dto.clone());
+
+        assert_eq!(cmd.session_id, "session123");
+        assert_eq!(cmd.username, dto.username);
+        assert_eq!(cmd.gender, dto.gender);
+        assert_eq!(cmd.age, dto.age);
+        assert_eq!(cmd.email, dto.email);
+    }
+
+    #[test]
+    fn test_from_session_id_and_dto_negative_empty_fields() {
+        let dto = SetUserProfileDTO {
+            username: "".to_string(),
+            gender: None,
+            age: None,
+            email: "".to_string(),
+        };
+
+        let cmd = SetUserProfileCommand::from_session_id_and_dto("".to_string(), dto);
+
+        assert!(cmd.session_id.is_empty());
+        assert!(cmd.username.is_empty());
+        assert!(cmd.gender.is_none());
+        assert!(cmd.age.is_none());
+        assert!(cmd.email.is_empty());
+    }
+
+    // ------------------------------
+    // UserProfileQuery 测试
+    // ------------------------------
+
+    #[test]
+    fn test_user_profile_query_positive() {
+        let query = UserProfileQuery {
+            session_id: "session999".to_string(),
+        };
+
+        assert_eq!(query.session_id, "session999");
+    }
+
+    #[test]
+    fn test_user_profile_query_negative_empty_session() {
+        let query = UserProfileQuery {
+            session_id: "".to_string(),
+        };
+
+        assert!(query.session_id.is_empty());
+    }
+}

@@ -116,3 +116,114 @@ impl TrainQueryValidate for TransferTrainQueryCommand {
         &self.arrival_city
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn sample_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()
+    }
+
+    // ------------------------------
+    // DirectTrainQueryCommand 测试
+    // ------------------------------
+
+    #[test]
+    fn test_direct_validate_positive() {
+        let cmd = DirectTrainQueryCommand {
+            session_id: "s1".to_string(),
+            departure_station: Some("北京南".to_string()),
+            arrival_station: Some("上海虹桥".to_string()),
+            departure_city: None,
+            arrival_city: None,
+            departure_time: sample_date(),
+        };
+
+        assert!(cmd.validate().is_ok());
+    }
+
+    #[test]
+    fn test_direct_validate_negative_inconsistent_departure() {
+        let cmd = DirectTrainQueryCommand {
+            session_id: "s2".to_string(),
+            departure_station: Some("北京南".to_string()),
+            arrival_station: Some("上海虹桥".to_string()),
+            departure_city: Some("北京".to_string()),
+            arrival_city: None,
+            departure_time: sample_date(),
+        };
+
+        let result = cmd.validate();
+        assert!(matches!(result, Err(TrainQueryServiceError::InconsistentQuery)));
+    }
+
+    #[test]
+    fn test_direct_getters() {
+        let cmd = DirectTrainQueryCommand {
+            session_id: "s3".to_string(),
+            departure_station: Some("A".to_string()),
+            arrival_station: Some("B".to_string()),
+            departure_city: Some("C".to_string()),
+            arrival_city: Some("D".to_string()),
+            departure_time: sample_date(),
+        };
+
+        assert_eq!(cmd.dep_station().as_deref(), Some("A"));
+        assert_eq!(cmd.dep_city().as_deref(), Some("C"));
+        assert_eq!(cmd.arr_station().as_deref(), Some("B"));
+        assert_eq!(cmd.arr_city().as_deref(), Some("D"));
+    }
+
+    // ------------------------------
+    // TransferTrainQueryCommand 测试
+    // ------------------------------
+
+    #[test]
+    fn test_transfer_validate_positive() {
+        let cmd = TransferTrainQueryCommand {
+            session_id: "s4".to_string(),
+            departure_station: None,
+            arrival_station: Some("南京南".to_string()),
+            departure_city: Some("北京".to_string()),
+            arrival_city: None,
+            departure_time: sample_date(),
+        };
+
+        assert!(cmd.validate().is_ok());
+    }
+
+    #[test]
+    fn test_transfer_validate_negative_inconsistent_arrival() {
+        let cmd = TransferTrainQueryCommand {
+            session_id: "s5".to_string(),
+            departure_station: None,
+            arrival_station: Some("广州南".to_string()),
+            departure_city: Some("北京".to_string()),
+            arrival_city: Some("广州".to_string()),
+            departure_time: sample_date(),
+        };
+
+        let result = cmd.validate();
+        assert!(matches!(result, Err(TrainQueryServiceError::InconsistentQuery)));
+    }
+
+    #[test]
+    fn test_transfer_getters() {
+        let cmd = TransferTrainQueryCommand {
+            session_id: "s6".to_string(),
+            departure_station: Some("X".to_string()),
+            arrival_station: Some("Y".to_string()),
+            departure_city: Some("M".to_string()),
+            arrival_city: Some("N".to_string()),
+            departure_time: sample_date(),
+        };
+
+        assert_eq!(cmd.dep_station().as_deref(), Some("X"));
+        assert_eq!(cmd.dep_city().as_deref(), Some("M"));
+        assert_eq!(cmd.arr_station().as_deref(), Some("Y"));
+        assert_eq!(cmd.arr_city().as_deref(), Some("N"));
+    }
+}
