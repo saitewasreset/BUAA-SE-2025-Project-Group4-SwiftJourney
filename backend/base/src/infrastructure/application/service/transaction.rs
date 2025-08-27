@@ -383,13 +383,16 @@ where
 
         let target_tx = target_tx.ok_or_else(|| {
             warn!("No transaction found for order id {}", target_order_uuid);
-            GeneralError::NotFound
+            GeneralError::NotFound(format!(
+                "No transaction found for order id {}",
+                target_order_uuid
+            ))
         })?;
 
         let target_order = target_order.unwrap();
 
         self.transaction_service
-            .refund_transaction(target_tx.uuid(), &[target_order.clone()])
+            .refund_transaction(target_tx.uuid(), std::slice::from_ref(target_order))
             .await
             .map_err(|e| match e {
                 TransactionServiceError::RefundError(e) => Box::new(

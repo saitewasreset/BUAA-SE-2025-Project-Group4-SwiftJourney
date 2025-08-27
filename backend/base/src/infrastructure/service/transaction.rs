@@ -150,7 +150,12 @@ where
             })?
             .ok_or(TransactionServiceError::InvalidTransactionId(
                 transaction_id,
-            ))?;
+            ))
+            .inspect_err(|e| {
+                error!("No transaction found: {:?}", e);
+            })?;
+
+        info!("Transaction loaded");
 
         let available_balance = self.get_balance(tx.user_id()).await.inspect_err(|e| {
             error!("Failed to get user balance: {:?}", e);
@@ -164,6 +169,8 @@ where
                 amount: TransactionAmountAbs::from(tx.raw_amount()),
             });
         }
+
+        info!("Balance check passed");
 
         tx.pay().map_err(|e| match e {
             TransactionError::AlreadyPaid(_) => TransactionServiceError::InvalidTransactionStatus {

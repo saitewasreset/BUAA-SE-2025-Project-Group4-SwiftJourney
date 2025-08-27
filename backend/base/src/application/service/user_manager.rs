@@ -92,9 +92,12 @@ pub struct UserUpdatePasswordDTO {
 pub enum UserManagerError {
     /// 用户已存在错误(手机号已注册)
     #[error("User with phone {0} already exists")]
-    UserAlreadyExists(String),
+    PhoneAlreadyExists(String),
+    /// 用户已存在错误(手机号已注册)
+    #[error("User with identity card id {0} already exists")]
+    IdentityCardIdAlreadyExists(String),
     /// 手机号或密码错误
-    #[error("Invalid phone number of password")]
+    #[error("Invalid phone number or password")]
     InvalidPhoneNumberOrPassword,
     #[error("Invalid username")]
     /// 无效的用户名格式，详见RFC3
@@ -110,7 +113,8 @@ pub enum UserManagerError {
 impl ApplicationError for UserManagerError {
     fn error_code(&self) -> u32 {
         match self {
-            UserManagerError::UserAlreadyExists(_) => 15001,
+            UserManagerError::PhoneAlreadyExists(_) => 15001,
+            UserManagerError::IdentityCardIdAlreadyExists(_) => 15001,
             UserManagerError::InvalidPhoneNumberOrPassword => 15002,
             UserManagerError::InvalidUsernameFormat => 15003,
             UserManagerError::InvalidPasswordFormat => 15004,
@@ -133,7 +137,10 @@ impl From<UserServiceError> for Box<dyn ApplicationError> {
             UserServiceError::NoSuchUser(_) => {
                 UserManagerError::InvalidPhoneNumberOrPassword.into()
             }
-            UserServiceError::UserExists(s, _) => UserManagerError::UserAlreadyExists(s).into(),
+            UserServiceError::PhoneExists(s) => UserManagerError::PhoneAlreadyExists(s).into(),
+            UserServiceError::IdentityCardExists(s) => {
+                UserManagerError::IdentityCardIdAlreadyExists(s).into()
+            }
             UserServiceError::PaymentPasswordMaxAttemptsExceed(_) => {
                 TransactionApplicationServiceError::TooManyPaymentPasswordAttempts.into()
             }

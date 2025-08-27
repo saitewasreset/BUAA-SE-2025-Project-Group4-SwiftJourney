@@ -53,5 +53,8 @@ pub const API_FORBIDDEN_MESSAGE_TEMPLATE: &str =
     "Sorry, but this was meant to be a private game: {}";
 pub const API_BAD_REQUEST_MESSAGE_TEMPLATE: &str = "{}";
 
+pub const API_NOT_FOUND_MESSAGE_TEMPLATE: &str =
+    "Sorry, but this was meant to be a private game: {}";
+
 pub const API_INTERNAL_SERVER_ERROR_MESSAGE: &str =
     "Multiplayer Session Ended: an internal server error has occurred";

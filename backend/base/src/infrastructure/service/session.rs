@@ -78,16 +78,13 @@ where
         let expires_at = created_at + self.session_config.default_ttl;
 
         // 会话淘汰逻辑
-        if let Some(mut sessions) = self.user_id_to_session.get_mut(&user_id) {
-            if sessions.len() >= self.session_config.max_concurrent_sessions_per_user {
-                if let Some(evicted_session_id) = sessions.pop_front() {
-                    if let Some(evicted_session) =
-                        self.session_repository.find(evicted_session_id).await?
-                    {
-                        self.session_repository.remove(evicted_session).await?;
-                    }
-                }
-            }
+
+        if let Some(mut sessions) = self.user_id_to_session.get_mut(&user_id)
+            && sessions.len() >= self.session_config.max_concurrent_sessions_per_user
+            && let Some(evicted_session_id) = sessions.pop_front()
+            && let Some(evicted_session) = self.session_repository.find(evicted_session_id).await?
+        {
+            self.session_repository.remove(evicted_session).await?;
         }
 
         let mut session = Session::new(user_id, created_at, expires_at);

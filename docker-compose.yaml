@@ -70,7 +70,9 @@ services:
     restart: on-failure
 
   backend:
-    build: .
+    build:
+      context: ./backend
+      network: host
     volumes:
       - backend_data:/instance
       - ./data:/init_data
@@ -94,8 +96,22 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      network: host
+
+  swift_journey:
+    image: nginx:alpine
+    depends_on:
+      - frontend
+      - backend
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "8081:8080"
+      - "8080:80"
+    restart: unless-stopped
 
 volumes:
   postgres_data:

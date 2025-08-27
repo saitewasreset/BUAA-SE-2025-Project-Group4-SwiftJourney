@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  namespace: swiftjourney
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_ROOT_USER } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                {
+                  secretKeyRef: { name: app-secrets, key: MINIO_ROOT_PASSWORD },
+                }
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_ACCESS_KEY } }
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_SECRET_KEY } }
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              echo "Waiting for MinIO..."
+              until (mc alias set swiftjourney http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1); do
+                sleep 2
+              done
+              echo "Creating access key (idempotent)..."
+              mc admin accesskey create --access-key "$MINIO_ACCESS_KEY" --secret-key "$MINIO_SECRET_KEY" swiftjourney || true

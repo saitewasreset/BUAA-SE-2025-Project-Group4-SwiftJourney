@@ -102,11 +102,14 @@ pub enum UserProfileError {
     InvalidAge,
     #[error("Invalid email")]
     InvalidEmail,
+    #[error("Invalid username")]
+    InvalidUsername,
 }
 
 impl ApplicationError for UserProfileError {
     fn error_code(&self) -> u32 {
         match self {
+            UserProfileError::InvalidUsername => 15003,
             UserProfileError::InvalidAge => 15006,
             UserProfileError::InvalidEmail => 15007,
         }

@@ -210,8 +210,8 @@ where
             .get_schedule_by_train_number_and_date(cmd.train_number.clone(), departure_date)
             .await
             .map_err(|e| match e {
-                TrainScheduleServiceError::InvalidTrainNumber(_for_super_earth) => {
-                    GeneralError::NotFound
+                TrainScheduleServiceError::InvalidTrainNumber(train_number) => {
+                    GeneralError::NotFound(format!("Invalid train number: {}", train_number))
                 }
                 x => {
                     error!("Failed to get train schedule: {}", x);
@@ -220,7 +220,7 @@ where
                 }
             })?
             .ok_or(GeneralError::BadRequest(format!(
-                "invalid train: {} {}",
+                "no train number {} found for date {}",
                 cmd.train_number, cmd.departure_date
             )))?;
 

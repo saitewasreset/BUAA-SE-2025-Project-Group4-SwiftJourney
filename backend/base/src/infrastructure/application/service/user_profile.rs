@@ -169,8 +169,7 @@ where
 
         let username = Username::try_from(command.username.clone()).map_err(|e| {
             warn!("invalid username: {} {}", command.username, e);
-
-            GeneralError::BadRequest(e.to_string())
+            UserProfileError::InvalidUsername
         })?;
 
         let gender = command

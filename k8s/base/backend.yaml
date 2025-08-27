@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: swiftjourney
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: saitewasreset/swiftjourney-backend:v0.1.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          env:
+            - name: DEBUG
+              value: "1"
+            - name: RUST_LOG
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: RUST_LOG } }
+            - name: POSTGRES_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@db/$(POSTGRES_DB)
+            - name: RABBITMQ_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_USER } }
+            - name: RABBITMQ_PASS
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_PASS } }
+            - name: RABBITMQ_URL
+              value: amqp://$(RABBITMQ_USER):$(RABBITMQ_PASS)@rabbitmq/%2f
+            - name: TZ_OFFSET_HOUR
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: TZ_OFFSET_HOUR } }
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: MINIO_ENDPOINT } }
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_ACCESS_KEY } }
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_SECRET_KEY } }
+            - name: DATA_PATH
+              value: /init_data
+            - name: SERVER_NAME
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: SERVER_NAME } }
+            - name: AUTO_SCHEDULE_DAYS
+              valueFrom:
+                {
+                  configMapKeyRef:
+                    { name: app-config, key: AUTO_SCHEDULE_DAYS },
+                }
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: backend-data
+              mountPath: /instance
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: backend-data
+          persistentVolumeClaim:
+            claimName: backend-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: swiftjourney
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
