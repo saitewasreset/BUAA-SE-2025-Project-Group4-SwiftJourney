@@ -537,7 +537,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().error_message(),
-            "Invalid phone number of password"
+            "Invalid phone number or password"
         );
     }
 
