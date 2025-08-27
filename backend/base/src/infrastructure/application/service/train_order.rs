@@ -10,7 +10,7 @@ use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
 };
 use crate::domain::model::session::SessionId;
-use crate::domain::model::train::{SeatTypeName, TrainNumber};
+use crate::domain::model::train::SeatTypeName;
 use crate::domain::model::train_schedule::StationRange;
 use crate::domain::model::user::UserId;
 use crate::domain::repository::order::OrderRepository;
@@ -23,6 +23,7 @@ use crate::domain::service::ServiceError;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::train_booking::TrainBookingService;
 use crate::domain::service::train_schedule::TrainScheduleService;
+use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::service::transaction::TransactionService;
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -31,11 +32,11 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::sync::Arc;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub struct TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS>
+pub struct TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS, TTCS>
 where
     TSR: TrainScheduleRepository,
     TBS: TrainBookingService,
@@ -47,6 +48,7 @@ where
     SMS: SessionManagerService,
     PIR: PersonalInfoRepository,
     TSS: TrainScheduleService,
+    TTCS: TrainTypeConfigurationService,
 {
     train_schedule_repository: Arc<TSR>,
     train_booking_service: Arc<TBS>,
@@ -58,10 +60,11 @@ where
     session_manager_service: Arc<SMS>,
     personal_info_repository: Arc<PIR>,
     train_schedule_service: Arc<TSS>,
+    train_type_configuration_service: Arc<TTCS>,
 }
 
-impl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS>
-    TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS>
+impl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS, TTCS>
+    TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS, TTCS>
 where
     TSR: TrainScheduleRepository,
     TBS: TrainBookingService,
@@ -73,6 +76,7 @@ where
     SMS: SessionManagerService,
     PIR: PersonalInfoRepository,
     TSS: TrainScheduleService,
+    TTCS: TrainTypeConfigurationService,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -86,6 +90,7 @@ where
         session_manager_service: Arc<SMS>,
         personal_info_repository: Arc<PIR>,
         train_schedule_service: Arc<TSS>,
+        train_type_configuration_service: Arc<TTCS>,
     ) -> Self {
         Self {
             train_schedule_repository,
@@ -98,17 +103,25 @@ where
             session_manager_service,
             personal_info_repository,
             train_schedule_service,
+            train_type_configuration_service,
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_and_create_train_order(
         &self,
         dto: &CreateTrainOrderDTO,
         user_id: UserId,
     ) -> Result<Box<dyn Order>, Box<dyn ApplicationError>> {
-        // == 验证订单 ==
-        // SAFETY: 正确性将在find_by_train_number中检查
-        let train_number = TrainNumber::from_unchecked(dto.train_number.clone());
+        let train_number = self
+            .train_type_configuration_service
+            .verify_train_number(dto.train_number.clone().into())
+            .await
+            .map_err(|e| {
+                warn!("{:?}", e);
+
+                GeneralError::NotFound(format!("Invalid train number: {}", dto.train_number))
+            })?;
 
         let train = self
             .train_repository
@@ -465,8 +478,8 @@ where
 }
 
 #[async_trait]
-impl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS> TrainOrderService
-    for TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS>
+impl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS, TTCS> TrainOrderService
+    for TrainOrderServiceImpl<TSR, TBS, TR, RR, SR, OR, TS, SMS, PIR, TSS, TTCS>
 where
     TSR: TrainScheduleRepository + Send + Sync + 'static,
     TBS: TrainBookingService + Send + Sync + 'static,
@@ -478,6 +491,7 @@ where
     SMS: SessionManagerService + Send + Sync + 'static,
     PIR: PersonalInfoRepository + Send + Sync + 'static,
     TSS: TrainScheduleService + Send + Sync + 'static,
+    TTCS: TrainTypeConfigurationService + Send + Sync + 'static,
 {
     #[instrument(skip_all)]
     async fn process_train_order_packs(

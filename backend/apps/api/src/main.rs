@@ -449,6 +449,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&personal_info_repository_impl),
         Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&train_type_configuration_service_impl),
     ));
 
     let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(

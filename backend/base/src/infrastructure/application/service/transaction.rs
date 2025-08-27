@@ -383,7 +383,10 @@ where
 
         let target_tx = target_tx.ok_or_else(|| {
             warn!("No transaction found for order id {}", target_order_uuid);
-            GeneralError::NotFound
+            GeneralError::NotFound(format!(
+                "No transaction found for order id {}",
+                target_order_uuid
+            ))
         })?;
 
         let target_order = target_order.unwrap();
