@@ -29,50 +29,48 @@ async fn ws(
     session_manager_service: Data<dyn SessionManagerService>,
     message_listener_service: Data<dyn MessageListenerService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if let Ok(session_id) = get_session_id(&req) {
-        if let Ok(session_id) = SessionId::try_from(session_id.as_str()) {
-            if let Ok(user_id) = session_manager_service
-                .get_user_id_by_session(session_id)
-                .await
-            {
-                if let Some(user_id) = user_id {
-                    let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
+    if let Ok(session_id) = get_session_id(&req)
+        && let Ok(session_id) = SessionId::try_from(session_id.as_str())
+        && let Ok(user_id) = session_manager_service
+            .get_user_id_by_session(session_id)
+            .await
+    {
+        return if let Some(user_id) = user_id {
+            let (res, mut session, stream) = actix_ws::handle(&req, stream)?;
 
-                    let mut stream = stream
-                        .aggregate_continuations()
-                        // aggregate continuation frames up to 1MiB
-                        .max_continuation_size(2_usize.pow(20));
+            let mut stream = stream
+                .aggregate_continuations()
+                // aggregate continuation frames up to 1MiB
+                .max_continuation_size(2_usize.pow(20));
 
-                    let message_listener = MessageListenerImpl::new(session.clone());
+            let message_listener = MessageListenerImpl::new(session.clone());
 
-                    message_listener_service.add_listener(user_id, Box::new(message_listener));
+            message_listener_service.add_listener(user_id, Box::new(message_listener));
 
-                    // start task but don't wait for it
-                    actix_web::rt::spawn(async move {
-                        // receive messages from websocket
-                        while let Some(msg) = stream.next().await {
-                            if let Ok(AggregatedMessage::Ping(msg)) = msg {
-                                // respond to PING frame with PONG frame
-                                session.pong(&msg).await.unwrap();
-                            }
+            // start task but don't wait for it
+            actix_web::rt::spawn(async move {
+                // receive messages from websocket
+                while let Some(msg) = stream.next().await {
+                    if let Ok(AggregatedMessage::Ping(msg)) = msg {
+                        // respond to PING frame with PONG frame
+                        session.pong(&msg).await.unwrap();
+                    }
 
-                            // 忽略客户端发送的其他消息
-                        }
-                    });
-
-                    // respond immediately with response connected to WS session
-                    return Ok(res);
+                    // 忽略客户端发送的其他消息
                 }
-            } else {
-                return Ok(
-                    HttpResponse::Ok().body(serde_json::to_vec(&ApiResponse::<()> {
-                        code: 500,
-                        message: API_INTERNAL_SERVER_ERROR_MESSAGE.to_string(),
-                        data: None,
-                    })?),
-                );
-            }
-        }
+            });
+
+            // respond immediately with response connected to WS session
+            Ok(res)
+        } else {
+            Ok(
+                HttpResponse::Ok().body(serde_json::to_vec(&ApiResponse::<()> {
+                    code: 500,
+                    message: API_INTERNAL_SERVER_ERROR_MESSAGE.to_string(),
+                    data: None,
+                })?),
+            )
+        };
     }
 
     Ok(

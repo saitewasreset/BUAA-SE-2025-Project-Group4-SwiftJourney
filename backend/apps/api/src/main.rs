@@ -449,6 +449,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&personal_info_repository_impl),
         Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&train_type_configuration_service_impl),
     ));
 
     let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
@@ -637,10 +638,10 @@ fn read_file_env(target_env: &str) -> Option<String> {
         }
     }
 
-    if result.is_none() {
-        if let Ok(env_str) = env::var(target_env) {
-            result = Some(env_str);
-        }
+    if result.is_none()
+        && let Ok(env_str) = env::var(target_env)
+    {
+        result = Some(env_str);
     }
 
     result

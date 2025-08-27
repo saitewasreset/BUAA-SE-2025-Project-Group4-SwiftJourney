@@ -95,9 +95,9 @@ impl From<TransactionServiceError> for Box<dyn ApplicationError> {
             TransactionServiceError::InvalidUser(x) => {
                 Box::new(GeneralError::BadRequest(format!("invalid user id: {}", x)))
             }
-            TransactionServiceError::InvalidTransactionId(x) => {
-                Box::new(GeneralError::BadRequest(format!("invalid user id: {}", x)))
-            }
+            TransactionServiceError::InvalidTransactionId(x) => Box::new(GeneralError::BadRequest(
+                format!("invalid transaction id: {}", x),
+            )),
             e @ TransactionServiceError::InvalidTransactionStatus {
                 op: _,
                 status: _,

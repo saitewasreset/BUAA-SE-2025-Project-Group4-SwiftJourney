@@ -318,15 +318,9 @@ where
                     || order.order_status() == OrderStatus::Active
             })
             .find(|order| {
-                if let Some(train_order) =
-                    ((*order).deref() as &dyn Any).downcast_ref::<TrainOrder>()
-                {
-                    if train_order.train_schedule_id() == train_schedule_id {
-                        return true;
-                    }
-                }
-
-                false
+                ((*order).deref() as &dyn Any)
+                    .downcast_ref::<TrainOrder>()
+                    .is_some_and(|train_order| train_order.train_schedule_id() == train_schedule_id)
             })
             .ok_or(TrainDishApplicationServiceError::NoRelatedTrainOrder)?;
 

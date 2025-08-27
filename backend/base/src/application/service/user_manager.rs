@@ -97,7 +97,7 @@ pub enum UserManagerError {
     #[error("User with identity card id {0} already exists")]
     IdentityCardIdAlreadyExists(String),
     /// 手机号或密码错误
-    #[error("Invalid phone number of password")]
+    #[error("Invalid phone number or password")]
     InvalidPhoneNumberOrPassword,
     #[error("Invalid username")]
     /// 无效的用户名格式，详见RFC3
