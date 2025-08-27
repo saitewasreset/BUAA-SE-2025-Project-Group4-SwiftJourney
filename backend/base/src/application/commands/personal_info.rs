@@ -83,3 +83,97 @@ impl SetPersonalInfoCommand {
         self.name.is_some() && self.default.is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::service::personal_info::SetPersonalInfoDTO;
+
+    #[test]
+    fn test_from_session_id_and_dto_positive() {
+        let dto = SetPersonalInfoDTO {
+            name: Some("张三".to_string()),
+            identity_card_id: "1234567890".to_string(),
+            preferred_seat_location: Some("窗口".to_string()),
+            default: Some(true),
+        };
+
+        let cmd = SetPersonalInfoCommand::from_session_id_and_dto("session123".to_string(), dto.clone());
+
+        assert_eq!(cmd.session_id, "session123");
+        assert_eq!(cmd.name, dto.name);
+        assert_eq!(cmd.identity_card_id, dto.identity_card_id);
+        assert_eq!(cmd.preferred_seat_location, dto.preferred_seat_location);
+        assert_eq!(cmd.default, dto.default);
+    }
+
+    #[test]
+    fn test_from_session_id_and_dto_negative() {
+        let dto = SetPersonalInfoDTO {
+            name: None,
+            identity_card_id: "9876543210".to_string(),
+            preferred_seat_location: None,
+            default: None,
+        };
+
+        let cmd = SetPersonalInfoCommand::from_session_id_and_dto("session999".to_string(), dto);
+
+        assert_eq!(cmd.session_id, "session999");
+        assert!(cmd.name.is_none());
+        assert!(cmd.preferred_seat_location.is_none());
+        assert!(cmd.default.is_none());
+    }
+
+    #[test]
+    fn test_is_delete_operation_positive() {
+        let cmd = SetPersonalInfoCommand {
+            session_id: "session1".to_string(),
+            name: None,
+            identity_card_id: "123456".to_string(),
+            preferred_seat_location: None,
+            default: None,
+        };
+
+        assert!(cmd.is_delete_operation());
+    }
+
+    #[test]
+    fn test_is_delete_operation_negative() {
+        let cmd = SetPersonalInfoCommand {
+            session_id: "session2".to_string(),
+            name: Some("李四".to_string()),
+            identity_card_id: "654321".to_string(),
+            preferred_seat_location: None,
+            default: None,
+        };
+
+        assert!(!cmd.is_delete_operation());
+    }
+
+    #[test]
+    fn test_is_update_operation_positive() {
+        let cmd = SetPersonalInfoCommand {
+            session_id: "session3".to_string(),
+            name: Some("王五".to_string()),
+            identity_card_id: "111111".to_string(),
+            preferred_seat_location: Some("过道".to_string()),
+            default: Some(true),
+        };
+
+        assert!(cmd.is_update_operation());
+    }
+
+    #[test]
+    fn test_is_update_operation_negative() {
+        let cmd = SetPersonalInfoCommand {
+            session_id: "session4".to_string(),
+            name: None, // 缺少姓名
+            identity_card_id: "222222".to_string(),
+            preferred_seat_location: Some("中间".to_string()),
+            default: Some(false),
+        };
+
+        assert!(!cmd.is_update_operation());
+    }
+}
+

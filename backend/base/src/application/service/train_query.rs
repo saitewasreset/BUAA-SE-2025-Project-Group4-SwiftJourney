@@ -199,3 +199,132 @@ pub trait TrainQueryService: 'static + Send + Sync {
         cmd: TransferTrainQueryCommand,
     ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>>;
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_code() {
+        let err = TrainQueryServiceError::InvalidSessionId;
+        assert_eq!(err.error_code(), 403);
+
+        let err = TrainQueryServiceError::InvalidStationId;
+        assert_eq!(err.error_code(), 404);
+
+        let err = TrainQueryServiceError::InvalidCityId;
+        assert_eq!(err.error_code(), 404);
+
+        let err = TrainQueryServiceError::InconsistentQuery;
+        assert_eq!(err.error_code(), 12001);
+    }
+
+    #[test]
+    fn test_error_message() {
+        let err = TrainQueryServiceError::InvalidSessionId;
+        assert_eq!(err.error_message(), "invalid session id:");
+
+        let err = TrainQueryServiceError::InvalidStationId;
+        assert_eq!(err.error_message(), "invalid station id");
+
+        let err = TrainQueryServiceError::InvalidCityId;
+        assert_eq!(err.error_message(), "invalid city id");
+
+        let err = TrainQueryServiceError::InconsistentQuery;
+        assert_eq!(err.error_message(), "inconsistent query");
+    }
+}
+
+#[cfg(test)]
+mod async_tests {
+    use super::*;
+    use async_trait::async_trait;
+
+    struct MockTrainQueryService;
+
+    #[async_trait]
+    impl TrainQueryService for MockTrainQueryService {
+        async fn query_train(
+            &self,
+            _cmd: TrainScheduleQueryCommand,
+        ) -> Result<TrainQueryResponseDTO, Box<dyn ApplicationError>> {
+            Ok(TrainQueryResponseDTO {
+                origin_station: "StationA".into(),
+                origin_departure_time: "08:00".into(),
+                departure_date: "2025-08-26".into(),
+                terminal_station: "StationB".into(),
+                terminal_arrival_time: "10:00".into(),
+                route: vec![],
+            })
+        }
+
+        async fn query_direct_trains(
+            &self,
+            _cmd: DirectTrainQueryCommand,
+        ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
+            Ok(DirectTrainQueryDTO { solutions: vec![] })
+        }
+
+        async fn query_transfer_trains(
+            &self,
+            _cmd: TransferTrainQueryCommand,
+        ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>> {
+            Ok(TransferTrainQueryDTO { solutions: vec![] })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_query_train_success() {
+        let service = MockTrainQueryService;
+        let cmd = TrainScheduleQueryCommand {
+            session_id: "session_id".into(),
+            train_number: "train_number".into(),
+            departure_date: "2025-08-26".into(),
+        };
+        let result = service.query_train(cmd).await;
+        assert!(result.is_ok());
+        let dto = result.unwrap();
+        assert_eq!(dto.origin_station, "StationA");
+    }
+
+    #[tokio::test]
+    async fn test_query_train_failure() {
+        struct FailingService;
+        #[async_trait]
+        impl TrainQueryService for FailingService {
+            async fn query_train(
+                &self,
+                _cmd: TrainScheduleQueryCommand,
+            ) -> Result<TrainQueryResponseDTO, Box<dyn ApplicationError>> {
+                Err(Box::new(TrainQueryServiceError::InvalidSessionId))
+            }
+
+            async fn query_direct_trains(
+                &self,
+                _cmd: DirectTrainQueryCommand,
+            ) -> Result<DirectTrainQueryDTO, Box<dyn ApplicationError>> {
+                Err(Box::new(TrainQueryServiceError::InvalidSessionId))
+            }
+
+            async fn query_transfer_trains(
+                &self,
+                _cmd: TransferTrainQueryCommand,
+            ) -> Result<TransferTrainQueryDTO, Box<dyn ApplicationError>> {
+                Err(Box::new(TrainQueryServiceError::InvalidSessionId))
+            }
+        }
+
+        let service = FailingService;
+        let cmd = TrainScheduleQueryCommand {
+            session_id: "session_id".into(),
+            train_number: "train_number".into(),
+            departure_date: "2025-08-26".into(),
+        };
+        let result = service.query_train(cmd).await;
+        assert!(result.is_err());
+        assert_eq!(result.err().unwrap().error_code(), 403);
+    }
+}
+

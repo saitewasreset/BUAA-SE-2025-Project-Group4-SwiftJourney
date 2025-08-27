@@ -89,7 +89,7 @@ pub async fn get_history(
 ) -> Result<ApiResponse<Vec<NotifyDTO>>, ApplicationErrorBox> {
     let session_id = get_session_id(&requests)?;
 
-    let query = HistoryMessageQuery { session_id };
+    let query = HistoryMessageQuery { session_id, limit: Some(10), };
 
     let result = message_application_service.get_history(query).await?;
 

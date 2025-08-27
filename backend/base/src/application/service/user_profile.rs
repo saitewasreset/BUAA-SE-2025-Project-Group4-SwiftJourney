@@ -42,7 +42,7 @@ pub struct UserProfileDTO {
     pub identity_card_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SetUserProfileDTO {
     pub username: String,
     pub gender: Option<String>,
