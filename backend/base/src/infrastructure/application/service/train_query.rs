@@ -220,7 +220,7 @@ where
                 }
             })?
             .ok_or(GeneralError::BadRequest(format!(
-                "invalid train: {} {}",
+                "no train number {} found for date {}",
                 cmd.train_number, cmd.departure_date
             )))?;
 
