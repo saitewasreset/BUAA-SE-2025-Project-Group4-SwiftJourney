@@ -1,6 +1,14 @@
 # k8s部署方式
 
-> 注：使用kubectl命令
+> 注：使用`kubectl`命令
+
+为了使用自动扩容，需安装VPA（Vertical Pod Autoscaler），参见：<https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/installation.md>
+
+启动`minikube`：
+
+```shell
+minikube start
+```
 
 创建命名空间：
 
@@ -24,5 +32,5 @@ kubectl apply -k k8s/overlays/local
 端口转发：
 
 ```shell
-kubectl -n swiftjourney port-forward svc/frontend 8080:80
+kubectl -n swiftjourney port-forward svc/gateway 8080:80
 ```

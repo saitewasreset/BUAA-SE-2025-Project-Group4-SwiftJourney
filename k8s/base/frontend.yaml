@@ -17,6 +17,13 @@ spec:
         - name: frontend
           image: saitewasreset/swiftjourney-frontend:v0.1.0
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
           ports:
             - containerPort: 80
           readinessProbe:

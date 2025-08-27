@@ -13,6 +13,8 @@ resources:
   - minio-init-job.yaml
   - backend.yaml
   - frontend.yaml
+  - vpa-backend.yaml
+  - vpa-frontend.yaml
   - gateway-nginx.yaml
   - ingress.yaml
 images:
