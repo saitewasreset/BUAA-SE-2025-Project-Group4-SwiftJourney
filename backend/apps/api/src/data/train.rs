@@ -6,6 +6,7 @@ use base::application::commands::train_data::{
     LoadTrainTypeCommand,
 };
 use base::application::service::train_data::TrainDataService;
+use sea_orm::DatabaseConnection;
 
 #[post("/city")]
 async fn load_city_data(
@@ -35,10 +36,13 @@ async fn load_station_data(
 async fn load_train_type_data(
     body: Bytes,
     train_data_service: Data<dyn TrainDataService>,
+    db: Data<DatabaseConnection>,
 ) -> Result<ApiResponse<()>, ApplicationErrorBox> {
     let data: LoadTrainTypeCommand = parse_request_body(body)?;
 
-    train_data_service.load_train_type(data).await?;
+    train_data_service
+        .load_train_type(data, db.get_ref().clone())
+        .await?;
 
     ApiResponse::ok(())
 }
@@ -47,10 +51,13 @@ async fn load_train_type_data(
 async fn load_train_number_data(
     body: Bytes,
     train_data_service: Data<dyn TrainDataService>,
+    db: Data<DatabaseConnection>,
 ) -> Result<ApiResponse<()>, ApplicationErrorBox> {
     let data: LoadTrainNumberCommand = parse_request_body(body)?;
 
-    train_data_service.load_train_number(data).await?;
+    train_data_service
+        .load_train_number(data, db.get_ref().clone())
+        .await?;
 
     ApiResponse::ok(())
 }
@@ -59,10 +66,13 @@ async fn load_train_number_data(
 async fn load_dish_takeaway_data(
     body: Bytes,
     train_data_service: Data<dyn TrainDataService>,
+    db: Data<DatabaseConnection>,
 ) -> Result<ApiResponse<()>, ApplicationErrorBox> {
     let data: LoadDishTakeawayCommand = parse_request_body(body)?;
 
-    train_data_service.load_dish_takeaway(data).await?;
+    train_data_service
+        .load_dish_takeaway(data, db.get_ref().clone())
+        .await?;
 
     ApiResponse::ok(())
 }

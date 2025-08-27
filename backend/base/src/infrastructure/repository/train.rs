@@ -939,340 +939,337 @@ impl TrainRepository for TrainRepositoryImpl {
             Ok(Vec::new())
         }
     }
+}
 
-    /// 保存原始车次编号数据
-    ///
-    /// # Arguments
-    /// * `train_number_data`: 车次编号数据
-    /// * `route_repository`: 路线仓储
-    ///
-    /// # Returns
-    /// 操作结果
-    #[instrument(skip_all)]
-    async fn save_raw_train_number<T: RouteRepository>(
-        &self,
-        train_number_data: TrainNumberData,
-        route_repository: Arc<T>,
-    ) -> Result<(), RepositoryError> {
-        let txn = self
-            .db
-            .begin()
-            .await
-            .context("failed to start transaction")
-            .map_err(|e| {
-                error!("failed to start transaction: {}", e);
-                e
-            })?;
+/// 保存原始车次编号数据。
+///
+/// # Arguments
+/// * `train_number_data` - 原始车次编号数据。
+/// * `route_repository` - 路线仓储实例。
+///
+/// # Returns
+/// 成功时返回`()`；失败时返回`RepositoryError`。
+#[instrument(skip_all)]
+pub async fn save_raw_train_number<T: RouteRepository>(
+    train_number_data: TrainNumberData,
+    route_repository: Arc<T>,
+    db: DatabaseConnection,
+) -> Result<(), RepositoryError> {
+    let txn = db
+        .begin()
+        .await
+        .context("failed to start transaction")
+        .map_err(|e| {
+            error!("failed to start transaction: {}", e);
+            e
+        })?;
 
-        let to_insert_train_number_set = train_number_data
-            .iter()
-            .map(|item| item.train_number.clone())
-            .collect::<HashSet<_>>();
+    let to_insert_train_number_set = train_number_data
+        .iter()
+        .map(|item| item.train_number.clone())
+        .collect::<HashSet<_>>();
 
-        let trains = crate::models::train::Entity::find()
-            .all(&txn)
-            .await
-            .context("failed to load trains")
-            .map_err(|e| {
-                error!("failed to load trains: {}", e);
-                e
-            })?;
+    let trains = crate::models::train::Entity::find()
+        .all(&txn)
+        .await
+        .context("failed to load trains")
+        .map_err(|e| {
+            error!("failed to load trains: {}", e);
+            e
+        })?;
 
-        let to_delete_train_number = trains
-            .iter()
-            .filter(|item| to_insert_train_number_set.contains(&item.number))
-            .map(|item| (item.number.clone(), item.clone()))
-            .collect::<Vec<_>>();
+    let to_delete_train_number = trains
+        .iter()
+        .filter(|item| to_insert_train_number_set.contains(&item.number))
+        .map(|item| (item.number.clone(), item.clone()))
+        .collect::<Vec<_>>();
 
-        for (train_number, train_data) in to_delete_train_number {
-            crate::models::route::Entity::delete_many()
-                .filter(crate::models::route::Column::LineId.eq(train_data.default_line_id))
-                .exec(&txn)
-                .await
-                .context(format!(
-                    "failed to delete route with id: {}",
-                    train_data.default_line_id
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to delete route with id: {}: {}",
-                        train_data.default_line_id, e
-                    );
-                    e
-                })?;
-            crate::models::train::Entity::delete_many()
-                .filter(crate::models::train::Column::Number.eq(&train_number))
-                .exec(&txn)
-                .await
-                .context(format!(
-                    "failed to delete train with number: {}",
-                    train_number
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to delete train with number: {}: {}",
-                        train_number, e
-                    );
-                    e
-                })?;
-        }
-
-        let train_types = crate::models::train_type::Entity::find()
-            .all(&txn)
-            .await
-            .context("failed to load train types")
-            .map_err(|e| {
-                error!("failed to load train types: {}", e);
-                e
-            })?;
-
-        let train_type_to_id = train_types
-            .into_iter()
-            .map(|item| (item.type_name, item.id))
-            .collect::<HashMap<_, _>>();
-
-        let mut model_list = Vec::with_capacity(train_number_data.len());
-
-        for data in train_number_data {
-            let route_id = route_repository
-                .save_raw(data.route)
-                .await
-                .context(format!(
-                    "failed to save route for train number: {}",
-                    &data.train_number
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to save route for train number: {}: {}",
-                        &data.train_number, e
-                    );
-                    e
-                })?;
-
-            let train_type_id = train_type_to_id
-                .get(&data.train_type)
-                .copied()
-                .ok_or(RepositoryError::InconsistentState(anyhow!(
-                    "no train type {} (train number: {})",
-                    &data.train_type,
-                    &data.train_number
-                )))
-                .map_err(|e| {
-                    error!(
-                        "no train type {} (train number: {}): {}",
-                        &data.train_type, &data.train_number, e
-                    );
-                    e
-                })?;
-
-            let model = crate::models::train::ActiveModel {
-                id: ActiveValue::NotSet,
-                number: ActiveValue::Set(data.train_number),
-                type_id: ActiveValue::Set(train_type_id),
-                default_line_id: ActiveValue::Set(route_id.to_db_value()),
-                default_origin_departure_time: ActiveValue::Set(data.origin_departure_time as i32),
-            };
-
-            model_list.push(model);
-        }
-
-        crate::models::train::Entity::insert_many(model_list)
+    for (train_number, train_data) in to_delete_train_number {
+        crate::models::route::Entity::delete_many()
+            .filter(crate::models::route::Column::LineId.eq(train_data.default_line_id))
             .exec(&txn)
             .await
-            .context("failed to save train data")
+            .context(format!(
+                "failed to delete route with id: {}",
+                train_data.default_line_id
+            ))
             .map_err(|e| {
-                error!("failed to save train data: {}", e);
+                error!(
+                    "failed to delete route with id: {}: {}",
+                    train_data.default_line_id, e
+                );
                 e
             })?;
-
-        trace!("Commit transaction");
-        txn.commit().await.context("failed to commit transaction")?;
-
-        Ok(())
+        crate::models::train::Entity::delete_many()
+            .filter(crate::models::train::Column::Number.eq(&train_number))
+            .exec(&txn)
+            .await
+            .context(format!(
+                "failed to delete train with number: {}",
+                train_number
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to delete train with number: {}: {}",
+                    train_number, e
+                );
+                e
+            })?;
     }
 
-    /// 保存原始车次类型数据
-    ///
-    /// # Arguments
-    /// * `train_type_data`: 车次类型数据
-    ///
-    /// # Returns
-    /// 操作结果
-    #[instrument(skip_all)]
-    async fn save_raw_train_type(
-        &self,
-        train_type_data: TrainTypeData,
-    ) -> Result<(), RepositoryError> {
-        let txn = self
-            .db
-            .begin()
+    let train_types = crate::models::train_type::Entity::find()
+        .all(&txn)
+        .await
+        .context("failed to load train types")
+        .map_err(|e| {
+            error!("failed to load train types: {}", e);
+            e
+        })?;
+
+    let train_type_to_id = train_types
+        .into_iter()
+        .map(|item| (item.type_name, item.id))
+        .collect::<HashMap<_, _>>();
+
+    let mut model_list = Vec::with_capacity(train_number_data.len());
+
+    for data in train_number_data {
+        let route_id = route_repository
+            .save_raw(data.route)
             .await
-            .context("failed to start transaction")
+            .context(format!(
+                "failed to save route for train number: {}",
+                &data.train_number
+            ))
             .map_err(|e| {
-                error!("failed to start transaction: {}", e);
+                error!(
+                    "failed to save route for train number: {}: {}",
+                    &data.train_number, e
+                );
                 e
             })?;
 
-        let train_type_list = train_type_data
-            .iter()
-            .map(|item| crate::models::train_type::ActiveModel {
-                id: ActiveValue::NotSet,
-                type_name: ActiveValue::Set(item.id.to_string()),
-            })
-            .collect::<Vec<_>>();
+        let train_type_id = train_type_to_id
+            .get(&data.train_type)
+            .copied()
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no train type {} (train number: {})",
+                &data.train_type,
+                &data.train_number
+            )))
+            .map_err(|e| {
+                error!(
+                    "no train type {} (train number: {}): {}",
+                    &data.train_type, &data.train_number, e
+                );
+                e
+            })?;
 
-        crate::models::train_type::Entity::insert_many(train_type_list)
-            .on_conflict(
-                OnConflict::column(crate::models::train_type::Column::TypeName)
-                    .do_nothing()
-                    .to_owned(),
-            )
+        let model = crate::models::train::ActiveModel {
+            id: ActiveValue::NotSet,
+            number: ActiveValue::Set(data.train_number),
+            type_id: ActiveValue::Set(train_type_id),
+            default_line_id: ActiveValue::Set(route_id.to_db_value()),
+            default_origin_departure_time: ActiveValue::Set(data.origin_departure_time as i32),
+        };
+
+        model_list.push(model);
+    }
+
+    crate::models::train::Entity::insert_many(model_list)
+        .exec(&txn)
+        .await
+        .context("failed to save train data")
+        .map_err(|e| {
+            error!("failed to save train data: {}", e);
+            e
+        })?;
+
+    trace!("Commit transaction");
+    txn.commit().await.context("failed to commit transaction")?;
+
+    Ok(())
+}
+
+/// 保存原始列车类型数据。
+///
+/// # Arguments
+/// * `train_type_data` - 原始列车类型数据。
+///
+/// # Returns
+/// 成功时返回`()`；失败时返回`RepositoryError`。
+#[instrument(skip_all)]
+pub async fn save_raw_train_type(
+    db: DatabaseConnection,
+    train_type_data: TrainTypeData,
+) -> Result<(), RepositoryError> {
+    let txn = db
+        .begin()
+        .await
+        .context("failed to start transaction")
+        .map_err(|e| {
+            error!("failed to start transaction: {}", e);
+            e
+        })?;
+
+    let train_type_list = train_type_data
+        .iter()
+        .map(|item| crate::models::train_type::ActiveModel {
+            id: ActiveValue::NotSet,
+            type_name: ActiveValue::Set(item.id.to_string()),
+        })
+        .collect::<Vec<_>>();
+
+    crate::models::train_type::Entity::insert_many(train_type_list)
+        .on_conflict(
+            OnConflict::column(crate::models::train_type::Column::TypeName)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(&txn)
+        .await
+        .context("failed to save raw train type data")
+        .map_err(|e| {
+            error!("failed to save raw train type data: {}", e);
+            e
+        })?;
+
+    let to_insert_train_type_name_set = train_type_data
+        .iter()
+        .map(|item| item.id.to_string())
+        .collect::<HashSet<_>>();
+
+    let db_train_type_list = crate::models::train_type::Entity::find()
+        .all(&txn)
+        .await
+        .context("failed to load train type")
+        .map_err(|e| {
+            error!("failed to load train type: {}", e);
+            e
+        })?;
+
+    let train_type_name_to_id = db_train_type_list
+        .iter()
+        .map(|item| (item.type_name.clone(), item.id))
+        .collect::<HashMap<_, _>>();
+
+    let inserted_train_type_id_set = db_train_type_list
+        .iter()
+        .filter(|item| to_insert_train_type_name_set.contains(&item.type_name))
+        .map(|item| item.id)
+        .collect::<HashSet<_>>();
+
+    let seat_type_in_train_type_list = crate::models::seat_type_in_train_type::Entity::find()
+        .all(&txn)
+        .await
+        .context("failed to load seat type in train type")
+        .map_err(|e| {
+            error!("failed to load seat type in train type: {}", e);
+            e
+        })?;
+
+    let to_delete_seat_type_id = seat_type_in_train_type_list
+        .iter()
+        .filter(|item| inserted_train_type_id_set.contains(&item.train_type_id))
+        .map(|item| item.seat_type_id)
+        .collect::<Vec<_>>();
+
+    // 注意：不同车次，相同座位类型（例如，都是一等座），其seat_type_id也不同
+    for seat_type_id in to_delete_seat_type_id {
+        crate::models::seat_type_mapping::Entity::delete_many()
+            .filter(crate::models::seat_type_mapping::Column::SeatTypeId.eq(seat_type_id))
             .exec(&txn)
             .await
-            .context("failed to save raw train type data")
+            .context(format!(
+                "failed to delete seat type mapping for seat type id: {}",
+                seat_type_id
+            ))
             .map_err(|e| {
-                error!("failed to save raw train type data: {}", e);
-                e
-            })?;
-
-        let to_insert_train_type_name_set = train_type_data
-            .iter()
-            .map(|item| item.id.to_string())
-            .collect::<HashSet<_>>();
-
-        let db_train_type_list = crate::models::train_type::Entity::find()
-            .all(&txn)
-            .await
-            .context("failed to load train type")
-            .map_err(|e| {
-                error!("failed to load train type: {}", e);
-                e
-            })?;
-
-        let train_type_name_to_id = db_train_type_list
-            .iter()
-            .map(|item| (item.type_name.clone(), item.id))
-            .collect::<HashMap<_, _>>();
-
-        let inserted_train_type_id_set = db_train_type_list
-            .iter()
-            .filter(|item| to_insert_train_type_name_set.contains(&item.type_name))
-            .map(|item| item.id)
-            .collect::<HashSet<_>>();
-
-        let seat_type_in_train_type_list = crate::models::seat_type_in_train_type::Entity::find()
-            .all(&txn)
-            .await
-            .context("failed to load seat type in train type")
-            .map_err(|e| {
-                error!("failed to load seat type in train type: {}", e);
-                e
-            })?;
-
-        let to_delete_seat_type_id = seat_type_in_train_type_list
-            .iter()
-            .filter(|item| inserted_train_type_id_set.contains(&item.train_type_id))
-            .map(|item| item.seat_type_id)
-            .collect::<Vec<_>>();
-
-        // 注意：不同车次，相同座位类型（例如，都是一等座），其seat_type_id也不同
-        for seat_type_id in to_delete_seat_type_id {
-            crate::models::seat_type_mapping::Entity::delete_many()
-                .filter(crate::models::seat_type_mapping::Column::SeatTypeId.eq(seat_type_id))
-                .exec(&txn)
-                .await
-                .context(format!(
-                    "failed to delete seat type mapping for seat type id: {}",
-                    seat_type_id
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to delete seat type mapping for seat type id: {}: {}",
-                        seat_type_id, e
-                    );
-                    e
-                })?;
-
-            crate::models::seat_type_in_train_type::Entity::delete_many()
-                .filter(crate::models::seat_type_in_train_type::Column::SeatTypeId.eq(seat_type_id))
-                .exec(&txn)
-                .await
-                .context(format!(
-                    "failed to delete seat type in train type for seat type id: {}",
-                    seat_type_id
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to delete seat type in train type for seat type id: {}: {}",
-                        seat_type_id, e
-                    );
-                    e
-                })?;
-
-            crate::models::seat_type::Entity::delete_many()
-                .filter(crate::models::seat_type::Column::Id.eq(seat_type_id))
-                .exec(&txn)
-                .await
-                .context(format!(
-                    "failed to delete seat type for seat type id: {}",
-                    seat_type_id
-                ))
-                .map_err(|e| {
-                    error!(
-                        "failed to delete seat type for seat type id: {}: {}",
-                        seat_type_id, e
-                    );
-                    e
-                })?;
-        }
-
-        let mut train_type_id_to_seat_type_name_to_id: HashMap<i32, HashMap<String, i32>> =
-            HashMap::new();
-
-        let mut seat_type_in_train_type_model_list = Vec::new();
-
-        for train_type_info in &train_type_data {
-            let train_type_id = train_type_name_to_id[&train_type_info.id];
-            for (seat_type, m) in &train_type_info.seat {
-                let capacity = m.values().map(|v| v.len()).sum::<usize>() as i32;
-
-                let model = crate::models::seat_type::ActiveModel {
-                    id: ActiveValue::NotSet,
-                    type_name: ActiveValue::Set(seat_type.to_string()),
-                    capacity: ActiveValue::Set(capacity),
-                    price: ActiveValue::Set(rust_decimal::Decimal::from(
-                        m.values().next().unwrap().iter().next().unwrap().price,
-                    )),
-                };
-
-                let result = crate::models::seat_type::Entity::insert(model)
-                    .exec(&txn)
-                    .await
-                    .context("failed to insert seat type")
-                    .map_err(|e| {
-                        error!("failed to insert seat type: {}", e);
-                        e
-                    })?;
-
-                let seat_type_id = result.last_insert_id;
-
-                seat_type_in_train_type_model_list.push(
-                    crate::models::seat_type_in_train_type::ActiveModel {
-                        seat_type_id: ActiveValue::Set(seat_type_id),
-                        train_type_id: ActiveValue::Set(train_type_id),
-                    },
+                error!(
+                    "failed to delete seat type mapping for seat type id: {}: {}",
+                    seat_type_id, e
                 );
+                e
+            })?;
 
-                train_type_id_to_seat_type_name_to_id
-                    .entry(train_type_id)
-                    .or_default()
-                    .insert(seat_type.clone(), seat_type_id);
-            }
+        crate::models::seat_type_in_train_type::Entity::delete_many()
+            .filter(crate::models::seat_type_in_train_type::Column::SeatTypeId.eq(seat_type_id))
+            .exec(&txn)
+            .await
+            .context(format!(
+                "failed to delete seat type in train type for seat type id: {}",
+                seat_type_id
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to delete seat type in train type for seat type id: {}: {}",
+                    seat_type_id, e
+                );
+                e
+            })?;
+
+        crate::models::seat_type::Entity::delete_many()
+            .filter(crate::models::seat_type::Column::Id.eq(seat_type_id))
+            .exec(&txn)
+            .await
+            .context(format!(
+                "failed to delete seat type for seat type id: {}",
+                seat_type_id
+            ))
+            .map_err(|e| {
+                error!(
+                    "failed to delete seat type for seat type id: {}: {}",
+                    seat_type_id, e
+                );
+                e
+            })?;
+    }
+
+    let mut train_type_id_to_seat_type_name_to_id: HashMap<i32, HashMap<String, i32>> =
+        HashMap::new();
+
+    let mut seat_type_in_train_type_model_list = Vec::new();
+
+    for train_type_info in &train_type_data {
+        let train_type_id = train_type_name_to_id[&train_type_info.id];
+        for (seat_type, m) in &train_type_info.seat {
+            let capacity = m.values().map(|v| v.len()).sum::<usize>() as i32;
+
+            let model = crate::models::seat_type::ActiveModel {
+                id: ActiveValue::NotSet,
+                type_name: ActiveValue::Set(seat_type.to_string()),
+                capacity: ActiveValue::Set(capacity),
+                price: ActiveValue::Set(rust_decimal::Decimal::from(
+                    m.values().next().unwrap().iter().next().unwrap().price,
+                )),
+            };
+
+            let result = crate::models::seat_type::Entity::insert(model)
+                .exec(&txn)
+                .await
+                .context("failed to insert seat type")
+                .map_err(|e| {
+                    error!("failed to insert seat type: {}", e);
+                    e
+                })?;
+
+            let seat_type_id = result.last_insert_id;
+
+            seat_type_in_train_type_model_list.push(
+                crate::models::seat_type_in_train_type::ActiveModel {
+                    seat_type_id: ActiveValue::Set(seat_type_id),
+                    train_type_id: ActiveValue::Set(train_type_id),
+                },
+            );
+
+            train_type_id_to_seat_type_name_to_id
+                .entry(train_type_id)
+                .or_default()
+                .insert(seat_type.clone(), seat_type_id);
         }
+    }
 
-        crate::models::seat_type_in_train_type::Entity::insert_many(
-            seat_type_in_train_type_model_list,
-        )
+    crate::models::seat_type_in_train_type::Entity::insert_many(seat_type_in_train_type_model_list)
         .exec(&txn)
         .await
         .context("failed to insert seat type in train type")
@@ -1281,51 +1278,49 @@ impl TrainRepository for TrainRepositoryImpl {
             e
         })?;
 
-        let mut seat_type_mapping_model_list = Vec::new();
+    let mut seat_type_mapping_model_list = Vec::new();
 
-        for train_type_info in train_type_data {
-            let train_type_id = train_type_name_to_id[&train_type_info.id];
-            for (seat_type, m) in train_type_info.seat {
-                let mut current_seat_id = 0;
-                let seat_type_id =
-                    train_type_id_to_seat_type_name_to_id[&train_type_id][&seat_type];
+    for train_type_info in train_type_data {
+        let train_type_id = train_type_name_to_id[&train_type_info.id];
+        for (seat_type, m) in train_type_info.seat {
+            let mut current_seat_id = 0;
+            let seat_type_id = train_type_id_to_seat_type_name_to_id[&train_type_id][&seat_type];
 
-                for (seat_location, seat_info_list) in m {
-                    for seat_info in seat_info_list {
-                        let model = crate::models::seat_type_mapping::ActiveModel {
-                            train_type_id: ActiveValue::Set(train_type_id),
-                            seat_type_id: ActiveValue::Set(seat_type_id),
-                            seat_id: ActiveValue::Set(current_seat_id),
-                            carriage: ActiveValue::Set(seat_info.description.carriage),
-                            row: ActiveValue::Set(seat_info.description.row),
-                            location: ActiveValue::Set(String::from(seat_location)),
-                        };
+            for (seat_location, seat_info_list) in m {
+                for seat_info in seat_info_list {
+                    let model = crate::models::seat_type_mapping::ActiveModel {
+                        train_type_id: ActiveValue::Set(train_type_id),
+                        seat_type_id: ActiveValue::Set(seat_type_id),
+                        seat_id: ActiveValue::Set(current_seat_id),
+                        carriage: ActiveValue::Set(seat_info.description.carriage),
+                        row: ActiveValue::Set(seat_info.description.row),
+                        location: ActiveValue::Set(String::from(seat_location)),
+                    };
 
-                        seat_type_mapping_model_list.push(model);
-                        current_seat_id += 1;
-                    }
+                    seat_type_mapping_model_list.push(model);
+                    current_seat_id += 1;
                 }
             }
         }
-
-        crate::models::seat_type_mapping::Entity::insert_many(seat_type_mapping_model_list)
-            .exec(&txn)
-            .await
-            .context("failed to insert seat type mapping")
-            .map_err(|e| {
-                error!("failed to insert seat type mapping: {}", e);
-                e
-            })?;
-
-        trace!("Commit transaction");
-
-        txn.commit()
-            .await
-            .context("failed to commit transaction")
-            .map_err(|e| {
-                error!("failed to commit transaction: {}", e);
-                e
-            })?;
-        Ok(())
     }
+
+    crate::models::seat_type_mapping::Entity::insert_many(seat_type_mapping_model_list)
+        .exec(&txn)
+        .await
+        .context("failed to insert seat type mapping")
+        .map_err(|e| {
+            error!("failed to insert seat type mapping: {}", e);
+            e
+        })?;
+
+    trace!("Commit transaction");
+
+    txn.commit()
+        .await
+        .context("failed to commit transaction")
+        .map_err(|e| {
+            error!("failed to commit transaction: {}", e);
+            e
+        })?;
+    Ok(())
 }

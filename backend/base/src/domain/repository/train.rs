@@ -9,12 +9,9 @@
 use crate::Verified;
 use crate::domain::model::train::{SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
-use crate::domain::repository::route::RouteRepository;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
-use shared::data::{TrainNumberData, TrainTypeData};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 /// 列车车次仓储接口
 ///
@@ -112,30 +109,4 @@ pub trait TrainRepository: Repository<Train> + 'static + Send + Sync {
         &self,
         train_type: TrainType<Verified>,
     ) -> Result<Vec<Train>, RepositoryError>;
-
-    /// 保存原始车次编号数据。
-    ///
-    /// # Arguments
-    /// * `train_number_data` - 原始车次编号数据。
-    /// * `route_repository` - 路线仓储实例。
-    ///
-    /// # Returns
-    /// 成功时返回`()`；失败时返回`RepositoryError`。
-    async fn save_raw_train_number<T: RouteRepository>(
-        &self,
-        train_number_data: TrainNumberData,
-        route_repository: Arc<T>,
-    ) -> Result<(), RepositoryError>;
-
-    /// 保存原始列车类型数据。
-    ///
-    /// # Arguments
-    /// * `train_type_data` - 原始列车类型数据。
-    ///
-    /// # Returns
-    /// 成功时返回`()`；失败时返回`RepositoryError`。
-    async fn save_raw_train_type(
-        &self,
-        train_type_data: TrainTypeData,
-    ) -> Result<(), RepositoryError>;
 }

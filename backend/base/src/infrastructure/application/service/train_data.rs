@@ -17,13 +17,16 @@ use crate::application::commands::train_data::{
 use crate::application::service::train_data::TrainDataService;
 use crate::application::{ApplicationError, GeneralError, ModeError};
 use crate::domain::repository::city::CityRepository;
-use crate::domain::repository::dish::DishRepository;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::takeaway::TakeawayShopRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::object_storage::ObjectStorageService;
+use crate::infrastructure::repository::dish::save_raw_dish;
+use crate::infrastructure::repository::takeaway::save_raw_takeaway;
+use crate::infrastructure::repository::train::{save_raw_train_number, save_raw_train_type};
 use async_trait::async_trait;
+use sea_orm::DatabaseConnection;
 use shared::data::{DishData, TakeawayData};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -47,13 +50,12 @@ use tracing::{error, instrument, warn};
 /// - `station_repository`: 火车站仓储
 /// - `train_repository`: 列车仓储
 /// - `route_repository`: 路线仓储
-pub struct TrainDataServiceImpl<C, S, T, R, D, TS, OSS>
+pub struct TrainDataServiceImpl<C, S, T, R, TS, OSS>
 where
     C: CityRepository,
     S: StationRepository,
     T: TrainRepository,
     R: RouteRepository,
-    D: DishRepository,
     TS: TakeawayShopRepository,
     OSS: ObjectStorageService,
 {
@@ -63,18 +65,16 @@ where
     station_repository: Arc<S>,
     train_repository: Arc<T>,
     route_repository: Arc<R>,
-    dish_repository: Arc<D>,
     takeaway_shop_repository: Arc<TS>,
     object_storage_service: Arc<OSS>,
 }
 
-impl<C, S, T, R, D, TS, OSS> TrainDataServiceImpl<C, S, T, R, D, TS, OSS>
+impl<C, S, T, R, TS, OSS> TrainDataServiceImpl<C, S, T, R, TS, OSS>
 where
     C: CityRepository,
     S: StationRepository,
     T: TrainRepository,
     R: RouteRepository,
-    D: DishRepository,
     TS: TakeawayShopRepository,
     OSS: ObjectStorageService,
 {
@@ -97,7 +97,6 @@ where
         station_repository: Arc<S>,
         train_repository: Arc<T>,
         route_repository: Arc<R>,
-        dish_repository: Arc<D>,
         takeaway_shop_repository: Arc<TS>,
         object_storage_service: Arc<OSS>,
     ) -> Self {
@@ -108,7 +107,6 @@ where
             station_repository,
             train_repository,
             route_repository,
-            dish_repository,
             takeaway_shop_repository,
             object_storage_service,
         }
@@ -134,13 +132,12 @@ where
 }
 
 #[async_trait]
-impl<C, S, T, R, D, TS, OSS> TrainDataService for TrainDataServiceImpl<C, S, T, R, D, TS, OSS>
+impl<C, S, T, R, TS, OSS> TrainDataService for TrainDataServiceImpl<C, S, T, R, TS, OSS>
 where
     C: CityRepository,
     S: StationRepository,
     T: TrainRepository,
     R: RouteRepository,
-    D: DishRepository,
     TS: TakeawayShopRepository,
     OSS: ObjectStorageService,
 {
@@ -221,16 +218,14 @@ where
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        self.train_repository
-            .save_raw_train_type(command)
-            .await
-            .map_err(|e| {
-                error!("Error saving train type: {:?}", e);
-                GeneralError::InternalServerError
-            })?;
+        save_raw_train_type(db, command).await.map_err(|e| {
+            error!("Error saving train type: {:?}", e);
+            GeneralError::InternalServerError
+        })?;
 
         Ok(())
     }
@@ -251,11 +246,11 @@ where
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        self.train_repository
-            .save_raw_train_number(command, Arc::clone(&self.route_repository))
+        save_raw_train_number(command, Arc::clone(&self.route_repository), db)
             .await
             .map_err(|e| {
                 error!("Error saving train number: {:?}", e);
@@ -268,6 +263,7 @@ where
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         let mut dish_data: DishData = HashMap::new();
         let mut takeaway_data: TakeawayData = HashMap::new();
@@ -293,31 +289,31 @@ where
             }
         }
 
-        self.dish_repository
-            .save_raw_dish(
-                dish_data,
-                &self.data_path,
-                Arc::clone(&self.train_repository),
-                Arc::clone(&self.object_storage_service),
-            )
-            .await
-            .inspect_err(|e| {
-                error!("Error saving dish data: {:?}", e);
-            })
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+        save_raw_dish(
+            dish_data,
+            &self.data_path,
+            Arc::clone(&self.train_repository),
+            Arc::clone(&self.object_storage_service),
+            db.clone(),
+        )
+        .await
+        .inspect_err(|e| {
+            error!("Error saving dish data: {:?}", e);
+        })
+        .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
-        self.takeaway_shop_repository
-            .save_raw_takeaway(
-                takeaway_data,
-                &self.data_path,
-                Arc::clone(&self.station_repository),
-                Arc::clone(&self.object_storage_service),
-            )
-            .await
-            .inspect_err(|e| {
-                error!("Error saving takeaway data: {:?}", e);
-            })
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+        save_raw_takeaway(
+            takeaway_data,
+            &self.data_path,
+            Arc::clone(&self.takeaway_shop_repository),
+            Arc::clone(&self.station_repository),
+            Arc::clone(&self.object_storage_service),
+        )
+        .await
+        .inspect_err(|e| {
+            error!("Error saving takeaway data: {:?}", e);
+        })
+        .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(())
     }

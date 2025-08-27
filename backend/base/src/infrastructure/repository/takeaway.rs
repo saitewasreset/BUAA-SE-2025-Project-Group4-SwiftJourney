@@ -600,92 +600,96 @@ WHERE "route"."line_id" = $1;"#,
 
         Ok(())
     }
+}
 
-    async fn save_raw_takeaway<S: StationRepository, OS: ObjectStorageService>(
-        &self,
-        data: TakeawayData,
-        data_path: &Path,
-        station_repository: Arc<S>,
-        object_storage_service: Arc<OS>,
-    ) -> Result<(), RepositoryError> {
-        let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
+pub async fn save_raw_takeaway<
+    TSR: TakeawayShopRepository,
+    S: StationRepository,
+    OS: ObjectStorageService,
+>(
+    data: TakeawayData,
+    data_path: &Path,
+    takeaway_shop_repository: Arc<TSR>,
+    station_repository: Arc<S>,
+    object_storage_service: Arc<OS>,
+) -> Result<(), RepositoryError> {
+    let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
 
-        let station_list = station_repository
-            .load()
-            .await
-            .inspect_err(|e| {
-                error!("failed to get stations: {}", e);
-            })
-            .map_err(|e| RepositoryError::Db(e.into()))?;
+    let station_list = station_repository
+        .load()
+        .await
+        .inspect_err(|e| {
+            error!("failed to get stations: {}", e);
+        })
+        .map_err(|e| RepositoryError::Db(e.into()))?;
 
-        let station_name_to_id = station_list
-            .iter()
-            .map(|station| (station.name().to_string(), station.get_id().unwrap()))
-            .collect::<HashMap<_, _>>();
+    let station_name_to_id = station_list
+        .iter()
+        .map(|station| (station.name().to_string(), station.get_id().unwrap()))
+        .collect::<HashMap<_, _>>();
 
-        let mut entity_list = Vec::new();
+    let mut entity_list = Vec::new();
 
-        for (station_name, inner_map) in data {
-            let station_id = *station_name_to_id.get(&station_name).ok_or_else(|| {
-                RepositoryError::InconsistentState(anyhow!(
-                    "station name {} not found in database",
-                    station_name
-                ))
-            })?;
+    for (station_name, inner_map) in data {
+        let station_id = *station_name_to_id.get(&station_name).ok_or_else(|| {
+            RepositoryError::InconsistentState(anyhow!(
+                "station name {} not found in database",
+                station_name
+            ))
+        })?;
 
-            for (shop_name, takeaway_list) in inner_map {
-                let mut shop = TakeawayShop::new(shop_name, station_id);
+        for (shop_name, takeaway_list) in inner_map {
+            let mut shop = TakeawayShop::new(shop_name, station_id);
 
-                for takeaway in takeaway_list {
-                    let image_uuid = if let Some(uuid) = image_path_to_uuid.get(&takeaway.picture) {
-                        *uuid
-                    } else {
-                        let image_path = data_path.join(&takeaway.picture);
+            for takeaway in takeaway_list {
+                let image_uuid = if let Some(uuid) = image_path_to_uuid.get(&takeaway.picture) {
+                    *uuid
+                } else {
+                    let image_path = data_path.join(&takeaway.picture);
 
-                        let image_data = fs::read(&image_path)
-                            .context(format!("cannot read from: {:?}", &image_path))
-                            .inspect_err(|e| {
-                                error!("failed load takeaway image: {}", e);
-                            })?;
+                    let image_data = fs::read(&image_path)
+                        .context(format!("cannot read from: {:?}", &image_path))
+                        .inspect_err(|e| {
+                            error!("failed load takeaway image: {}", e);
+                        })?;
 
-                        let uuid = object_storage_service
-                            .put_object(ObjectCategory::Takeaway, "image/jpeg", image_data)
-                            .await
-                            .map_err(|e| {
-                                error!("failed save image: {}", e);
+                    let uuid = object_storage_service
+                        .put_object(ObjectCategory::Takeaway, "image/jpeg", image_data)
+                        .await
+                        .map_err(|e| {
+                            error!("failed save image: {}", e);
 
-                                RepositoryError::Db(e.into())
-                            })?;
+                            RepositoryError::Db(e.into())
+                        })?;
 
-                        image_path_to_uuid.insert(takeaway.picture.clone(), uuid);
-                        uuid
-                    };
+                    image_path_to_uuid.insert(takeaway.picture.clone(), uuid);
+                    uuid
+                };
 
-                    let takeaway_dish = TakeawayDish::new(
-                        None,
-                        None,
-                        takeaway.name,
-                        "".to_string(),
-                        Decimal::from_f64(takeaway.price).ok_or(
-                            RepositoryError::ValidationError(anyhow!(
-                                "invalid price: {}",
-                                takeaway.price
-                            )),
-                        )?,
-                        vec![image_uuid],
-                    );
+                let takeaway_dish = TakeawayDish::new(
+                    None,
+                    None,
+                    takeaway.name,
+                    "".to_string(),
+                    Decimal::from_f64(takeaway.price).ok_or(RepositoryError::ValidationError(
+                        anyhow!("invalid price: {}", takeaway.price),
+                    ))?,
+                    vec![image_uuid],
+                );
 
-                    shop.add_dish(takeaway_dish);
-                }
-
-                entity_list.push(shop);
+                shop.add_dish(takeaway_dish);
             }
-        }
 
-        self.save_many_atomic(entity_list).await.inspect_err(|e| {
+            entity_list.push(shop);
+        }
+    }
+
+    takeaway_shop_repository
+        .save_many_atomic(entity_list)
+        .await
+        .inspect_err(|e| {
             error!("failed to save takeaway: {}", e);
         })?;
 
-        Ok(())
-    }
+    Ok(())
 }

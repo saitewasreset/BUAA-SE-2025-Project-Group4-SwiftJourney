@@ -261,7 +261,6 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_repository_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&route_repository_impl),
-        Arc::clone(&dish_repository_impl),
         Arc::clone(&takeaway_repository_impl),
         Arc::clone(&s3_object_storage_service_impl),
     ));
@@ -319,7 +318,6 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
         Arc::clone(&s3_object_storage_service_impl),
-        Arc::clone(&hotel_repository_impl),
     ));
 
     let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
@@ -597,6 +595,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(train_dish_application_service.clone())
             .app_data(train_order_service.clone())
             .app_data(hotel_order_service.clone())
+            .app_data(conn.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
