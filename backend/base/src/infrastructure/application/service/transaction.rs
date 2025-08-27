@@ -392,7 +392,7 @@ where
         let target_order = target_order.unwrap();
 
         self.transaction_service
-            .refund_transaction(target_tx.uuid(), &[target_order.clone()])
+            .refund_transaction(target_tx.uuid(), std::slice::from_ref(target_order))
             .await
             .map_err(|e| match e {
                 TransactionServiceError::RefundError(e) => Box::new(

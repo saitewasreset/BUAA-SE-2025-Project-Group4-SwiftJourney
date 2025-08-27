@@ -638,10 +638,10 @@ fn read_file_env(target_env: &str) -> Option<String> {
         }
     }
 
-    if result.is_none() {
-        if let Ok(env_str) = env::var(target_env) {
-            result = Some(env_str);
-        }
+    if result.is_none()
+        && let Ok(env_str) = env::var(target_env)
+    {
+        result = Some(env_str);
     }
 
     result
