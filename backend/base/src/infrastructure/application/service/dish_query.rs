@@ -3,19 +3,19 @@ use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-use crate::domain::Identifiable;
 use crate::domain::service::order::OrderService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
 };
+use crate::domain::Identifiable;
 use crate::{
     application::{
-        ApplicationError, GeneralError,
-        commands::dish_query::DishQueryDTO,
-        service::dish_query::{
+        commands::dish_query::DishQueryDTO, service::dish_query::{
             DishInfoDTO, DishQueryService, TakeawayDTO, TakeawayDishInfoDTO, TrainDishInfoDTO,
         },
+        ApplicationError,
+        GeneralError,
     },
     domain::{
         model::{session::SessionId, train::TrainNumber},
@@ -291,5 +291,193 @@ where
             can_booking,
             reason,
         })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use anyhow::anyhow;
+    use chrono::Utc;
+    use rust_decimal::Decimal;
+    use crate::application::commands::dish_query::DishQueryDTO;
+    use crate::application::service::dish_query::DishQueryService;
+    use crate::domain::model::dish::Dish;
+    use crate::domain::model::dish::DishTime::Lunch;
+    use crate::domain::model::train::Train;
+
+    use crate::domain::model::train::{ TrainNumber, TrainType };
+
+    use crate::domain::RepositoryError;
+
+    use crate::domain::service::mock::{
+        order::mock_order_service,
+        session::mock_session_service,
+        station::mock_station_service,
+        train_schedule::mock_train_schedule_service,
+        train_type::mock_train_type_service,
+    };
+    use crate::domain::repository::mock::{
+        dish::mock_dish_repo,
+        takeaway::mock_takeaway_shop_repo,
+        train::mock_train_repo,
+    };
+
+    // ------------------- 正向测试 -------------------
+    #[tokio::test]
+    async fn test_query_dish_success() {
+        // 1. Mock SessionManager 返回用户 ID
+        let mut session_mock = mock_session_service();
+        session_mock
+            .expect_get_user_id_by_session()
+            .returning(|_| Ok(Some(1u64.into())));
+
+        // 2. Mock TrainTypeConfigurationService 验证车次
+        let mut train_type_mock = mock_train_type_service();
+        train_type_mock
+            .expect_verify_train_number()
+            .returning(|train_number| Ok(TrainNumber::from_unchecked(train_number.to_string())));
+
+        // 3. Mock TrainScheduleService 返回终点到达时间
+        let mut train_schedule_mock = mock_train_schedule_service();
+        train_schedule_mock
+            .expect_get_terminal_arrival_time()
+            .returning(|_, _| Ok(Utc::now().into()));
+
+        // 4. Mock DishRepository 返回硬编码 Dish
+        let mut dish_repo_mock = mock_dish_repo();
+        dish_repo_mock
+            .expect_find_by_train_number()
+            .returning(|_| {
+                Ok(vec![Dish::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    "饺子".to_string(),
+                    Lunch,
+                    "饺子炒饭".to_string(),
+                    Decimal::new(100, 2),
+                    vec![Uuid::new_v4()],
+                )]) // 你需要在 Dish 模型里实现 new_example()
+            });
+
+        // 5. Mock TrainRepository 返回 Train
+        let mut train_repo_mock = mock_train_repo();
+        train_repo_mock
+            .expect_find_by_train_number()
+            .returning(|_| Ok(Train::new(
+                Some(1u64.into()),
+                TrainNumber::from_unchecked("G101".to_string()),
+                TrainType::from_unchecked("G".to_string()),
+                HashMap::new(),
+                1u64.into(),
+                1000,
+            )));
+
+        // 6. Mock TakeawayShopRepository 返回空
+        let mut takeaway_repo_mock = mock_takeaway_shop_repo();
+        takeaway_repo_mock
+            .expect_find_by_train_route()
+            .returning(|_| Ok(HashMap::new()));
+
+        // 7. Mock StationService 返回空
+        let mut station_service_mock = mock_station_service();
+        station_service_mock
+            .expect_get_stations()
+            .returning(|| Ok(vec![]));
+
+        // 8. Mock OrderService 返回可订餐
+        let mut order_service_mock = mock_order_service();
+        order_service_mock
+            .expect_verify_train_order()
+            .returning(|_, _, _| Ok(true));
+
+        // 创建 Service
+        let service = DishQueryServiceImpl::new(
+            Arc::new(dish_repo_mock),
+            Arc::new(takeaway_repo_mock),
+            Arc::new(train_repo_mock),
+            Arc::new(session_mock),
+            Arc::new(train_schedule_mock),
+            Arc::new(train_type_mock),
+            Arc::new(station_service_mock),
+            Arc::new(order_service_mock),
+        );
+
+        // 查询 DTO
+        let query_dto = DishQueryDTO {
+            train_number: "G101".to_string(),
+            origin_departure_time: Utc::now().to_rfc3339(),
+        };
+
+        let result = service.query_dish(query_dto, Uuid::new_v4().to_string()).await;
+        assert!(result.is_ok());
+        let dto = result.unwrap();
+        assert_eq!(dto.train_number, "G101");
+        assert!(dto.dishes.len() > 0);
+        assert!(dto.can_booking);
+    }
+
+    // ------------------- 反向测试：无效 session -------------------
+    #[tokio::test]
+    async fn test_query_dish_invalid_session() {
+        let mut session_mock = mock_session_service();
+        session_mock
+            .expect_get_user_id_by_session()
+            .returning(|_| Ok(None));
+
+        let service = DishQueryServiceImpl::new(
+            Arc::new(mock_dish_repo()),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_train_repo()),
+            Arc::new(session_mock),
+            Arc::new(mock_train_schedule_service()),
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_station_service()),
+            Arc::new(mock_order_service()),
+        );
+
+        let query_dto = DishQueryDTO {
+            train_number: "G101".to_string(),
+            origin_departure_time: Utc::now().to_rfc3339(),
+        };
+
+        let result = service.query_dish(query_dto, "invalid_session".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    // ------------------- 反向测试：DishRepository 返回错误 -------------------
+    #[tokio::test]
+    async fn test_query_dish_dish_repo_error() {
+        let mut session_mock = mock_session_service();
+        session_mock
+            .expect_get_user_id_by_session()
+            .returning(|_| Ok(Some(1u64.into())));
+
+        let mut dish_repo_mock = mock_dish_repo();
+        dish_repo_mock
+            .expect_find_by_train_number()
+            .returning(|_| Err(RepositoryError::InconsistentState(anyhow!("error".to_string()))));
+
+        let service = DishQueryServiceImpl::new(
+            Arc::new(dish_repo_mock),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_train_repo()),
+            Arc::new(session_mock),
+            Arc::new(mock_train_schedule_service()),
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_station_service()),
+            Arc::new(mock_order_service()),
+        );
+
+        let query_dto = DishQueryDTO {
+            train_number: "G101".to_string(),
+            origin_departure_time: Utc::now().to_rfc3339(),
+        };
+
+        let result = service.query_dish(query_dto, "session123".to_string()).await;
+        assert!(result.is_err());
     }
 }

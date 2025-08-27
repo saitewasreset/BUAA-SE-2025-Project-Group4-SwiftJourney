@@ -107,6 +107,7 @@ pub mod train_seat;
 pub mod train_type;
 pub mod transaction;
 pub mod user;
+pub mod mock;
 
 use crate::domain::{Aggregate, AggregateManager, MultiEntityDiff, RepositoryError};
 use std::collections::HashMap;
