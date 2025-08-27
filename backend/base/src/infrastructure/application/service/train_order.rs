@@ -246,7 +246,11 @@ where
             .any(|(key, _)| key == &dto.seat_type);
 
         if !seat_type_exists {
-            return Err(Box::new(TrainOrderServiceError::InvalidTrainNumber));
+            return Err(GeneralError::NotFound(format!(
+                "no seat type {} found for train number {}",
+                dto.seat_type, dto.train_number
+            ))
+            .into());
         }
 
         // SAFETY: dto.seat_type 已经在上面验证过存在
