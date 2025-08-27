@@ -16,11 +16,20 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
           env:
             - name: RABBITMQ_DEFAULT_USER
-              valueFrom: { secretKeyRef: { name: app-secrets, key: RABBITMQ_USER } }
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_USER } }
             - name: RABBITMQ_DEFAULT_PASS
-              valueFrom: { secretKeyRef: { name: app-secrets, key: RABBITMQ_PASS } }
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_PASS } }
           ports:
             - containerPort: 5672
 ---

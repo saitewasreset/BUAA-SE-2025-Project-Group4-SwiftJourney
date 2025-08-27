@@ -17,19 +17,33 @@ spec:
       containers:
         - name: postgres
           image: postgres:17-alpine
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
           env:
             - name: POSTGRES_USER
-              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
             - name: POSTGRES_PASSWORD
-              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
             - name: POSTGRES_DB
-              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
             - name: TZ
               valueFrom: { configMapKeyRef: { name: app-config, key: TZ } }
             - name: LANG
               valueFrom: { configMapKeyRef: { name: app-config, key: LANG } }
             - name: POSTGRES_INITDB_ARGS
-              valueFrom: { configMapKeyRef: { name: app-config, key: POSTGRES_INITDB_ARGS } }
+              valueFrom:
+                {
+                  configMapKeyRef:
+                    { name: app-config, key: POSTGRES_INITDB_ARGS },
+                }
           ports:
             - containerPort: 5432
           volumeMounts:
@@ -37,7 +51,8 @@ spec:
               mountPath: /var/lib/postgresql/data
           readinessProbe:
             exec:
-              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+              command:
+                ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
