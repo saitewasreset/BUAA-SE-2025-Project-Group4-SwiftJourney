@@ -561,7 +561,7 @@ mod tests {
         let repo = MockUserRepository::new();
 
         let mut last_id = 0;
-        for i in 0..10 {
+        for (i, _identity) in IDENTITY_CARD_ID_STR.iter().take(10).enumerate() {
             let mut user = create_test_user(&format!("1380000{:04}", i), IDENTITY_CARD_ID_STR[i]);
             repo.save(&mut user).await.unwrap();
 

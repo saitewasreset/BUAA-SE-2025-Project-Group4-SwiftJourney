@@ -140,6 +140,7 @@ where
     RR: RouteRepository,
 {
     #[instrument(skip(self))]
+    #[allow(clippy::type_complexity)]
     async fn load_daily_context(
         &self,
         date: NaiveDate,
