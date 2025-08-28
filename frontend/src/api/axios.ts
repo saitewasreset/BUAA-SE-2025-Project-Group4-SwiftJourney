@@ -1,4 +1,3 @@
-import { useUserStore } from '@/stores/user';
 import axios from 'axios';
 
 const instance = axios.create({
@@ -15,11 +14,11 @@ instance.interceptors.request.use(
   }
 );
 
-const request = (config: Object) => {
+const request = (config: object) => {
     return instance.request(config);
 }
 
-export const getRequest = (url: string, params?: Object) => {
+export const getRequest = (url: string, params?: object) => {
     return request({
         url,
         method: 'get',
@@ -27,7 +26,7 @@ export const getRequest = (url: string, params?: Object) => {
     });
 };
 
-export const postRequest = (url: string, data?: Object) => {
+export const postRequest = (url: string, data?: object) => {
     return request({
         url,
         method: 'post',
@@ -35,7 +34,7 @@ export const postRequest = (url: string, data?: Object) => {
     });
 };
 
-export const postBlobRequest = (url: string, data?: Object) => {
+export const postBlobRequest = (url: string, data?: object) => {
     return request({
         url,
         method: 'post',
@@ -44,7 +43,7 @@ export const postBlobRequest = (url: string, data?: Object) => {
     });
 };
 
-export const putRequest = (url: string, data?: Object) => {
+export const putRequest = (url: string, data?: object) => {
     return request({
         url,
         method: 'put',

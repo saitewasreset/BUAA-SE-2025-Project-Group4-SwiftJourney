@@ -5,13 +5,15 @@ import type {
   indirectScheduleInfo,
   QueryMode,
   scheduleRequest,
-  seatTypeInfo,
 } from '@/interface/ticketServiceInterface'
 import { CheckType, SortType } from '@/interface/ticketServiceInterface'
 import dayjs, { Dayjs } from 'dayjs'
 import { useGeneralStore } from './general'
 import { TicketServiceApi } from '@/api/TicketServiceApi/TicketServiceApi'
 import { message } from 'ant-design-vue'
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 const generalStore = useGeneralStore()
 

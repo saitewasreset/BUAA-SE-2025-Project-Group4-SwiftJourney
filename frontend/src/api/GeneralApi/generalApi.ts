@@ -1,4 +1,4 @@
-import { getRequest} from "../axios";
+import { getRequest } from "../axios";
 
 export const generalApi = {
     getCity: () => {
