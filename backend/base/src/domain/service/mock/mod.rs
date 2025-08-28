@@ -6,3 +6,5 @@ pub mod order;
 pub mod hotel_rating;
 pub mod hotel_query;
 pub mod hotel_booking;
+pub mod object_storage;
+pub mod transaction;

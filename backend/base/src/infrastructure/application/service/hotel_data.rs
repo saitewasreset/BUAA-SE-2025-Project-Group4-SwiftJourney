@@ -80,3 +80,114 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::path::PathBuf;
+
+    use crate::domain::repository::mock::city::MockCityRepository;
+    use crate::domain::repository::mock::station::MockStationRepository;
+    use crate::domain::service::mock::object_storage::MockObjectStorageService;
+
+    use sea_orm::{DatabaseBackend, MockExecResult};
+    use sea_orm::MockDatabase;
+    use shared::data::HotelInfo;
+
+    // ================= is_debug_mode =================
+    #[test]
+    fn test_is_debug_mode_true() {
+        let service = HotelDataServiceImpl::new(
+            true,
+            PathBuf::new(),
+            Arc::new(MockCityRepository::new()),
+            Arc::new(MockStationRepository::new()),
+            Arc::new(MockObjectStorageService::new()),
+        );
+        assert!(service.is_debug_mode());
+    }
+
+    #[test]
+    fn test_is_debug_mode_false() {
+        let service = HotelDataServiceImpl::new(
+            false,
+            PathBuf::new(),
+            Arc::new(MockCityRepository::new()),
+            Arc::new(MockStationRepository::new()),
+            Arc::new(MockObjectStorageService::new()),
+        );
+        assert!(!service.is_debug_mode());
+    }
+
+    // ================= load_hotel =================
+    #[tokio::test]
+    async fn test_load_hotel_success() {
+        let city_repo = Arc::new(MockCityRepository::new());
+        let station_repo = Arc::new(MockStationRepository::new());
+        let object_storage = Arc::new(MockObjectStorageService::new());
+
+        let service = HotelDataServiceImpl::new(
+            true,
+            PathBuf::from("/tmp"),
+            Arc::clone(&city_repo),
+            Arc::clone(&station_repo),
+            Arc::clone(&object_storage),
+        );
+
+        let command = vec![
+            HotelInfo {
+                name: "日升大酒店".to_string(),
+                address: "升日路123号".to_string(),
+                city: "北京".to_string(),
+                station: None,
+                images: vec![],
+                phone: vec![],
+                info: "林日升为您服务".to_string(),
+                room_info: Default::default(),
+                comments: vec![],
+            }];
+
+        let db =
+            MockDatabase::new(DatabaseBackend::Postgres)
+                .append_exec_results([MockExecResult {
+                    last_insert_id: 1,
+                    rows_affected: 1,
+                }])
+                .into_connection();
+
+
+        let result = service.load_hotel(command, db).await;
+
+        assert!(result.is_ok(), "预期成功，但返回 {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_load_hotel_fail() {
+        let city_repo = Arc::new(MockCityRepository::new());
+        let station_repo = Arc::new(MockStationRepository::new());
+        let object_storage = Arc::new(MockObjectStorageService::new());
+
+        let service = HotelDataServiceImpl::new(
+            true,
+            PathBuf::from("/tmp"),
+            Arc::clone(&city_repo),
+            Arc::clone(&station_repo),
+            Arc::clone(&object_storage),
+        );
+
+        let command = vec![];
+
+        let db =
+            MockDatabase::new(DatabaseBackend::Postgres)
+                .append_exec_results([MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0, // 这里模拟 "什么都没插入"
+                }])
+                .into_connection();
+
+        let result = service.load_hotel(command, db).await;
+
+        assert!(result.is_err(), "预期失败，但返回 {:?}", result);
+    }
+}
