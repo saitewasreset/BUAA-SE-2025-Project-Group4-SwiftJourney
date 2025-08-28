@@ -17,6 +17,6 @@ pub trait HotelDataService: 'static + Send + Sync {
     async fn load_hotel(
         &self,
         command: LoadHotelCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 }

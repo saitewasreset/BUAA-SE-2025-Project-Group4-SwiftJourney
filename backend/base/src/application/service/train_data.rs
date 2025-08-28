@@ -60,7 +60,7 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     /// 加载列车车次数据
@@ -73,12 +73,12 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 }

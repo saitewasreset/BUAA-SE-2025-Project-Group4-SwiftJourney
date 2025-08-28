@@ -953,7 +953,7 @@ impl TrainRepository for TrainRepositoryImpl {
 pub async fn save_raw_train_number<T: RouteRepository>(
     train_number_data: TrainNumberData,
     route_repository: Arc<T>,
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
 ) -> Result<(), RepositoryError> {
     let txn = db
         .begin()
@@ -1100,7 +1100,7 @@ pub async fn save_raw_train_number<T: RouteRepository>(
 /// 成功时返回`()`；失败时返回`RepositoryError`。
 #[instrument(skip_all)]
 pub async fn save_raw_train_type(
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
     train_type_data: TrainTypeData,
 ) -> Result<(), RepositoryError> {
     let txn = db

@@ -594,7 +594,7 @@ pub async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectS
     city_repository: Arc<C>,
     station_repository: Arc<S>,
     object_storage: Arc<OS>,
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
     data_base_path: &Path,
     hotel_data: HotelData,
 ) -> Result<(), RepositoryError> {

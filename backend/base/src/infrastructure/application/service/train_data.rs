@@ -218,7 +218,7 @@ where
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
@@ -246,7 +246,7 @@ where
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
@@ -263,7 +263,7 @@ where
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         let mut dish_data: DishData = HashMap::new();
         let mut takeaway_data: TakeawayData = HashMap::new();
