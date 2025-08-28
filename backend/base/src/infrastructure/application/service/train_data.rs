@@ -294,7 +294,7 @@ where
             &self.data_path,
             Arc::clone(&self.train_repository),
             Arc::clone(&self.object_storage_service),
-            db.clone(),
+            db,
         )
         .await
         .inspect_err(|e| {
