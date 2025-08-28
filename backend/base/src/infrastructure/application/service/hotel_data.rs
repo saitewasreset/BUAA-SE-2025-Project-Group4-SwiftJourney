@@ -157,7 +157,7 @@ mod tests {
                 .into_connection();
 
 
-        let result = service.load_hotel(command, db).await;
+        let result = service.load_hotel(command, &db).await;
 
         assert!(result.is_ok(), "预期成功，但返回 {:?}", result);
     }
@@ -186,7 +186,7 @@ mod tests {
                 }])
                 .into_connection();
 
-        let result = service.load_hotel(command, db).await;
+        let result = service.load_hotel(command, &db).await;
 
         assert!(result.is_err(), "预期失败，但返回 {:?}", result);
     }
