@@ -14,6 +14,7 @@ use crate::application::commands::train_data::{
     LoadTrainTypeCommand,
 };
 use async_trait::async_trait;
+use sea_orm::DatabaseConnection;
 
 /// 列车数据服务接口
 ///
@@ -59,6 +60,7 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     /// 加载列车车次数据
@@ -71,10 +73,12 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
+        db: DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 }

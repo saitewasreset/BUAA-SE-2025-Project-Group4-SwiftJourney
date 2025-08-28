@@ -140,6 +140,7 @@ where
     RR: RouteRepository,
 {
     #[instrument(skip(self))]
+    #[allow(clippy::type_complexity)]
     async fn load_daily_context(
         &self,
         date: NaiveDate,
@@ -528,18 +529,18 @@ where
             };
 
             for &(from, to) in &want {
-                if let (Some(&i_from), Some(&i_to)) = (pos_map.get(&from), pos_map.get(&to)) {
-                    if i_from < i_to {
-                        let stop = route.stops()[i_from];
-                        let departure_offset =
-                            stop.departure_time() + schedule.origin_departure_time() as u32;
-                        let departure_datetime = schedule.date().and_hms_opt(0, 0, 0).unwrap()
-                            + chrono::Duration::seconds(departure_offset as i64);
+                if let (Some(&i_from), Some(&i_to)) = (pos_map.get(&from), pos_map.get(&to))
+                    && i_from < i_to
+                {
+                    let stop = route.stops()[i_from];
+                    let departure_offset =
+                        stop.departure_time() + schedule.origin_departure_time() as u32;
+                    let departure_datetime = schedule.date().and_hms_opt(0, 0, 0).unwrap()
+                        + chrono::Duration::seconds(departure_offset as i64);
 
-                        if departure_datetime.date() == date {
-                            result.push((schedule.clone(), from, to));
-                            break;
-                        }
+                    if departure_datetime.date() == date {
+                        result.push((schedule.clone(), from, to));
+                        break;
                     }
                 }
             }

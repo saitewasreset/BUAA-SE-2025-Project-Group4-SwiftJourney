@@ -587,191 +587,182 @@ impl HotelRepository for HotelRepositoryImpl {
             .await
         }
     }
+}
 
-    #[instrument(skip_all)]
-    async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectStorageService>(
-        &self,
-        city_repository: Arc<C>,
-        station_repository: Arc<S>,
-        object_storage: Arc<OS>,
-        data_base_path: &Path,
-        hotel_data: HotelData,
-    ) -> Result<(), RepositoryError> {
-        let tx = self
-            .db
-            .begin()
-            .await
-            .context("Failed to begin transaction")?;
+#[instrument(skip_all)]
+pub async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectStorageService>(
+    city_repository: Arc<C>,
+    station_repository: Arc<S>,
+    object_storage: Arc<OS>,
+    db: DatabaseConnection,
+    data_base_path: &Path,
+    hotel_data: HotelData,
+) -> Result<(), RepositoryError> {
+    let tx = db.begin().await.context("Failed to begin transaction")?;
 
-        let cities = city_repository.load().await?;
-        let stations = station_repository.load().await?;
+    let cities = city_repository.load().await?;
+    let stations = station_repository.load().await?;
 
-        let city_name_to_city = cities
-            .into_iter()
-            .map(|c| (c.name().to_string(), c))
-            .collect::<HashMap<_, _>>();
+    let city_name_to_city = cities
+        .into_iter()
+        .map(|c| (c.name().to_string(), c))
+        .collect::<HashMap<_, _>>();
 
-        let station_name_to_station = stations
-            .into_iter()
-            .map(|s| (s.name().to_string(), s))
-            .collect::<HashMap<_, _>>();
+    let station_name_to_station = stations
+        .into_iter()
+        .map(|s| (s.name().to_string(), s))
+        .collect::<HashMap<_, _>>();
 
-        let mut images_cache: HashMap<PathBuf, Uuid> = HashMap::new();
+    let mut images_cache: HashMap<PathBuf, Uuid> = HashMap::new();
 
-        let mut hotel_do_list = Vec::new();
-        let mut hotel_uuid_to_room_type: HashMap<
-            Uuid,
-            Vec<crate::models::hotel_room_type::ActiveModel>,
-        > = HashMap::new();
+    let mut hotel_do_list = Vec::new();
+    let mut hotel_uuid_to_room_type: HashMap<
+        Uuid,
+        Vec<crate::models::hotel_room_type::ActiveModel>,
+    > = HashMap::new();
 
-        for hotel_info in hotel_data {
-            let city = city_name_to_city
-                .get(&hotel_info.city)
+    for hotel_info in hotel_data {
+        let city = city_name_to_city
+            .get(&hotel_info.city)
+            .cloned()
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "Invalid city: {}",
+                &hotel_info.city
+            )))
+            .inspect_err(|e| {
+                error!("Invalid city: {}: {}", &hotel_info.city, e);
+            })?;
+
+        if let Some(station) = hotel_info.station {
+            let station = station_name_to_station
+                .get(&station)
                 .cloned()
                 .ok_or(RepositoryError::InconsistentState(anyhow!(
-                    "Invalid city: {}",
-                    &hotel_info.city
+                    "Invalid station: {}",
+                    &station
                 )))
                 .inspect_err(|e| {
-                    error!("Invalid city: {}: {}", &hotel_info.city, e);
+                    error!("Invalid station: {}: {}", &station, e);
                 })?;
 
-            if let Some(station) = hotel_info.station {
-                let station = station_name_to_station
-                    .get(&station)
-                    .cloned()
-                    .ok_or(RepositoryError::InconsistentState(anyhow!(
-                        "Invalid station: {}",
-                        &station
-                    )))
-                    .inspect_err(|e| {
-                        error!("Invalid station: {}: {}", &station, e);
-                    })?;
+            let mut hotel = Hotel::new(
+                hotel_info.name,
+                city,
+                station,
+                hotel_info.address,
+                hotel_info.info,
+            );
 
-                let mut hotel = Hotel::new(
-                    hotel_info.name,
-                    city,
-                    station,
-                    hotel_info.address,
-                    hotel_info.info,
-                );
-
-                for phone in hotel_info.phone {
-                    hotel.add_phone(phone);
-                }
-
-                for image in hotel_info.images {
-                    let image_path = data_base_path.join(image);
-
-                    let image_uuid = if let Some(uuid) = images_cache.get(&image_path) {
-                        *uuid
-                    } else {
-                        let image_data = fs::read(&image_path)
-                            .context(format!("cannot read from: {:?}", &image_path))
-                            .inspect_err(|e| {
-                                error!("failed load hotel image: {}", e);
-                            })?;
-
-                        let uuid = object_storage
-                            .put_object(ObjectCategory::Hotel, "image/jpeg", image_data)
-                            .await
-                            .map_err(|e| {
-                                error!("failed save image: {}", e);
-
-                                RepositoryError::Db(e.into())
-                            })?;
-
-                        images_cache.insert(image_path, uuid);
-
-                        uuid
-                    };
-
-                    hotel.add_image(image_uuid);
-                }
-
-                for (room_type_name, room_type_info) in hotel_info.room_info {
-                    let price = Decimal::from_f64(room_type_info.price).unwrap();
-                    let hotel_room_type = HotelRoomType::new(
-                        None,
-                        None,
-                        room_type_name,
-                        room_type_info.capacity,
-                        price,
-                    );
-
-                    hotel.add_room_type(hotel_room_type);
-                }
-
-                hotel_do_list.push(HotelDataConverter::transform_to_do(&hotel));
-                hotel_uuid_to_room_type.insert(
-                    hotel.uuid(),
-                    hotel
-                        .room_type_list()
-                        .iter()
-                        .map(HotelRoomTypeDataConverter::transform_to_do)
-                        .collect::<Vec<_>>(),
-                );
-
-                // 由于评论需要与用户关联，无法在此处加载评论
-            } else {
-                warn!("Skipping hotel info without a station: {}", hotel_info.name);
+            for phone in hotel_info.phone {
+                hotel.add_phone(phone);
             }
-        }
 
-        for hotel_do_part in hotel_do_list.chunks(DB_CHUNK_SIZE) {
-            crate::models::hotel::Entity::insert_many(hotel_do_part.to_vec())
-                .exec(&tx)
-                .await
-                .inspect_err(|e| {
-                    error!("Failed to insert hotel: {}", e);
-                })
-                .context("Failed to insert hotel")?;
-        }
+            for image in hotel_info.images {
+                let image_path = data_base_path.join(image);
 
-        let hotel_id_uuid_list: Vec<(i32, Uuid)> = crate::models::hotel::Entity::find()
-            .select_only()
-            .columns([
-                crate::models::hotel::Column::Id,
-                crate::models::hotel::Column::Uuid,
-            ])
-            .into_tuple()
-            .all(&tx)
+                let image_uuid = if let Some(uuid) = images_cache.get(&image_path) {
+                    *uuid
+                } else {
+                    let image_data = fs::read(&image_path)
+                        .context(format!("cannot read from: {:?}", &image_path))
+                        .inspect_err(|e| {
+                            error!("failed load hotel image: {}", e);
+                        })?;
+
+                    let uuid = object_storage
+                        .put_object(ObjectCategory::Hotel, "image/jpeg", image_data)
+                        .await
+                        .map_err(|e| {
+                            error!("failed save image: {}", e);
+
+                            RepositoryError::Db(e.into())
+                        })?;
+
+                    images_cache.insert(image_path, uuid);
+
+                    uuid
+                };
+
+                hotel.add_image(image_uuid);
+            }
+
+            for (room_type_name, room_type_info) in hotel_info.room_info {
+                let price = Decimal::from_f64(room_type_info.price).unwrap();
+                let hotel_room_type =
+                    HotelRoomType::new(None, None, room_type_name, room_type_info.capacity, price);
+
+                hotel.add_room_type(hotel_room_type);
+            }
+
+            hotel_do_list.push(HotelDataConverter::transform_to_do(&hotel));
+            hotel_uuid_to_room_type.insert(
+                hotel.uuid(),
+                hotel
+                    .room_type_list()
+                    .iter()
+                    .map(HotelRoomTypeDataConverter::transform_to_do)
+                    .collect::<Vec<_>>(),
+            );
+
+            // 由于评论需要与用户关联，无法在此处加载评论
+        } else {
+            warn!("Skipping hotel info without a station: {}", hotel_info.name);
+        }
+    }
+
+    for hotel_do_part in hotel_do_list.chunks(DB_CHUNK_SIZE) {
+        crate::models::hotel::Entity::insert_many(hotel_do_part.to_vec())
+            .exec(&tx)
             .await
             .inspect_err(|e| {
-                error!("Failed to load hotel: {}", e);
+                error!("Failed to insert hotel: {}", e);
             })
-            .context("Failed to load hotel")?;
-
-        let hotel_uuid_map = hotel_id_uuid_list
-            .into_iter()
-            .map(|(id, uuid)| (uuid, id))
-            .collect::<HashMap<_, _>>();
-
-        for (hotel_uuid, hotel_room_type_list) in &mut hotel_uuid_to_room_type {
-            let hotel_id = *hotel_uuid_map.get(hotel_uuid).unwrap();
-
-            hotel_room_type_list.iter_mut().for_each(|x| {
-                x.hotel_id = ActiveValue::Set(hotel_id);
-            })
-        }
-
-        let hotel_room_type_do_list = hotel_uuid_to_room_type
-            .into_values()
-            .flatten()
-            .collect::<Vec<_>>();
-
-        for hotel_room_type_do_part in hotel_room_type_do_list.chunks(DB_CHUNK_SIZE) {
-            crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_part.to_vec())
-                .exec(&tx)
-                .await
-                .inspect_err(|e| {
-                    error!("Failed to insert hotel room type: {}", e);
-                })
-                .context("Failed to insert hotel room type")?;
-        }
-
-        tx.commit().await.context("Failed to commit transaction")?;
-
-        Ok(())
+            .context("Failed to insert hotel")?;
     }
+
+    let hotel_id_uuid_list: Vec<(i32, Uuid)> = crate::models::hotel::Entity::find()
+        .select_only()
+        .columns([
+            crate::models::hotel::Column::Id,
+            crate::models::hotel::Column::Uuid,
+        ])
+        .into_tuple()
+        .all(&tx)
+        .await
+        .inspect_err(|e| {
+            error!("Failed to load hotel: {}", e);
+        })
+        .context("Failed to load hotel")?;
+
+    let hotel_uuid_map = hotel_id_uuid_list
+        .into_iter()
+        .map(|(id, uuid)| (uuid, id))
+        .collect::<HashMap<_, _>>();
+
+    for (hotel_uuid, hotel_room_type_list) in &mut hotel_uuid_to_room_type {
+        let hotel_id = *hotel_uuid_map.get(hotel_uuid).unwrap();
+
+        hotel_room_type_list.iter_mut().for_each(|x| {
+            x.hotel_id = ActiveValue::Set(hotel_id);
+        })
+    }
+
+    let hotel_room_type_do_list = hotel_uuid_to_room_type
+        .into_values()
+        .flatten()
+        .collect::<Vec<_>>();
+
+    for hotel_room_type_do_part in hotel_room_type_do_list.chunks(DB_CHUNK_SIZE) {
+        crate::models::hotel_room_type::Entity::insert_many(hotel_room_type_do_part.to_vec())
+            .exec(&tx)
+            .await
+            .inspect_err(|e| {
+                error!("Failed to insert hotel room type: {}", e);
+            })
+            .context("Failed to insert hotel room type")?;
+    }
+
+    tx.commit().await.context("Failed to commit transaction")?;
+
+    Ok(())
 }

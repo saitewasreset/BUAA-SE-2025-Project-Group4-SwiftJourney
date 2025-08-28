@@ -261,7 +261,6 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_repository_impl),
         Arc::clone(&train_repository_impl),
         Arc::clone(&route_repository_impl),
-        Arc::clone(&dish_repository_impl),
         Arc::clone(&takeaway_repository_impl),
         Arc::clone(&s3_object_storage_service_impl),
     ));
@@ -319,7 +318,6 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
         Arc::clone(&s3_object_storage_service_impl),
-        Arc::clone(&hotel_repository_impl),
     ));
 
     let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
@@ -449,6 +447,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&personal_info_repository_impl),
         Arc::clone(&train_schedule_service_impl),
+        Arc::clone(&train_type_configuration_service_impl),
     ));
 
     let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
@@ -596,6 +595,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(train_dish_application_service.clone())
             .app_data(train_order_service.clone())
             .app_data(hotel_order_service.clone())
+            .app_data(conn.clone())
             // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
             // Good! Next, build your API endpoint in `api::train::schedule`
             .app_data(app_config_data.clone())
@@ -637,10 +637,10 @@ fn read_file_env(target_env: &str) -> Option<String> {
         }
     }
 
-    if result.is_none() {
-        if let Ok(env_str) = env::var(target_env) {
-            result = Some(env_str);
-        }
+    if result.is_none()
+        && let Ok(env_str) = env::var(target_env)
+    {
+        result = Some(env_str);
     }
 
     result

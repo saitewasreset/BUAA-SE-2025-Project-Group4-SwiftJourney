@@ -101,6 +101,9 @@ where
     ) -> Result<(), Box<dyn ApplicationError>> {
         let phone =
             Phone::try_from(command.phone).map_err(|e| GeneralError::BadRequest(e.to_string()))?;
+
+        tracing::info!("phone: {:?}", phone);
+
         let identity_card_id = IdentityCardId::try_from(command.identity_card_id)
             .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
 
@@ -534,7 +537,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().error_message(),
-            "Invalid phone number of password"
+            "Invalid phone number or password"
         );
     }
 

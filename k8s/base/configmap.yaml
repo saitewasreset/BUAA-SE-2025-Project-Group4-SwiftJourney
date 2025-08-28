@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: swiftjourney
+data:
+  TZ: Asia/Shanghai
+  LANG: zh_CN.utf-8
+  POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=zh-CN --encoding=UTF8"
+  RUST_LOG: info
+  TZ_OFFSET_HOUR: "8"
+  AUTO_SCHEDULE_DAYS: "14"
+  MINIO_ENDPOINT: http://minio:9000
+  SERVER_NAME: 127.0.0.1:8080

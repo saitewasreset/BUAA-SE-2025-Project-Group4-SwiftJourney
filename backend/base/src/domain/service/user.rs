@@ -21,9 +21,11 @@ pub enum UserServiceError {
     #[error("an infrastructure error occurred: {0}")]
     InfrastructureError(ServiceError),
 
-    /// 用户已存在（手机号或身份证号重复）
-    #[error("user with same phone number or identity card id exists: {0} {1}")]
-    UserExists(String, String),
+    #[error("user with same phone number exists: {0}")]
+    PhoneExists(String),
+
+    #[error("user with same identity card id exists: {0}")]
+    IdentityCardExists(String),
 
     /// 找不到指定用户
     #[error("no user with specified phone number: {0}")]

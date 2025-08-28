@@ -80,7 +80,10 @@ where
                 error!("Failed to get hotel id by uuid: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "invalid hotel uuid: {}",
+                hotel_uuid
+            ))) as Box<dyn ApplicationError>)?;
 
         let hotel = self
             .hotel_repository
@@ -90,13 +93,19 @@ where
                 error!("Failed to find hotel: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                dto.hotel_id,
+            ))) as Box<dyn ApplicationError>)?;
 
         let room_type = hotel
             .room_type_list()
             .iter()
             .find(|rt| rt.type_name() == &dto.room_type)
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel room type: {}",
+                dto.room_type
+            ))) as Box<dyn ApplicationError>)?;
 
         let room_type_id = room_type
             .get_id()
@@ -166,7 +175,10 @@ where
         let personal_info = personal_infos
             .into_iter()
             .find(|info| info.uuid() == personal_uuid)
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "invalid personal info uuid: {}",
+                personal_uuid
+            ))) as Box<dyn ApplicationError>)?;
 
         let personal_info_id = personal_info
             .get_id()

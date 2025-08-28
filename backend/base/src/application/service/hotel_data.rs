@@ -1,6 +1,7 @@
 use crate::application::ApplicationError;
 use crate::application::commands::hotel_data::LoadHotelCommand;
 use async_trait::async_trait;
+use sea_orm::DatabaseConnection;
 
 #[async_trait]
 pub trait HotelDataService: 'static + Send + Sync {
@@ -13,5 +14,9 @@ pub trait HotelDataService: 'static + Send + Sync {
     ///
     /// # Arguments
     /// * `command` - 包含酒店数据的命令对象
-    async fn load_hotel(&self, command: LoadHotelCommand) -> Result<(), Box<dyn ApplicationError>>;
+    async fn load_hotel(
+        &self,
+        command: LoadHotelCommand,
+        db: DatabaseConnection,
+    ) -> Result<(), Box<dyn ApplicationError>>;
 }

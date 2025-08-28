@@ -144,9 +144,10 @@ where
             .add_comment(command.hotel_id, user_id, rating, command.comment)
             .await
             .map_err(|e| match e {
-                HotelRatingServiceError::InvalidHotelUuid(_) => {
-                    Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>
-                }
+                HotelRatingServiceError::InvalidHotelUuid(uuid) => Box::new(GeneralError::NotFound(
+                    format!("Invalid hotel uuid: {}", uuid),
+                ))
+                    as Box<dyn ApplicationError>,
                 HotelRatingServiceError::NoCommentsQuotaLeft(_, _) => {
                     Box::new(HotelServiceError::CommentCountExceed) as Box<dyn ApplicationError>
                 }
@@ -260,7 +261,10 @@ where
                 error!("Failed to get hotel id by uuid: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                query.hotel_id
+            ))) as Box<dyn ApplicationError>)?;
 
         let hotel = self
             .hotel_repository
@@ -270,7 +274,10 @@ where
                 error!("Failed to find hotel: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(GeneralError::InternalServerError)
+            .inspect_err(|_for_super_earth| {
+                error!("inconsistent state: hotel id {} not found, but get_id_by_uuid({}) returned the id", hotel_id, query.hotel_id);
+            })?;
 
         let comments = self
             .hotel_rating_service
@@ -365,7 +372,10 @@ where
                 error!("Failed to get hotel id by uuid: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                query.hotel_id
+            ))) as Box<dyn ApplicationError>)?;
 
         let hotel = self
             .hotel_repository
@@ -375,7 +385,9 @@ where
                 error!("Failed to find hotel: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::NotFound) as Box<dyn ApplicationError>)?;
+            .ok_or(GeneralError::InternalServerError).inspect_err(|_for_super_earth| {
+            error!("inconsistent state: hotel id {} not found, but get_id_by_uuid({}) returned the id", hotel_id, query.hotel_id);
+        })?;
 
         let date_range = match (query.begin_date, query.end_date) {
             (None, None) => None,
