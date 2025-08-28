@@ -358,7 +358,7 @@ where
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or(GeneralError::InvalidSessionId)?;
 
-        let train_number = TrainNumber::from(command.info.train_number);
+        let train_number = TrainNumber::from(command.info.train_number.clone());
 
         let train_number = self
             .train_type_configuration_service
@@ -371,7 +371,7 @@ where
                 }
                 _ => {
                     error!("failed to verify train number: {}", e);
-                    GeneralError::BadRequest(format!("invalid train number: {}", e))
+                    GeneralError::NotFound(format!("invalid train number: {}", e))
                 }
             })?;
         let personal_info_list = self
@@ -413,13 +413,12 @@ where
             .inspect_err(|e| error!("failed to find train schedule: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or_else(|| {
-                error!(
-                    "inconsistent state: train schedule not found for train number: {:?} and departure time: {}",
-                    train_number,
-                    origin_departure_time
-                );
+                // 车次号一定存在，但车次（包含出发时间）不一定存在
 
-                GeneralError::InternalServerError
+                GeneralError::NotFound(format!(
+                    "no train schedule found for train number {} at {}",
+                    command.info.train_number, command.info.origin_departure_time
+                ))
             })?;
 
         let train_order_id = self
