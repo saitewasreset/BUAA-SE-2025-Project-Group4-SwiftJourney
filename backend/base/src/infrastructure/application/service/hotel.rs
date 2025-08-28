@@ -468,3 +468,300 @@ where
         Ok(result)
     }
 }
+
+
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::sync::Arc;
+//     use chrono::{Utc, Duration};
+//     use crate::domain::model::hotel::{Hotel, HotelId};
+//     
+//     use crate::domain::service::mock::session::MockSessionManagerService;
+//     use crate::domain::service::mock::hotel_rating::MockHotelRatingService;
+//     use crate::domain::service::mock::hotel_query::MockHotelQueryService;
+//     
+//     use crate::domain::repository::mock::user::MockUserRepository;
+//     use crate::domain::repository::mock::hotel::MockHotelRepository;
+// 
+//     // ================= get_quota =================
+//     #[tokio::test]
+//     async fn test_get_quota_success() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(1.into())));
+// 
+//         let mut rating = MockHotelRatingService::new();
+//         rating.expect_get_hotel_comment_quota().returning(|_, _| Ok(5));
+//         rating.expect_get_current_comment_count().returning(|_, _| Ok(2));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(rating),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let query = QuotaQuery { session_id: "valid".into(), hotel_id: "h1".into() };
+//         let result = service.get_quota(query).await.unwrap();
+//         assert_eq!(result.quota, 5);
+//         assert_eq!(result.used, 2);
+//     }
+// 
+//     #[tokio::test]
+//     async fn test_get_quota_invalid_session() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(None));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let query = QuotaQuery { session_id: "invalid".into(), hotel_id: "h1".into() };
+//         let err = service.get_quota(query).await.unwrap_err();
+//         assert!(err.to_string().contains("InvalidSessionId"));
+//     }
+// 
+//     // ================= new_comment =================
+//     #[tokio::test]
+//     async fn test_new_comment_success() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(2.into())));
+// 
+//         let mut rating = MockHotelRatingService::new();
+//         rating.expect_add_comment()
+//             .returning(|_, _, _, _, _| Ok(()));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(rating),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelCommentDTO {
+//             session_id: "s1".into(),
+//             hotel_id: "h1".into(),
+//             rating: 4.5,
+//             comment: "good".into(),
+//         };
+// 
+//         assert!(service.new_comment(dto).await.is_ok());
+//     }
+// 
+//     #[tokio::test]
+//     async fn test_new_comment_invalid_rating() {
+//         let session = MockSessionManagerService::new();
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelCommentDTO {
+//             session_id: "s1".into(),
+//             hotel_id: "h1".into(),
+//             rating: 6.0,
+//             comment: "bad".into(),
+//         };
+// 
+//         let err = service.new_comment(dto).await.unwrap_err();
+//         assert!(matches!(err, HotelServiceError::InvalidRating));
+//     }
+// 
+//     // ================= query_hotels =================
+//     #[tokio::test]
+//     async fn test_query_hotels_success() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(3.into())));
+// 
+//         let mut query_service = MockHotelQueryService::new();
+//         query_service.expect_query_hotels()
+//             .returning(|_, _| Ok(vec![
+//                 HotelGeneralInfoDTO { id: "h1".into(), name: "Hotel1".into(), ..Default::default() }
+//             ]));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(query_service),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelQueryDTO {
+//             session_id: "s1".into(),
+//             begin_date: Utc::now(),
+//             end_date: Utc::now() + Duration::days(1),
+//             city_name: "Beijing".into(),
+//         };
+// 
+//         let result = service.query_hotels(dto).await.unwrap();
+//         assert_eq!(result.len(), 1);
+//         assert_eq!(result[0].name, "Hotel1");
+//     }
+// 
+//     #[tokio::test]
+//     async fn test_query_hotels_invalid_date_range() {
+//         let session = MockSessionManagerService::new();
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelQueryDTO {
+//             session_id: "s1".into(),
+//             begin_date: Utc::now(),
+//             end_date: Utc::now(),
+//             city_name: "Beijing".into(),
+//         };
+// 
+//         let err = service.query_hotels(dto).await.unwrap_err();
+//         assert!(matches!(err, HotelServiceError::InvalidDateRangeMessage(_)));
+//     }
+// 
+//     // ================= query_hotel_info =================
+//     #[tokio::test]
+//     async fn test_query_hotel_info_success() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(4.into())));
+// 
+//         let mut repo = MockHotelRepository::new();
+//         repo.expect_get_id_by_uuid()
+//             .returning(|_| Ok(Some(HotelId::from(1u64))));
+//         repo.expect_get_by_id()
+//             .returning(|_| Ok(Some(Hotel::new(HotelId::from(1u64), "HotelX".into(), "Addr".into()))));
+// 
+//         let mut rating = MockHotelRatingService::new();
+//         rating.expect_get_comments()
+//             .returning(|_, _| Ok(vec![HotelComment::new("user".into(), 4.0, "nice".into())]));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(rating),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(repo),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelInfoQueryDTO { session_id: "s1".into(), hotel_id: "h1".into() };
+//         let result = service.query_hotel_info(dto).await.unwrap();
+//         assert_eq!(result.name, "HotelX");
+//         assert_eq!(result.comments.len(), 1);
+//     }
+// 
+//     #[tokio::test]
+//     async fn test_query_hotel_info_not_found() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(5.into())));
+// 
+//         let mut repo = MockHotelRepository::new();
+//         repo.expect_get_id_by_uuid()
+//             .returning(|_| Ok(None));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(repo),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelInfoQueryDTO { session_id: "s1".into(), hotel_id: "h2".into() };
+//         let err = service.query_hotel_info(dto).await.unwrap_err();
+//         assert!(err.to_string().contains("Invalid hotel uuid"));
+//     }
+// 
+//     // ================= query_hotel_order_info =================
+//     #[tokio::test]
+//     async fn test_query_hotel_order_info_success() {
+//         let mut session = MockSessionManagerService::new();
+//         session.expect_get_user_id_by_session()
+//             .returning(|_| Ok(Some(6.into())));
+// 
+//         let mut booking = MockHotelBookingService::new();
+//         booking.expect_get_available_room()
+//             .returning(|_, _, _, _| Ok(10));
+// 
+//         let mut repo = MockHotelRepository::new();
+//         repo.expect_get_rooms_by_hotel_id()
+//             .returning(|_| Ok(vec![
+//                 Room::new("Deluxe".into(), 100.0, 5),
+//                 Room::new("Standard".into(), 80.0, 5),
+//             ]));
+// 
+//         repo.expect_get_id_by_uuid()
+//             .returning(|_| Ok(Some(HotelId::from(1u64))));
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(booking),
+//             Arc::new(repo),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelOrderInfoQueryDTO {
+//             session_id: "s1".into(),
+//             hotel_id: "h1".into(),
+//             begin_date: Utc::now(),
+//             end_date: Utc::now() + Duration::days(1),
+//         };
+// 
+//         let result = service.query_hotel_order_info(dto).await.unwrap();
+//         assert!(result.contains_key("Deluxe"));
+//         assert!(result.contains_key("Standard"));
+//     }
+// 
+//     #[tokio::test]
+//     async fn test_query_hotel_order_info_invalid_date() {
+//         let session = MockSessionManagerService::new();
+// 
+//         let service = HotelServiceImpl::new(
+//             Arc::new(MockHotelRatingService::new()),
+//             Arc::new(MockHotelQueryService::new()),
+//             Arc::new(MockHotelBookingService::new()),
+//             Arc::new(MockHotelRepository::new()),
+//             Arc::new(MockUserRepository::new()),
+//             Arc::new(session),
+//         );
+// 
+//         let dto = HotelOrderInfoQueryDTO {
+//             session_id: "s1".into(),
+//             hotel_id: "h1".into(),
+//             begin_date: Utc::now(),
+//             end_date: Utc::now(),
+//         };
+// 
+//         let err = service.query_hotel_order_info(dto).await.unwrap_err();
+//         assert!(matches!(err, HotelServiceError::InvalidDateRangeMessage(_)));
+//     }
+// }
