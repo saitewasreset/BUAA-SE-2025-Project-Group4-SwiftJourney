@@ -29,8 +29,8 @@ export const useMealOrderStore = defineStore('mealOrder', {
                 station: station,
                 dishTime: dishTime,
             }
-            for (let key of this.mealOrderInfoList) {
-                if (key.shopName == shopName && key.name == food.name && key.dishTime == dishTime) {
+            for (const key of this.mealOrderInfoList) {
+                if (key.shopName == shopName && key.name == food.name && key.dishTime == dishTime && key.station == station) {
                     key.amount ++;
                     return true;
                 }

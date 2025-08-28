@@ -11,17 +11,20 @@
 use crate::application::commands::user_manager::{
     UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
+use crate::application::service::personal_info::PersonalInfoError;
 use crate::application::service::user_manager::{UserManagerError, UserManagerService};
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::model::session::SessionId;
-use crate::domain::model::user::{IdentityCardId, Phone, RawPassword, RealName, Username};
+use crate::domain::model::user::{
+    IdentityCardError, IdentityCardId, Phone, RawPassword, RealName, Username,
+};
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::user::UserService;
 use crate::domain::{DbId, Identifiable};
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, warn};
 
 /// 用户管理服务实现
 ///
@@ -104,8 +107,19 @@ where
 
         tracing::info!("phone: {:?}", phone);
 
-        let identity_card_id = IdentityCardId::try_from(command.identity_card_id)
-            .map_err(|e| GeneralError::BadRequest(e.to_string()))?;
+        let identity_card_id = IdentityCardId::try_from(command.identity_card_id).map_err(|e| {
+            warn!("invalid identity card id: {}", e);
+
+            match e {
+                IdentityCardError::InvalidFormat => PersonalInfoError::InvalidIdentityCardIdFormat,
+                IdentityCardError::InvalidLength(_) => {
+                    PersonalInfoError::InvalidIdentityCardIdFormat
+                }
+                IdentityCardError::InvalidCheckCode(_, _) => {
+                    PersonalInfoError::InvalidIdentityCardId
+                }
+            }
+        })?;
 
         let username = Username::try_from(command.username)
             .map_err(|_for_super_earth| UserManagerError::InvalidUsernameFormat)?;
