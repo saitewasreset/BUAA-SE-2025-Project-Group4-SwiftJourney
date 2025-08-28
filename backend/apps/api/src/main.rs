@@ -75,7 +75,6 @@ use base::infrastructure::messaging::consumer::order_status::{
     DishOrderStatusConsumer, HotelOrderStatusConsumer, RabbitMQOrderStatusConsumer,
     TakeawayOrderStatusConsumer, TrainOrderStatusConsumer,
 };
-use base::infrastructure::repository::city::CityRepositoryImpl;
 use base::infrastructure::repository::dish::DishRepositoryImpl;
 use base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
@@ -86,7 +85,8 @@ use base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use base::infrastructure::repository::route::RouteRepositoryImpl;
 use base::infrastructure::repository::seat_availability::SeatAvailabilityRepositoryImpl;
 use base::infrastructure::repository::session::SessionRepositoryImpl;
-use base::infrastructure::repository::station::StationRepositoryImpl;
+use base::infrastructure::repository::http::city_http::CityRepositoryHttpImpl;
+use base::infrastructure::repository::http::station_http::StationRepositoryHttpImpl;
 use base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use base::infrastructure::repository::train::TrainRepositoryImpl;
 use base::infrastructure::repository::train_schedule::TrainScheduleRepositoryImpl;
@@ -192,8 +192,9 @@ async fn main() -> std::io::Result<()> {
         ));
 
     let user_repository_impl = Arc::new(UserRepositoryImpl::new(conn.clone()));
-    let city_repository_impl = Arc::new(CityRepositoryImpl::new(conn.clone()));
-    let station_repository_impl = Arc::new(StationRepositoryImpl::new(conn.clone()));
+    let geo_base_url = read_file_env("GEO_BASE_URL").expect("cannot get geo base url");
+    let city_repository_impl = Arc::new(CityRepositoryHttpImpl::new(&geo_base_url));
+    let station_repository_impl = Arc::new(StationRepositoryHttpImpl::new(&geo_base_url));
     let train_repository_impl = Arc::new(TrainRepositoryImpl::new(conn.clone()));
     let route_repository_impl = Arc::new(RouteRepositoryImpl::new(conn.clone()));
     let transaction_repository_impl = Arc::new(TransactionRepositoryImpl::new(conn.clone()));

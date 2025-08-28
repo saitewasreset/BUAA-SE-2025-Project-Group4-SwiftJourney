@@ -1,27 +1,8 @@
 use anyhow::Context;
 use tracing::{error, instrument};
 
-pub mod session;
-pub mod user;
-
 pub mod city;
-pub mod mock;
-pub mod personal_info;
-pub mod route;
 pub mod station;
-pub mod train;
-pub mod train_schedule;
-pub mod transaction;
-
-pub mod http;
-pub mod dish;
-pub mod hotel;
-pub mod hotel_rating;
-pub mod notify;
-pub mod occupied_room;
-pub mod order;
-pub mod seat_availability;
-pub mod takeaway;
 
 #[instrument(level = "trace", skip_all)]
 pub fn transform_list<T, U, I>(
