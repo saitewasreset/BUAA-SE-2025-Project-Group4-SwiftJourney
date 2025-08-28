@@ -46,6 +46,3 @@ actix-ws = "0.3"
 
 claims = "0.8"
 mockall = "0.13"
-sea-orm = { version = "1.1", features = [
-    "mock",
-] }
