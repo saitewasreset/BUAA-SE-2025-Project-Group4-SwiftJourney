@@ -41,7 +41,7 @@ async fn load_train_type_data(
     let data: LoadTrainTypeCommand = parse_request_body(body)?;
 
     train_data_service
-        .load_train_type(data, db.get_ref().clone())
+        .load_train_type(data, db.get_ref())
         .await?;
 
     ApiResponse::ok(())
@@ -56,7 +56,7 @@ async fn load_train_number_data(
     let data: LoadTrainNumberCommand = parse_request_body(body)?;
 
     train_data_service
-        .load_train_number(data, db.get_ref().clone())
+        .load_train_number(data, db.get_ref())
         .await?;
 
     ApiResponse::ok(())
@@ -71,7 +71,7 @@ async fn load_dish_takeaway_data(
     let data: LoadDishTakeawayCommand = parse_request_body(body)?;
 
     train_data_service
-        .load_dish_takeaway(data, db.get_ref().clone())
+        .load_dish_takeaway(data, db.get_ref())
         .await?;
 
     ApiResponse::ok(())

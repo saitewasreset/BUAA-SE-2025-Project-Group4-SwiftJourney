@@ -62,7 +62,7 @@ where
     async fn load_hotel(
         &self,
         command: LoadHotelCommand,
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         save_raw_hotel(
             Arc::clone(&self.city_repository),
