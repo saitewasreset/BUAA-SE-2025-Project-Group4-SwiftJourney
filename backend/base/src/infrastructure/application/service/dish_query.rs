@@ -133,16 +133,14 @@ where
                     error!("Infrastructure error while verifying train number: {:?}", e);
                     GeneralError::InternalServerError
                 }
-                _ => {
-                    GeneralError::BadRequest(format!("invalid trainNumber: {}", query.train_number))
-                }
+                _ => GeneralError::NotFound(format!("invalid trainNumber: {}", query.train_number)),
             })?;
 
         let origin_departure_time = DateTimeWithTimeZone::parse_from_rfc3339(
             &query.origin_departure_time,
         )
         .map_err(|_for_super_earth| {
-            GeneralError::BadRequest(format!(
+            GeneralError::NotFound(format!(
                 "invalid originDepartureTime: {}",
                 query.origin_departure_time
             ))

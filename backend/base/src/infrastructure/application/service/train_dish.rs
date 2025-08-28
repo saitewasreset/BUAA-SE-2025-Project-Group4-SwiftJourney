@@ -153,6 +153,14 @@ where
 
             let amount = Decimal::from(request.amount);
 
+            // `request.amount >= 0`，故只需检查是否为零
+            if amount == Decimal::ZERO {
+                return Err(Box::new(GeneralError::BadRequest(format!(
+                    "invalid dish amount: {}",
+                    amount
+                ))) as Box<dyn ApplicationError>);
+            }
+
             let dish_time =
                 DishTime::try_from(request.dish_time.as_str()).map_err(|_for_super_earth| {
                     GeneralError::BadRequest(format!("invalid dish time: {}", request.dish_time))
@@ -280,13 +288,23 @@ where
                 )
                 .unwrap();
 
+            let amount = Decimal::from(request.amount);
+
+            // `request.amount >= 0`，故只需检查是否为零
+            if amount == Decimal::ZERO {
+                return Err(Box::new(GeneralError::BadRequest(format!(
+                    "invalid takeaway amount: {}",
+                    amount
+                ))) as Box<dyn ApplicationError>);
+            }
+
             result.push(VerifiedTakeawayOrderRequest {
                 takeaway_dish_id: requested_dish.get_id().expect("dish should have an ID"),
                 train_id: train_schedule.train_id(),
                 station_id: *station_id,
                 personal_id: personal_info_id,
                 unit_price: requested_dish.unit_price(),
-                amount: Decimal::from(request.amount),
+                amount,
                 active_time,
             });
         }
@@ -358,7 +376,7 @@ where
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or(GeneralError::InvalidSessionId)?;
 
-        let train_number = TrainNumber::from(command.info.train_number);
+        let train_number = TrainNumber::from(command.info.train_number.clone());
 
         let train_number = self
             .train_type_configuration_service
@@ -371,7 +389,7 @@ where
                 }
                 _ => {
                     error!("failed to verify train number: {}", e);
-                    GeneralError::BadRequest(format!("invalid train number: {}", e))
+                    GeneralError::NotFound(format!("invalid train number: {}", e))
                 }
             })?;
         let personal_info_list = self
@@ -413,13 +431,12 @@ where
             .inspect_err(|e| error!("failed to find train schedule: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or_else(|| {
-                error!(
-                    "inconsistent state: train schedule not found for train number: {:?} and departure time: {}",
-                    train_number,
-                    origin_departure_time
-                );
+                // 车次号一定存在，但车次（包含出发时间）不一定存在
 
-                GeneralError::InternalServerError
+                GeneralError::NotFound(format!(
+                    "no train schedule found for train number {} at {}",
+                    command.info.train_number, command.info.origin_departure_time
+                ))
             })?;
 
         let train_order_id = self

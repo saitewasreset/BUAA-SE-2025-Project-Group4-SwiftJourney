@@ -1,21 +1,20 @@
 import { getRequest } from "../axios";
 import { postRequest } from "../axios";
-import { postBlobRequest } from "../axios";
 
 export const userApi = {
-    userLogin: (params: Object) => {
+    userLogin: (params: object) => {
         return postRequest('/api/user/login', params);
     },
-    setUserInfo: (params: Object) => {
+    setUserInfo: (params: object) => {
         return postRequest('/api/user/user_info', params);
     },
-    updatePassword: (params: Object) => {
+    updatePassword: (params: object) => {
         return postRequest('/api/user/update_password', params);
     },
     getUserInfo: () => {
         return getRequest('/api/user/user_info');
     },
-    userRegister: (params: Object) => {
+    userRegister: (params: object) => {
         return postRequest('/api/user/register', params);
     },
     userLogout: () => {
@@ -27,7 +26,7 @@ export const userApi = {
     queryPersonalInfo: () => {
         return getRequest('/api/user/personal_info');
     },
-    setPersonalInfo: (params: Object) => {
+    setPersonalInfo: (params: object) => {
         return postRequest('/api/user/personal_info', params);
     }
 };

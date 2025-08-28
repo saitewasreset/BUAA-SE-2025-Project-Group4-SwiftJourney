@@ -31,7 +31,7 @@ export const useGeneralStore = defineStore('general', {
             let successGetCity = false;
             let successGetStation = false;
 
-            let bothPinYinList: {cityName: string, pinYin: string}[] = [];
+            const bothPinYinList: {cityName: string, pinYin: string}[] = [];
 
             try {
                 const res = await generalApi.getCity();
