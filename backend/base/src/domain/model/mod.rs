@@ -14,3 +14,4 @@ pub mod train;
 pub mod train_schedule;
 pub mod transaction;
 pub mod user;
+pub mod mock;

@@ -8,3 +8,4 @@ pub mod hotel_query;
 pub mod hotel_booking;
 pub mod object_storage;
 pub mod transaction;
+pub mod message;
