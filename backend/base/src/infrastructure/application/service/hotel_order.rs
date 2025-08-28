@@ -189,7 +189,14 @@ where
             .signed_duration_since(date_range.begin_date())
             .num_days() as u32;
         let room_price = room_price_per_day * Decimal::from(days);
+
         let amount = Decimal::from(dto.amount);
+
+        if amount <= Decimal::ZERO {
+            return Err(Box::new(GeneralError::BadRequest(
+                "Amount must be greater than zero".to_string(),
+            )) as Box<dyn ApplicationError>);
+        }
 
         let order_uuid = Uuid::new_v4();
         let payment_info = PaymentInfo::new(None, None);

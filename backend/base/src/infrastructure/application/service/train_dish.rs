@@ -153,6 +153,14 @@ where
 
             let amount = Decimal::from(request.amount);
 
+            // `request.amount >= 0`，故只需检查是否为零
+            if amount == Decimal::ZERO {
+                return Err(Box::new(GeneralError::BadRequest(format!(
+                    "invalid dish amount: {}",
+                    amount
+                ))) as Box<dyn ApplicationError>);
+            }
+
             let dish_time =
                 DishTime::try_from(request.dish_time.as_str()).map_err(|_for_super_earth| {
                     GeneralError::BadRequest(format!("invalid dish time: {}", request.dish_time))
@@ -280,13 +288,23 @@ where
                 )
                 .unwrap();
 
+            let amount = Decimal::from(request.amount);
+
+            // `request.amount >= 0`，故只需检查是否为零
+            if amount == Decimal::ZERO {
+                return Err(Box::new(GeneralError::BadRequest(format!(
+                    "invalid takeaway amount: {}",
+                    amount
+                ))) as Box<dyn ApplicationError>);
+            }
+
             result.push(VerifiedTakeawayOrderRequest {
                 takeaway_dish_id: requested_dish.get_id().expect("dish should have an ID"),
                 train_id: train_schedule.train_id(),
                 station_id: *station_id,
                 personal_id: personal_info_id,
                 unit_price: requested_dish.unit_price(),
-                amount: Decimal::from(request.amount),
+                amount,
                 active_time,
             });
         }
