@@ -163,7 +163,7 @@ pub async fn save_raw_dish<T: TrainRepository, OS: ObjectStorageService>(
     data_path: &Path,
     train_repository: Arc<T>,
     object_storage_service: Arc<OS>,
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
 ) -> Result<(), RepositoryError> {
     let tx = db
         .begin()
