@@ -318,3 +318,400 @@ where
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // 引入 mock
+    use crate::domain::repository::mock::{
+        city::mock_city_repository,
+        route::mock_route_repository,
+        station::mock_station_repository,
+        takeaway::mock_takeaway_shop_repo,
+        train::mock_train_repo,
+    };
+    use crate::domain::service::mock::object_storage::mock_object_storage_service;
+    use crate::domain::RepositoryError;
+    use anyhow::anyhow;
+    use sea_orm::Database;
+    use shared::data::{StationDataItem, TrainNumberInfoItem, TrainTypeInfoItem};
+    use tempfile::tempdir;
+    use tokio;
+
+    fn setup_service(debug: bool) -> TrainDataServiceImpl<
+        impl CityRepository,
+        impl StationRepository,
+        impl TrainRepository,
+        impl RouteRepository,
+        impl TakeawayShopRepository,
+        impl ObjectStorageService,
+    > {
+        let temp = tempdir().unwrap();
+        TrainDataServiceImpl::new(
+            debug,
+            temp.path().to_path_buf(),
+            Arc::new(mock_city_repository()),
+            Arc::new(mock_station_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_route_repository()),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_object_storage_service()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_load_city_success() {
+        // 创建 Mock 并设置 expectation
+        let mut mock_city_repo = crate::domain::repository::mock::city::MockCityRepository::new();
+
+        // 对 save_raw 的调用设置期望
+        mock_city_repo
+            .expect_save_raw()
+            .withf(|city_data| city_data.get("Beijing").map(|v| v == "BJP").unwrap_or(false))
+            .returning(|_city_data| Ok(()));
+
+        let service = TrainDataServiceImpl::new(
+            true,
+            std::path::PathBuf::from("/tmp"),
+            Arc::new(mock_city_repo),
+            Arc::new(mock_station_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_route_repository()),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_object_storage_service()),
+        );
+
+        let cmd: HashMap<String, String> = [("Beijing".to_string(), "BJP".to_string())]
+            .into_iter()
+            .collect();
+
+        let result = service.load_city(cmd).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_load_city_fail_debug_off() {
+        let service = setup_service(false);
+        let cmd = [("Beijing".to_string(), "BJP".to_string())]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        let result = service.load_city(cmd).await;
+        assert!(result.is_err()); // 因为 debug = false
+    }
+
+    #[tokio::test]
+    async fn test_load_station_success() {
+        // 创建 mock
+        let mut station_repo = mock_station_repository();
+
+        // 设置 expectation：save_raw 被调用一次，返回 Ok(())
+        station_repo
+            .expect_save_raw()
+            .times(1)
+            .returning(|_cmd| Ok::<(), RepositoryError>(()));
+
+
+        let service = TrainDataServiceImpl::new(
+            true, // debug = true
+            tempdir().unwrap().path().to_path_buf(),
+            Arc::new(mock_city_repository()), // city repo 不会被调用
+            Arc::new(station_repo),
+            Arc::new(mock_train_repo()),      // train repo
+            Arc::new(mock_route_repository()),// route repo
+            Arc::new(mock_takeaway_shop_repo()), // takeaway shop
+            Arc::new(mock_object_storage_service()), // object storage
+        );
+
+        let cmd = vec![StationDataItem {
+            name: "上海虹桥".to_string(),
+            city: "上海".to_string(),
+        }];
+
+        let result = service.load_station(cmd).await;
+        assert!(result.is_ok());
+    }
+
+
+    #[tokio::test]
+    async fn test_load_station_fail_debug_off() {
+        let service = setup_service(false);
+        let cmd = vec![StationDataItem {
+            name: "上海虹桥".to_string(),
+            city: "上海".to_string(),
+        }];
+        let result = service.load_station(cmd).await;
+        assert!(result.is_err());
+    }
+
+    // #[tokio::test]
+    // async fn test_load_train_type_success() {
+    //     // Mock TrainRepository
+    //     let mut train_repo = mock_train_repo();
+    //     train_repo.expect_get_trains().returning(move || Ok(vec![]));
+    //     train_repo.expect_find_by_train_type().returning(|_cmd| Ok(vec![]));
+    //     train_repo.expect_get_verified_train_type().returning(move || Ok(HashSet::new()));
+    //     train_repo.expect_get_verified_seat_type().returning(|_cmd| Ok(HashSet::new()));
+    //     train_repo.expect_get_seat_id_map().returning(|_cmd| Ok(HashMap::new()));
+    //     train_repo.expect_save().returning(|_train| Ok(1u64.into()));
+    //     train_repo.expect_remove().returning(|_train| Ok(()));
+    //     train_repo.expect_find().returning(|_train| {Ok(Some(crate::domain::model::train::Train::new(
+    //         Some(1u64.into()),
+    //         TrainNumber::from_unchecked("G111".to_string()),
+    //         TrainType::from_unchecked("G".to_string()),
+    //         HashMap::new(),
+    //         1u64.into(),
+    //         0,
+    //     )))});
+    //
+    //     // Mock StationRepository
+    //     let mut station_repo = mock_station_repository();
+    //     station_repo.expect_load().returning(|| Ok(vec![]));
+    //
+    //     // Mock CityRepository
+    //     let mut city_repo = mock_city_repository();
+    //     city_repo.expect_load().returning(|| Ok(vec![]));
+    //
+    //     // Mock TakeawayShopRepository 并设置 save_many_atomic 返回 Ok
+    //     let takeaway_repo_mock = mock_takeaway_shop_repo();
+    //
+    //     let takeaway_repo = Arc::new(takeaway_repo_mock);
+    //
+    //     // 其他 repo/service
+    //     let route_repo = Arc::new(mock_route_repository());
+    //     let object_storage = Arc::new(mock_object_storage_service());
+    //
+    //     // 构造服务
+    //     let service = TrainDataServiceImpl::new(
+    //         true,
+    //         tempdir().unwrap().path().to_path_buf(),
+    //         Arc::new(city_repo),
+    //         Arc::new(station_repo),
+    //         Arc::new(train_repo),
+    //         route_repo,
+    //         takeaway_repo,
+    //         object_storage,
+    //     );
+    //
+    //     // 构造命令数据
+    //     let cmd = vec![TrainTypeInfoItem {
+    //         id: "1".to_string(),
+    //         name: "日升".to_string(),
+    //         seat: Default::default(),
+    //     }];
+    //
+    //     let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+    //
+    //     let result = service.load_train_type(cmd, &db).await;
+    //
+    //     assert!(result.is_err());
+    // }
+
+
+
+    #[tokio::test]
+    async fn test_load_train_type_fail_debug_off() {
+        let service = setup_service(false);
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+        let cmd = vec![
+            TrainTypeInfoItem {
+                id: "1".to_string(),
+                name: "日升".to_string(),
+                seat: Default::default(),
+            }
+        ];
+        let result = service.load_train_type(cmd, &db).await;
+        assert!(result.is_err());
+    }
+
+    // #[tokio::test]
+    // async fn test_load_train_number_success() {
+    //     let service = setup_service(true);
+    //     let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+    //     let cmd = vec![
+    //         TrainNumberInfoItem {
+    //             train_number: "1".to_string(),
+    //             train_type: "G".to_string(),
+    //             origin_departure_time: 0,
+    //             route: vec![
+    //                 RouteStationInfo{
+    //                     order: 0,
+    //                     station: "北京南".to_string(),
+    //                     arrival_time: 0,
+    //                     departure_time: 0,
+    //                 }
+    //             ],
+    //         }
+    //     ];
+    //     let result = service.load_train_number(cmd, &db).await;
+    //     assert!(result.is_ok());
+    // }
+
+    #[tokio::test]
+    async fn test_load_train_number_fail_debug_off() {
+        let service = setup_service(false);
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+        let cmd = vec![
+            TrainNumberInfoItem {
+                train_number: "1".to_string(),
+                train_type: "G".to_string(),
+                origin_departure_time: 0,
+                route: vec![],
+            }
+        ];
+        let result = service.load_train_number(cmd, &db).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_load_dish_takeaway_success() {
+        use std::collections::HashMap;
+        use std::sync::Arc;
+        use tempfile::tempdir;
+        use sea_orm::{Database, DatabaseConnection};
+        use crate::domain::model::train::{Train, TrainNumber, TrainType};
+        use crate::domain::repository::mock::{
+            city::mock_city_repository,
+            route::mock_route_repository,
+            station::mock_station_repository,
+            takeaway::mock_takeaway_shop_repo,
+            train::mock_train_repo,
+        };
+        use crate::domain::service::mock::object_storage::mock_object_storage_service;
+        use shared::data::RawDishTakeawayInfo;
+
+        // 构造 Train 的 mock
+        let mock_train = Train::new(
+            Some(1u64.into()),
+            TrainNumber::from_unchecked("G111".to_string()),
+            TrainType::from_unchecked("G".to_string()),
+            HashMap::new(),
+            1u64.into(),
+            0,
+        );
+
+        // Mock TrainRepository
+        let mut train_repo = mock_train_repo();
+        train_repo.expect_get_trains().returning(move || Ok(vec![mock_train.clone()]));
+
+        // Mock StationRepository
+        let mut station_repo = mock_station_repository();
+        station_repo.expect_load().returning(|| Ok(vec![]));
+
+        // Mock CityRepository
+        let mut city_repo = mock_city_repository();
+        city_repo.expect_load().returning(|| Ok(vec![]));
+
+        // Mock TakeawayShopRepository 并设置 save_many_atomic 返回 Ok
+        let mut takeaway_repo_mock = mock_takeaway_shop_repo();
+        takeaway_repo_mock
+            .expect_save_many_atomic()
+            .returning(|_items| Ok(()));
+
+        let takeaway_repo = Arc::new(takeaway_repo_mock);
+
+        // 其他 repo/service
+        let route_repo = Arc::new(mock_route_repository());
+        let object_storage = Arc::new(mock_object_storage_service());
+
+        // 构造服务
+        let service = TrainDataServiceImpl::new(
+            true,
+            tempdir().unwrap().path().to_path_buf(),
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            Arc::new(train_repo),
+            route_repo,
+            takeaway_repo,
+            object_storage,
+        );
+
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+
+        let cmd = vec![RawDishTakeawayInfo {
+            train_number: "G111".to_string(),
+            dish_info: vec![],
+            takeaway_info: Default::default(),
+        }];
+
+        let result = service.load_dish_takeaway(cmd, &db).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_load_dish_takeaway_fail_debug_off() {
+        use std::collections::HashMap;
+        use std::sync::Arc;
+        use tempfile::tempdir;
+        use sea_orm::{Database, DatabaseConnection};
+        use crate::domain::model::train::{Train, TrainNumber, TrainType};
+        use crate::domain::repository::mock::{
+            city::mock_city_repository,
+            route::mock_route_repository,
+            station::mock_station_repository,
+            takeaway::mock_takeaway_shop_repo,
+            train::mock_train_repo,
+        };
+        use crate::domain::service::mock::object_storage::mock_object_storage_service;
+        use shared::data::RawDishTakeawayInfo;
+
+        // 构造 Train 的 mock
+        let mock_train = Train::new(
+            Some(1u64.into()),
+            TrainNumber::from_unchecked("G111".to_string()),
+            TrainType::from_unchecked("G".to_string()),
+            HashMap::new(),
+            1u64.into(),
+            0,
+        );
+
+        // Mock TrainRepository
+        let mut train_repo = mock_train_repo();
+        train_repo.expect_get_trains().returning(move || Ok(vec![mock_train.clone()]));
+
+        // Mock StationRepository
+        let mut station_repo = mock_station_repository();
+        station_repo.expect_load().returning(|| Ok(vec![]));
+
+        // Mock CityRepository
+        let mut city_repo = mock_city_repository();
+        city_repo.expect_load().returning(|| Ok(vec![]));
+
+        // Mock TakeawayShopRepository，返回错误以模拟 debug = false 的失败
+        let mut takeaway_repo_mock = mock_takeaway_shop_repo();
+        takeaway_repo_mock
+            .expect_save_many_atomic()
+            .returning(|_items| Err(RepositoryError::Db(anyhow!("simulated failure"))));
+
+        let takeaway_repo = Arc::new(takeaway_repo_mock);
+
+        // 其他 repo/service
+        let route_repo = Arc::new(mock_route_repository());
+        let object_storage = Arc::new(mock_object_storage_service());
+
+        // 构造服务
+        let service = TrainDataServiceImpl::new(
+            false, // debug = false
+            tempdir().unwrap().path().to_path_buf(),
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            Arc::new(train_repo),
+            route_repo,
+            takeaway_repo,
+            object_storage,
+        );
+
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+
+        let cmd = vec![RawDishTakeawayInfo {
+            train_number: "G111".to_string(),
+            dish_info: vec![],
+            takeaway_info: Default::default(),
+        }];
+
+        // 执行并验证返回 Err
+        let result = service.load_dish_takeaway(cmd, &db).await;
+        assert!(result.is_err());
+    }
+
+}

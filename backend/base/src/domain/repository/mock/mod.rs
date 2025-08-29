@@ -5,3 +5,4 @@ pub mod user;
 pub mod hotel;
 pub mod city;
 pub mod station;
+pub mod route;
