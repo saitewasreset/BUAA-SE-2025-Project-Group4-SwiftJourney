@@ -1,4 +1,3 @@
-import type { DefineComponent } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { message } from 'ant-design-vue';
@@ -74,9 +73,15 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to, from, next) => {
-  const isLogin: Boolean = localStorage.getItem('isLogin') === 'true';
-  
+
+import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
+
+export async function globalBeforeEachGuard(
+  to: RouteLocationNormalized,
+  from: RouteLocationNormalized,
+  next: NavigationGuardNext
+) {
+  const isLogin = localStorage.getItem('isLogin') === 'true';
   if (!isLogin) {
     if (to.path !== '/login' && to.path !== '/register') {
       message.warning('请先登录');
@@ -88,14 +93,16 @@ router.beforeEach(async (to, from, next) => {
     if (to.path === '/login' || to.path === '/register') {
       message.info('您已登录');
       next({ path: '/homepage' });
-    } else if(to.path === '/personalhomepage/personaldata') {
+    } else if (to.path === '/personalhomepage/personaldata') {
       await useUserStore().restoreUserFromCookie(router);
       next();
     } else {
-        await nextTick();
-        next();
+      await nextTick();
+      next();
     }
   }
-})
+}
+
+router.beforeEach(globalBeforeEachGuard)
 
 export default router
