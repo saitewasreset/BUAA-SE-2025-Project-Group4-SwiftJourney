@@ -102,7 +102,13 @@ where
             .await
             .map_err(|e| {
                 error!("Failed to get hotel comment quota: {:?}", e);
-                GeneralError::InternalServerError
+
+                match e {
+                    HotelRatingServiceError::InvalidHotelUuid(uuid) => {
+                        return GeneralError::NotFound(format!("Invalid hotel uuid: {}", uuid));
+                    }
+                    _ => GeneralError::InternalServerError,
+                }
             })?;
 
         let used = self
