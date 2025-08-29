@@ -36,12 +36,6 @@ Object.defineProperty(window, 'localStorage', {
   value: mockLocalStorage
 })
 
-// Helper function to get navigation guard
-function getNavigationGuard() {
-  const guards = (router as any).beforeGuards
-  return guards[0]
-}
-
 // Helper function to create mock route
 function createMockRoute(path: string, fullPath?: string): RouteLocationNormalized {
   return {
@@ -185,9 +179,9 @@ describe('Router', () => {
     })
 
     it('should restore user data when accessing personal data page', async () => {
-      const { useUserStore } = await import('@/stores/user')
-      const mockRestoreUser = vi.fn()
-      ;(useUserStore as any).mockReturnValue({
+      const { useUserStore } = await import('../../src/stores/user')
+      const mockRestoreUser = vi.fn();
+      (useUserStore as any).mockReturnValue({
         restoreUserFromCookie: mockRestoreUser
       })
 
