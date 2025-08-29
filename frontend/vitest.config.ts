@@ -13,7 +13,7 @@ export default mergeConfig(
       coverage: {
         provider: 'istanbul', // or 'istanbul'
         enabled: true,
-        include: ['src/**/*.{ts,tsx,vue}']
+        include: ['src/**/*.{ts,tsx}']
       },
     },
   }),
