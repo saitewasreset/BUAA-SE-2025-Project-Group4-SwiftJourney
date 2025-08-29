@@ -6,3 +6,6 @@ pub mod hotel;
 pub mod city;
 pub mod station;
 pub mod route;
+pub mod train_schedule;
+pub mod transaction;
+pub mod personal_info;

@@ -1,4 +1,3 @@
-use crate::Verified;
 use crate::application::commands::train_dish::OrderTrainDishCommand;
 use crate::application::service::train_dish::{
     DishOrderRequestDTO, TakeawayOrderRequestDTO, TrainDishApplicationService,
@@ -6,7 +5,6 @@ use crate::application::service::train_dish::{
 };
 use crate::application::service::transaction::TransactionInfoDTO;
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::Identifiable;
 use crate::domain::model::dish::DishTime;
 use crate::domain::model::order::{
     BaseOrder, DishOrder, Order, OrderId, OrderStatus, OrderTimeInfo, PaymentInfo, TakeawayOrder,
@@ -31,10 +29,12 @@ use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
 };
+use crate::domain::Identifiable;
+use crate::Verified;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveTime};
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use std::any::Any;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -562,5 +562,289 @@ where
             amount: tx.amount().to_f64().unwrap(),
             status: tx.status().to_string(),
         })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::application::service::train_dish::TakeawayOrderRequestDTO;
+    use crate::domain::model::order::{BaseOrder, OrderTimeInfo, PaymentInfo, TrainOrder};
+    use crate::domain::model::personal_info::PreferredSeatLocation;
+    use crate::domain::model::route::Stop;
+    use crate::domain::model::takeaway::TakeawayDish;
+    use crate::domain::model::train::{SeatType, SeatTypeName};
+    use crate::domain::model::train_schedule::{Seat, SeatLocationInfo, SeatStatus, StationRange, TrainSchedule};
+    use crate::domain::repository::mock::takeaway::{mock_takeaway_shop_repo, MockTakeawayShopRepository};
+    use crate::domain::repository::mock::transaction::MockTransactionRepository;
+    use crate::domain::repository::mock::{
+        dish::mock_dish_repo,
+        personal_info::mock_personal_info_repository,
+        station::mock_station_repository,
+        train::mock_train_repo,
+        train_schedule::mock_train_schedule_repository,
+        transaction::mock_transaction_repository,
+    };
+    use crate::domain::service::mock::{
+        session::mock_session_service,
+        train_type::mock_train_type_service,
+    };
+    use crate::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl;
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use uuid::Uuid;
+    use crate::domain::model::transaction::TransactionStatus;
+
+    // 成功用例：verify_train_order 成功
+    #[tokio::test]
+    async fn test_verify_train_order_success() {
+        use crate::domain::model::transaction::Transaction;
+        use crate::domain::model::order::OrderStatus;
+
+        let mut tx_repo = MockTransactionRepository::new();
+
+        // 构造一个 TrainOrder，状态为 Paid
+        let schedule_id = 1u64.into();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            OrderStatus::Paid,
+            OrderTimeInfo::new(
+                Transaction::now(),
+                Transaction::now(),
+                Transaction::now(),
+            ),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let train_order = TrainOrder::new(
+            base_order,
+            1u64.into(),
+            Some(Seat::new(
+                1u64.into(),
+                SeatType::new(
+                    Some(1u64.into()),
+                    SeatTypeName::from_unchecked("二等座".to_string()),
+                    1,
+                    Decimal::new(1000, 2),
+                ),
+                SeatLocationInfo {
+                    carriage: 3,
+                    row: 11,
+                    location: 'A',
+                },
+                SeatStatus::Occupied,
+            )),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            Some(PreferredSeatLocation::A),
+            StationRange::from_unchecked(1u64.into(), 1u64.into()),
+        );
+
+        let transaction = Transaction::new_full(
+            None,
+            Uuid::new_v4(),
+            Transaction::now(),
+            Some(Transaction::now()),
+            Decimal::ONE,
+            TransactionStatus::Paid,
+            1u64.into(),
+            vec![Box::new(train_order)],
+            false,
+        );
+
+        // mock 返回这个 Transaction
+        tx_repo
+            .expect_find_by_user_id()
+            .returning(move |_| Ok(vec![transaction.clone()]));
+
+        let service = TrainDishApplicationServiceImpl::new(
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_dish_repo()),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_train_schedule_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_personal_info_repository()),
+            Arc::new(mock_session_service()),
+            Arc::new(mock_station_repository()),
+            Arc::new(tx_repo),
+            8,
+        );
+
+        let user_id = 1u64.into();
+
+        let result = service.verify_train_order(user_id, schedule_id).await;
+
+        println!("{:?}", result);
+
+        assert!(result.is_ok());
+        let order_id = result.unwrap();
+        assert_eq!(order_id, 1u64.into());  // 校验返回的就是我们构造的 order_id
+    }
+
+
+    // 失败用例：verify_train_order 无订单
+    #[tokio::test]
+    async fn test_verify_train_order_no_related_order() {
+        let mut tx_repo = MockTransactionRepository::new();
+        tx_repo.expect_find_by_user_id()
+            .returning(|_| Ok(vec![])); // 返回空，模拟无订单
+
+        let service = TrainDishApplicationServiceImpl::new(
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_dish_repo()),
+            Arc::new(mock_takeaway_shop_repo()),
+            Arc::new(mock_train_schedule_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_personal_info_repository()),
+            Arc::new(mock_session_service()),
+            Arc::new(mock_station_repository()),
+            Arc::new(tx_repo),
+            8,
+        );
+
+        let user_id = 1u64.into();
+        let schedule_id = 1u64.into();
+
+        let result = service.verify_train_order(user_id, schedule_id).await;
+        assert!(result.is_err()); // 这里预期失败
+    }
+
+    // 成功用例：verify_takeaway_order_request
+    #[tokio::test]
+    async fn test_verify_takeaway_order_request_success() {
+        let mut takeaway_repo = MockTakeawayShopRepository::new();
+        takeaway_repo.expect_find_by_train_route()
+            .returning(|_| {
+                let mut map = HashMap::new();
+                // 模拟 route 下有一个 station 和 shop
+                use crate::domain::model::takeaway::TakeawayShop;
+
+                let stop = Stop::new(
+                    Some(1u64.into()),
+                    Some(1u64.into()),
+                    1u64.into(),
+                    0,
+                    0,
+                    0,
+                ); // 停靠时间 100 秒
+                let mut shop = TakeawayShop::new(
+                    "好吃的店".to_string(),
+                    1u64.into(),
+                );
+
+                shop.add_dish(TakeawayDish::new(
+                    Some(1u64.into()),
+                    Some(1u64.into()),
+                    "米饭".to_string(),
+                    "主食".to_string(),
+                    Decimal::new(1000, 2),
+                    vec![],
+                ));
+
+                map.insert(stop, vec![shop]);
+                Ok(map)
+            });
+
+        let service = TrainDishApplicationServiceImpl::new(
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_dish_repo()),
+            Arc::new(takeaway_repo),
+            Arc::new(mock_train_schedule_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_personal_info_repository()),
+            Arc::new(mock_session_service()),
+            Arc::new(mock_station_repository()),
+            Arc::new(mock_transaction_repository()),
+            8,
+        );
+
+        // 构造参数
+        let train_schedule = TrainSchedule::new(
+            Some(1u64.into()),
+            1u64.into(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).expect("date"),
+            0, // 出发时间
+            1u64.into(),
+        );
+
+        let mut personal_uuid_to_id = HashMap::new();
+        let uuid = Uuid::new_v4();
+        personal_uuid_to_id.insert(uuid, 1u64.into());
+
+        let mut station_name_to_id = HashMap::new();
+        station_name_to_id.insert("测试站".to_string(), 1u64.into());
+
+        let request_list = vec![TakeawayOrderRequestDTO {
+            personal_id: uuid,
+            station: "测试站".to_string(),
+            shop_name: "好吃的店".to_string(),
+            name: "米饭".to_string(),
+            amount: 1,
+        }];
+
+        let result = service
+            .verify_takeaway_order_request(&train_schedule, &personal_uuid_to_id, &station_name_to_id, request_list)
+            .await;
+
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert_eq!(verified.len(), 1);
+        assert_eq!(verified[0].amount, Decimal::ONE);
+    }
+
+    // 失败用例：无效车站
+    #[tokio::test]
+    async fn test_verify_takeaway_order_request_fail_invalid_station() {
+        let mut takeaway_repo = MockTakeawayShopRepository::new();
+        takeaway_repo.expect_find_by_train_route()
+            .returning(|_| Ok(HashMap::new())); // 没有车站
+
+        let service = TrainDishApplicationServiceImpl::new(
+            Arc::new(mock_train_type_service()),
+            Arc::new(mock_dish_repo()),
+            Arc::new(takeaway_repo),
+            Arc::new(mock_train_schedule_repository()),
+            Arc::new(mock_train_repo()),
+            Arc::new(mock_personal_info_repository()),
+            Arc::new(mock_session_service()),
+            Arc::new(mock_station_repository()),
+            Arc::new(mock_transaction_repository()),
+            8,
+        );
+
+        let train_schedule = TrainSchedule::new(
+            Some(1u64.into()),
+            1u64.into(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).expect("date"),
+            0, // 出发时间
+            1u64.into(),
+        );
+
+        let mut personal_uuid_to_id = HashMap::new();
+        let uuid = Uuid::new_v4();
+        personal_uuid_to_id.insert(uuid, 1u64.into());
+
+        let mut station_name_to_id = HashMap::new();
+        station_name_to_id.insert("测试站".to_string(), 1u64.into());
+
+        let request_list = vec![TakeawayOrderRequestDTO {
+            personal_id: uuid,
+            station: "测试站".to_string(),
+            shop_name: "好吃的店".to_string(),
+            name: "米饭".to_string(),
+            amount: 1,
+        }];
+
+        let result = service
+            .verify_takeaway_order_request(&train_schedule, &personal_uuid_to_id, &station_name_to_id, request_list)
+            .await;
+
+        assert!(result.is_err());
     }
 }
