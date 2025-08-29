@@ -1,0 +1,14 @@
+---
+source: shared/tests/snapshot_data.rs
+expression: list
+---
+[
+  {
+    "name": "北京南",
+    "city": "北京"
+  },
+  {
+    "name": "天津",
+    "city": "天津"
+  }
+]
