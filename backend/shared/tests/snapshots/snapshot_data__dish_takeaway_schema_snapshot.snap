@@ -1,0 +1,30 @@
+---
+source: shared/tests/snapshot_data.rs
+expression: pack
+---
+{
+  "trainNumber": "G1234",
+  "dishInfo": [
+    {
+      "availableTime": [
+        "lunch",
+        "dinner"
+      ],
+      "name": "牛肉面",
+      "type": "主食",
+      "picture": "./images/example_dish_1.jpg",
+      "price": 25.0
+    }
+  ],
+  "takeawayInfo": {
+    "北京南": {
+      "老张拉面": [
+        {
+          "name": "番茄鸡蛋盖饭",
+          "picture": "./images/example_takeaway_1.jpg",
+          "price": 22.0
+        }
+      ]
+    }
+  }
+}

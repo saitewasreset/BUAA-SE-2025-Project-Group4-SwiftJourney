@@ -1,0 +1,23 @@
+---
+source: shared/tests/snapshot_data.rs
+expression: item
+---
+{
+  "train_number": "G1234",
+  "train_type": "G",
+  "originDepatureTime": 510,
+  "route": [
+    {
+      "order": 1,
+      "station": "北京南",
+      "arrivalTime": 0,
+      "depatureTime": 510
+    },
+    {
+      "order": 2,
+      "station": "天津",
+      "arrivalTime": 545,
+      "depatureTime": 548
+    }
+  ]
+}

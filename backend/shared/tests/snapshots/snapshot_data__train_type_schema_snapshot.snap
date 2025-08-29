@@ -1,0 +1,34 @@
+---
+source: shared/tests/snapshot_data.rs
+expression: snap
+---
+{
+  "id": "G",
+  "name": "高铁",
+  "seat": {
+    "二等座": {
+      "A": [
+        {
+          "description": {
+            "carriage": 3,
+            "location": "A",
+            "row": 12,
+            "type": "二等座"
+          },
+          "price": 350
+        }
+      ],
+      "B": [
+        {
+          "description": {
+            "carriage": 3,
+            "location": "B",
+            "row": 12,
+            "type": "二等座"
+          },
+          "price": 350
+        }
+      ]
+    }
+  }
+}

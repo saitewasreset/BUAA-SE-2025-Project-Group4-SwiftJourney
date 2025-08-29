@@ -1,0 +1,30 @@
+---
+source: shared/tests/snapshot_data.rs
+expression: item
+---
+{
+  "name": "示例酒店",
+  "address": "示例路 123 号",
+  "city": "北京",
+  "station": "北京南",
+  "images": [
+    "./images/example_hotel_1.jpg"
+  ],
+  "phone": [
+    "010-12345678"
+  ],
+  "info": "这是一家示例酒店",
+  "room_info": {
+    "标准间": {
+      "capacity": 2,
+      "price": 388.0
+    }
+  },
+  "comments": [
+    {
+      "time": "2025-01-02 12:34:56",
+      "rating": 4.5,
+      "text": "房间干净整洁"
+    }
+  ]
+}
