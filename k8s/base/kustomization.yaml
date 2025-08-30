@@ -13,10 +13,11 @@ resources:
   - minio-init-job.yaml
   - backend.yaml
   - frontend.yaml
-  - vpa-backend.yaml
-  - vpa-frontend.yaml
+  # - vpa-backend.yaml
+  # - vpa-frontend.yaml
   - gateway-nginx.yaml
   - ingress.yaml
+  - hpa-backend.yaml
 images:
   - name: saitewasreset/swiftjourney-backend
     newTag: v0.1.0
