@@ -1010,3 +1010,94 @@ impl Identifiable for TakeawayOrder {
 
 impl Entity for TakeawayOrder {}
 impl Aggregate for TakeawayOrder {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::station::StationId;
+    use crate::domain::model::train::SeatTypeName;
+    use crate::domain::model::train_schedule::StationRange;
+    use claims::assert_err;
+    use sea_orm::prelude::DateTimeWithTimeZone;
+
+    #[test]
+    fn order_status_mapping_and_display() {
+        let cases = vec![
+            ("unpaid", OrderStatus::Unpaid),
+            ("paid", OrderStatus::Paid),
+            ("ongoing", OrderStatus::Ongoing),
+            ("active", OrderStatus::Active),
+            ("completed", OrderStatus::Completed),
+            ("failed", OrderStatus::Failed),
+            ("cancelled", OrderStatus::Cancelled),
+        ];
+        for (s, expected) in cases {
+            let got = OrderStatus::try_from(s).unwrap();
+            assert_eq!(got, expected);
+            assert_eq!(got.to_string(), s);
+        }
+        assert_err!(OrderStatus::try_from("invalid"));
+    }
+
+    #[test]
+    fn payment_info_and_refund_flag() {
+        let info = PaymentInfo::new(None, None);
+        let base = BaseOrder::new(
+            None,
+            Uuid::new_v4(),
+            OrderStatus::Unpaid,
+            {
+                let now: DateTimeWithTimeZone = chrono::Utc::now().into();
+                OrderTimeInfo::new(now, now, now)
+            },
+            Decimal::new(1000, 2),
+            Decimal::new(2, 0),
+            info,
+            PersonalInfoId::from(1u64),
+        );
+
+        let mut order = HotelOrder::new(
+            base,
+            HotelId::from(1u64),
+            HotelRoomTypeId::from(1u64),
+            HotelDateRange::new(
+                chrono::NaiveDate::from_ymd_opt(2025, 8, 1).unwrap(),
+                chrono::NaiveDate::from_ymd_opt(2025, 8, 2).unwrap(),
+            )
+            .unwrap(),
+        );
+
+        assert!(!order.already_refund());
+        let tx = TransactionId::from(1u64);
+        order.payment_info_mut().set_refund_transaction_id(tx);
+        assert!(order.already_refund());
+    }
+
+    #[test]
+    fn train_order_status_update() {
+        let base = BaseOrder::new(
+            None,
+            Uuid::new_v4(),
+            OrderStatus::Unpaid,
+            {
+                let now: DateTimeWithTimeZone = chrono::Utc::now().into();
+                OrderTimeInfo::new(now, now, now)
+            },
+            Decimal::new(1000, 2),
+            Decimal::new(1, 0),
+            PaymentInfo::new(None, None),
+            PersonalInfoId::from(1u64),
+        );
+        // 构造合法的已验证类型
+        let schedule_id = TrainScheduleId::from(1u64);
+        let seat_type: SeatTypeName<crate::Verified> =
+            SeatTypeName::from_unchecked("二等座".to_string());
+        let station_range: StationRange<crate::Verified> =
+            StationRange::from_unchecked(StationId::from(1u64), StationId::from(2u64));
+
+        let mut order = TrainOrder::new(base, schedule_id, None, seat_type, None, station_range);
+        assert_eq!(order.order_status(), OrderStatus::Unpaid);
+        order.set_status(OrderStatus::Paid);
+        assert_eq!(order.order_status(), OrderStatus::Paid);
+    }
+}

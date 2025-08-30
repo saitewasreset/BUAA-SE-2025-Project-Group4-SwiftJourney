@@ -12,3 +12,15 @@ impl Default for SessionConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_values() {
+        let cfg = SessionConfig::default();
+        assert_eq!(cfg.default_ttl.as_secs(), 3600 * 24 * 3);
+        assert_eq!(cfg.max_concurrent_sessions_per_user, 3);
+    }
+}

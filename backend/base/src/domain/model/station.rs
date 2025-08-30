@@ -114,3 +114,19 @@ impl Station {
         self.city_id
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn station_new_getters_and_set_id() {
+        let mut st = Station::new(None, "杭州东站".to_string(), CityId::from(3301u64));
+        assert!(st.get_id().is_none());
+        assert_eq!(st.name(), "杭州东站");
+        assert_eq!(st.city_id(), CityId::from(3301u64));
+        let id: StationId = 7u64.into();
+        st.set_id(id);
+        assert_eq!(st.get_id(), Some(id));
+    }
+}

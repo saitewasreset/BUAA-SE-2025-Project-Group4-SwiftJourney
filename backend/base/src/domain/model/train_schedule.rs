@@ -118,6 +118,20 @@ impl Identifiable for TrainSchedule {
 }
 
 impl Entity for TrainSchedule {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn station_range_from_unchecked_and_getters() {
+        let from = StationId::from(1u64);
+        let to = StationId::from(2u64);
+        let range = StationRange::from_unchecked(from, to);
+        assert_eq!(range.get_from_station_id(), from);
+        assert_eq!(range.get_to_station_id(), to);
+    }
+}
 impl Aggregate for TrainSchedule {}
 
 impl TrainSchedule {

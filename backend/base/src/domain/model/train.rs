@@ -363,3 +363,46 @@ impl<T> Deref for TrainNumber<T> {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn seat_type_getters() {
+        let st_name = SeatTypeName::from_unchecked("二等座".to_string());
+        let price = Decimal::new(3000, 2);
+        let st = SeatType::new(None, st_name, 200, price);
+        assert_eq!(st.name(), "二等座");
+        assert_eq!(st.capacity(), 200);
+        assert_eq!(st.unit_price(), price);
+    }
+
+    #[test]
+    fn train_getters() {
+        let mut seats: HashMap<String, SeatType> = HashMap::new();
+        let st = SeatType::new(
+            None,
+            SeatTypeName::from_unchecked("一等座".into()),
+            100,
+            Decimal::new(4000, 2),
+        );
+        seats.insert("一等座".into(), st);
+
+        let train = Train::new(
+            None,
+            TrainNumber::from_unchecked("G1234".into()),
+            TrainType::from_unchecked("G".into()),
+            seats,
+            RouteId::from(101u64),
+            800,
+        );
+
+        assert_eq!(train.number(), "G1234");
+        assert_eq!(train.train_type(), "G");
+        assert!(train.seats().contains_key("一等座"));
+        assert_eq!(train.default_route_id(), RouteId::from(101u64));
+        assert_eq!(train.default_origin_departure_time(), 800);
+    }
+}
