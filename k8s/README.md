@@ -2,7 +2,7 @@
 
 > 注：使用`kubectl`命令
 
-为了使用自动扩容，需安装VPA（Vertical Pod Autoscaler），参见：<https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/installation.md>
+<!-- 为了使用自动扩容，需安装VPA（Vertical Pod Autoscaler），参见：<https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/installation.md> -->
 
 启动`minikube`：
 
