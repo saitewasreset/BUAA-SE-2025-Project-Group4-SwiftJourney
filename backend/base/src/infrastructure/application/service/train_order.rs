@@ -1,11 +1,10 @@
-use crate::application::ApplicationError;
-use crate::application::GeneralError;
 use crate::application::service::train_order::CreateTrainOrderDTO;
 use crate::application::service::train_order::OrderPackDTO;
 use crate::application::service::train_order::TrainOrderService;
 use crate::application::service::train_order::TrainOrderServiceError;
 use crate::application::service::transaction::TransactionInfoDTO;
-use crate::domain::Identifiable;
+use crate::application::ApplicationError;
+use crate::application::GeneralError;
 use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
 };
@@ -19,17 +18,18 @@ use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
-use crate::domain::service::ServiceError;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::train_booking::TrainBookingService;
 use crate::domain::service::train_schedule::TrainScheduleService;
 use crate::domain::service::train_type::TrainTypeConfigurationService;
 use crate::domain::service::transaction::TransactionService;
+use crate::domain::service::ServiceError;
+use crate::domain::Identifiable;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Timelike;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
@@ -560,5 +560,407 @@ where
             amount: total_amount,
             status: "unpaid".to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+    use chrono::{DateTime, NaiveDate};
+    use rust_decimal::Decimal;
+    use sea_orm::prelude::DateTimeWithTimeZone;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    use crate::application::service::train_order::CreateTrainOrderDTO;
+    use crate::domain::model::order::{
+        BaseOrder, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
+    };
+    use crate::domain::model::personal_info::{PersonalInfo, PreferredSeatLocation};
+    use crate::domain::model::route::Route;
+    use crate::domain::model::station::Station;
+    use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainNumber, TrainType};
+    use crate::domain::model::train_schedule::{
+        Seat, SeatLocationInfo, SeatStatus, StationRange, TrainSchedule,
+    };
+    use crate::domain::model::transaction::Transaction;
+    use crate::domain::model::user::{IdentityCardId, RealName};
+    // 引入 mocks
+    use crate::domain::repository::mock::{
+        order::MockOrderRepository, personal_info::MockPersonalInfoRepository,
+        route::MockRouteRepository, station::MockStationRepository, train::MockTrainRepository,
+        train_schedule::MockTrainScheduleRepository,
+    };
+    use crate::domain::service::mock::{
+        session::MockSessionManagerService, train_booking::MockTrainBookingService,
+        train_schedule::MockTrainScheduleService, train_type::MockTrainTypeConfigurationService,
+        transaction::MockTransactionService,
+    };
+    use crate::domain::service::train_booking::TrainBookingServiceError;
+    use crate::domain::service::ServiceError;
+    use crate::infrastructure::application::service::train_order::TrainOrderServiceImpl;
+
+    type Service = TrainOrderServiceImpl<
+        MockTrainScheduleRepository,
+        MockTrainBookingService,
+        MockTrainRepository,
+        MockRouteRepository,
+        MockStationRepository,
+        MockOrderRepository,
+        MockTransactionService,
+        MockSessionManagerService,
+        MockPersonalInfoRepository,
+        MockTrainScheduleService,
+        MockTrainTypeConfigurationService,
+    >;
+
+    fn build_service(
+        schedule_repo: Arc<MockTrainScheduleRepository>,
+        booking_service: Arc<MockTrainBookingService>,
+        train_repo: Arc<MockTrainRepository>,
+        route_repo: Arc<MockRouteRepository>,
+        station_repo: Arc<MockStationRepository>,
+        order_repo: Arc<MockOrderRepository>,
+        tx_service: Arc<MockTransactionService>,
+        session_service: Arc<MockSessionManagerService>,
+        personal_repo: Arc<MockPersonalInfoRepository>,
+        schedule_service: Arc<MockTrainScheduleService>,
+        type_service: Arc<MockTrainTypeConfigurationService>,
+    ) -> Service {
+        TrainOrderServiceImpl::new(
+            schedule_repo,
+            booking_service,
+            train_repo,
+            route_repo,
+            station_repo,
+            order_repo,
+            tx_service,
+            session_service,
+            personal_repo,
+            schedule_service,
+            type_service,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_create_train_order_success() {
+        let mut mock_station = MockStationRepository::new();
+        mock_station
+            .expect_find_by_name()
+            .returning(|name| match name {
+                "北京南" => Ok(Some(Station::new(
+                    Some(1u64.into()),
+                    "北京南".to_string(),
+                    1u64.into(),
+                ))),
+                "南京南" => Ok(Some(Station::new(
+                    Some(2u64.into()),
+                    "南京南".to_string(),
+                    2u64.into(),
+                ))),
+                _ => Ok(None),
+            });
+
+        mock_station
+            .expect_find()
+            .returning(|station_id| match u64::from(station_id) {
+                1u64 => Ok(Some(Station::new(
+                    Some(1u64.into()),
+                    "北京南".to_string(),
+                    1u64.into(),
+                ))),
+                2u64 => Ok(Some(Station::new(
+                    Some(2u64.into()),
+                    "南京南".to_string(),
+                    2u64.into(),
+                ))),
+                _ => Ok(None),
+            });
+
+        let mut mock_type = MockTrainTypeConfigurationService::new();
+        mock_type
+            .expect_verify_train_number()
+            .returning(|_| Ok(TrainNumber::from_unchecked("G1234".to_string())));
+
+        let mut train_seats = HashMap::new();
+        train_seats.insert(
+            "二等座".to_string(),
+            SeatType::new(
+                Some(1u64.into()),
+                SeatTypeName::from_unchecked("二等座".to_string()),
+                1,
+                Decimal::from(1000),
+            ),
+        );
+
+        let train_info = Train::new(
+            Some(1u64.into()),
+            TrainNumber::from_unchecked("G1234".to_string()),
+            TrainType::from_unchecked("G".to_string()),
+            train_seats.clone(),
+            1u64.into(),
+            0,
+        );
+
+        let train_info_clone = train_info.clone();
+
+        let mut mock_train = MockTrainRepository::new();
+        mock_train
+            .expect_find_by_train_number()
+            .returning(move |_| Ok(train_info.clone()));
+
+        mock_train
+            .expect_find()
+            .returning(move |_| Ok(Some(train_info_clone.clone())));
+
+        let mut mock_train_schedule = MockTrainScheduleRepository::new();
+        mock_train_schedule
+            .expect_find_by_train_id()
+            .returning(|_| {
+                Ok(vec![TrainSchedule::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                    0,
+                    1u64.into(),
+                )])
+            });
+
+        let mut route = Route::new(Some(1u64.into()));
+        route.add_stop(Some(1u64.into()), 1u64.into(), 1, 5, 1);
+        route.add_stop(Some(2u64.into()), 2u64.into(), 10, 15, 2);
+
+        let mut mock_route = MockRouteRepository::new();
+        mock_route
+            .expect_find()
+            .returning(move |_| Ok(Some(route.clone())));
+
+        let mut mock_train_schedule_service = MockTrainScheduleService::new();
+        mock_train_schedule_service
+            .expect_get_station_arrival_time()
+            .returning(|_, station_id| match u64::from(station_id) {
+                1u64 => Ok(DateTimeWithTimeZone::from(
+                    DateTime::parse_from_rfc3339("2025-08-30T00:00:01+08:00").unwrap(),
+                )),
+                2u64 => Ok(DateTimeWithTimeZone::from(
+                    DateTime::parse_from_rfc3339("2025-08-30T00:00:10+08:00").unwrap(),
+                )),
+                _ => Ok(DateTimeWithTimeZone::from(
+                    DateTime::parse_from_rfc3339("2025-08-30T00:00:00+08:00").unwrap(),
+                )),
+            });
+
+        let personal_id = Uuid::new_v4();
+
+        let mut mock_personal = MockPersonalInfoRepository::new();
+        mock_personal.expect_find_by_user_id().returning(move |_| {
+            Ok(vec![PersonalInfo::new(
+                Some(1u64.into()),
+                personal_id,
+                RealName::try_from("日升".to_string()).unwrap(),
+                IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+                Some(PreferredSeatLocation::A),
+                1u64.into(),
+            )])
+        });
+
+        let service = build_service(
+            Arc::new(mock_train_schedule),
+            Arc::new(MockTrainBookingService::new()),
+            Arc::new(mock_train),
+            Arc::new(mock_route),
+            Arc::new(mock_station),
+            Arc::new(MockOrderRepository::new()),
+            Arc::new(MockTransactionService::new()),
+            Arc::new(MockSessionManagerService::new()),
+            Arc::new(mock_personal),
+            Arc::new(mock_train_schedule_service),
+            Arc::new(mock_type),
+        );
+
+        let dto = CreateTrainOrderDTO {
+            train_number: "G1234".to_string(),
+            origin_departure_time: "2025-08-30T00:00:00+08:00".to_string(),
+            departure_station: "北京南".to_string(),
+            arrival_station: "南京南".to_string(),
+            personal_id: personal_id.to_string(),
+            seat_type: "二等座".to_string(),
+        };
+
+        let result = service
+            .validate_and_create_train_order(&dto, 1u64.into())
+            .await;
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_create_train_order_fail_invalid_station() {
+        let mut mock_station = MockStationRepository::new();
+        mock_station.expect_find_by_name().returning(|_| Ok(None));
+
+        let mut mock_train_type_configuration = MockTrainTypeConfigurationService::new();
+        mock_train_type_configuration
+            .expect_verify_train_number()
+            .returning(|_| Ok(TrainNumber::from_unchecked("G1234".to_string())));
+
+        let mut mock_train = MockTrainRepository::new();
+        mock_train.expect_find_by_train_number().returning(|_| {
+            Ok(Train::new(
+                Some(1u64.into()),
+                TrainNumber::from_unchecked("G1234".to_string()),
+                TrainType::from_unchecked("G".to_string()),
+                HashMap::new(),
+                1u64.into(),
+                0,
+            ))
+        });
+
+        let mut mock_train_schedule = MockTrainScheduleRepository::new();
+        mock_train_schedule
+            .expect_find_by_train_id()
+            .returning(|_| {
+                Ok(vec![TrainSchedule::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+                    0,
+                    1u64.into(),
+                )])
+            });
+
+        let service = build_service(
+            Arc::new(mock_train_schedule),
+            Arc::new(MockTrainBookingService::new()),
+            Arc::new(mock_train),
+            Arc::new(MockRouteRepository::new()),
+            Arc::new(mock_station),
+            Arc::new(MockOrderRepository::new()),
+            Arc::new(MockTransactionService::new()),
+            Arc::new(MockSessionManagerService::new()),
+            Arc::new(MockPersonalInfoRepository::new()),
+            Arc::new(MockTrainScheduleService::new()),
+            Arc::new(mock_train_type_configuration),
+        );
+
+        let dto = CreateTrainOrderDTO {
+            train_number: "G1234".to_string(),
+            origin_departure_time: "2025-08-30T08:00:00+08:00".to_string(),
+            departure_station: "InvalidStation".to_string(),
+            arrival_station: "Shanghai".to_string(),
+            personal_id: "1".to_string(),
+            seat_type: "FirstClass".to_string(),
+        };
+
+        let user_id = 1u64.into();
+        let result = service.validate_and_create_train_order(&dto, user_id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_order_message_success() {
+        let mut mock_booking = MockTrainBookingService::new();
+        mock_booking
+            .expect_booking_group()
+            .returning(|_, _| Ok(vec![]));
+
+        let service = build_service(
+            Arc::new(MockTrainScheduleRepository::new()),
+            Arc::new(mock_booking),
+            Arc::new(MockTrainRepository::new()),
+            Arc::new(MockRouteRepository::new()),
+            Arc::new(MockStationRepository::new()),
+            Arc::new(MockOrderRepository::new()),
+            Arc::new(MockTransactionService::new()),
+            Arc::new(MockSessionManagerService::new()),
+            Arc::new(MockPersonalInfoRepository::new()),
+            Arc::new(MockTrainScheduleService::new()),
+            Arc::new(MockTrainTypeConfigurationService::new()),
+        );
+
+        let transaction_id = Uuid::new_v4();
+        let order_uuid = Uuid::new_v4();
+        let result = service
+            .process_order_message(transaction_id, vec![order_uuid], true)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_process_order_message_fail_and_refund() {
+        let mut mock_booking = MockTrainBookingService::new();
+        mock_booking.expect_booking_group().returning(|_, _| {
+            Err(TrainBookingServiceError::InfrastructureError(
+                ServiceError::RepositoryError(anyhow!("Mock error").into()),
+            ))
+        });
+
+        let order_uuid = Uuid::new_v4();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let train_order = TrainOrder::new(
+            base_order,
+            1u64.into(),
+            Some(Seat::new(
+                1u64.into(),
+                SeatType::new(
+                    Some(1u64.into()),
+                    SeatTypeName::from_unchecked("二等座".to_string()),
+                    1,
+                    Decimal::new(1000, 2),
+                ),
+                SeatLocationInfo {
+                    carriage: 3,
+                    row: 11,
+                    location: 'A',
+                },
+                SeatStatus::Occupied,
+            )),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            Some(PreferredSeatLocation::A),
+            StationRange::from_unchecked(1u64.into(), 1u64.into()),
+        );
+
+        let mut mock_order = MockOrderRepository::new();
+        mock_order
+            .expect_find_train_order_by_uuid()
+            .returning(move |_| Ok(Some(train_order.clone())));
+
+        let transaction_id = Uuid::new_v4();
+
+        let mut mock_transaction_service = MockTransactionService::new();
+        mock_transaction_service
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(transaction_id));
+
+        let service = build_service(
+            Arc::new(MockTrainScheduleRepository::new()),
+            Arc::new(mock_booking),
+            Arc::new(MockTrainRepository::new()),
+            Arc::new(MockRouteRepository::new()),
+            Arc::new(MockStationRepository::new()),
+            Arc::new(mock_order),
+            Arc::new(mock_transaction_service),
+            Arc::new(MockSessionManagerService::new()),
+            Arc::new(MockPersonalInfoRepository::new()),
+            Arc::new(MockTrainScheduleService::new()),
+            Arc::new(MockTrainTypeConfigurationService::new()),
+        );
+
+        let result = service
+            .process_order_message(transaction_id, vec![order_uuid], true)
+            .await;
+        assert!(result.is_err());
     }
 }
