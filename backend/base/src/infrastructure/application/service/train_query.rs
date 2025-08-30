@@ -913,6 +913,2267 @@ where
 // HINT: You may use AI tools to generate unit test
 // HINT: You may refer to `UserManagerServiceImpl` for example
 // Exercise 1.2.1D - 5: Your code here. (5 / 6)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::commands::train_query::{
+        DirectTrainQueryCommand, TrainScheduleQueryCommand, TransferTrainQueryCommand,
+    };
+    use crate::domain::model::city::CityId;
+    use crate::domain::model::route::{Route, RouteId};
+    use crate::domain::model::station::{Station, StationId};
+    use crate::domain::model::train::{
+        SeatType, SeatTypeId, SeatTypeName, Train, TrainId, TrainNumber, TrainType,
+    };
+    use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
+    use crate::domain::repository::route::RouteRepository;
+    use crate::domain::repository::station::StationRepository;
+    use crate::domain::repository::train::TrainRepository;
+    use crate::domain::service::route::RouteService;
+    use crate::domain::service::session::SessionManagerService;
+    use crate::domain::service::station::StationService;
+    use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
+    use crate::domain::{Repository, RepositoryError};
+    use async_trait::async_trait;
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+    use std::collections::{HashMap, HashSet};
+    use std::sync::{Arc, Mutex};
+
+    // --- Stubs ---
+    #[allow(clippy::type_complexity)]
+    struct SchSvcStub {
+        sched_by_number: Mutex<HashMap<(String, NaiveDate), TrainSchedule>>,
+        direct: Mutex<Vec<(TrainSchedule, StationId, StationId)>>,
+        transfer: Mutex<
+            Vec<(
+                Vec<TrainScheduleId>,
+                StationId,
+                StationId,
+                Option<StationId>,
+            )>,
+        >,
+        schedules: Mutex<Vec<TrainSchedule>>,
+    }
+
+    #[async_trait]
+    impl TrainScheduleService for SchSvcStub {
+        async fn add_schedule(
+            &self,
+            _train_id: crate::domain::model::train::TrainId,
+            _date: NaiveDate,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule(
+            &self,
+            _begin_date: NaiveDate,
+            _days: i32,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule_daemon(&self, _days: i32) {}
+        async fn direct_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
+            Ok(self.direct.lock().unwrap().clone())
+        }
+        async fn transfer_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<
+            Vec<(
+                Vec<TrainScheduleId>,
+                StationId,
+                StationId,
+                Option<StationId>,
+            )>,
+            TrainScheduleServiceError,
+        > {
+            Ok(self.transfer.lock().unwrap().clone())
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            train_number: String,
+            date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(self
+                .sched_by_number
+                .lock()
+                .unwrap()
+                .get(&(train_number, date))
+                .cloned())
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(self.schedules.lock().unwrap().clone())
+        }
+        async fn get_station_arrival_time(
+            &self,
+            _train_schedule_id: TrainScheduleId,
+            _station_id: StationId,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+        async fn get_terminal_arrival_time(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+            _origin_departure_time: DateTimeWithTimeZone,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+    }
+
+    struct StSvcStub {
+        stations: Mutex<Vec<Station>>,
+        by_name: Mutex<HashMap<String, Station>>,
+        by_city_name: Mutex<HashMap<String, Vec<Station>>>,
+    }
+
+    #[async_trait]
+    impl StationService for StSvcStub {
+        async fn get_stations(
+            &self,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(self.stations.lock().unwrap().clone())
+        }
+        async fn get_station_by_city(
+            &self,
+            _city_id: CityId,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(vec![])
+        }
+        async fn get_station_by_name(
+            &self,
+            name: String,
+        ) -> Result<Option<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(self.by_name.lock().unwrap().get(&name).cloned())
+        }
+        async fn add_station(
+            &self,
+            _station_name: String,
+            _city_name: String,
+        ) -> Result<StationId, crate::domain::service::station::StationServiceError> {
+            Ok(StationId::from(0u64))
+        }
+        async fn modify_station(
+            &self,
+            _station_id: StationId,
+            _station_name: String,
+            _city_name: String,
+        ) -> Result<(), crate::domain::service::station::StationServiceError> {
+            Ok(())
+        }
+        async fn delete_station(
+            &self,
+            _station: Station,
+        ) -> Result<(), crate::domain::service::station::StationServiceError> {
+            Ok(())
+        }
+        async fn get_station_by_city_name(
+            &self,
+            name: &str,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(self
+                .by_city_name
+                .lock()
+                .unwrap()
+                .get(name)
+                .cloned()
+                .unwrap_or_default())
+        }
+        async fn station_pairs_by_city(
+            &self,
+            _from_city: &str,
+            _to_city: &str,
+        ) -> Result<Vec<(StationId, StationId)>, crate::domain::service::station::StationServiceError>
+        {
+            Ok(vec![])
+        }
+    }
+
+    struct RtSvcStub {
+        routes: Mutex<Vec<Route>>,
+    }
+    #[async_trait]
+    impl RouteService for RtSvcStub {
+        async fn get_routes(
+            &self,
+        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
+            Ok(self.routes.lock().unwrap().clone())
+        }
+        async fn get_route_map(
+            &self,
+        ) -> Result<
+            crate::domain::service::route::RouteGraph,
+            crate::domain::service::route::RouteServiceError,
+        > {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("not implemented"),
+                    )),
+                ),
+            )
+        }
+        async fn add_route(
+            &self,
+            _stops: Vec<crate::domain::model::route::Stop>,
+        ) -> Result<RouteId, crate::domain::service::route::RouteServiceError> {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("not implemented"),
+                    )),
+                ),
+            )
+        }
+    }
+
+    struct SessStub {
+        ok: bool,
+    }
+    #[async_trait]
+    impl SessionManagerService for SessStub {
+        async fn create_session(
+            &self,
+            _user_id: crate::domain::model::user::UserId,
+        ) -> Result<crate::domain::model::session::Session, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn delete_session(
+            &self,
+            _session: crate::domain::model::session::Session,
+        ) -> Result<(), RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn get_session(
+            &self,
+            _session_id: crate::domain::model::session::SessionId,
+        ) -> Result<Option<crate::domain::model::session::Session>, RepositoryError> {
+            Ok(None)
+        }
+        async fn get_user_id_by_session(
+            &self,
+            _session_id: crate::domain::model::session::SessionId,
+        ) -> Result<Option<crate::domain::model::user::UserId>, RepositoryError> {
+            Ok(None)
+        }
+        async fn verify_session_id(&self, _session_id_str: &str) -> Result<bool, RepositoryError> {
+            Ok(self.ok)
+        }
+    }
+
+    // repos stubs
+    struct RtRepoStub {
+        route_by_schedule: Mutex<Option<Route>>,
+    }
+    #[async_trait]
+    impl RouteRepository for RtRepoStub {
+        async fn load(&self) -> Result<Vec<Route>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn get_by_train_schedule(
+            &self,
+            _id: TrainScheduleId,
+        ) -> Result<Option<Route>, RepositoryError> {
+            Ok(self.route_by_schedule.lock().unwrap().clone())
+        }
+        async fn save_raw(
+            &self,
+            _raw_routes: Vec<shared::data::RouteStationInfo>,
+        ) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+    }
+    #[async_trait]
+    impl Repository<Route> for RtRepoStub {
+        async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct TrRepoStub {
+        trains: Mutex<Vec<Train>>,
+    }
+    #[async_trait]
+    impl TrainRepository for TrRepoStub {
+        async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_verified_seat_type(
+            &self,
+            _train_id: TrainId,
+        ) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError> {
+            Ok(self.trains.lock().unwrap().clone())
+        }
+        async fn get_seat_id_map(
+            &self,
+            _train_id: TrainId,
+        ) -> Result<
+            HashMap<
+                SeatTypeName<crate::Verified>,
+                Vec<(
+                    crate::domain::model::train_schedule::SeatId,
+                    crate::domain::model::train_schedule::SeatLocationInfo,
+                )>,
+            >,
+            RepositoryError,
+        > {
+            Ok(HashMap::new())
+        }
+        async fn find_by_train_number(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+        ) -> Result<Train, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn find_by_train_type(
+            &self,
+            _train_type: TrainType<crate::Verified>,
+        ) -> Result<Vec<Train>, RepositoryError> {
+            Ok(vec![])
+        }
+    }
+    #[async_trait]
+    impl Repository<Train> for TrRepoStub {
+        async fn find(&self, _id: TrainId) -> Result<Option<Train>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
+            Ok(TrainId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Train) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct StRepoStub {
+        stations: Mutex<Vec<Station>>,
+    }
+    #[async_trait]
+    impl StationRepository for StRepoStub {
+        async fn load(&self) -> Result<Vec<Station>, RepositoryError> {
+            Ok(self.stations.lock().unwrap().clone())
+        }
+        async fn find_by_city(&self, _city_id: CityId) -> Result<Vec<Station>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn find_by_name(
+            &self,
+            _station_name: &str,
+        ) -> Result<Option<Station>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save_raw(
+            &self,
+            _station_data: shared::data::StationData,
+        ) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+    #[async_trait]
+    impl Repository<Station> for StRepoStub {
+        async fn find(&self, _id: StationId) -> Result<Option<Station>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
+            Ok(StationId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Station) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    // --- Helpers ---
+    fn mk_station(id: u64, name: &str, city: u64) -> Station {
+        Station::new(
+            Some(StationId::from(id)),
+            name.to_string(),
+            CityId::from(city),
+        )
+    }
+
+    fn mk_route_with_two_stops(rid: u64, s_from: StationId, s_to: StationId) -> Route {
+        let mut r = Route::new(Some(RouteId::from(rid)));
+        // order=0 origin, depart at t=0
+        r.add_stop(None, s_from, 0, 0, 0);
+        // order=1 terminal, arrive at 3600s
+        r.add_stop(None, s_to, 3600, 3600, 1);
+        r
+    }
+
+    fn mk_train(tid: u64, number: &str, route_id: RouteId) -> Train {
+        let mut seats = std::collections::HashMap::new();
+        let st = SeatType::new(
+            Some(SeatTypeId::from(1u64)),
+            SeatTypeName::from_unchecked("二等座".into()),
+            100,
+            Decimal::new(500, 0), // 500 per segment
+        );
+        seats.insert("二等座".to_string(), st);
+        Train::new(
+            Some(TrainId::from(tid)),
+            TrainNumber::from_unchecked(number.to_string()),
+            TrainType::from_unchecked("G".into()),
+            seats,
+            route_id,
+            0,
+        )
+    }
+
+    fn mk_schedule(id: u64, train_id: TrainId, route_id: RouteId) -> TrainSchedule {
+        TrainSchedule::new(
+            Some(TrainScheduleId::from(id)),
+            train_id,
+            NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+            0,
+            route_id,
+        )
+    }
+
+    #[tokio::test]
+    async fn query_train_success() {
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G1001", route.get_id().unwrap());
+        let sch = mk_schedule(1000, train.get_id().unwrap(), route.get_id().unwrap());
+
+        let sess = SessStub { ok: true };
+
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert(
+                    (
+                        "G1001".to_string(),
+                        NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                    ),
+                    sch.clone(),
+                );
+                m
+            }),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+
+        let rt_repo = RtRepoStub {
+            route_by_schedule: Mutex::new(Some(route.clone())),
+        };
+
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            by_name: Mutex::new(HashMap::new()),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+
+        let tr_repo = TrRepoStub {
+            trains: Mutex::new(vec![train.clone()]),
+        };
+
+        let st_repo = StRepoStub {
+            stations: Mutex::new(vec![]),
+        }; // 不使用
+        let rt_svc = RtSvcStub {
+            routes: Mutex::new(vec![]),
+        }; // 不使用
+
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(rt_svc),
+            Arc::new(sess),
+            Arc::new(rt_repo),
+            Arc::new(tr_repo),
+            Arc::new(st_repo),
+            8,
+        );
+
+        let dto = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G1001".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(dto.origin_station, "A");
+        assert_eq!(dto.terminal_station, "B");
+        assert_eq!(dto.route.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn query_train_invalid_session() {
+        let sess = SessStub { ok: false };
+
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new(HashMap::new()),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "bad".into(),
+                train_number: "G1".into(),
+                departure_date: "2025-01-01".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().contains("invalid session id"));
+    }
+
+    #[tokio::test]
+    async fn query_direct_trains_minimum_flow() {
+        // 准备站点与映射
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G1002", route.get_id().unwrap());
+        let sch = mk_schedule(2000, train.get_id().unwrap(), route.get_id().unwrap());
+
+        // session ok
+        let sess = SessStub { ok: true };
+
+        // station service: resolve by name
+        // station service
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![]),
+            by_name: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert("A".into(), st_from.clone());
+                m.insert("B".into(), st_to.clone());
+                m
+            }),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+
+        // train schedule service: direct_schedules
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![(
+                sch.clone(),
+                st_from.get_id().unwrap(),
+                st_to.get_id().unwrap(),
+            )]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+
+        // route service
+        let rt_svc = RtSvcStub {
+            routes: Mutex::new(vec![route.clone()]),
+        };
+
+        // station repo: load
+        let st_repo = StRepoStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+        };
+
+        // train repo: get_trains
+        let tr_repo = TrRepoStub {
+            trains: Mutex::new(vec![train.clone()]),
+        };
+
+        // route repo: 不用
+        let rt_repo = RtRepoStub {
+            route_by_schedule: Mutex::new(None),
+        };
+
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(rt_svc),
+            Arc::new(sess),
+            Arc::new(rt_repo),
+            Arc::new(tr_repo),
+            Arc::new(st_repo),
+            8,
+        );
+
+        let dto = svc
+            .query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(dto.solutions.len(), 1);
+        let s = &dto.solutions[0];
+        assert_eq!(s.departure_station, "A");
+        assert_eq!(s.arrival_station, "B");
+        assert!(s.price > 0);
+    }
+
+    #[tokio::test]
+    async fn query_transfer_trains_minimum_flow() {
+        // 三站：A(1) -> C(3) -> B(2)
+        let st_a = mk_station(1, "A", 10);
+        let st_b = mk_station(2, "B", 10);
+        let st_c = mk_station(3, "C", 10);
+
+        // 两条 route
+        let r1 = mk_route_with_two_stops(101, st_a.get_id().unwrap(), st_c.get_id().unwrap());
+        let r2 = mk_route_with_two_stops(102, st_c.get_id().unwrap(), st_b.get_id().unwrap());
+
+        let t1 = mk_train(21, "G2001", r1.get_id().unwrap());
+        let t2 = mk_train(22, "G2002", r2.get_id().unwrap());
+        let s1 = mk_schedule(3001, t1.get_id().unwrap(), r1.get_id().unwrap());
+        let s2 = mk_schedule(3002, t2.get_id().unwrap(), r2.get_id().unwrap());
+
+        let date = NaiveDate::from_ymd_opt(2025, 8, 30).unwrap();
+
+        // session ok
+        let sess = SessStub { ok: true };
+
+        // station resolve by name
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![]),
+            by_name: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert("A".into(), st_a.clone());
+                m.insert("B".into(), st_b.clone());
+                m
+            }),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+
+        // transfer_schedules
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![(
+                vec![s1.get_id().unwrap(), s2.get_id().unwrap()],
+                st_a.get_id().unwrap(),
+                st_b.get_id().unwrap(),
+                Some(st_c.get_id().unwrap()),
+            )]),
+            schedules: Mutex::new(vec![s1.clone(), s2.clone()]),
+        };
+
+        // route service returns both r1 & r2
+        let rt_svc = RtSvcStub {
+            routes: Mutex::new(vec![r1.clone(), r2.clone()]),
+        };
+
+        // station repo load A/B/C
+        let st_repo = StRepoStub {
+            stations: Mutex::new(vec![st_a.clone(), st_b.clone(), st_c.clone()]),
+        };
+
+        // train repo returns t1&t2
+        let tr_repo = TrRepoStub {
+            trains: Mutex::new(vec![t1.clone(), t2.clone()]),
+        };
+
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(rt_svc),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(tr_repo),
+            Arc::new(st_repo),
+            8,
+        );
+
+        let dto = svc
+            .query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(dto.solutions.len(), 1);
+        let sol = &dto.solutions[0];
+        assert_eq!(sol.first_ride.arrival_station, "C");
+        assert_eq!(sol.second_ride.departure_station, "C");
+    }
+
+    // ---------------------- Extra error stubs ----------------------
+    struct SessErrStub;
+    #[async_trait]
+    impl SessionManagerService for SessErrStub {
+        async fn create_session(
+            &self,
+            _user_id: crate::domain::model::user::UserId,
+        ) -> Result<crate::domain::model::session::Session, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn delete_session(
+            &self,
+            _session: crate::domain::model::session::Session,
+        ) -> Result<(), RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn get_session(
+            &self,
+            _session_id: crate::domain::model::session::SessionId,
+        ) -> Result<Option<crate::domain::model::session::Session>, RepositoryError> {
+            Ok(None)
+        }
+        async fn get_user_id_by_session(
+            &self,
+            _session_id: crate::domain::model::session::SessionId,
+        ) -> Result<Option<crate::domain::model::user::UserId>, RepositoryError> {
+            Ok(None)
+        }
+        async fn verify_session_id(&self, _session_id_str: &str) -> Result<bool, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("session check failed")))
+        }
+    }
+
+    struct RtRepoErrStub;
+    #[async_trait]
+    impl RouteRepository for RtRepoErrStub {
+        async fn load(&self) -> Result<Vec<Route>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn get_by_train_schedule(
+            &self,
+            _id: TrainScheduleId,
+        ) -> Result<Option<Route>, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("db error")))
+        }
+        async fn save_raw(
+            &self,
+            _raw_routes: Vec<shared::data::RouteStationInfo>,
+        ) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+    }
+    #[async_trait]
+    impl Repository<Route> for RtRepoErrStub {
+        async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct RtRepoNoneStub;
+    #[async_trait]
+    impl RouteRepository for RtRepoNoneStub {
+        async fn load(&self) -> Result<Vec<Route>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn get_by_train_schedule(
+            &self,
+            _id: TrainScheduleId,
+        ) -> Result<Option<Route>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save_raw(
+            &self,
+            _raw_routes: Vec<shared::data::RouteStationInfo>,
+        ) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+    }
+    #[async_trait]
+    impl Repository<Route> for RtRepoNoneStub {
+        async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct StSvcErrGetStations;
+    #[async_trait]
+    impl StationService for StSvcErrGetStations {
+        async fn get_stations(
+            &self,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Err(
+                crate::domain::service::station::StationServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("oops"),
+                    )),
+                ),
+            )
+        }
+        async fn get_station_by_city(
+            &self,
+            _city_id: CityId,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(vec![])
+        }
+        async fn get_station_by_name(
+            &self,
+            _name: String,
+        ) -> Result<Option<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(None)
+        }
+        async fn add_station(
+            &self,
+            _station_name: String,
+            _city_name: String,
+        ) -> Result<StationId, crate::domain::service::station::StationServiceError> {
+            Ok(StationId::from(0u64))
+        }
+        async fn modify_station(
+            &self,
+            _station_id: StationId,
+            _station_name: String,
+            _city_name: String,
+        ) -> Result<(), crate::domain::service::station::StationServiceError> {
+            Ok(())
+        }
+        async fn delete_station(
+            &self,
+            _station: Station,
+        ) -> Result<(), crate::domain::service::station::StationServiceError> {
+            Ok(())
+        }
+        async fn get_station_by_city_name(
+            &self,
+            _name: &str,
+        ) -> Result<Vec<Station>, crate::domain::service::station::StationServiceError> {
+            Ok(vec![])
+        }
+        async fn station_pairs_by_city(
+            &self,
+            _from_city: &str,
+            _to_city: &str,
+        ) -> Result<Vec<(StationId, StationId)>, crate::domain::service::station::StationServiceError>
+        {
+            Ok(vec![])
+        }
+    }
+
+    struct RtSvcErrGetRoutes;
+    #[async_trait]
+    impl RouteService for RtSvcErrGetRoutes {
+        async fn get_routes(
+            &self,
+        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("db"),
+                    )),
+                ),
+            )
+        }
+        async fn get_route_map(
+            &self,
+        ) -> Result<
+            crate::domain::service::route::RouteGraph,
+            crate::domain::service::route::RouteServiceError,
+        > {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("db"),
+                    )),
+                ),
+            )
+        }
+        async fn add_route(
+            &self,
+            _stops: Vec<crate::domain::model::route::Stop>,
+        ) -> Result<RouteId, crate::domain::service::route::RouteServiceError> {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("db"),
+                    )),
+                ),
+            )
+        }
+    }
+
+    struct StRepoErrLoadStub;
+    #[async_trait]
+    impl StationRepository for StRepoErrLoadStub {
+        async fn load(&self) -> Result<Vec<Station>, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("db")))
+        }
+        async fn find_by_city(&self, _city_id: CityId) -> Result<Vec<Station>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn find_by_name(
+            &self,
+            _station_name: &str,
+        ) -> Result<Option<Station>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save_raw(
+            &self,
+            _station_data: shared::data::StationData,
+        ) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+    #[async_trait]
+    impl Repository<Station> for StRepoErrLoadStub {
+        async fn find(&self, _id: StationId) -> Result<Option<Station>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
+            Ok(StationId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Station) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct TrRepoErrGetTrainsStub;
+    #[async_trait]
+    impl TrainRepository for TrRepoErrGetTrainsStub {
+        async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_verified_seat_type(
+            &self,
+            _train_id: TrainId,
+        ) -> Result<HashSet<String>, RepositoryError> {
+            Ok(HashSet::new())
+        }
+        async fn get_trains(&self) -> Result<Vec<Train>, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("db")))
+        }
+        async fn get_seat_id_map(
+            &self,
+            _train_id: TrainId,
+        ) -> Result<
+            HashMap<
+                SeatTypeName<crate::Verified>,
+                Vec<(
+                    crate::domain::model::train_schedule::SeatId,
+                    crate::domain::model::train_schedule::SeatLocationInfo,
+                )>,
+            >,
+            RepositoryError,
+        > {
+            Ok(HashMap::new())
+        }
+        async fn find_by_train_number(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+        ) -> Result<Train, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not implemented")))
+        }
+        async fn find_by_train_type(
+            &self,
+            _train_type: TrainType<crate::Verified>,
+        ) -> Result<Vec<Train>, RepositoryError> {
+            Ok(vec![])
+        }
+    }
+    #[async_trait]
+    impl Repository<Train> for TrRepoErrGetTrainsStub {
+        async fn find(&self, _id: TrainId) -> Result<Option<Train>, RepositoryError> {
+            Ok(None)
+        }
+        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
+            Ok(TrainId::from(0u64))
+        }
+        async fn remove(&self, _aggregate: Train) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct SchSvcErrDirect;
+    #[async_trait]
+    impl TrainScheduleService for SchSvcErrDirect {
+        async fn add_schedule(
+            &self,
+            _train_id: crate::domain::model::train::TrainId,
+            _date: NaiveDate,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule(
+            &self,
+            _begin_date: NaiveDate,
+            _days: i32,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule_daemon(&self, _days: i32) {}
+        async fn direct_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
+        }
+        async fn transfer_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<
+            Vec<(
+                Vec<TrainScheduleId>,
+                StationId,
+                StationId,
+                Option<StationId>,
+            )>,
+            TrainScheduleServiceError,
+        > {
+            Ok(vec![])
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn get_station_arrival_time(
+            &self,
+            _train_schedule_id: TrainScheduleId,
+            _station_id: StationId,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+        async fn get_terminal_arrival_time(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+            _origin_departure_time: DateTimeWithTimeZone,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+    }
+
+    struct SchSvcErrTransfer;
+    #[async_trait]
+    impl TrainScheduleService for SchSvcErrTransfer {
+        async fn add_schedule(
+            &self,
+            _train_id: crate::domain::model::train::TrainId,
+            _date: NaiveDate,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule(
+            &self,
+            _begin_date: NaiveDate,
+            _days: i32,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule_daemon(&self, _days: i32) {}
+        async fn direct_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn transfer_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<
+            Vec<(
+                Vec<TrainScheduleId>,
+                StationId,
+                StationId,
+                Option<StationId>,
+            )>,
+            TrainScheduleServiceError,
+        > {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn get_station_arrival_time(
+            &self,
+            _train_schedule_id: TrainScheduleId,
+            _station_id: StationId,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+        async fn get_terminal_arrival_time(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+            _origin_departure_time: DateTimeWithTimeZone,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+    }
+
+    struct SchSvcErrGetSchedules;
+    #[async_trait]
+    impl TrainScheduleService for SchSvcErrGetSchedules {
+        async fn add_schedule(
+            &self,
+            _train_id: crate::domain::model::train::TrainId,
+            _date: NaiveDate,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule(
+            &self,
+            _begin_date: NaiveDate,
+            _days: i32,
+        ) -> Result<(), TrainScheduleServiceError> {
+            Ok(())
+        }
+        async fn auto_plan_schedule_daemon(&self, _days: i32) {}
+        async fn direct_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn transfer_schedules(
+            &self,
+            _date: NaiveDate,
+            _station_pairs: &[(StationId, StationId)],
+        ) -> Result<
+            Vec<(
+                Vec<TrainScheduleId>,
+                StationId,
+                StationId,
+                Option<StationId>,
+            )>,
+            TrainScheduleServiceError,
+        > {
+            Ok(vec![])
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
+        }
+        async fn get_station_arrival_time(
+            &self,
+            _train_schedule_id: TrainScheduleId,
+            _station_id: StationId,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+        async fn get_terminal_arrival_time(
+            &self,
+            _train_number: TrainNumber<crate::Verified>,
+            _origin_departure_time: DateTimeWithTimeZone,
+        ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("NA".into()))
+        }
+    }
+
+    // ---------------------- Extra tests for coverage ----------------------
+
+    #[tokio::test]
+    async fn query_train_bad_date() {
+        let sess = SessStub { ok: true };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new(HashMap::new()),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G1".into(),
+                departure_date: "bad-date".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("invalid date"));
+    }
+
+    #[tokio::test]
+    async fn query_train_schedule_not_found() {
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let sess = SessStub { ok: true };
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            by_name: Mutex::new(HashMap::new()),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(st_svc),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G404".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().contains("no train number"));
+    }
+
+    #[tokio::test]
+    async fn query_train_route_repo_error() {
+        // prepare schedule and train
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G1001", route.get_id().unwrap());
+        let sch = mk_schedule(1000, train.get_id().unwrap(), route.get_id().unwrap());
+
+        let sess = SessStub { ok: true };
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert(
+                    (
+                        "G1001".into(),
+                        NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                    ),
+                    sch.clone(),
+                );
+                m
+            }),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            by_name: Mutex::new(HashMap::new()),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoErrStub),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![train.clone()]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G1001".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("internal"));
+    }
+
+    #[tokio::test]
+    async fn query_train_route_repo_none() {
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G1001", route.get_id().unwrap());
+        let sch = mk_schedule(1000, train.get_id().unwrap(), route.get_id().unwrap());
+
+        let sess = SessStub { ok: true };
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert(
+                    (
+                        "G1001".into(),
+                        NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                    ),
+                    sch.clone(),
+                );
+                m
+            }),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            by_name: Mutex::new(HashMap::new()),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoNoneStub),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![train.clone()]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G1001".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("internal"));
+    }
+
+    #[tokio::test]
+    async fn query_train_station_service_error() {
+        // 准备 schedule 和 route，确保执行到 get_stations 分支
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G1", route.get_id().unwrap());
+        let sch = mk_schedule(1000, train.get_id().unwrap(), route.get_id().unwrap());
+
+        let sess = SessStub { ok: true };
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert(
+                    ("G1".into(), NaiveDate::from_ymd_opt(2025, 8, 30).unwrap()),
+                    sch.clone(),
+                );
+                m
+            }),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(StSvcErrGetStations),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(Some(route.clone())),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "ok".into(),
+                train_number: "G1".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("internal"));
+    }
+
+    #[tokio::test]
+    async fn verify_session_error_path() {
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new(HashMap::new()),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessErrStub),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let err = svc
+            .query_train(TrainScheduleQueryCommand {
+                session_id: "any".into(),
+                train_number: "G1".into(),
+                departure_date: "2025-08-30".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("internal"));
+    }
+
+    #[tokio::test]
+    async fn direct_inconsistent_query_params() {
+        let sess = SessStub { ok: true };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcErrDirect),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new(HashMap::new()),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(sess),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        // 同时传 station 与 city，触发 resolve_station_ids 的 InconsistentQuery
+        let err = svc
+            .query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: Some("X".into()),
+                arrival_station: Some("B".into()),
+                arrival_city: Some("Y".into()),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("inconsistent"));
+    }
+
+    #[tokio::test]
+    async fn direct_services_and_repos_error_paths() {
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        // direct schedules error
+        let svc1 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcErrDirect),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_from.clone());
+                    m.insert("B".into(), st_to.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc1.query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // route service error
+        let sch = mk_schedule(1, TrainId::from(1u64), RouteId::from(1u64));
+        let sch_svc_ok = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![(
+                sch.clone(),
+                st_from.get_id().unwrap(),
+                st_to.get_id().unwrap(),
+            )]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+        let svc2 = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc_ok),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_from.clone());
+                    m.insert("B".into(), st_to.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcErrGetRoutes),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc2.query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // station repo error
+        let svc3 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![(
+                    sch.clone(),
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_from.clone());
+                    m.insert("B".into(), st_to.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![mk_route_with_two_stops(
+                    1,
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoErrLoadStub),
+            8,
+        );
+        assert!(
+            svc3.query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // train repo error
+        let svc4 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![(
+                    sch.clone(),
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_from.clone());
+                    m.insert("B".into(), st_to.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![mk_route_with_two_stops(
+                    1,
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoErrGetTrainsStub),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            }),
+            8,
+        );
+        assert!(
+            svc4.query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // train missing in map
+        let svc5 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![(
+                    sch.clone(),
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_from.clone());
+                    m.insert("B".into(), st_to.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![mk_route_with_two_stops(
+                    1,
+                    st_from.get_id().unwrap(),
+                    st_to.get_id().unwrap(),
+                )]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+            }),
+            8,
+        );
+        assert!(
+            svc5.query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+    }
+
+    #[tokio::test]
+    async fn transfer_error_paths_and_filters() {
+        let st_a = mk_station(1, "A", 10);
+        let st_b = mk_station(2, "B", 10);
+        let st_c = mk_station(3, "C", 10);
+        let date = NaiveDate::from_ymd_opt(2025, 8, 30).unwrap();
+
+        // transfer schedules error
+        let svc1 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcErrTransfer),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc1.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // route service error
+        let svc2 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcErrGetRoutes),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc2.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // get_schedules error
+        let svc3 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcErrGetSchedules),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc3.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // station repo error
+        let svc4 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoErrLoadStub),
+            8,
+        );
+        assert!(
+            svc4.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // train repo error
+        let svc5 = TrainQueryServiceImpl::new(
+            Arc::new(SchSvcStub {
+                sched_by_number: Mutex::new(HashMap::new()),
+                direct: Mutex::new(vec![]),
+                transfer: Mutex::new(vec![]),
+                schedules: Mutex::new(vec![]),
+            }),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoErrGetTrainsStub),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        assert!(
+            svc5.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .unwrap_err()
+            .error_message()
+            .to_lowercase()
+            .contains("internal")
+        );
+
+        // filtered out: len != 2 或者 mid = None -> 0 结果
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![]),
+            by_name: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert("A".into(), st_a.clone());
+                m.insert("B".into(), st_b.clone());
+                m
+            }),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+        let sch_bad = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![(
+                vec![],
+                st_a.get_id().unwrap(),
+                st_b.get_id().unwrap(),
+                None,
+            )]),
+            schedules: Mutex::new(vec![]),
+        };
+        let svc6 = TrainQueryServiceImpl::new(
+            Arc::new(sch_bad),
+            Arc::new(st_svc),
+            Arc::new(RtSvcStub {
+                routes: Mutex::new(vec![]),
+            }),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(TrRepoStub {
+                trains: Mutex::new(vec![]),
+            }),
+            Arc::new(StRepoStub {
+                stations: Mutex::new(vec![]),
+            }),
+            8,
+        );
+        let dto = svc6
+            .query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(dto.solutions.len(), 0);
+
+        // mid station name missing -> error
+        let r1 = mk_route_with_two_stops(101, st_a.get_id().unwrap(), st_c.get_id().unwrap());
+        let r2 = mk_route_with_two_stops(102, st_c.get_id().unwrap(), st_b.get_id().unwrap());
+        let t1 = mk_train(21, "G2001", r1.get_id().unwrap());
+        let t2 = mk_train(22, "G2002", r2.get_id().unwrap());
+        let s1 = mk_schedule(3001, t1.get_id().unwrap(), r1.get_id().unwrap());
+        let s2 = mk_schedule(3002, t2.get_id().unwrap(), r2.get_id().unwrap());
+        let sch_good = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![]),
+            transfer: Mutex::new(vec![(
+                vec![s1.get_id().unwrap(), s2.get_id().unwrap()],
+                st_a.get_id().unwrap(),
+                st_b.get_id().unwrap(),
+                Some(st_c.get_id().unwrap()),
+            )]),
+            schedules: Mutex::new(vec![s1.clone(), s2.clone()]),
+        };
+        let rt_svc = RtSvcStub {
+            routes: Mutex::new(vec![r1.clone(), r2.clone()]),
+        };
+        // 注意：故意缺失 C，导致中转站名查找失败
+        let st_repo_missing_c = StRepoStub {
+            stations: Mutex::new(vec![st_a.clone(), st_b.clone()]),
+        };
+        let tr_repo = TrRepoStub {
+            trains: Mutex::new(vec![t1.clone(), t2.clone()]),
+        };
+        let svc7 = TrainQueryServiceImpl::new(
+            Arc::new(sch_good),
+            Arc::new(StSvcStub {
+                stations: Mutex::new(vec![]),
+                by_name: Mutex::new({
+                    let mut m = HashMap::new();
+                    m.insert("A".into(), st_a.clone());
+                    m.insert("B".into(), st_b.clone());
+                    m
+                }),
+                by_city_name: Mutex::new(HashMap::new()),
+            }),
+            Arc::new(rt_svc),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(tr_repo),
+            Arc::new(st_repo_missing_c),
+            8,
+        );
+        assert!(
+            svc7.query_transfer_trains(TransferTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: date,
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None
+            })
+            .await
+            .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_build_dto_route_not_found() {
+        // 返回的 routes 与 schedule 的 route_id 不匹配，触发 build_dto 的错误分支
+        let st_from = mk_station(1, "A", 10);
+        let st_to = mk_station(2, "B", 10);
+        let other_route =
+            mk_route_with_two_stops(999, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let real_route =
+            mk_route_with_two_stops(100, st_from.get_id().unwrap(), st_to.get_id().unwrap());
+        let train = mk_train(11, "G3001", real_route.get_id().unwrap());
+        let sch = mk_schedule(9000, train.get_id().unwrap(), real_route.get_id().unwrap());
+
+        let sch_svc = SchSvcStub {
+            sched_by_number: Mutex::new(HashMap::new()),
+            direct: Mutex::new(vec![(
+                sch.clone(),
+                st_from.get_id().unwrap(),
+                st_to.get_id().unwrap(),
+            )]),
+            transfer: Mutex::new(vec![]),
+            schedules: Mutex::new(vec![]),
+        };
+        let st_svc = StSvcStub {
+            stations: Mutex::new(vec![]),
+            by_name: Mutex::new({
+                let mut m = HashMap::new();
+                m.insert("A".into(), st_from.clone());
+                m.insert("B".into(), st_to.clone());
+                m
+            }),
+            by_city_name: Mutex::new(HashMap::new()),
+        };
+        let rt_svc = RtSvcStub {
+            routes: Mutex::new(vec![other_route.clone()]),
+        };
+        let st_repo = StRepoStub {
+            stations: Mutex::new(vec![st_from.clone(), st_to.clone()]),
+        };
+        let tr_repo = TrRepoStub {
+            trains: Mutex::new(vec![train.clone()]),
+        };
+        let svc = TrainQueryServiceImpl::new(
+            Arc::new(sch_svc),
+            Arc::new(st_svc),
+            Arc::new(rt_svc),
+            Arc::new(SessStub { ok: true }),
+            Arc::new(RtRepoStub {
+                route_by_schedule: Mutex::new(None),
+            }),
+            Arc::new(tr_repo),
+            Arc::new(st_repo),
+            8,
+        );
+        let err = svc
+            .query_direct_trains(DirectTrainQueryCommand {
+                session_id: "ok".into(),
+                departure_time: NaiveDate::from_ymd_opt(2025, 8, 30).unwrap(),
+                departure_station: Some("A".into()),
+                departure_city: None,
+                arrival_station: Some("B".into()),
+                arrival_city: None,
+            })
+            .await
+            .unwrap_err();
+        assert!(err.error_message().to_lowercase().contains("invalid"));
+    }
+}
 
 // Step 7: Write document comment and mod comment for your implementation
 // HINT: You may use AI tools to generate comment
