@@ -35,6 +35,7 @@ mock! {
             train_type: TrainType<Unverified>
         ) -> Result<TrainType<Verified>, TrainTypeConfigurationServiceError>;
 
+        #[allow(clippy::type_complexity)]
         async fn get_seat_id_map(
             &self,
             train_id: TrainId

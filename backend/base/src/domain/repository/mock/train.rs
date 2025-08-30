@@ -24,6 +24,7 @@ mock! {
 
     // 实现 TrainRepository
     #[async_trait]
+    #[allow(clippy::type_complexity)]
     impl TrainRepository for TrainRepository {
         async fn get_verified_train_number(&self) -> Result<HashSet<String>, RepositoryError>;
         async fn get_verified_train_type(&self) -> Result<HashSet<String>, RepositoryError>;

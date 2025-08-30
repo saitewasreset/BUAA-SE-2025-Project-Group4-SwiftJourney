@@ -166,7 +166,7 @@ mod tests {
         match &result[0] {
             NotifyDTO::Order(order) => {
                 assert_eq!(order.title, "title order".to_string());
-                assert!(matches!(order.order.as_ref(), &Dish(ref x) if x.train_number == "G123"));
+                assert!(matches!(order.order.as_ref(), Dish(x) if x.train_number == "G123"));
             }
             _ => panic!("Expected Order variant"),
         }
