@@ -615,6 +615,7 @@ mod tests {
         MockTrainTypeConfigurationService,
     >;
 
+    #[allow(clippy::too_many_arguments)]
     fn build_service(
         schedule_repo: Arc<MockTrainScheduleRepository>,
         booking_service: Arc<MockTrainBookingService>,
