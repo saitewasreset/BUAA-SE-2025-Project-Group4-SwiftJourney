@@ -517,3 +517,217 @@ impl Transaction {
         self.atomic
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::order::{BaseOrder, OrderId, OrderTimeInfo, OrderType, PaymentInfo};
+    use crate::domain::model::personal_info::PersonalInfoId;
+    use claims::{assert_err, assert_ok};
+
+    #[derive(Debug, Clone)]
+    struct DummyOrder {
+        base: BaseOrder,
+        ty: OrderType,
+    }
+
+    impl Order for DummyOrder {
+        fn order_id(&self) -> Option<OrderId> {
+            self.base.order_id
+        }
+        fn uuid(&self) -> Uuid {
+            self.base.uuid
+        }
+        fn already_refund(&self) -> bool {
+            self.base.payment_info.refund_transaction_id().is_some()
+        }
+        fn order_status(&self) -> OrderStatus {
+            self.base.order_status
+        }
+        fn order_type(&self) -> OrderType {
+            self.ty
+        }
+        fn order_time_info(&self) -> OrderTimeInfo {
+            self.base.order_time_info
+        }
+        fn unit_price(&self) -> Decimal {
+            self.base.unit_price
+        }
+        fn amount(&self) -> Decimal {
+            self.base.amount
+        }
+        fn payment_info(&self) -> PaymentInfo {
+            self.base.payment_info
+        }
+        fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+            &mut self.base.payment_info
+        }
+        fn personal_info_id(&self) -> PersonalInfoId {
+            self.base.personal_info_id
+        }
+        fn set_status(&mut self, status: OrderStatus) {
+            self.base.order_status = status;
+        }
+    }
+
+    fn base_order(price: i64, amount: i64, status: OrderStatus) -> BaseOrder {
+        let now: DateTimeWithTimeZone = chrono::Utc::now().into();
+        BaseOrder::new(
+            None,
+            Uuid::new_v4(),
+            status,
+            OrderTimeInfo::new(now, now, now),
+            Decimal::new(price, 2),
+            Decimal::new(amount, 0),
+            PaymentInfo::new(None, None),
+            PersonalInfoId::from(1_u64),
+        )
+    }
+
+    #[test]
+    fn transaction_status_parse_and_display() {
+        assert_eq!(TransactionStatus::Unpaid.to_string(), "unpaid");
+        assert_eq!(TransactionStatus::Paid.to_string(), "paid");
+        assert_eq!(
+            <TransactionStatus as TryFrom<&str>>::try_from("unpaid").unwrap(),
+            TransactionStatus::Unpaid
+        );
+        assert_eq!(
+            <TransactionStatus as TryFrom<&str>>::try_from("paid").unwrap(),
+            TransactionStatus::Paid
+        );
+        assert!(TransactionStatus::try_from("other").is_err());
+        assert_eq!(<&str>::from(TransactionStatus::Paid), "paid");
+    }
+
+    #[test]
+    fn transaction_amount_abs_from_f64_checked() {
+        assert_ok!(TransactionAmountAbs::from_f64_checked(0.0));
+        assert_ok!(TransactionAmountAbs::from_f64_checked(12.34));
+        assert_err!(TransactionAmountAbs::from_f64_checked(-1.0));
+    }
+
+    #[test]
+    fn new_recharge_and_new_debug_shape() {
+        let user_id = UserId::from(7_u64);
+        let t1 =
+            Transaction::new_recharge(user_id, TransactionAmountAbs::from(Decimal::new(1000, 2)));
+        assert_eq!(t1.status(), TransactionStatus::Paid);
+        assert!(t1.finish_time().is_some());
+        assert!(t1.raw_amount().is_sign_negative());
+
+        let t2 = Transaction::new_debug(user_id, TransactionAmountAbs::from(Decimal::new(2500, 2)));
+        assert_eq!(t2.status(), TransactionStatus::Unpaid);
+        assert!(t2.finish_time().is_some());
+        assert!(t2.raw_amount().is_sign_positive());
+    }
+
+    #[test]
+    fn new_transaction_total_amount_and_atomic() {
+        let o1: Box<dyn Order> = Box::new(DummyOrder {
+            base: base_order(1000, 2, OrderStatus::Unpaid),
+            ty: OrderType::Train,
+        });
+        let o2: Box<dyn Order> = Box::new(DummyOrder {
+            base: base_order(2500, 1, OrderStatus::Unpaid),
+            ty: OrderType::Dish,
+        });
+        let t = Transaction::new(UserId::from(1_u64), vec![o1, o2], true);
+        assert_eq!(t.status(), TransactionStatus::Unpaid);
+        assert!(t.finish_time().is_none());
+        assert_eq!(
+            t.amount(),
+            Decimal::new(1000, 2) * Decimal::new(2, 0) + Decimal::new(2500, 2)
+        );
+        assert!(t.atomic());
+    }
+
+    #[test]
+    fn pay_and_double_pay_error() {
+        let t_orders: Vec<Box<dyn Order>> = vec![Box::new(DummyOrder {
+            base: base_order(1000, 1, OrderStatus::Unpaid),
+            ty: OrderType::Hotel,
+        })];
+        let mut t = Transaction::new(UserId::from(3_u64), t_orders, false);
+        assert_ok!(t.pay());
+        assert_eq!(t.status(), TransactionStatus::Paid);
+        assert!(t.finish_time().is_some());
+        // 再次支付应报错
+        assert!(matches!(t.pay(), Err(TransactionError::AlreadyPaid(_))));
+    }
+
+    #[test]
+    fn refund_full_and_partial_checks() {
+        // 交易未支付时退款应失败
+        let mut t = Transaction::new(
+            UserId::from(5_u64),
+            vec![Box::new(DummyOrder {
+                base: base_order(1500, 1, OrderStatus::Unpaid),
+                ty: OrderType::Takeaway,
+            })],
+            false,
+        );
+        assert!(matches!(
+            t.refund_transaction(),
+            Err(RefundError::NotPaid(_))
+        ));
+
+        // 支付后，包含已完成/已退款的订单时应分别报错
+        assert_ok!(t.pay());
+        // 设置订单状态=Completed
+        if let Some(order) = t.orders_mut().get_mut(0) {
+            let ord = order.as_mut();
+            ord.set_status(OrderStatus::Completed);
+        }
+        assert!(matches!(
+            t.refund_transaction(),
+            Err(RefundError::AlreadyFulfilled(_))
+        ));
+
+        // 换一笔交易，标记已退款
+        let mut t2 = Transaction::new(
+            UserId::from(8_u64),
+            vec![Box::new(DummyOrder {
+                base: base_order(2000, 1, OrderStatus::Unpaid),
+                ty: OrderType::Train,
+            })],
+            false,
+        );
+        assert_ok!(t2.pay());
+        if let Some(order) = t2.orders_mut().get_mut(0) {
+            let ord = order.as_mut();
+            // 设置退款事务ID模拟已退款
+            let mut pi = ord.payment_info();
+            pi.set_refund_transaction_id(crate::domain::model::transaction::TransactionId::from(
+                1_u64,
+            ));
+            *ord.payment_info_mut() = pi;
+        }
+        assert!(matches!(
+            t2.refund_transaction(),
+            Err(RefundError::AlreadyRefunded(_))
+        ));
+
+        // 其他场景覆盖在另一个应 panic 的测试里
+    }
+
+    #[test]
+    #[should_panic]
+    fn refund_partial_with_foreign_order_should_panic() {
+        // 部分退款：若传入订单不属于交易将 panic（按实现约束）
+        let mut t3 = Transaction::new(
+            UserId::from(9_u64),
+            vec![Box::new(DummyOrder {
+                base: base_order(3000, 1, OrderStatus::Paid),
+                ty: OrderType::Dish,
+            })],
+            false,
+        );
+        assert_ok!(t3.pay());
+        let foreign_order: Box<dyn Order> = Box::new(DummyOrder {
+            base: base_order(100, 1, OrderStatus::Unpaid),
+            ty: OrderType::Dish,
+        });
+        let _ = t3.refund_transaction_partial(&[foreign_order]);
+    }
+}

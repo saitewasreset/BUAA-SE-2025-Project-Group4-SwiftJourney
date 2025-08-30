@@ -84,3 +84,29 @@ pub struct HashedPassword {
     /// 使用的盐值
     pub salt: PasswordSalt,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn password_salt_conversions() {
+        let bytes = vec![1u8; 32];
+        let salt = PasswordSalt::from(bytes.clone());
+        let back: Vec<u8> = salt.clone().into();
+        assert_eq!(back, bytes);
+        let as_slice: &[u8] = (&salt).into();
+        assert_eq!(as_slice.len(), 32);
+    }
+
+    #[test]
+    fn hashed_password_shape() {
+        let hp = HashedPassword {
+            hashed_password: vec![2u8; 16],
+            salt: PasswordSalt::from(vec![3u8; 8]),
+        };
+        assert_eq!(hp.hashed_password.len(), 16);
+        let salt_vec: Vec<u8> = hp.salt.clone().into();
+        assert_eq!(salt_vec, vec![3u8; 8]);
+    }
+}
