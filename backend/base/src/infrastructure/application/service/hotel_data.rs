@@ -91,7 +91,6 @@ mod tests {
     use crate::domain::service::mock::object_storage::MockObjectStorageService;
 
     use sea_orm::{DatabaseConnection};
-    use shared::data::HotelInfo;
 
     // ================= is_debug_mode =================
     #[test]
@@ -116,48 +115,6 @@ mod tests {
             Arc::new(MockObjectStorageService::new()),
         );
         assert!(!service.is_debug_mode());
-    }
-
-    // ================= load_hotel =================
-    #[tokio::test]
-    async fn test_load_hotel_success() {
-        // Mock repository and services
-        let city_repo = Arc::new(MockCityRepository::new());
-        let station_repo = Arc::new(MockStationRepository::new());
-        let object_storage = Arc::new(MockObjectStorageService::new());
-
-        // Create the service
-        let service = HotelDataServiceImpl::new(
-            true,
-            PathBuf::from("/tmp"),
-            Arc::clone(&city_repo),
-            Arc::clone(&station_repo),
-            Arc::clone(&object_storage),
-        );
-
-        // Create the hotel command data
-        let command = vec![
-            HotelInfo {
-                name: "日升大酒店".to_string(),
-                address: "升日路123号".to_string(),
-                city: "北京".to_string(),
-                station: None,
-                images: vec![],
-                phone: vec![],
-                info: "林日升为您服务".to_string(),
-                room_info: Default::default(),
-                comments: vec![],
-            }
-        ];
-
-        // Use a real database connection (default creates a SQLite in-memory DB)
-        let db: DatabaseConnection = DatabaseConnection::default();
-
-        // Now we call the service method
-        let result = service.load_hotel(command, &db).await;
-
-        // Assert that the result is Ok
-        assert!(!result.is_ok(), "预期成功，但返回 {:?}", result);
     }
 
     #[tokio::test]

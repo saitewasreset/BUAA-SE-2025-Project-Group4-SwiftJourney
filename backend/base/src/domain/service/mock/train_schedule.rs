@@ -3,11 +3,11 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 
+use crate::Verified;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::{TrainId, TrainNumber};
 use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
-use crate::Verified;
 use sea_orm::prelude::DateTimeWithTimeZone;
 
 use mockall::mock;
@@ -37,6 +37,7 @@ mock! {
             pairs: &[(StationId, StationId)],
         ) -> Result<Vec<(TrainSchedule, StationId, StationId)>, TrainScheduleServiceError>;
 
+        #[allow(clippy::type_complexity)]
         async fn transfer_schedules(
             &self,
             date: NaiveDate,

@@ -1,4 +1,3 @@
-use serde_json;
 use shared::data::{
     DishInfo, HotelComment, HotelInfo, HotelRoomType, RouteStationInfo, StationDataItem,
     TakeawayDishInfo, TrainNumberInfoItem, TrainTypeInfoItem,
