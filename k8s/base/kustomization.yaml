@@ -18,6 +18,7 @@ resources:
   - gateway-nginx.yaml
   - ingress.yaml
   - hpa-backend.yaml
+  - metrics-server.yaml
 images:
   - name: saitewasreset/swiftjourney-backend
     newTag: v0.1.0
