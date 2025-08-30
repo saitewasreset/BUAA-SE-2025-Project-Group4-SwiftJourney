@@ -147,3 +147,47 @@ impl Identifiable for PersonalInfo {
 
 impl Entity for PersonalInfo {}
 impl Aggregate for PersonalInfo {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::user::{IdentityCardId, RealName};
+    use claims::assert_err;
+
+    #[test]
+    fn preferred_seat_location_parse_and_display() {
+        for (c, expected) in [
+            ('A', PreferredSeatLocation::A),
+            ('B', PreferredSeatLocation::B),
+            ('C', PreferredSeatLocation::C),
+            ('D', PreferredSeatLocation::D),
+            ('F', PreferredSeatLocation::F),
+        ] {
+            let loc = PreferredSeatLocation::try_from(c).unwrap();
+            assert_eq!(loc, expected);
+            assert_eq!(char::from(loc), c);
+            assert_eq!(loc.to_string(), c.to_string());
+        }
+        assert_err!(PreferredSeatLocation::try_from('E'));
+    }
+
+    #[test]
+    fn personal_info_setters() {
+        let mut info = PersonalInfo::new(
+            None,
+            Uuid::new_v4(),
+            RealName::try_from("高松灯".to_string()).unwrap(),
+            IdentityCardId::try_from("110108197502157336".to_string()).unwrap(),
+            None,
+            UserId::from(1u64),
+        );
+        assert!(info.preferred_seat_location().is_none());
+        info.set_preferred_seat_location(Some(PreferredSeatLocation::C));
+        assert_eq!(
+            info.preferred_seat_location(),
+            Some(PreferredSeatLocation::C)
+        );
+        info.set_default(true);
+        assert!(info.is_default());
+    }
+}

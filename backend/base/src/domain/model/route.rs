@@ -235,3 +235,55 @@ impl Route {
         self.stops.push(stop);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_stop_and_ordering() {
+        let mut route = Route::new(None);
+        route.add_stop(None, StationId::from(1_u64), 0, 60, 0);
+        route.add_stop(None, StationId::from(2_u64), 120, 180, 1);
+
+        let stops = route.stops();
+        assert_eq!(stops.len(), 2);
+        assert_eq!(stops[0].order(), 0);
+        assert_eq!(stops[1].order(), 1);
+        assert!(stops[0].departure_time() <= stops[1].arrival_time());
+    }
+
+    #[test]
+    fn set_id_propagates_to_stops() {
+        let mut route = Route::new(None);
+        route.add_stop(None, StationId::from(1_u64), 0, 60, 0);
+        route.add_stop(None, StationId::from(2_u64), 120, 180, 1);
+
+        // 设置 route_id 后，后续 add_stop 会带上该 id
+        route.set_id(RouteId::from(10_u64));
+        assert_eq!(route.get_id(), Some(RouteId::from(10_u64)));
+
+        // 现有 stops 的 route_id 也应已被设置
+        for s in route.stops.iter() {
+            assert_eq!(s.route_id, Some(RouteId::from(10_u64)));
+        }
+
+        // 新增一个 stop，应该自动带上 route_id
+        route.add_stop(None, StationId::from(3_u64), 200, 240, 2);
+        assert_eq!(route.stops[2].route_id, Some(RouteId::from(10_u64)));
+    }
+
+    #[test]
+    fn stop_basic_getters_and_invariants() {
+        let s = Stop::new(None, None, StationId::from(7_u64), 300, 300, 3);
+        assert_eq!(s.station_id(), StationId::from(7_u64));
+        assert_eq!(s.arrival_time(), 300);
+        assert_eq!(s.departure_time(), 300);
+        assert_eq!(s.order(), 3);
+
+        // 极端边界：到达==出发 允许
+        let s2 = Stop::new(None, None, StationId::from(7_u64), 0, 0, 0);
+        assert_eq!(s2.arrival_time(), s2.departure_time());
+    }
+}
+

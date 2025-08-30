@@ -165,3 +165,24 @@ impl City {
         &self.province
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ops::Deref;
+
+    #[test]
+    fn city_new_and_getters() {
+        let mut city = City::new(
+            None,
+            CityName::from("杭州市".to_string()),
+            ProvinceName::from("浙江省".to_string()),
+        );
+        assert!(city.get_id().is_none());
+        assert_eq!(city.name().deref(), "杭州市");
+        assert_eq!(city.province().deref(), "浙江省");
+        let id: CityId = 1u64.into();
+        city.set_id(id);
+        assert_eq!(city.get_id(), Some(id));
+    }
+}

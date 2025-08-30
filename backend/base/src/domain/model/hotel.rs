@@ -36,17 +36,17 @@ impl HotelDateRange {
         begin_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<HotelDateRange, HotelDateRangeError> {
+        if end_date < begin_date {
+            return Err(HotelDateRangeError::InvalidEndDate {
+                begin_date,
+                end_date,
+            });
+        }
         let range = (end_date - begin_date).num_days() as u32;
         if range > HOTEL_MAX_BOOKING_DAYS {
             return Err(HotelDateRangeError::RangeTooLong {
                 specified: range,
                 max: HOTEL_MAX_BOOKING_DAYS,
-            });
-        }
-        if end_date < begin_date {
-            return Err(HotelDateRangeError::InvalidEndDate {
-                begin_date,
-                end_date,
             });
         }
         Ok(HotelDateRange {
@@ -439,3 +439,66 @@ impl Identifiable for OccupiedRoom {
 impl Entity for OccupiedRoom {}
 
 impl Aggregate for OccupiedRoom {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
+    use crate::domain::model::station::Station;
+    use chrono::NaiveDate;
+    use claims::{assert_err, assert_ok, assert_ok_eq};
+    use rust_decimal::Decimal;
+    use rust_decimal::prelude::FromPrimitive;
+
+    #[test]
+    fn hotel_date_range_valid_and_invalid() {
+        let begin = NaiveDate::from_ymd_opt(2025, 8, 1).unwrap();
+        let end_ok = NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(); // 7天
+        assert_ok!(HotelDateRange::new(begin, end_ok));
+
+        let end_short = NaiveDate::from_ymd_opt(2025, 7, 31).unwrap();
+        let err = HotelDateRange::new(begin, end_short).unwrap_err();
+        assert!(matches!(err, HotelDateRangeError::InvalidEndDate { .. }));
+
+        let end_long = NaiveDate::from_ymd_opt(2025, 8, 9).unwrap(); // 8天
+        let err = HotelDateRange::new(begin, end_long).unwrap_err();
+        assert!(matches!(err, HotelDateRangeError::RangeTooLong { .. }));
+    }
+
+    #[test]
+    fn rating_bounds() {
+        assert_ok_eq!(Rating::try_from(Decimal::ZERO), Rating(Decimal::ZERO));
+        let five = Decimal::from_f64(5.0).unwrap();
+        assert_ok_eq!(Rating::try_from(five), Rating(five));
+
+        let over = Decimal::from_f64(5.1).unwrap();
+        assert_err!(Rating::try_from(over));
+        let neg = Decimal::from_f64(-0.1).unwrap();
+        assert_err!(Rating::try_from(neg));
+    }
+
+    #[test]
+    fn set_id_cascades_to_room_types() {
+        // 准备一个带两个房型的酒店
+        let city_id: CityId = 100u64.into();
+        let city = City::new(
+            Some(city_id),
+            CityName::from("TestCity".to_string()),
+            ProvinceName::from("TestProvince".to_string()),
+        );
+        let station = Station::new(None, "Station".to_string(), city_id);
+        let mut hotel = Hotel::new("Hotel".into(), city, station, "addr".into(), "info".into());
+        let price = Decimal::from_f64(100.0).unwrap();
+        hotel.add_room_type(HotelRoomType::new(None, None, "A".into(), 2, price));
+        hotel.add_room_type(HotelRoomType::new(None, None, "B".into(), 3, price));
+
+        let new_id: HotelId = 1u64.into();
+        assert!(hotel.get_id().is_none());
+        hotel.set_id(new_id);
+        assert_eq!(hotel.get_id(), Some(new_id));
+
+        for rt in hotel.room_type_list() {
+            assert_eq!(rt.hotel_id(), Some(new_id));
+        }
+    }
+}
