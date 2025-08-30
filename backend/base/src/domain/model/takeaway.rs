@@ -237,3 +237,48 @@ impl Identifiable for TakeawayDish {
 
 impl Entity for TakeawayDish {}
 impl Aggregate for TakeawayDish {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn takeaway_shop_add_images_and_dishes_and_set_id_propagates() {
+        let station_id = StationId::from(11_u64);
+        let mut shop = TakeawayShop::new("Shop".into(), station_id);
+        assert_eq!(shop.name(), "Shop");
+        assert_eq!(shop.station_id(), station_id);
+        assert!(shop.images().is_empty());
+        assert!(shop.dishes().is_empty());
+
+        let img = Uuid::new_v4();
+        shop.add_image(img);
+        assert_eq!(shop.images(), &[img]);
+
+        let dish = TakeawayDish::new(None, None, "Rice".into(), "main".into(), Decimal::new(1500, 2), vec![]);
+        shop.add_dish(dish);
+        assert_eq!(shop.dishes().len(), 1);
+        assert!(shop.dishes()[0].shop_id().is_none());
+
+        // set_id 级联到子项
+        let shop_id = TakeawayShopId::from(5_u64);
+        shop.set_id(shop_id);
+        assert_eq!(shop.get_id(), Some(shop_id));
+        assert_eq!(shop.dishes()[0].shop_id(), Some(shop_id));
+    }
+
+    #[test]
+    fn takeaway_dish_getters_and_identifiable() {
+        let price = Decimal::new(2500, 2);
+        let images = vec![Uuid::nil()];
+        let mut dish = TakeawayDish::new(None, None, "Noodle".into(), "main".into(), price, images.clone());
+        assert_eq!(dish.name(), "Noodle");
+        assert_eq!(dish.dish_type(), "main");
+        assert_eq!(dish.unit_price(), price);
+        assert_eq!(dish.images(), images.as_slice());
+
+        assert!(dish.get_id().is_none());
+        dish.set_id(TakeawayDishId::from(1_u64));
+        assert_eq!(dish.get_id(), Some(TakeawayDishId::from(1_u64)));
+    }
+}

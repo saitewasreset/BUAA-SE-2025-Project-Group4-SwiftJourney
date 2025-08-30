@@ -191,3 +191,52 @@ impl Identifiable for Dish {
 
 impl Entity for Dish {}
 impl Aggregate for Dish {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::Identifiable;
+    use claims::assert_ok;
+
+    #[test]
+    fn dish_time_try_from_and_display() {
+        assert_ok!(DishTime::try_from("lunch"));
+        assert_ok!(DishTime::try_from("dinner"));
+
+        let err = DishTime::try_from("breakfast").unwrap_err();
+        match err {
+            DishTimeError::InvalidDishTime(s) => assert_eq!(s, "breakfast"),
+        }
+
+        assert_eq!(DishTime::Lunch.to_string(), "lunch");
+        assert_eq!(DishTime::Dinner.to_string(), "dinner");
+    }
+
+    #[test]
+    fn dish_fields_and_identifiable() {
+        let train_id = TrainId::from(99_u64);
+        let price = rust_decimal::Decimal::new(1234, 2); // 12.34
+        let images = vec![Uuid::nil(), Uuid::new_v4()];
+
+        let mut dish = Dish::new(
+            None,
+            train_id,
+            "main".to_string(),
+            DishTime::Dinner,
+            "Beef Noodle".to_string(),
+            price,
+            images.clone(),
+        );
+
+        assert_eq!(dish.train_id(), train_id);
+        assert_eq!(dish.dish_type(), "main");
+        assert_eq!(dish.dish_time(), DishTime::Dinner);
+        assert_eq!(dish.name(), "Beef Noodle");
+        assert_eq!(dish.unit_price(), price);
+        assert_eq!(dish.images(), images.as_slice());
+
+        assert!(dish.get_id().is_none());
+        dish.set_id(DishId::from(7_u64));
+        assert_eq!(dish.get_id(), Some(DishId::from(7_u64)));
+    }
+}

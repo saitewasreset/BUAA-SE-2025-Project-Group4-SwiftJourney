@@ -139,3 +139,31 @@ impl Session {
         Utc::now() > self.expires_at
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::{assert_err, assert_ok};
+
+    #[test]
+    fn session_id_parse_and_display() {
+        let id = SessionId::random();
+        let s = id.to_string();
+        let parsed = SessionId::try_from(s.as_str());
+        assert_ok!(parsed);
+
+        let bad = SessionId::try_from("not-a-uuid");
+        assert_err!(bad);
+    }
+
+    #[test]
+    fn session_expiration_checks() {
+        let user_id: UserId = 1u64.into();
+        let now = Utc::now();
+        let expired = Session::new(user_id, now, now - chrono::Duration::seconds(1));
+        assert!(expired.is_expired());
+
+        let active = Session::new(user_id, now, now + chrono::Duration::seconds(3600));
+        assert!(!active.is_expired());
+    }
+}
