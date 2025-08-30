@@ -469,299 +469,744 @@ where
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::commands::hotel::{HotelQuery, TargetType};
+    use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
+    use crate::domain::model::hotel::{Hotel, HotelId};
+    use crate::domain::model::hotel::{HotelRoomStatus, HotelRoomType, HotelRoomTypeId};
+    use crate::domain::model::session::Session;
+    use crate::domain::model::station::Station;
+    use crate::domain::model::user::{User, UserId};
+    use crate::domain::service::hotel_booking::HotelBookingServiceError;
+    use crate::domain::service::hotel_rating::HotelRatingServiceError;
+    use crate::domain::{Repository, RepositoryError};
+    use async_trait::async_trait;
+    use chrono::Utc;
+    use rust_decimal::Decimal;
+    use uuid::Uuid;
 
+    // -------- Session stubs --------
+    struct SessOk;
+    #[async_trait]
+    impl SessionManagerService for SessOk {
+        async fn create_session(&self, _user_id: UserId) -> Result<Session, RepositoryError> {
+            Err(RepositoryError::Db(anyhow::anyhow!("not used")))
+        }
+        async fn delete_session(&self, _session: Session) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn get_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<Session>, RepositoryError> {
+            let now = Utc::now();
+            Ok(Some(Session::new(1u64.into(), now, now)))
+        }
+        async fn get_user_id_by_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<UserId>, RepositoryError> {
+            Ok(Some(1u64.into()))
+        }
+        async fn verify_session_id(&self, _session_id_str: &str) -> Result<bool, RepositoryError> {
+            Ok(true)
+        }
+    }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use std::sync::Arc;
-//     use chrono::{Utc, Duration};
-//     use crate::domain::model::hotel::{Hotel, HotelId};
-//     
-//     use crate::domain::service::mock::session::MockSessionManagerService;
-//     use crate::domain::service::mock::hotel_rating::MockHotelRatingService;
-//     use crate::domain::service::mock::hotel_query::MockHotelQueryService;
-//     
-//     use crate::domain::repository::mock::user::MockUserRepository;
-//     use crate::domain::repository::mock::hotel::MockHotelRepository;
-// 
-//     // ================= get_quota =================
-//     #[tokio::test]
-//     async fn test_get_quota_success() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(1.into())));
-// 
-//         let mut rating = MockHotelRatingService::new();
-//         rating.expect_get_hotel_comment_quota().returning(|_, _| Ok(5));
-//         rating.expect_get_current_comment_count().returning(|_, _| Ok(2));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(rating),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let query = QuotaQuery { session_id: "valid".into(), hotel_id: "h1".into() };
-//         let result = service.get_quota(query).await.unwrap();
-//         assert_eq!(result.quota, 5);
-//         assert_eq!(result.used, 2);
-//     }
-// 
-//     #[tokio::test]
-//     async fn test_get_quota_invalid_session() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(None));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let query = QuotaQuery { session_id: "invalid".into(), hotel_id: "h1".into() };
-//         let err = service.get_quota(query).await.unwrap_err();
-//         assert!(err.to_string().contains("InvalidSessionId"));
-//     }
-// 
-//     // ================= new_comment =================
-//     #[tokio::test]
-//     async fn test_new_comment_success() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(2.into())));
-// 
-//         let mut rating = MockHotelRatingService::new();
-//         rating.expect_add_comment()
-//             .returning(|_, _, _, _, _| Ok(()));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(rating),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelCommentDTO {
-//             session_id: "s1".into(),
-//             hotel_id: "h1".into(),
-//             rating: 4.5,
-//             comment: "good".into(),
-//         };
-// 
-//         assert!(service.new_comment(dto).await.is_ok());
-//     }
-// 
-//     #[tokio::test]
-//     async fn test_new_comment_invalid_rating() {
-//         let session = MockSessionManagerService::new();
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelCommentDTO {
-//             session_id: "s1".into(),
-//             hotel_id: "h1".into(),
-//             rating: 6.0,
-//             comment: "bad".into(),
-//         };
-// 
-//         let err = service.new_comment(dto).await.unwrap_err();
-//         assert!(matches!(err, HotelServiceError::InvalidRating));
-//     }
-// 
-//     // ================= query_hotels =================
-//     #[tokio::test]
-//     async fn test_query_hotels_success() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(3.into())));
-// 
-//         let mut query_service = MockHotelQueryService::new();
-//         query_service.expect_query_hotels()
-//             .returning(|_, _| Ok(vec![
-//                 HotelGeneralInfoDTO { id: "h1".into(), name: "Hotel1".into(), ..Default::default() }
-//             ]));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(query_service),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelQueryDTO {
-//             session_id: "s1".into(),
-//             begin_date: Utc::now(),
-//             end_date: Utc::now() + Duration::days(1),
-//             city_name: "Beijing".into(),
-//         };
-// 
-//         let result = service.query_hotels(dto).await.unwrap();
-//         assert_eq!(result.len(), 1);
-//         assert_eq!(result[0].name, "Hotel1");
-//     }
-// 
-//     #[tokio::test]
-//     async fn test_query_hotels_invalid_date_range() {
-//         let session = MockSessionManagerService::new();
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelQueryDTO {
-//             session_id: "s1".into(),
-//             begin_date: Utc::now(),
-//             end_date: Utc::now(),
-//             city_name: "Beijing".into(),
-//         };
-// 
-//         let err = service.query_hotels(dto).await.unwrap_err();
-//         assert!(matches!(err, HotelServiceError::InvalidDateRangeMessage(_)));
-//     }
-// 
-//     // ================= query_hotel_info =================
-//     #[tokio::test]
-//     async fn test_query_hotel_info_success() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(4.into())));
-// 
-//         let mut repo = MockHotelRepository::new();
-//         repo.expect_get_id_by_uuid()
-//             .returning(|_| Ok(Some(HotelId::from(1u64))));
-//         repo.expect_get_by_id()
-//             .returning(|_| Ok(Some(Hotel::new(HotelId::from(1u64), "HotelX".into(), "Addr".into()))));
-// 
-//         let mut rating = MockHotelRatingService::new();
-//         rating.expect_get_comments()
-//             .returning(|_, _| Ok(vec![HotelComment::new("user".into(), 4.0, "nice".into())]));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(rating),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(repo),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelInfoQueryDTO { session_id: "s1".into(), hotel_id: "h1".into() };
-//         let result = service.query_hotel_info(dto).await.unwrap();
-//         assert_eq!(result.name, "HotelX");
-//         assert_eq!(result.comments.len(), 1);
-//     }
-// 
-//     #[tokio::test]
-//     async fn test_query_hotel_info_not_found() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(5.into())));
-// 
-//         let mut repo = MockHotelRepository::new();
-//         repo.expect_get_id_by_uuid()
-//             .returning(|_| Ok(None));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(repo),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelInfoQueryDTO { session_id: "s1".into(), hotel_id: "h2".into() };
-//         let err = service.query_hotel_info(dto).await.unwrap_err();
-//         assert!(err.to_string().contains("Invalid hotel uuid"));
-//     }
-// 
-//     // ================= query_hotel_order_info =================
-//     #[tokio::test]
-//     async fn test_query_hotel_order_info_success() {
-//         let mut session = MockSessionManagerService::new();
-//         session.expect_get_user_id_by_session()
-//             .returning(|_| Ok(Some(6.into())));
-// 
-//         let mut booking = MockHotelBookingService::new();
-//         booking.expect_get_available_room()
-//             .returning(|_, _, _, _| Ok(10));
-// 
-//         let mut repo = MockHotelRepository::new();
-//         repo.expect_get_rooms_by_hotel_id()
-//             .returning(|_| Ok(vec![
-//                 Room::new("Deluxe".into(), 100.0, 5),
-//                 Room::new("Standard".into(), 80.0, 5),
-//             ]));
-// 
-//         repo.expect_get_id_by_uuid()
-//             .returning(|_| Ok(Some(HotelId::from(1u64))));
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(booking),
-//             Arc::new(repo),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelOrderInfoQueryDTO {
-//             session_id: "s1".into(),
-//             hotel_id: "h1".into(),
-//             begin_date: Utc::now(),
-//             end_date: Utc::now() + Duration::days(1),
-//         };
-// 
-//         let result = service.query_hotel_order_info(dto).await.unwrap();
-//         assert!(result.contains_key("Deluxe"));
-//         assert!(result.contains_key("Standard"));
-//     }
-// 
-//     #[tokio::test]
-//     async fn test_query_hotel_order_info_invalid_date() {
-//         let session = MockSessionManagerService::new();
-// 
-//         let service = HotelServiceImpl::new(
-//             Arc::new(MockHotelRatingService::new()),
-//             Arc::new(MockHotelQueryService::new()),
-//             Arc::new(MockHotelBookingService::new()),
-//             Arc::new(MockHotelRepository::new()),
-//             Arc::new(MockUserRepository::new()),
-//             Arc::new(session),
-//         );
-// 
-//         let dto = HotelOrderInfoQueryDTO {
-//             session_id: "s1".into(),
-//             hotel_id: "h1".into(),
-//             begin_date: Utc::now(),
-//             end_date: Utc::now(),
-//         };
-// 
-//         let err = service.query_hotel_order_info(dto).await.unwrap_err();
-//         assert!(matches!(err, HotelServiceError::InvalidDateRangeMessage(_)));
-//     }
-// }
+    struct SessUnused; // for cases where parsing fails before calling service
+    #[async_trait]
+    impl SessionManagerService for SessUnused {
+        async fn create_session(&self, _user_id: UserId) -> Result<Session, RepositoryError> {
+            unreachable!()
+        }
+        async fn delete_session(&self, _session: Session) -> Result<(), RepositoryError> {
+            unreachable!()
+        }
+        async fn get_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<Session>, RepositoryError> {
+            unreachable!()
+        }
+        async fn get_user_id_by_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<UserId>, RepositoryError> {
+            unreachable!()
+        }
+        async fn verify_session_id(&self, _session_id_str: &str) -> Result<bool, RepositoryError> {
+            unreachable!()
+        }
+    }
+
+    // -------- Rating service stub --------
+    enum AddMode {
+        Ok,
+        InvalidUuid,
+        NoQuota,
+        LengthExceed,
+    }
+    struct RatingSvc {
+        add_mode: AddMode,
+        quota: i32,
+        used: i32,
+    }
+    #[async_trait]
+    impl HotelRatingService for RatingSvc {
+        async fn get_hotel_rating(
+            &self,
+            _hotel_uuid: Uuid,
+        ) -> Result<Rating, HotelRatingServiceError> {
+            Ok(Rating::default())
+        }
+        async fn get_hotel_comment_quota(
+            &self,
+            _hotel_uuid: Uuid,
+            _user_id: UserId,
+        ) -> Result<i32, HotelRatingServiceError> {
+            Ok(self.quota)
+        }
+        async fn get_current_comment_count(
+            &self,
+            _hotel_uuid: Uuid,
+            _user_id: UserId,
+        ) -> Result<i32, HotelRatingServiceError> {
+            Ok(self.used)
+        }
+        async fn get_comments(
+            &self,
+            _hotel_uuid: Uuid,
+        ) -> Result<Vec<crate::domain::model::hotel::HotelRating>, HotelRatingServiceError>
+        {
+            Ok(vec![])
+        }
+        async fn add_comment(
+            &self,
+            hotel_uuid: Uuid,
+            _user_id: UserId,
+            _rating: Rating,
+            _text: String,
+        ) -> Result<(), HotelRatingServiceError> {
+            match self.add_mode {
+                AddMode::Ok => Ok(()),
+                AddMode::InvalidUuid => Err(HotelRatingServiceError::InvalidHotelUuid(hotel_uuid)),
+                AddMode::NoQuota => Err(HotelRatingServiceError::NoCommentsQuotaLeft(
+                    hotel_uuid, self.quota,
+                )),
+                AddMode::LengthExceed => Err(HotelRatingServiceError::CommentLengthExceed {
+                    limit: 10,
+                    actual: 20,
+                }),
+            }
+        }
+    }
+
+    // -------- Query service stub --------
+    struct QuerySvcOk;
+    #[async_trait]
+    impl HotelQueryService for QuerySvcOk {
+        async fn find_hotels_by_target(
+            &self,
+            _target: &str,
+            _target_type: &TargetType,
+            _search_term: Option<&str>,
+        ) -> Result<Vec<Hotel>, HotelQueryError> {
+            Ok(vec![])
+        }
+        async fn calculate_minimum_prices(
+            &self,
+            _hotels: &[Hotel],
+            _date_range: Option<&HotelDateRange>,
+        ) -> Result<std::collections::HashMap<HotelId, rust_decimal::Decimal>, HotelQueryError>
+        {
+            Ok(HashMap::new())
+        }
+        async fn query_hotels(
+            &self,
+            target: &str,
+            _target_type: &TargetType,
+            _search_term: Option<&str>,
+            _date_range: Option<&HotelDateRange>,
+        ) -> Result<Vec<HotelGeneralInfoDTO>, HotelQueryError> {
+            Ok(vec![HotelGeneralInfoDTO {
+                hotel_id: Uuid::new_v4(),
+                name: format!("Hotel@{}", target),
+                picture: None,
+                rating: 4.2,
+                rating_count: 10,
+                total_bookings: 30,
+                price: 199.0,
+                info: "nice".to_string(),
+            }])
+        }
+    }
+
+    // -------- Booking service stub --------
+    struct BookingSvc;
+    #[async_trait]
+    impl HotelBookingService for BookingSvc {
+        async fn get_available_room(
+            &self,
+            _hotel_id: HotelId,
+            _booking_date_range: HotelDateRange,
+        ) -> Result<
+            std::collections::HashMap<
+                crate::domain::model::hotel::HotelRoomTypeId,
+                crate::domain::model::hotel::HotelRoomStatus,
+            >,
+            HotelBookingServiceError,
+        > {
+            Ok(HashMap::new())
+        }
+        async fn booking_hotel(&self, _order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
+            Ok(())
+        }
+        async fn cancel_hotel(&self, _order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
+            Ok(())
+        }
+        async fn booking_group(
+            &self,
+            _order_uuid_list: Vec<Uuid>,
+            _atomic: bool,
+        ) -> Result<Vec<crate::domain::model::order::HotelOrder>, HotelBookingServiceError>
+        {
+            Ok(vec![])
+        }
+    }
+
+    // -------- Hotel repository stub --------
+    struct HotelRepo;
+    #[async_trait]
+    impl HotelRepository for HotelRepo {
+        async fn get_id_by_uuid(&self, _uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
+            Ok(None)
+        }
+        async fn find_by_uuid(&self, _uuid: Uuid) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(None)
+        }
+        async fn find_by_city(
+            &self,
+            _city_id: crate::domain::model::city::CityId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn find_by_station(
+            &self,
+            _station_id: crate::domain::model::station::StationId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+    }
+    #[async_trait]
+    impl Repository<Hotel> for HotelRepo {
+        async fn find(&self, _id: HotelId) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(None)
+        }
+        async fn remove(&self, _aggregate: Hotel) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Hotel) -> Result<HotelId, RepositoryError> {
+            Ok(1u64.into())
+        }
+    }
+
+    // -------- User repository stub --------
+    struct UserRepo;
+    #[async_trait]
+    impl UserRepository for UserRepo {
+        async fn find_by_phone(
+            &self,
+            _phone: crate::domain::model::user::Phone,
+        ) -> Result<Option<User>, RepositoryError> {
+            Ok(None)
+        }
+        async fn find_by_identity_card_id(
+            &self,
+            _identity_card_id: crate::domain::model::user::IdentityCardId,
+        ) -> Result<Option<User>, RepositoryError> {
+            Ok(None)
+        }
+        async fn remove_by_phone(
+            &self,
+            _phone: crate::domain::model::user::Phone,
+        ) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+    #[async_trait]
+    impl Repository<User> for UserRepo {
+        async fn find(&self, _id: UserId) -> Result<Option<User>, RepositoryError> {
+            Ok(None)
+        }
+        async fn remove(&self, _aggregate: User) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(&self, _aggregate: &mut User) -> Result<UserId, RepositoryError> {
+            Ok(1u64.into())
+        }
+    }
+
+    // ---------------- Tests ----------------
+    #[tokio::test]
+    async fn get_quota_success() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 5,
+                used: 2,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+
+        let q = QuotaQuery {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+        };
+        let got = svc.get_quota(q).await.unwrap();
+        assert_eq!(got.quota, 5);
+        assert_eq!(got.used, 2);
+    }
+
+    #[tokio::test]
+    async fn get_quota_invalid_session_id_format() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessUnused),
+        );
+
+        let q = QuotaQuery {
+            session_id: "not-a-uuid".into(),
+            hotel_id: Uuid::new_v4(),
+        };
+        match svc.get_quota(q).await {
+            Ok(v) => panic!("expected error, got {:?}", v.quota),
+            Err(err) => assert!(err.to_string().contains("invalid session id")),
+        }
+    }
+
+    #[tokio::test]
+    async fn new_comment_success() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 5,
+                used: 1,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let cmd = NewCommentCommand {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+            rating: 4.5,
+            comment: "Great!".to_string(),
+        };
+        assert!(svc.new_comment(cmd).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn new_comment_invalid_rating() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 5,
+                used: 1,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let cmd = NewCommentCommand {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+            rating: 6.0,
+            comment: "too high".to_string(),
+        };
+        let err = svc.new_comment(cmd).await.unwrap_err();
+        assert!(err.to_string().contains("invalid rating"));
+    }
+
+    #[tokio::test]
+    async fn new_comment_error_mappings() {
+        // InvalidHotelUuid -> NotFound
+        let svc1 = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::InvalidUuid,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let cmd = NewCommentCommand {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+            rating: 3.0,
+            comment: "x".into(),
+        };
+        let err = svc1.new_comment(cmd).await.unwrap_err();
+        assert!(err.to_string().contains("Invalid hotel uuid"));
+
+        // NoCommentsQuotaLeft -> CommentCountExceed
+        let svc2 = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::NoQuota,
+                quota: 1,
+                used: 1,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let cmd = NewCommentCommand {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+            rating: 3.0,
+            comment: "x".into(),
+        };
+        let err = svc2.new_comment(cmd).await.unwrap_err();
+        assert!(err.to_string().contains("comment count exceed"));
+
+        // CommentLengthExceed -> mapped accordingly
+        let svc3 = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::LengthExceed,
+                quota: 5,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let cmd = NewCommentCommand {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: Uuid::new_v4(),
+            rating: 3.0,
+            comment: "xxxxxxxxxxxxxxxxxxxxxxxx".into(),
+        };
+        let err = svc3.new_comment(cmd).await.unwrap_err();
+        assert!(err.to_string().contains("comment length exceed"));
+    }
+
+    #[tokio::test]
+    async fn query_hotels_success_minimal() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let q = HotelQuery {
+            session_id: Uuid::new_v4().to_string(),
+            target: "Beijing".into(),
+            target_type: TargetType::City,
+            search: None,
+            begin_date: None,
+            end_date: None,
+        };
+        let list = svc.query_hotels(q).await.unwrap();
+        assert_eq!(list.len(), 1);
+        assert!(list[0].name.contains("Beijing"));
+    }
+
+    #[tokio::test]
+    async fn query_hotels_invalid_date_range_equal() {
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepo),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let today = chrono::Local::now().date_naive();
+        let q = HotelQuery {
+            session_id: Uuid::new_v4().to_string(),
+            target: "BJ".into(),
+            target_type: TargetType::City,
+            search: None,
+            begin_date: Some(today),
+            end_date: Some(today),
+        };
+        match svc.query_hotels(q).await {
+            Ok(v) => panic!("expected error, got {} items", v.len()),
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("End date must be after begin date")
+            ),
+        }
+    }
+
+    // -------- query_hotel_info --------
+    struct HotelRepoInfoOk {
+        hotel: Hotel,
+        hid: HotelId,
+    }
+    #[async_trait]
+    impl HotelRepository for HotelRepoInfoOk {
+        async fn get_id_by_uuid(&self, _uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
+            Ok(Some(self.hid))
+        }
+        async fn find_by_uuid(&self, _uuid: Uuid) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(Some(self.hotel.clone()))
+        }
+        async fn find_by_city(
+            &self,
+            _city_id: crate::domain::model::city::CityId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn find_by_station(
+            &self,
+            _station_id: crate::domain::model::station::StationId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+    }
+    #[async_trait]
+    impl Repository<Hotel> for HotelRepoInfoOk {
+        async fn find(&self, _id: HotelId) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(Some(self.hotel.clone()))
+        }
+        async fn remove(&self, _aggregate: Hotel) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Hotel) -> Result<HotelId, RepositoryError> {
+            Ok(self.hid)
+        }
+    }
+
+    #[tokio::test]
+    async fn query_hotel_info_success() {
+        // build a minimal Hotel aggregate
+        let city = City::new(
+            Some(CityId::from(1u64)),
+            CityName::from("C".to_string()),
+            ProvinceName::from("P".to_string()),
+        );
+        let station = Station::new(Some(1u64.into()), "S".to_string(), CityId::from(1u64));
+        let hotel_id: HotelId = 10u64.into();
+        let hotel = Hotel::new_full_unchecked(
+            Some(hotel_id),
+            Uuid::new_v4(),
+            "NiceHotel".to_string(),
+            city,
+            station,
+            "Addr".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![],
+            "Info".to_string(),
+        );
+
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(BookingSvc),
+            Arc::new(HotelRepoInfoOk {
+                hotel: hotel.clone(),
+                hid: hotel_id,
+            }),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+
+        let dto = HotelInfoQuery {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: hotel.uuid(),
+        };
+        let out = svc.query_hotel_info(dto).await.unwrap();
+        assert_eq!(out.name, "NiceHotel");
+        assert!(out.picture.is_none());
+    }
+
+    // -------- query_hotel_order_info --------
+    struct BookingSvcMap {
+        map: HashMap<HotelRoomTypeId, HotelRoomStatus>,
+    }
+    #[async_trait]
+    impl HotelBookingService for BookingSvcMap {
+        async fn get_available_room(
+            &self,
+            _hotel_id: HotelId,
+            _booking_date_range: HotelDateRange,
+        ) -> Result<HashMap<HotelRoomTypeId, HotelRoomStatus>, HotelBookingServiceError> {
+            Ok(self.map.clone())
+        }
+        async fn booking_hotel(&self, _order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
+            Ok(())
+        }
+        async fn cancel_hotel(&self, _order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
+            Ok(())
+        }
+        async fn booking_group(
+            &self,
+            _order_uuid_list: Vec<Uuid>,
+            _atomic: bool,
+        ) -> Result<Vec<crate::domain::model::order::HotelOrder>, HotelBookingServiceError>
+        {
+            Ok(vec![])
+        }
+    }
+
+    struct HotelRepoOrderOk {
+        hotel: Hotel,
+        hid: HotelId,
+    }
+    #[async_trait]
+    impl HotelRepository for HotelRepoOrderOk {
+        async fn get_id_by_uuid(&self, _uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
+            Ok(Some(self.hid))
+        }
+        async fn find_by_uuid(&self, _uuid: Uuid) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(Some(self.hotel.clone()))
+        }
+        async fn find_by_city(
+            &self,
+            _city_id: crate::domain::model::city::CityId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+        async fn find_by_station(
+            &self,
+            _station_id: crate::domain::model::station::StationId,
+            _name_pattern: Option<&str>,
+        ) -> Result<Vec<Hotel>, RepositoryError> {
+            Ok(vec![])
+        }
+    }
+    #[async_trait]
+    impl Repository<Hotel> for HotelRepoOrderOk {
+        async fn find(&self, _id: HotelId) -> Result<Option<Hotel>, RepositoryError> {
+            Ok(Some(self.hotel.clone()))
+        }
+        async fn remove(&self, _aggregate: Hotel) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Hotel) -> Result<HotelId, RepositoryError> {
+            Ok(self.hid)
+        }
+    }
+
+    #[tokio::test]
+    async fn query_hotel_order_info_success() {
+        let city = City::new(
+            Some(CityId::from(1u64)),
+            CityName::from("C".to_string()),
+            ProvinceName::from("P".to_string()),
+        );
+        let station = Station::new(Some(1u64.into()), "S".to_string(), CityId::from(1u64));
+        let hotel_id: HotelId = 20u64.into();
+        let rt_with_id = HotelRoomType::new(
+            Some(100u64.into()),
+            Some(hotel_id),
+            "Deluxe".to_string(),
+            2,
+            Decimal::from(100),
+        );
+        let rt_no_id = HotelRoomType::new(
+            None,
+            Some(hotel_id),
+            "Standard".to_string(),
+            3,
+            Decimal::from(80),
+        );
+        let hotel = Hotel::new_full_unchecked(
+            Some(hotel_id),
+            Uuid::new_v4(),
+            "H".to_string(),
+            city,
+            station,
+            "Addr".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![rt_with_id.clone(), rt_no_id.clone()],
+            "Info".to_string(),
+        );
+        let mut map = HashMap::new();
+        map.insert(
+            rt_with_id.get_id().unwrap(),
+            HotelRoomStatus {
+                capacity: 2,
+                remain_count: 3,
+                price: Decimal::from(100),
+            },
+        );
+        let booking = BookingSvcMap { map };
+
+        let svc = HotelServiceImpl::new(
+            Arc::new(RatingSvc {
+                add_mode: AddMode::Ok,
+                quota: 0,
+                used: 0,
+            }),
+            Arc::new(QuerySvcOk),
+            Arc::new(booking),
+            Arc::new(HotelRepoOrderOk {
+                hotel: hotel.clone(),
+                hid: hotel_id,
+            }),
+            Arc::new(UserRepo),
+            Arc::new(SessOk),
+        );
+        let today = chrono::Local::now().date_naive();
+        let q = HotelOrderInfoQuery {
+            session_id: Uuid::new_v4().to_string(),
+            hotel_id: hotel.uuid(),
+            begin_date: Some(today),
+            end_date: Some(today.succ_opt().unwrap()),
+        };
+        let out = svc.query_hotel_order_info(q).await.unwrap();
+        assert_eq!(out.get("Deluxe").unwrap().remain_count, 3);
+        assert_eq!(out.get("Standard").unwrap().remain_count, 3); // fallback to capacity when no id
+    }
+}
