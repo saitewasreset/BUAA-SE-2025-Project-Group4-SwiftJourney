@@ -408,3 +408,1022 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::service::transaction::TransactionApplicationService;
+    use crate::domain::model::order::{
+        BaseOrder, Order, OrderId, OrderStatus, OrderTimeInfo, OrderType, PaymentInfo,
+    };
+    use crate::domain::model::password::{HashedPassword, PasswordSalt};
+    use crate::domain::model::personal_info::PersonalInfoId;
+    use crate::domain::model::user::{
+        IdentityCardId, Phone, RawPassword, RealName, UserInfo, Username,
+    };
+    use crate::domain::{Repository, RepositoryError};
+    use rust_decimal::Decimal;
+
+    use uuid::Uuid;
+
+    // -------- Test helpers --------
+    fn make_user(id: u64) -> User {
+        let username = Username::try_from("tester".to_string()).unwrap();
+        let hp = HashedPassword {
+            hashed_password: vec![1, 2, 3],
+            salt: PasswordSalt::from(vec![9, 9, 9]),
+        };
+        let info = UserInfo::new(
+            RealName::try_from("Alice".to_string()).unwrap(),
+            None,
+            None,
+            Phone::try_from("13012345678".to_string()).unwrap(),
+            None,
+            IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+        );
+        User::new(
+            Some(UserId::from(id)),
+            username,
+            hp,
+            None,
+            Default::default(),
+            info,
+        )
+    }
+
+    #[derive(Debug, Clone)]
+    struct DummyOrder {
+        base: BaseOrder,
+        ty: OrderType,
+    }
+    impl Order for DummyOrder {
+        fn order_id(&self) -> Option<OrderId> {
+            self.base.order_id
+        }
+        fn uuid(&self) -> Uuid {
+            self.base.uuid
+        }
+        fn already_refund(&self) -> bool {
+            self.base.payment_info.refund_transaction_id().is_some()
+        }
+        fn order_status(&self) -> OrderStatus {
+            self.base.order_status
+        }
+        fn order_type(&self) -> OrderType {
+            self.ty
+        }
+        fn order_time_info(&self) -> OrderTimeInfo {
+            self.base.order_time_info
+        }
+        fn unit_price(&self) -> Decimal {
+            self.base.unit_price
+        }
+        fn amount(&self) -> Decimal {
+            self.base.amount
+        }
+        fn payment_info(&self) -> PaymentInfo {
+            self.base.payment_info
+        }
+        fn payment_info_mut(&mut self) -> &mut PaymentInfo {
+            &mut self.base.payment_info
+        }
+        fn personal_info_id(&self) -> PersonalInfoId {
+            self.base.personal_info_id
+        }
+        fn set_status(&mut self, status: OrderStatus) {
+            self.base.order_status = status;
+        }
+    }
+    fn base_order(price_cent: i64, amount: i64, status: OrderStatus) -> BaseOrder {
+        let now: sea_orm::prelude::DateTimeWithTimeZone = chrono::Utc::now().into();
+        BaseOrder::new(
+            None,
+            Uuid::new_v4(),
+            status,
+            OrderTimeInfo::new(now, now, now),
+            Decimal::new(price_cent, 2),
+            Decimal::new(amount, 0),
+            PaymentInfo::new(None, None),
+            PersonalInfoId::from(1_u64),
+        )
+    }
+
+    // -------- Stubs --------
+    struct SessOk;
+    #[async_trait]
+    impl SessionManagerService for SessOk {
+        async fn create_session(
+            &self,
+            _user_id: UserId,
+        ) -> Result<crate::domain::model::session::Session, RepositoryError> {
+            unimplemented!()
+        }
+        async fn delete_session(
+            &self,
+            _session: crate::domain::model::session::Session,
+        ) -> Result<(), RepositoryError> {
+            unimplemented!()
+        }
+        async fn get_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<crate::domain::model::session::Session>, RepositoryError> {
+            Ok(None)
+        }
+        async fn get_user_id_by_session(
+            &self,
+            _session_id: SessionId,
+        ) -> Result<Option<UserId>, RepositoryError> {
+            Ok(Some(UserId::from(1_u64)))
+        }
+        async fn verify_session_id(&self, _session_id_str: &str) -> Result<bool, RepositoryError> {
+            Ok(true)
+        }
+    }
+
+    struct UserRepoOk;
+    #[async_trait]
+    impl Repository<User> for UserRepoOk {
+        async fn find(&self, id: UserId) -> Result<Option<User>, RepositoryError> {
+            Ok(Some(make_user(id.into())))
+        }
+        async fn remove(&self, _aggregate: User) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(&self, _aggregate: &mut User) -> Result<UserId, RepositoryError> {
+            Ok(UserId::from(1_u64))
+        }
+    }
+    #[async_trait]
+    impl UserRepository for UserRepoOk {
+        async fn find_by_phone(&self, _phone: Phone) -> Result<Option<User>, RepositoryError> {
+            Ok(None)
+        }
+        async fn find_by_identity_card_id(
+            &self,
+            _identity_card_id: IdentityCardId,
+        ) -> Result<Option<User>, RepositoryError> {
+            Ok(None)
+        }
+        async fn remove_by_phone(&self, _phone: Phone) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+    }
+
+    struct UserSvc {
+        verify_ok: bool,
+        verify_payment_ok: bool,
+    }
+    #[async_trait]
+    impl UserService for UserSvc {
+        async fn register(
+            &self,
+            _username: Username,
+            _raw_password: RawPassword,
+            _name: RealName,
+            _phone: Phone,
+            _identity_card_id: IdentityCardId,
+        ) -> Result<(), UserServiceError> {
+            unimplemented!()
+        }
+        async fn delete(&self, _phone: Phone) -> Result<(), UserServiceError> {
+            unimplemented!()
+        }
+        async fn verify_password(
+            &self,
+            _user: &User,
+            _raw_password: String,
+        ) -> Result<(), UserServiceError> {
+            if self.verify_ok {
+                Ok(())
+            } else {
+                Err(UserServiceError::InvalidPassword)
+            }
+        }
+        async fn verify_payment_password(
+            &self,
+            _user: &User,
+            _raw_payment_password: String,
+        ) -> Result<(), UserServiceError> {
+            if self.verify_payment_ok {
+                Ok(())
+            } else {
+                Err(UserServiceError::InvalidPassword)
+            }
+        }
+        async fn set_password(
+            &self,
+            _user_id: UserId,
+            _raw_password: String,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+        async fn set_payment_password(
+            &self,
+            _user_id: UserId,
+            _payment_password: Option<PaymentPassword>,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+        async fn set_wrong_payment_password_tried(
+            &self,
+            _user_id: UserId,
+            _password_attempts: crate::domain::model::user::PasswordAttempts,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+        async fn clear_wrong_payment_password_tried(
+            &self,
+            _user_id: UserId,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+        async fn increment_wrong_payment_password_tried(
+            &self,
+            _user_id: UserId,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+        async fn set_user_info(
+            &self,
+            _user_id: UserId,
+            _user_info: UserInfo,
+        ) -> Result<(), UserServiceError> {
+            Ok(())
+        }
+    }
+
+    struct TxSvc {
+        recharge_err: bool,
+        balance: Decimal,
+        pay_err: bool,
+        refund_err: bool,
+        convert_err: bool,
+    }
+    #[async_trait]
+    impl TransactionService for TxSvc {
+        async fn recharge(
+            &self,
+            _user_id: UserId,
+            _amount: TransactionAmountAbs,
+        ) -> Result<Uuid, TransactionServiceError> {
+            if self.recharge_err {
+                Err(TransactionServiceError::InsufficientFunds {
+                    transaction_id: Uuid::new_v4(),
+                    balance: Decimal::ZERO,
+                    amount: TransactionAmountAbs::from(Decimal::new(1, 0)),
+                })
+            } else {
+                Ok(Uuid::new_v4())
+            }
+        }
+        async fn get_balance(&self, _user_id: UserId) -> Result<Decimal, TransactionServiceError> {
+            Ok(self.balance)
+        }
+        async fn new_transaction(
+            &self,
+            _user_id: UserId,
+            _orders: Vec<Box<dyn Order>>,
+            _atomic: bool,
+        ) -> Result<Uuid, TransactionServiceError> {
+            unimplemented!()
+        }
+        async fn pay_transaction(
+            &self,
+            _transaction_id: Uuid,
+        ) -> Result<(), TransactionServiceError> {
+            if self.pay_err {
+                Err(TransactionServiceError::InvalidTransactionId(Uuid::new_v4()))
+            } else {
+                Ok(())
+            }
+        }
+        async fn refund_transaction(
+            &self,
+            _transaction_id: Uuid,
+            _to_refund_orders: &[Box<dyn Order>],
+        ) -> Result<Uuid, TransactionServiceError> {
+            if self.refund_err {
+                Err(TransactionServiceError::RefundError(
+                    crate::domain::model::transaction::RefundError::NotPaid(Uuid::new_v4()),
+                ))
+            } else {
+                Ok(Uuid::new_v4())
+            }
+        }
+        async fn convert_transaction_to_dto(
+            &self,
+            transaction: Transaction,
+        ) -> Result<TransactionDataDto, TransactionServiceError> {
+            if self.convert_err {
+                Err(TransactionServiceError::InvalidTransactionId(
+                    transaction.uuid(),
+                ))
+            } else {
+                Ok(TransactionDataDto {
+                    transaction_id: transaction.uuid().to_string(),
+                    status: transaction.status().to_string(),
+                    create_time: "t".into(),
+                    pay_time: None,
+                    orders: vec![],
+                    amount: transaction.raw_amount().to_f64().unwrap(),
+                })
+            }
+        }
+    }
+
+    struct TxRepo {
+        tx_list: Vec<Transaction>,
+        find_err: bool,
+        save_err: bool,
+    }
+    #[async_trait]
+    impl Repository<Transaction> for TxRepo {
+        async fn find(
+            &self,
+            _id: crate::domain::model::transaction::TransactionId,
+        ) -> Result<Option<Transaction>, RepositoryError> {
+            Ok(None)
+        }
+        async fn remove(&self, _aggregate: Transaction) -> Result<(), RepositoryError> {
+            Ok(())
+        }
+        async fn save(
+            &self,
+            _aggregate: &mut Transaction,
+        ) -> Result<crate::domain::model::transaction::TransactionId, RepositoryError> {
+            if self.save_err {
+                Err(RepositoryError::Db(anyhow::anyhow!("x")))
+            } else {
+                Ok(crate::domain::model::transaction::TransactionId::from(
+                    1_u64,
+                ))
+            }
+        }
+    }
+    #[async_trait]
+    impl TransactionRepository for TxRepo {
+        async fn find_by_uuid(&self, _uuid: Uuid) -> Result<Option<Transaction>, RepositoryError> {
+            Ok(None)
+        }
+        async fn find_by_user_id(
+            &self,
+            _user_id: UserId,
+        ) -> Result<Vec<Transaction>, RepositoryError> {
+            if self.find_err {
+                Err(RepositoryError::Db(anyhow::anyhow!("fail")))
+            } else {
+                Ok(self.tx_list.clone())
+            }
+        }
+        async fn get_user_balance(
+            &self,
+            _user_id: UserId,
+        ) -> Result<Option<Decimal>, RepositoryError> {
+            Ok(None)
+        }
+    }
+
+    // -------- Tests --------
+    type AppType = TransactionApplicationServiceImpl<SessOk, TxSvc, TxRepo, UserSvc, UserRepoOk>;
+    fn make_app(
+        debug: bool,
+        sess: Arc<SessOk>,
+        txs: Arc<TxSvc>,
+        repo: Arc<TxRepo>,
+        us: Arc<UserSvc>,
+        ur: Arc<UserRepoOk>,
+    ) -> AppType {
+        TransactionApplicationServiceImpl::new(debug, sess, txs, repo, us, ur)
+    }
+
+    #[tokio::test]
+    async fn recharge_invalid_session_format() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .recharge(RechargeCommand {
+                session_id: "not-a-uuid".into(),
+                amount: 10.0,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 403);
+    }
+
+    #[tokio::test]
+    async fn recharge_invalid_amount_nan() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .recharge(RechargeCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: f64::NAN,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 400);
+    }
+
+    #[tokio::test]
+    async fn recharge_insufficient_funds_mapping() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: true,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .recharge(RechargeCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: 1.0,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 11004);
+    }
+
+    #[tokio::test]
+    async fn query_balance_success() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::new(12345, 2),
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let dto = app
+            .query_balance(BalanceQuery {
+                session_id: Uuid::new_v4().to_string(),
+            })
+            .await
+            .unwrap();
+        assert!((dto.balance - 123.45).abs() < 1e-6);
+    }
+
+    #[tokio::test]
+    async fn query_transactions_repo_error() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: true,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .query_transactions(TransactionQuery {
+                session_id: Uuid::new_v4().to_string(),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 500);
+    }
+
+    #[tokio::test]
+    async fn set_payment_password_invalid_format() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .set_payment_password(SetPaymentPasswordCommand {
+                session_id: Uuid::new_v4().to_string(),
+                user_password: "abc".into(),
+                payment_password: "12x456".into(),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 11007);
+    }
+
+    #[tokio::test]
+    async fn set_payment_password_wrong_user_password() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: false,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .set_payment_password(SetPaymentPasswordCommand {
+                session_id: Uuid::new_v4().to_string(),
+                user_password: "bad".into(),
+                payment_password: "123456".into(),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 11002);
+    }
+
+    #[tokio::test]
+    async fn pay_transaction_missing_passwords() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .pay_transaction(PayTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                transaction_id: Uuid::new_v4(),
+                user_password: None,
+                payment_password: None,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 400);
+    }
+
+    #[tokio::test]
+    async fn pay_transaction_wrong_payment_password_maps_to_user_wrong() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: false,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .pay_transaction(PayTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                transaction_id: Uuid::new_v4(),
+                user_password: None,
+                payment_password: Some("123456".into()),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 11002);
+    }
+
+    #[tokio::test]
+    async fn generate_debug_transaction_mode_off() {
+        let app = make_app(
+            false,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .generate_debug_transaction(GenerateDebugTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: 12.3,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 403);
+    }
+
+    #[tokio::test]
+    async fn generate_debug_transaction_negative_amount() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .generate_debug_transaction(GenerateDebugTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: -1.0,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 400);
+    }
+
+    #[tokio::test]
+    async fn generate_debug_transaction_repo_save_error() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: true,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .generate_debug_transaction(GenerateDebugTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: 1.0,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 500);
+    }
+
+    #[tokio::test]
+    async fn generate_debug_transaction_success() {
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let dto = app
+            .generate_debug_transaction(GenerateDebugTransactionCommand {
+                session_id: Uuid::new_v4().to_string(),
+                amount: 12.34,
+            })
+            .await
+            .unwrap();
+        assert!((dto.amount - 12.34).abs() < 1e-6);
+        assert_eq!(dto.status, "unpaid");
+    }
+
+    #[tokio::test]
+    async fn query_transaction_details_convert_error() {
+        let tx = Transaction::new_debug(
+            UserId::from(1_u64),
+            TransactionAmountAbs::from(Decimal::new(1000, 2)),
+        );
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: true,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![tx],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let res = app
+            .query_transaction_details(TransactionDetailQuery {
+                session_id: Uuid::new_v4().to_string(),
+            })
+            .await;
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.error_code(), 500);
+    }
+
+    #[tokio::test]
+    async fn query_transaction_details_success() {
+        let tx = Transaction::new_debug(
+            UserId::from(1_u64),
+            TransactionAmountAbs::from(Decimal::new(1000, 2)),
+        );
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![tx],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let list = app
+            .query_transaction_details(TransactionDetailQuery {
+                session_id: Uuid::new_v4().to_string(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(list.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_not_found() {
+        let tx = Transaction::new_debug(
+            UserId::from(1_u64),
+            TransactionAmountAbs::from(Decimal::new(1000, 2)),
+        );
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![tx],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .cancel_order(CancelOrderCommand {
+                session_id: Uuid::new_v4().to_string(),
+                order_id: Uuid::new_v4(),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 404);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_refund_error_mapping() {
+        // build tx with one order matching target order id
+        let order_id = Uuid::new_v4();
+        let order: Box<dyn Order> = Box::new(DummyOrder {
+            base: BaseOrder {
+                uuid: order_id,
+                ..base_order(1000, 1, OrderStatus::Paid)
+            },
+            ty: OrderType::Train,
+        });
+        let tx = Transaction::new(UserId::from(1_u64), vec![order], false);
+
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: true,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![tx],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        let err = app
+            .cancel_order(CancelOrderCommand {
+                session_id: Uuid::new_v4().to_string(),
+                order_id,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.error_code(), 11005);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_success() {
+        let order_id = Uuid::new_v4();
+        let order: Box<dyn Order> = Box::new(DummyOrder {
+            base: BaseOrder {
+                uuid: order_id,
+                ..base_order(1000, 1, OrderStatus::Paid)
+            },
+            ty: OrderType::Train,
+        });
+        let tx = Transaction::new(UserId::from(1_u64), vec![order], false);
+        let app = make_app(
+            true,
+            Arc::new(SessOk),
+            Arc::new(TxSvc {
+                recharge_err: false,
+                balance: Decimal::ZERO,
+                pay_err: false,
+                refund_err: false,
+                convert_err: false,
+            }),
+            Arc::new(TxRepo {
+                tx_list: vec![tx],
+                find_err: false,
+                save_err: false,
+            }),
+            Arc::new(UserSvc {
+                verify_ok: true,
+                verify_payment_ok: true,
+            }),
+            Arc::new(UserRepoOk),
+        );
+        assert!(
+            app.cancel_order(CancelOrderCommand {
+                session_id: Uuid::new_v4().to_string(),
+                order_id
+            })
+            .await
+            .is_ok()
+        );
+    }
+}
