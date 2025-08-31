@@ -26,11 +26,49 @@
  * Become a Helldiver!
  */
 pub mod data;
+pub mod event;
 pub mod utils;
 
 use phf::{Set, phf_set};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MicroService {
+    User,
+    Geo,
+    Train,
+    Hotel,
+    Dish,
+    Order,
+    ObjectStorage,
+    Message,
+}
+
+impl MicroService {
+    /// 返回枚举成员的小写字符串表示。
+    pub fn name(&self) -> &'static str {
+        match self {
+            MicroService::User => "user",
+            MicroService::Geo => "geo",
+            MicroService::Train => "train",
+            MicroService::Hotel => "hotel",
+            MicroService::Dish => "dish",
+            MicroService::Order => "order",
+            MicroService::ObjectStorage => "object_storage",
+            MicroService::Message => "message",
+        }
+    }
+}
+
+// 手动实现 Display 特征
+impl std::fmt::Display for MicroService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // 直接调用辅助方法，将小写名称写入格式化器
+        write!(f, "{}", self.name())
+    }
+}
 
 pub static PHONE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^1[3-9]\d{9}$").expect("Failed to create phone validation regex")
