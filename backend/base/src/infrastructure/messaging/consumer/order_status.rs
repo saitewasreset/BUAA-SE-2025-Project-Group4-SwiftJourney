@@ -386,3 +386,362 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::anyhow;
+    use rust_decimal::Decimal;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    use crate::domain::model::order::{
+        BaseOrder, DishOrder, OrderStatus, OrderTimeInfo, OrderType, PaymentInfo, TrainOrder,
+    };
+    use crate::domain::model::personal_info::PreferredSeatLocation;
+    use crate::domain::model::train::{SeatType, SeatTypeName};
+    use crate::domain::model::train_schedule::{Seat, SeatLocationInfo, SeatStatus, StationRange};
+    use crate::domain::model::transaction::Transaction;
+    use crate::domain::service::hotel_booking::HotelBookingServiceError;
+    use crate::domain::service::order_status::{
+        OrderStatusConsumerError, OrderStatusMessage, OrderStatusMessagePack,
+    };
+
+    use crate::domain::service::mock::{
+        dish_booking::MockDishBookingService, hotel_booking::MockHotelBookingService,
+        takeaway_booking::MockTakeawayBookingService, train_booking::MockTrainBookingService,
+        transaction::MockTransactionService,
+    };
+    use crate::domain::service::takeaway_booking::TakeawayBookingServiceError;
+    use crate::domain::service::ServiceError;
+
+    // -------------------- TrainOrderStatusConsumer --------------------
+    #[tokio::test]
+    async fn test_train_consumer_success_booking_and_cancel() {
+        let mut mock_train = MockTrainBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let order_id1 = Uuid::new_v4();
+        let order_id2 = Uuid::new_v4();
+
+        mock_train
+            .expect_booking_group()
+            .returning(|_, _| Ok(vec![]));
+        mock_train.expect_cancel_ticket().returning(|_| Ok(()));
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(order_id1));
+
+        let consumer = TrainOrderStatusConsumer::new(Arc::new(mock_train), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: true,
+            messages: vec![
+                OrderStatusMessage {
+                    order_id: order_id1,
+                    order_type: OrderType::Train,
+                    new_status: OrderStatus::Paid,
+                },
+                OrderStatusMessage {
+                    order_id: order_id2,
+                    order_type: OrderType::Train,
+                    new_status: OrderStatus::Cancelled,
+                },
+            ],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_train_consumer_invalid_order_type() {
+        let mut mock_train = MockTrainBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let train_order = TrainOrder::new(
+            base_order,
+            1u64.into(),
+            Some(Seat::new(
+                1u64.into(),
+                SeatType::new(
+                    Some(1u64.into()),
+                    SeatTypeName::from_unchecked("二等座".to_string()),
+                    1,
+                    Decimal::new(1000, 2),
+                ),
+                SeatLocationInfo {
+                    carriage: 3,
+                    row: 11,
+                    location: 'A',
+                },
+                SeatStatus::Occupied,
+            )),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            Some(PreferredSeatLocation::A),
+            StationRange::from_unchecked(1u64.into(), 1u64.into()),
+        );
+
+        mock_train
+            .expect_booking_group()
+            .returning(move |_, _| Ok(vec![train_order.clone()]));
+
+        let transaction_uuid = Uuid::new_v4();
+
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(transaction_uuid));
+
+        let consumer = TrainOrderStatusConsumer::new(Arc::new(mock_train), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid,
+            atomic: false,
+            messages: vec![OrderStatusMessage {
+                order_id: Uuid::new_v4(),
+                order_type: OrderType::Hotel,
+                new_status: OrderStatus::Paid,
+            }],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    // -------------------- HotelOrderStatusConsumer --------------------
+    #[tokio::test]
+    async fn test_hotel_consumer_success() {
+        let mut mock_hotel = MockHotelBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let order_id1 = Uuid::new_v4();
+        let order_id2 = Uuid::new_v4();
+
+        mock_hotel
+            .expect_booking_group()
+            .returning(|_, _| Ok(vec![]));
+        mock_hotel.expect_cancel_hotel().returning(|_| Ok(()));
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(order_id1));
+
+        let consumer = HotelOrderStatusConsumer::new(Arc::new(mock_hotel), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: true,
+            messages: vec![
+                OrderStatusMessage {
+                    order_id: order_id1,
+                    order_type: OrderType::Hotel,
+                    new_status: OrderStatus::Paid,
+                },
+                OrderStatusMessage {
+                    order_id: order_id2,
+                    order_type: OrderType::Hotel,
+                    new_status: OrderStatus::Cancelled,
+                },
+            ],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_hotel_consumer_related_service_error() {
+        let mut mock_hotel = MockHotelBookingService::new();
+        let mock_tx = MockTransactionService::new();
+
+        mock_hotel.expect_booking_group().returning(|_, _| {
+            Err(HotelBookingServiceError::InfrastructureError(
+                ServiceError::RelatedServiceError(anyhow!("some error")),
+            ))
+        });
+
+        let consumer = HotelOrderStatusConsumer::new(Arc::new(mock_hotel), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: false,
+            messages: vec![OrderStatusMessage {
+                order_id: Uuid::new_v4(),
+                order_type: OrderType::Hotel,
+                new_status: OrderStatus::Paid,
+            }],
+        };
+
+        assert!(matches!(
+            consumer.consume(msg_pack).await,
+            Err(OrderStatusConsumerError::RelatedServiceError(_))
+        ));
+    }
+
+    // -------------------- DishOrderStatusConsumer --------------------
+    #[tokio::test]
+    async fn test_dish_consumer_success() {
+        let mut mock_dish = MockDishBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let order_id1 = Uuid::new_v4();
+        let order_id2 = Uuid::new_v4();
+
+        mock_dish
+            .expect_booking_group()
+            .returning(|_, _| Ok(vec![]));
+        mock_dish.expect_cancel_dish().returning(|_| Ok(()));
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(order_id1));
+
+        let consumer = DishOrderStatusConsumer::new(Arc::new(mock_dish), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: true,
+            messages: vec![
+                OrderStatusMessage {
+                    order_id: order_id1,
+                    order_type: OrderType::Dish,
+                    new_status: OrderStatus::Unpaid,
+                },
+                OrderStatusMessage {
+                    order_id: order_id2,
+                    order_type: OrderType::Dish,
+                    new_status: OrderStatus::Cancelled,
+                },
+            ],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_dish_consumer_unexpected_status() {
+        let mut mock_dish = MockDishBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let train_order_id = 1u64.into();
+        let dish_id = 1u64.into();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let dish_order = DishOrder::new(
+            base_order.clone(),
+            train_order_id,
+            dish_id,
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+        );
+
+        let transaction_id = Uuid::new_v4();
+
+        mock_dish
+            .expect_booking_group()
+            .returning(move |_, _| Ok(vec![dish_order.clone()]));
+
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(transaction_id));
+
+        let consumer = DishOrderStatusConsumer::new(Arc::new(mock_dish), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: transaction_id,
+            atomic: false,
+            messages: vec![OrderStatusMessage {
+                order_id: Uuid::new_v4(),
+                order_type: OrderType::Dish,
+                new_status: OrderStatus::Unpaid,
+            }],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    // -------------------- TakeawayOrderStatusConsumer --------------------
+    #[tokio::test]
+    async fn test_takeaway_consumer_success() {
+        let mut mock_takeaway = MockTakeawayBookingService::new();
+        let mut mock_tx = MockTransactionService::new();
+
+        let order_id1 = Uuid::new_v4();
+        let order_id2 = Uuid::new_v4();
+
+        mock_takeaway
+            .expect_booking_group()
+            .returning(|_, _| Ok(vec![]));
+        mock_takeaway.expect_cancel_takeaway().returning(|_| Ok(()));
+        mock_tx
+            .expect_refund_transaction()
+            .returning(move |_, _| Ok(order_id1));
+
+        let consumer = TakeawayOrderStatusConsumer::new(Arc::new(mock_takeaway), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: true,
+            messages: vec![
+                OrderStatusMessage {
+                    order_id: order_id1,
+                    order_type: OrderType::Takeaway,
+                    new_status: OrderStatus::Unpaid,
+                },
+                OrderStatusMessage {
+                    order_id: order_id2,
+                    order_type: OrderType::Takeaway,
+                    new_status: OrderStatus::Cancelled,
+                },
+            ],
+        };
+
+        assert!(consumer.consume(msg_pack).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_takeaway_consumer_booking_group_error() {
+        let mut mock_takeaway = MockTakeawayBookingService::new();
+        let mock_tx = MockTransactionService::new();
+
+        mock_takeaway.expect_booking_group().returning(|_, _| {
+            Err(TakeawayBookingServiceError::InfrastructureError(
+                ServiceError::RelatedServiceError(anyhow!("some error")),
+            ))
+        });
+
+        let consumer = TakeawayOrderStatusConsumer::new(Arc::new(mock_takeaway), Arc::new(mock_tx));
+
+        let msg_pack = OrderStatusMessagePack {
+            transaction_uuid: Uuid::new_v4(),
+            atomic: false,
+            messages: vec![OrderStatusMessage {
+                order_id: Uuid::new_v4(),
+                order_type: OrderType::Takeaway,
+                new_status: OrderStatus::Unpaid,
+            }],
+        };
+
+        assert!(matches!(
+            consumer.consume(msg_pack).await,
+            Err(OrderStatusConsumerError::RelatedServiceError(_))
+        ));
+    }
+}
