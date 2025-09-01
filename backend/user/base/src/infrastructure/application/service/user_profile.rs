@@ -239,6 +239,7 @@ mod tests {
         }
         #[async_trait]
         impl UserRepository for UserRepository {
+            async fn load_all_raw(&self) -> Result<Vec<crate::models::user::Model>, RepositoryError>;
             async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError>;
             async fn find_by_identity_card_id(&self, identity_card_id: IdentityCardId) -> Result<Option<User>, RepositoryError>;
             async fn remove_by_phone(&self, phone: Phone) -> Result<(), RepositoryError>;

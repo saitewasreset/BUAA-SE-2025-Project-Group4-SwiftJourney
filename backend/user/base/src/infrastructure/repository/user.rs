@@ -25,6 +25,7 @@ use shared::domain::{AggregateManagerImpl, DiffInfo};
 use shared::impl_db_id_from_u64;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use tracing::instrument;
 
 impl_db_id_from_u64!(UserId, i32, "user id");
 
@@ -312,6 +313,14 @@ impl DbRepositorySupport<User> for UserRepositoryImpl {
 
 #[async_trait]
 impl UserRepository for UserRepositoryImpl {
+    #[instrument(skip(self))]
+    async fn load_all_raw(&self) -> Result<Vec<crate::models::user::Model>, RepositoryError> {
+        crate::models::user::Entity::find()
+            .all(&self.db)
+            .await
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
+
     async fn find_by_phone(&self, phone: Phone) -> Result<Option<User>, RepositoryError> {
         let phone: String = phone.into();
 

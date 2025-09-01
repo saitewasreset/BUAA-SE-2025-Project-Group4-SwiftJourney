@@ -132,6 +132,14 @@ impl Session {
         self.user_id
     }
 
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    pub fn expires_at(&self) -> DateTime<Utc> {
+        self.expires_at
+    }
+
     /// 检查会话是否已过期
     ///
     /// 根据系统当前时间与`expires_at`比较

@@ -30,6 +30,7 @@ pub mod application_error;
 pub mod data;
 pub mod domain;
 pub mod event;
+pub mod internal;
 pub mod macros;
 pub mod utils;
 

@@ -18,6 +18,9 @@ use shared::domain::{Repository, RepositoryError};
 /// - `find_by_user_id_and_identity_card`: 根据用户ID和身份证号查询个人信息
 #[async_trait]
 pub trait PersonalInfoRepository: Repository<PersonalInfo> {
+    async fn load_all_raw(&self)
+    -> Result<Vec<crate::models::person_info::Model>, RepositoryError>;
+
     /// 根据用户ID查询个人信息
     ///
     /// # Arguments

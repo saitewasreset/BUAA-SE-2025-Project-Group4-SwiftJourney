@@ -17,9 +17,9 @@ use shared::domain::{AggregateManagerImpl, DiffInfo};
 use shared::domain::{
     DbId, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
-use std::sync::{Arc, Mutex};
-
 use shared::impl_db_id_from_u64;
+use std::sync::{Arc, Mutex};
+use tracing::instrument;
 
 impl_db_id_from_u64!(PersonalInfoId, i32, "personal info");
 
@@ -263,6 +263,16 @@ impl DbRepositorySupport<PersonalInfo> for PersonalInfoRepositoryImpl {
 
 #[async_trait]
 impl PersonalInfoRepository for PersonalInfoRepositoryImpl {
+    #[instrument(skip(self))]
+    async fn load_all_raw(
+        &self,
+    ) -> Result<Vec<crate::models::person_info::Model>, RepositoryError> {
+        crate::models::person_info::Entity::find()
+            .all(&self.db)
+            .await
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
+
     /// 根据用户ID查询多个个人信息
     ///
     /// # Arguments

@@ -302,6 +302,8 @@ mod tests {
         }
         #[async_trait]
         impl PersonalInfoRepository for PersonalInfoRepository {
+            async fn load_all_raw(&self)
+    -> Result<Vec<crate::models::person_info::Model>, RepositoryError>;
             async fn find_by_user_id(&self, user_id: UserId) -> Result<Vec<PersonalInfo>, RepositoryError>;
             async fn find_by_user_id_and_identity_card(&self, user_id: UserId, identity_card_id: IdentityCardId) -> Result<Option<PersonalInfo>, RepositoryError>;
         }
