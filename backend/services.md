@@ -13,6 +13,7 @@
   - 用`++`标注的表，表示拆分后该表将不再属于当前微服务，需要跨微服务访问，例如：`++station`
 - Tables：该微服务的数据库应当包含的表
 - Depends：该微服务中仓储的运行依赖于其它微服务中的数据库中的表
+- Duplicates：为了支持跨微服务的数据库连接操作，使用非规范化设计，冗余存储需要的表，并根据领域事件进行同步。
 
 拆分前的数据库表：
 
@@ -51,6 +52,8 @@
 ```
 
 Events：
+
+领域事件以及其触发途径，接收到领域事件后，应当同步相关的表。
 
 - `CityUpdatedEvent`
   - `load_city`：`base/src/infrastructure/application/service/train_data.rs:165`
