@@ -25,14 +25,23 @@
  * Become a LEGEND.
  * Become a Helldiver!
  */
+pub mod api;
+pub mod application_error;
 pub mod data;
+pub mod domain;
 pub mod event;
+pub mod macros;
 pub mod utils;
 
 use phf::{Set, phf_set};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Unverified;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Verified;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MicroService {
