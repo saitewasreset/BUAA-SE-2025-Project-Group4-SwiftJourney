@@ -86,7 +86,7 @@ Events：
 - `TakeawayDishUpdatedEvent()`
   - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 
-## User
+## User(Err: 90XXX)
 
 Service:
 
@@ -144,7 +144,7 @@ Tables:
 - `user`
 - `personal_info`
 
-## Geo
+## Geo(Err: 91XXX)
 
 Service:
 
@@ -192,7 +192,7 @@ Tables:
 - `city`
 - `station`
 
-## Train
+## Train(Err: 92XXX)
 
 Service:
 
@@ -302,7 +302,7 @@ Duplicates:
   - `PersonalInfoUpdatedEvent(user_id)`
     - `set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
 
-## Hotel
+## Hotel(Err: 93XXX)
 
 Service:
 
@@ -398,7 +398,7 @@ Duplicates:
   - `PersonalInfoUpdatedEvent(user_id)`
     - `set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
 
-## Dish
+## Dish(Err: 94XXX)
 
 Service:
 
@@ -457,7 +457,7 @@ Duplicates:
   - `RouteUpdatedEvent()`
     - `save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
 
-## Order
+## Order(Err: 95XXX)
 
 Service:
 
@@ -617,14 +617,14 @@ Duplicates:
   - `TakeawayDishUpdatedEvent()`
     - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 
-## ObjectStorageService
+## ObjectStorageService(Err: 96XXX)
 
 - Internal Service
   - `+put_object(object_category: ObjectCategory, content_type: &str, object: Vec<u8>) -> Result<Uuid>;`
   - `+get_object(object_category: ObjectCategory, object_id: Uuid) -> Result<ObjectInfo>;`
   - `+delete_object(object_category: ObjectCategory, object_id: Uuid) -> Result<()>;`
 
-## Message(Unused)
+## Message(Unused)(Err: 97XXX)
 
 如下服务似乎未在其它代码中使用，故可能不需要拆分。
 
