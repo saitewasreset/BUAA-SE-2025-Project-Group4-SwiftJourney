@@ -2,6 +2,7 @@ use crate::domain::model::personal_info::PersonalInfo;
 use crate::domain::model::session::Session;
 use crate::domain::model::user::UserInfo;
 use async_trait::async_trait;
+use shared::application_error::ApplicationError;
 use shared::domain::Identifiable;
 use shared::internal::user::command::{
     ClearWrongPaymentPasswordTriedCommand, SessionQuery, SetPaymentPasswordCommand, UserInfoQuery,
@@ -22,6 +23,21 @@ pub enum UserInternalServiceError {
     InvalidSessionId(String),
     #[error(transparent)]
     RelatedServiceError(#[from] anyhow::Error),
+}
+
+impl ApplicationError for UserInternalServiceError {
+    fn error_code(&self) -> u32 {
+        match self {
+            Self::NoSuchUser(_) => 900000,
+            Self::InvalidPaymentPassword(_) => 90001,
+            Self::InvalidSessionId(_) => 90002,
+            Self::RelatedServiceError(_) => 90003,
+        }
+    }
+
+    fn error_message(&self) -> String {
+        self.to_string()
+    }
 }
 
 impl From<Session> for SessionDTO {

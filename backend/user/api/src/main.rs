@@ -31,6 +31,7 @@ use sea_orm::Database;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
 use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
+use user_base::application::service::internal::UserInternalService;
 use user_base::application::service::personal_info::PersonalInfoService;
 use user_base::application::service::user_manager::UserManagerService;
 use user_base::application::service::user_profile::UserProfileService;
@@ -45,6 +46,7 @@ use user_base::infrastructure::application::service::user_profile::UserProfileSe
 use user_base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use user_base::infrastructure::repository::session::SessionRepositoryImpl;
 use user_base::infrastructure::repository::user::UserRepositoryImpl;
+use user_base::infrastructure::service::internal::UserInternalServiceImpl;
 use user_base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use user_base::infrastructure::service::session::SessionManagerServiceImpl;
 use user_base::infrastructure::service::user::UserServiceImpl;
@@ -98,6 +100,13 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&personal_info_repository_impl),
     ));
 
+    let user_internal_service_impl = Arc::new(UserInternalServiceImpl::new(
+        Arc::clone(&user_service_impl),
+        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&user_repository_impl),
+        Arc::clone(&personal_info_repository_impl),
+    ));
+
     let user_repository: web::Data<dyn UserRepository> =
         web::Data::from(user_repository_impl as Arc<dyn UserRepository>);
 
@@ -115,6 +124,24 @@ async fn main() -> std::io::Result<()> {
 
     let personal_info_service: web::Data<dyn PersonalInfoService> =
         web::Data::from(personal_info_service_impl as Arc<dyn PersonalInfoService>);
+
+    let user_internal_service: web::Data<dyn UserInternalService> =
+        web::Data::from(user_internal_service_impl as Arc<dyn UserInternalService>);
+
+    tokio::task::spawn(async move {
+        HttpServer::new(move || {
+            App::new()
+                .app_data(user_internal_service.clone())
+                .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
+                .wrap(TracingLogger::default())
+                .service(web::scope("/internal").configure(user_api::internal::scoped_config))
+        })
+        .bind(("0.0.0.0", 23333))
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
+    });
 
     HttpServer::new(move || {
         App::new()
