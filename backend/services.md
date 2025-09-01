@@ -112,7 +112,7 @@ Service:
   - `+get_session(session_id: SessionId) -> Result<Option<Session>>;` + `+verify_session_id(session_id_str: &str) -> Result<bool>;` + `+get_user_id_by_session(session_id: SessionId) -> Result<Option<UserId>>;`
   - `+get_user_info(user_id: UserId) -> Result<Vec<PersonalInfo> + User + UserInfo>`
   - `+db_get_user_info() -> Result<Vec<models::User>>`
-  - `+db_get_personal_info_by_user_id(uesr_id: UserId) -> Result<Vec<models::PerosnalInfo>>`
+  - `+db_get_personal_info() -> Result<Vec<models::PerosnalInfo>>`
 - Domain Service
   - `UserService`
     - `register(username: Username, raw_password: RawPassword, name: RealName, phone: Phone, identity_card_id: IdentityCardId,) -> Result<()>;`
