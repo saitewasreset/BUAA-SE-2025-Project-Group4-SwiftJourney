@@ -7,10 +7,10 @@
 //! - 城市到省份的映射管理
 //! - 城市信息的增删改查
 //! - 城市名称和省份名称的关联查询
-use crate::domain::Identifiable;
 use crate::domain::model::city::{City, CityId, CityName, ProvinceName};
 use crate::domain::repository::city::CityRepository;
 use crate::domain::service::geo::{GeoService, GeoServiceError};
+use crate::domain::Identifiable;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -176,5 +176,210 @@ where
         } else {
             Err(GeoServiceError::NoSuchCityId(city_id.into()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::repository::mock::city::MockCityRepository;
+    use crate::domain::service::geo::GeoService;
+    use crate::domain::RepositoryError;
+    use anyhow::anyhow;
+    use mockall::predicate::*;
+    use std::sync::Arc;
+
+    fn sample_city(id: u64, name: String, province: String) -> City {
+        City::new(
+            Some(id.into()),
+            CityName::from(name),
+            ProvinceName::from(province),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_city_map_success() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_load().returning(|| {
+            Ok(vec![
+                sample_city(1, "Shanghai".to_string(), "Shanghai".to_string()),
+                sample_city(2, "Hangzhou".to_string(), "Zhejiang".to_string()),
+            ])
+        });
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service.get_city_map().await.unwrap();
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key(&ProvinceName::from("Shanghai".to_string())));
+        assert!(result.contains_key(&ProvinceName::from("Zhejiang".to_string())));
+    }
+
+    #[tokio::test]
+    async fn test_get_city_map_error() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_load()
+            .returning(|| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service.get_city_map().await;
+        assert!(matches!(
+            result,
+            Err(GeoServiceError::InfrastructureError(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_city_by_name_found() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_find_by_name()
+            .with(eq("Shanghai"))
+            .returning(|_| {
+                Ok(vec![sample_city(
+                    1u64,
+                    "Shanghai".to_string(),
+                    "Shanghai".to_string(),
+                )])
+            });
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service.get_city_by_name("Shanghai").await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(
+            result.unwrap().name(),
+            &CityName::from("Shanghai".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_city_by_name_not_found() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_find_by_name()
+            .with(eq("Unknown"))
+            .returning(|_| Ok(vec![]));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service.get_city_by_name("Unknown").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_add_city_success() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_find_by_name()
+            .with(eq("NewCity"))
+            .returning(|_| Ok(vec![]));
+
+        repo.expect_save().returning(|city: &mut City| {
+            city.set_id(1u64.into());
+            Ok(1u64.into())
+        });
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let city = sample_city(0, "NewCity".to_string(), "SomeProvince".to_string());
+        let id = service.add_city(city).await.unwrap();
+
+        assert_eq!(id, 1u64.into());
+    }
+
+    #[tokio::test]
+    async fn test_add_city_already_exists() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_find_by_name()
+            .with(eq("Shanghai"))
+            .returning(|_| {
+                Ok(vec![sample_city(
+                    1,
+                    "Shanghai".to_string(),
+                    "Shanghai".to_string(),
+                )])
+            });
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let city = sample_city(0, "Shanghai".to_string(), "Shanghai".to_string());
+        let result = service.add_city(city).await;
+
+        assert!(matches!(result, Err(GeoServiceError::CityExists(_))));
+    }
+
+    #[tokio::test]
+    async fn test_remove_city_success() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_remove().returning(|_| Ok(()));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let city = sample_city(1, "Shanghai".to_string(), "Shanghai".to_string());
+        let result = service.remove_city(city).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_city_error() {
+        let mut repo = MockCityRepository::new();
+        repo.expect_remove()
+            .returning(|_| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let city = sample_city(1, "Shanghai".to_string(), "Shanghai".to_string());
+        let result = service.remove_city(city).await;
+
+        assert!(matches!(
+            result,
+            Err(GeoServiceError::InfrastructureError(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_modify_city_success() {
+        let city_id: CityId = 1u64.into();
+        let mut repo = MockCityRepository::new();
+        repo.expect_find().with(eq(city_id)).returning(|_| {
+            Ok(Some(sample_city(
+                1,
+                "Old".to_string(),
+                "OldProv".to_string(),
+            )))
+        });
+
+        repo.expect_save().returning(|_| Ok(1u64.into()));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service
+            .modify_city(
+                1u64.into(),
+                CityName::from("New".to_string()),
+                ProvinceName::from("NewProv".to_string()),
+            )
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_modify_city_not_found() {
+        let city_id: CityId = 999u64.into();
+        let mut repo = MockCityRepository::new();
+        repo.expect_find().with(eq(city_id)).returning(|_| Ok(None));
+
+        let service = GeoServiceImpl::new(Arc::new(repo));
+
+        let result = service
+            .modify_city(
+                999u64.into(),
+                CityName::from("X".to_string()),
+                ProvinceName::from("Y".to_string()),
+            )
+            .await;
+
+        assert!(matches!(result, Err(GeoServiceError::NoSuchCityId(_))));
     }
 }
