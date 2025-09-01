@@ -4705,14 +4705,17 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
+ "actix-web",
  "anyhow",
  "async-trait",
  "chrono",
+ "dyn-fmt",
  "lapin 3.2.1",
  "phf",
  "regex",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5506,6 +5509,63 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+]
+
+[[package]]
+name = "user_api"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "actix-ws",
+ "chrono",
+ "dotenvy",
+ "dyn-fmt",
+ "migration",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "user_base",
+ "uuid",
+]
+
+[[package]]
+name = "user_base"
+version = "0.1.0"
+dependencies = [
+ "actix-ws",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "aws-sdk-s3",
+ "chrono",
+ "claims",
+ "dashmap",
+ "dyn-clone",
+ "dyn-fmt",
+ "email_address",
+ "id_macro",
+ "lapin 2.5.3",
+ "mockall",
+ "petgraph",
+ "phf",
+ "regex",
+ "rust_decimal",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
