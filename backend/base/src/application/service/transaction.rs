@@ -9,6 +9,7 @@ use crate::domain::service::transaction::TransactionServiceError;
 use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
+use shared::internal::order::dto::TransactionInfoDTO;
 use thiserror::Error;
 use uuid::Uuid;
 

@@ -1,7 +1,7 @@
-use super::transaction::TransactionInfoDTO;
 use crate::application::ApplicationError;
 use crate::application::commands::hotel_order::HotelOrderRequestsDTO;
 use async_trait::async_trait;
+use shared::internal::order::dto::TransactionInfoDTO;
 
 #[async_trait]
 pub trait HotelOrderService: 'static + Send + Sync {

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::transaction::TransactionInfoDTO;
+use shared::internal::order::dto::TransactionInfoDTO;
 
 // 定义请求数据结构
 #[derive(Serialize, Deserialize, Debug)]

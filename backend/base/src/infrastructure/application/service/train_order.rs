@@ -4,7 +4,6 @@ use crate::application::service::train_order::CreateTrainOrderDTO;
 use crate::application::service::train_order::OrderPackDTO;
 use crate::application::service::train_order::TrainOrderService;
 use crate::application::service::train_order::TrainOrderServiceError;
-use crate::application::service::transaction::TransactionInfoDTO;
 use crate::domain::Identifiable;
 use crate::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
@@ -31,6 +30,7 @@ use chrono::Timelike;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::internal::order::dto::TransactionInfoDTO;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;

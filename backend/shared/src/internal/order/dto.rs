@@ -5,5 +5,6 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct TransactionInfoDTO {
     pub transaction_id: Uuid,
-    pub total_price: String,
+    pub amount: f64,
+    pub status: String,
 }
