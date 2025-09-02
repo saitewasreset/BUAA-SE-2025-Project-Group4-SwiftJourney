@@ -1,6 +1,5 @@
 use crate::application::commands::hotel::TargetType;
 use crate::application::service::hotel::HotelGeneralInfoDTO;
-use crate::domain::Identifiable;
 use crate::domain::model::hotel::{
     Hotel, HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId,
 };
@@ -10,11 +9,12 @@ use crate::domain::repository::hotel_rating::HotelRatingRepository;
 use crate::domain::repository::occupied_room::OccupiedRoomRepository;
 use crate::domain::repository::station::StationRepository;
 use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
+use crate::domain::Identifiable;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
@@ -290,5 +290,492 @@ where
         }
 
         Ok(hotel_infos)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::City;
+    use crate::domain::model::hotel::{Hotel, HotelDateRange, HotelRoomType, OccupiedRoom, Rating};
+    use crate::domain::model::station::Station;
+    use crate::domain::repository::mock::{
+        city::MockCityRepository, hotel::MockHotelRepository,
+        hotel_rating::MockHotelRatingRepository, occupied_room::MockOccupiedRoomRepository,
+        station::MockStationRepository,
+    };
+    use crate::domain::RepositoryError;
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    fn build_service(
+        hotel_repo: MockHotelRepository,
+        hotel_rating_repo: MockHotelRatingRepository,
+        city_repo: MockCityRepository,
+        station_repo: MockStationRepository,
+        occupied_repo: MockOccupiedRoomRepository,
+    ) -> HotelQueryServiceImpl<
+        MockHotelRepository,
+        MockHotelRatingRepository,
+        MockCityRepository,
+        MockStationRepository,
+        MockOccupiedRoomRepository,
+    > {
+        HotelQueryServiceImpl::new(
+            Arc::new(hotel_repo),
+            Arc::new(hotel_rating_repo),
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            Arc::new(occupied_repo),
+        )
+    }
+
+    // ---------------- get_all_room_status 测试 ----------------
+    #[tokio::test]
+    async fn test_get_all_room_status_success() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(room_type_id),
+                    Some(hotel_id),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(100, 0),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(hotel_id),
+        };
+
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(move |_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    hotel_id,
+                    room_type_id,
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            MockCityRepository::new(),
+            MockStationRepository::new(),
+            occupied_repo,
+        );
+
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+        );
+
+        let result = service
+            .get_all_room_status(hotel_id, &date_range.unwrap())
+            .await
+            .unwrap();
+
+        assert!(result.contains_key(&room_type_id));
+        let status = result.get(&room_type_id).unwrap();
+        assert_eq!(status.capacity, 2);
+        assert_eq!(status.remain_count, 1);
+        assert_eq!(status.price, Decimal::new(100, 0));
+    }
+
+    #[tokio::test]
+    async fn test_get_all_room_status_hotel_not_found() {
+        let hotel_id = 1u64.into();
+
+        // 不返回任何酒店
+        let hotel_repo = MockHotelRepository {
+            hotel: None,
+            hotel_id: None,
+        };
+
+        let occupied_repo = MockOccupiedRoomRepository::new();
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            MockCityRepository::new(),
+            MockStationRepository::new(),
+            occupied_repo,
+        );
+
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+        )
+        .unwrap();
+
+        let result = service.get_all_room_status(hotel_id, &date_range).await;
+
+        assert!(result.is_err());
+    }
+
+    // ---------------- find_hotels_by_target 测试 ----------------
+    #[tokio::test]
+    async fn test_find_hotels_by_target_city_success() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(room_type_id),
+                    Some(hotel_id),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(hotel_id),
+        };
+
+        let mut city_repo = MockCityRepository::new();
+
+        let city = City::new(
+            Some(1u64.into()),
+            "北京".to_string().into(),
+            "北京市".to_string().into(),
+        );
+
+        city_repo
+            .expect_find_by_name()
+            .returning(move |_| Ok(vec![city.clone()]));
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            city_repo,
+            MockStationRepository::new(),
+            MockOccupiedRoomRepository::new(),
+        );
+
+        let result = service
+            .find_hotels_by_target("TestCity", &TargetType::City, None)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_find_hotels_by_target_city_not_found() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(room_type_id),
+                    Some(hotel_id),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(hotel_id),
+        };
+        let mut city_repo = MockCityRepository::new();
+        city_repo.expect_find_by_name().returning(|_| Ok(vec![]));
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            city_repo,
+            MockStationRepository::new(),
+            MockOccupiedRoomRepository::new(),
+        );
+
+        let result = service
+            .find_hotels_by_target("Unknown", &TargetType::City, None)
+            .await;
+        assert!(matches!(result, Err(HotelQueryError::TargetNotFound(_))));
+    }
+
+    // ---------------- calculate_minimum_prices 测试 ----------------
+    #[tokio::test]
+    async fn test_calculate_minimum_prices_no_date_range() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel = Hotel::new_full_unchecked(
+            Some(1u64.into()),
+            hotel_uuid,
+            "日升大酒店".to_string(),
+            City::new(
+                Some(1u64.into()),
+                "北京".to_string().into(),
+                "北京市".to_string().into(),
+            ),
+            Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+            "日升路".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![HotelRoomType::new(
+                Some(room_type_id),
+                Some(hotel_id),
+                "大床房".to_string(),
+                2,
+                Decimal::new(200, 0),
+            )],
+            "日升全程为您服务".to_string(),
+        );
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(hotel.clone()),
+            hotel_id: Some(hotel_id),
+        };
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            MockCityRepository::new(),
+            MockStationRepository::new(),
+            MockOccupiedRoomRepository::new(),
+        );
+
+        let result = service
+            .calculate_minimum_prices(&[hotel], None)
+            .await
+            .unwrap();
+        assert_eq!(result[&hotel_id], Decimal::new(200, 0));
+    }
+
+    #[tokio::test]
+    async fn test_calculate_minimum_prices_with_date_range_error() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel = Hotel::new_full_unchecked(
+            Some(1u64.into()),
+            hotel_uuid,
+            "日升大酒店".to_string(),
+            City::new(
+                Some(1u64.into()),
+                "北京".to_string().into(),
+                "北京市".to_string().into(),
+            ),
+            Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+            "日升路".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![HotelRoomType::new(
+                Some(room_type_id),
+                Some(hotel_id),
+                "大床房".to_string(),
+                2,
+                Decimal::new(1000, 2),
+            )],
+            "日升全程为您服务".to_string(),
+        );
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(hotel.clone()),
+            hotel_id: Some(hotel_id),
+        };
+
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| Err(RepositoryError::Db(anyhow!("DB error"))));
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            MockCityRepository::new(),
+            MockStationRepository::new(),
+            occupied_repo,
+        );
+
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+        );
+
+        let result = service
+            .calculate_minimum_prices(&[hotel], Some(&date_range.unwrap()))
+            .await
+            .unwrap();
+        assert!(result.is_empty());
+    }
+
+    // ---------------- query_hotels 测试 ----------------
+    #[tokio::test]
+    async fn test_query_hotels_success() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel = Hotel::new_full_unchecked(
+            Some(1u64.into()),
+            hotel_uuid,
+            "日升大酒店".to_string(),
+            City::new(
+                Some(1u64.into()),
+                "北京".to_string().into(),
+                "北京市".to_string().into(),
+            ),
+            Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+            "日升路".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![HotelRoomType::new(
+                Some(room_type_id),
+                Some(hotel_id),
+                "大床房".to_string(),
+                2,
+                Decimal::new(1000, 2),
+            )],
+            "日升全程为您服务".to_string(),
+        );
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(hotel.clone()),
+            hotel_id: Some(hotel_id),
+        };
+        let mut rating_repo = MockHotelRatingRepository::new();
+        let mut city_repo = MockCityRepository::new();
+        let city = City::new(
+            Some(1u64.into()),
+            "北京".to_string().into(),
+            "北京市".to_string().into(),
+        );
+        city_repo
+            .expect_find_by_name()
+            .returning(move |_| Ok(vec![city.clone()]));
+
+        rating_repo
+            .expect_get_hotel_rating()
+            .returning(|_| Ok(Some(Rating::try_from(Decimal::new(45, 1)).unwrap()))); // 4.5 rating
+
+        let service = build_service(
+            hotel_repo,
+            rating_repo,
+            city_repo,
+            MockStationRepository::new(),
+            MockOccupiedRoomRepository::new(),
+        );
+
+        let result = service
+            .query_hotels("TestCity", &TargetType::City, None, None)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].rating, 4.5);
+    }
+
+    #[tokio::test]
+    async fn test_query_hotels_not_found() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_id = 1u64.into();
+        let room_type_id = 101u64.into();
+        let hotel = Hotel::new_full_unchecked(
+            Some(1u64.into()),
+            hotel_uuid,
+            "日升大酒店".to_string(),
+            City::new(
+                Some(1u64.into()),
+                "北京".to_string().into(),
+                "北京市".to_string().into(),
+            ),
+            Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+            "日升路".to_string(),
+            vec![],
+            vec![],
+            0,
+            0,
+            vec![HotelRoomType::new(
+                Some(room_type_id),
+                Some(hotel_id),
+                "大床房".to_string(),
+                2,
+                Decimal::new(1000, 2),
+            )],
+            "日升全程为您服务".to_string(),
+        );
+        let hotel_repo = MockHotelRepository {
+            hotel: Some(hotel.clone()),
+            hotel_id: Some(hotel_id),
+        };
+
+        let mut city_repo = MockCityRepository::new();
+        city_repo
+            .expect_find_by_name()
+            .returning(|_target| Ok(vec![])); // 忽略参数，返回空
+
+        let service = build_service(
+            hotel_repo,
+            MockHotelRatingRepository::new(),
+            city_repo,
+            MockStationRepository::new(),
+            MockOccupiedRoomRepository::new(),
+        );
+
+        let result = service
+            .query_hotels("Unknown", &TargetType::City, None, None)
+            .await;
+
+        assert!(matches!(result, Err(HotelQueryError::TargetNotFound(_))));
     }
 }
