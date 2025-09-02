@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::domain::Identifiable;
 use crate::domain::model::route::{Route, RouteId, Stop};
 use crate::domain::repository::route::RouteRepository;
-use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService, RouteServiceError};
 use crate::domain::service::station::StationService;
+use crate::domain::service::ServiceError;
+use crate::domain::Identifiable;
 use async_trait::async_trait;
 use tracing::{error, instrument};
 
@@ -134,5 +134,155 @@ where
             .await
             .inspect_err(|e| error!("Failed to get routes: {}", e))
             .map_err(|e| RouteServiceError::InfrastructureError(ServiceError::RepositoryError(e)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::route::Stop;
+    use crate::domain::model::station::Station;
+    use crate::domain::repository::mock::route::MockRouteRepository;
+    use crate::domain::service::mock::station::MockStationService;
+    use crate::domain::service::station::StationServiceError;
+    use crate::domain::service::ServiceError;
+    use crate::domain::RepositoryError;
+    use anyhow::anyhow;
+    use std::sync::Arc;
+
+    // --------------------------
+    // get_routes 测试
+    // --------------------------
+    #[tokio::test]
+    async fn test_get_routes_success() {
+        let mut repo = MockRouteRepository::new();
+
+        repo.expect_load().returning(|| {
+            Ok(vec![
+                Route::new(Some(1u64.into())),
+                Route::new(Some(2u64.into())),
+            ])
+        });
+
+        let station_service = Arc::new(MockStationService::new());
+        let service = RouteServiceImpl::new(station_service, Arc::new(repo));
+
+        let result = service.get_routes().await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_routes_fail() {
+        let mut repo = MockRouteRepository::new();
+
+        repo.expect_load()
+            .returning(|| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let station_service = Arc::new(MockStationService::new());
+        let service = RouteServiceImpl::new(station_service, Arc::new(repo));
+
+        let result = service.get_routes().await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            RouteServiceError::InfrastructureError(ServiceError::RepositoryError(_)) => {}
+            _ => panic!("Unexpected error type"),
+        }
+    }
+
+    // --------------------------
+    // add_route 测试
+    // --------------------------
+    #[tokio::test]
+    async fn test_add_route_success() {
+        let mut repo = MockRouteRepository::new();
+
+        repo.expect_save().returning(|_| Ok(1u64.into()));
+
+        let station_service = Arc::new(MockStationService::new());
+        let service = RouteServiceImpl::new(station_service, Arc::new(repo));
+
+        let stops = vec![
+            Stop::new(Some(1u64.into()), Some(1u64.into()), 1u64.into(), 0, 1, 1),
+            Stop::new(Some(2u64.into()), Some(1u64.into()), 2u64.into(), 3, 4, 2),
+        ];
+
+        let result = service.add_route(stops).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_route_fail() {
+        let mut repo = MockRouteRepository::new();
+        repo.expect_save()
+            .returning(|_| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let station_service = Arc::new(MockStationService::new());
+        let service = RouteServiceImpl::new(station_service, Arc::new(repo));
+
+        let stops = vec![Stop::new(
+            Some(1u64.into()),
+            Some(1u64.into()),
+            1u64.into(),
+            0,
+            1,
+            1,
+        )];
+
+        let result = service.add_route(stops).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            RouteServiceError::InfrastructureError(ServiceError::RepositoryError(_)) => {}
+            _ => panic!("Unexpected error type"),
+        }
+    }
+
+    // --------------------------
+    // get_route_map 测试
+    // --------------------------
+    #[tokio::test]
+    async fn test_get_route_map_success() {
+        let mut repo = MockRouteRepository::new();
+
+        repo.expect_load().returning(|| Ok(vec![]));
+
+        let mut station_service = MockStationService::new();
+        station_service.expect_get_stations().returning(|| {
+            Ok(vec![Station::new(
+                Some(1u64.into()),
+                "beijing".into(),
+                1u64.into(),
+            )])
+        });
+
+        let service = RouteServiceImpl::new(Arc::new(station_service), Arc::new(repo));
+
+        let result = service.get_route_map().await;
+        assert!(result.is_ok());
+        let graph = result.unwrap();
+        assert_eq!(graph.node_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_route_map_fail_on_stations() {
+        let mut repo = MockRouteRepository::new();
+
+        repo.expect_load().returning(|| Ok(vec![]));
+
+        let mut station_service = MockStationService::new();
+        station_service.expect_get_stations().returning(|| {
+            Err(StationServiceError::InfrastructureError(
+                ServiceError::RelatedServiceError(anyhow!("station service error")),
+            ))
+        });
+
+        let service = RouteServiceImpl::new(Arc::new(station_service), Arc::new(repo));
+
+        let result = service.get_route_map().await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(_)) => {}
+            _ => panic!("Unexpected error type"),
+        }
     }
 }
