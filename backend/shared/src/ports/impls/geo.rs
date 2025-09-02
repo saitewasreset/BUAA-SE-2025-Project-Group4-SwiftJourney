@@ -1,5 +1,6 @@
 use crate::api::{ApiEndpoint, GeoInternalServiceApi, InternalApiError, SuperClient};
-use crate::internal::geo::dto::{CityInfoDTO, CityStationInfoDTO};
+use crate::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
+use crate::internal::geo::dto::{CityInfoDTO, CityStationInfoDTO, DbCityDTO, DbStationDTO};
 use crate::ports::geo::GeoPort;
 use async_trait::async_trait;
 use tracing::error;
@@ -30,5 +31,45 @@ impl GeoPort for HttpGeoPortImpl {
             .get(GeoInternalServiceApi::GetStations)
             .await
             .inspect_err(|e| error!("Failed to get city station info: {:?}", e))
+    }
+
+    async fn db_get_cities(&self) -> Result<Vec<DbCityDTO>, InternalApiError> {
+        self.super_client
+            .get(GeoInternalServiceApi::DbGetCities)
+            .await
+            .inspect_err(|e| error!("Failed to get db city info: {:?}", e))
+    }
+
+    async fn db_get_stations(&self) -> Result<Vec<DbStationDTO>, InternalApiError> {
+        self.super_client
+            .get(GeoInternalServiceApi::DbGetStations)
+            .await
+            .inspect_err(|e| error!("Failed to get db station info: {:?}", e))
+    }
+
+    async fn save_city_province_map(
+        &self,
+        cmd: SaveCityProvinceMapCommand,
+    ) -> Result<(), InternalApiError> {
+        self.super_client
+            .post(
+                GeoInternalServiceApi::SaveCityProvinceMap,
+                cmd.city_province_map,
+            )
+            .await
+            .inspect_err(|e| error!("Failed to save city province map: {:?}", e))
+    }
+
+    async fn save_station_city_map(
+        &self,
+        cmd: SaveStationCityMapCommand,
+    ) -> Result<(), InternalApiError> {
+        self.super_client
+            .post(
+                GeoInternalServiceApi::SaveStationCityMap,
+                cmd.station_city_map,
+            )
+            .await
+            .inspect_err(|e| error!("Failed to save station city map: {:?}", e))
     }
 }
