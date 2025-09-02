@@ -50,8 +50,7 @@ pub trait EventService: 'static + Send + Sync {
     fn micro_service(&self) -> MicroService;
     /// 返回用于与 RabbitMQ 通信的 `lapin::Channel`。
     fn lapin_channel(&self) -> lapin::Channel;
-    /// 返回一个自身的 `Arc` 引用，用于在异步任务中共享服务实例。
-    fn self_arc(&self) -> Arc<Self>;
+
     /// 返回一个包裹在 `Arc<Mutex<...>>` 中的 `EventRegistry` 实例。
     /// 使用 `Mutex` 确保在多线程环境下对注册中心的访问是安全的。
     fn event_registry(&self) -> Arc<Mutex<EventRegistry>>;
@@ -67,7 +66,7 @@ pub trait EventService: 'static + Send + Sync {
     ///    反序列化为具体的事件 `Box<dyn Any>`，最后调用 `handle_event` 方法进行处理。
     ///
     /// **注意**: 默认绑定路由键为 `#`，表示会接收所有事件。
-    async fn init_consumer(&self) -> Result<(), EventServiceError> {
+    async fn init_consumer(self: Arc<Self>) -> Result<(), EventServiceError> {
         let channel = self.lapin_channel();
 
         channel
@@ -145,7 +144,6 @@ pub trait EventService: 'static + Send + Sync {
             })
             .map_err(|e| EventServiceError::QueueServiceError(e.into()))?;
 
-        let self_arc = self.self_arc();
         let event_registry = self.event_registry();
 
         let consumer_callback = async move {
@@ -166,7 +164,7 @@ pub trait EventService: 'static + Send + Sync {
 
                                 match deserialize_result {
                                     Some(Ok(event)) => {
-                                        if let Err(e) = self_arc.handle_event(event).await {
+                                        if let Err(e) = self.handle_event(event).await {
                                             error!("Failed to handle event: {:?}", e);
                                         }
                                     }
