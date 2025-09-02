@@ -258,6 +258,7 @@
         async fn db_get_personal_info(&self) -> Result<Vec<DbPersonalInfo>, UserInternalServiceError>;
     }
     ```
+
 4. 实现Internal Service，对于一般方法（不以`db_`开头），直接转发到Domain Service中的同名方法（在某些情况下，你可能需要从数据库中加载相应的实体）；对于`db_`开头的方法，转换为对Repository的调用。在本步骤中，你可能需要修改之前的错误类型（例如，`UserInternalServiceError`），添加适用的更多变体。不要轻易使用`unwrap`等会导致`panic`的方法处理错误。你可能需要注意，所有`*Repository`都实现了`Repository`特征，你可能需要手动将DTO中的`u64`转换为对应的`*Id`，请为每个实现的Internal Service方法添加`#[instrument(skip(self))]`。在实现内部，对于除了API使用方式导致的错误（例如，要求年龄大于0，但传入了小于0的数值；要求支付密码为6位数字，但传入了其它内容），其余错误请在返回前使用`inspect_err` + `tracing::error`打印信息（`{:?}`），对于在多个函数中重复使用的代码，请搜集到单独的函数中，不要多次重复：
 
     ```rust
@@ -1048,6 +1049,7 @@
         Ok(result_list)
     }
     ```
+
    1. 根据给出的微服务拆分计划中的依赖关系，定义实现结构体以及其依赖的泛型参数。例如，对于`User`微服务，在`user/base/src/infrastructure/service/internal.rs`中，编写如下定义，并实现`new`关联方法：
 
         ```rust
@@ -1092,8 +1094,8 @@
             }
         }
         ```
-    
-    2. 实现特征上定义的方法，在实现过程中，你可能需要对之前定义的`*InteralServiceError`枚举增加错误类型；在实现`db_`开头的方法时，你可能需要修改对应`Repository`的定义，新增`load_all_raw`等加载所有数据的方法，注意，`load_all_raw`应当直接返回Database Model，不要转换为Domain Entity。
+
+   2. 实现特征上定义的方法，在实现过程中，你可能需要对之前定义的`*InteralServiceError`枚举增加错误类型；在实现`db_`开头的方法时，你可能需要修改对应`Repository`的定义，新增`load_all_raw`等加载所有数据的方法，注意，`load_all_raw`应当直接返回Database Model，不要转换为Domain Entity。
 
         例如，对于`User`微服务，在实现过程中，对于`UserInternalServiceError`进行了修改：
 
@@ -1366,41 +1368,41 @@
         }
         ```
 
-    3. 实现完成后，请执行`cargo check`、`cargo clippy`，修复其中的警告。禁止通过`#[allow]`消除警告，若你认为警告是误报、不太可能消除，请询问我意见，不要擅自行动。
+   3. 实现完成后，请执行`cargo check`、`cargo clippy`，修复其中的警告。禁止通过`#[allow]`消除警告，若你认为警告是误报、不太可能消除，请询问我意见，不要擅自行动。
 5. 实现调用Internal Service的API
    1. 为`*InternalServiceError`实现`Application Error`特征，错误代码可从微服务划分中获取，例如，`User(Err: 90XXX)`表示本微服务可用的错误码为`90000 -- 90999`，建议按`*InternalServiceError`枚举中变体出现的顺序，从`XX000`开始编号。
     例如，对于`User`微服务，在`user/base/src/application/service/internal.rs`中添加：
 
-    ```rust
-    #[derive(Error, Debug)]
-    pub enum UserInternalServiceError {
-        #[error("no such user: id = {0}")]
-        NoSuchUser(u64),
-        #[error("invalid payment password: {0}")]
-        InvalidPaymentPassword(String),
-        #[error("invalid session ID: {0}")]
-        InvalidSessionId(String),
-        #[error(transparent)]
-        RelatedServiceError(#[from] anyhow::Error),
-    }
+        ```rust
+        #[derive(Error, Debug)]
+        pub enum UserInternalServiceError {
+            #[error("no such user: id = {0}")]
+            NoSuchUser(u64),
+            #[error("invalid payment password: {0}")]
+            InvalidPaymentPassword(String),
+            #[error("invalid session ID: {0}")]
+            InvalidSessionId(String),
+            #[error(transparent)]
+            RelatedServiceError(#[from] anyhow::Error),
+        }
 
-    impl ApplicationError for UserInternalServiceError {
-        fn error_code(&self) -> u32 {
-            match self {
-                Self::NoSuchUser(_) => 900000,
-                Self::InvalidPaymentPassword(_) => 90001,
-                Self::InvalidSessionId(_) => 90002,
-                Self::RelatedServiceError(_) => 90003,
+        impl ApplicationError for UserInternalServiceError {
+            fn error_code(&self) -> u32 {
+                match self {
+                    Self::NoSuchUser(_) => 900000,
+                    Self::InvalidPaymentPassword(_) => 90001,
+                    Self::InvalidSessionId(_) => 90002,
+                    Self::RelatedServiceError(_) => 90003,
+                }
+            }
+
+            fn error_message(&self) -> String {
+                self.to_string()
             }
         }
+        ```
 
-        fn error_message(&self) -> String {
-            self.to_string()
-        }
-    }
-    ```
-
-    2. 按照微服务划分，编写`*InternalService`的API端点，端点路径、处理函数名与微服务划分中的函数名相同，若有至少一个参数，使用POST请求，否则使用GET请求。例如，对于`User`微服务，在`user/api/src/internal.rs`中新增如下API端点，新增`scoped_config`函数注册API端点：
+   2. 按照微服务划分，编写`*InternalService`的API端点，端点路径、处理函数名与微服务划分中的函数名相同，若有至少一个参数，使用POST请求，否则使用GET请求。例如，对于`User`微服务，在`user/api/src/internal.rs`中新增如下API端点，新增`scoped_config`函数注册API端点：
 
         ```rust
         use actix_web::web::Bytes;
@@ -1540,7 +1542,7 @@
         }
         ```
 
-    3. 在`main.rs`中，例如，对于`User`微服务，`user/api/src/main.rs`中，新增`*InternalService`的构建，并为内部服务创建单独的HTTP服务器，绑定到23333端口：
+   3. 在`main.rs`中，例如，对于`User`微服务，`user/api/src/main.rs`中，新增`*InternalService`的构建，并为内部服务创建单独的HTTP服务器，绑定到23333端口：
 
         ```rust
         let user_internal_service_impl = Arc::new(UserInternalServiceImpl::new(
@@ -1590,4 +1592,5 @@
         .run()
         .await?;
         ```
-    4. 实现完成后，请执行`cargo check`、`cargo clippy`，修复其中的警告。禁止通过`#[allow]`消除警告，若你认为警告是误报、不太可能消除，请询问我意见，不要擅自行动。
+
+   4. 实现完成后，请执行`cargo check`、`cargo clippy`，修复其中的警告。禁止通过`#[allow]`消除警告，若你认为警告是误报、不太可能消除，请询问我意见，不要擅自行动。
