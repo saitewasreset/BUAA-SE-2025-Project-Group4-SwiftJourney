@@ -7,7 +7,7 @@ use crate::domain::repository::occupied_room::OccupiedRoomRepository;
 use crate::domain::repository::order::OrderRepository;
 use crate::domain::service::hotel_booking::{HotelBookingService, HotelBookingServiceError};
 use crate::domain::{Identifiable, RepositoryError};
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use rust_decimal::prelude::ToPrimitive;
@@ -20,7 +20,7 @@ pub struct HotelBookingServiceImpl<HR, OR, ORR>
 where
     HR: HotelRepository,
     OR: OrderRepository,
-    ORR: OccupiedRoomRepository,
+    ORR: OccupiedRoomRepository + ?Sized,
 {
     hotel_repository: Arc<HR>,
     order_repository: Arc<OR>,
@@ -315,5 +315,782 @@ where
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::repository::mock::{
+        hotel::MockHotelRepository, occupied_room::MockOccupiedRoomRepository,
+        order::MockOrderRepository,
+    };
+
+    use crate::domain::model::hotel::{Hotel, HotelRoomType};
+    use crate::domain::model::order::{
+        BaseOrder, HotelOrder, OrderStatus, OrderTimeInfo, PaymentInfo,
+    };
+
+    use crate::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
+
+    use crate::domain::model::city::City;
+    use crate::domain::model::hotel::OccupiedRoom;
+    use crate::domain::model::station::Station;
+    use crate::domain::model::transaction::Transaction;
+    use crate::domain::repository::mock::order::mock_order_repository;
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+    use std::sync::Arc;
+
+    fn make_service(
+        hotel_repo: Arc<MockHotelRepository>,
+        order_repo: Arc<MockOrderRepository>,
+        occupied_repo: Arc<MockOccupiedRoomRepository>,
+    ) -> HotelBookingServiceImpl<MockHotelRepository, MockOrderRepository, MockOccupiedRoomRepository>
+    {
+        HotelBookingServiceImpl::new(hotel_repo, order_repo, occupied_repo)
+    }
+
+    // ========== TESTS ==========
+
+    #[tokio::test]
+    async fn test_get_available_room_success() {
+        // Arrange
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+        let order_repo = Arc::new(MockOrderRepository::new());
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    1u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+
+        let service = make_service(hotel_repo, order_repo, Arc::new(occupied_repo));
+        let hotel_id = 1u64.into();
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+        );
+
+        // Act
+        let result = service
+            .get_available_room(hotel_id, date_range.unwrap())
+            .await
+            .unwrap();
+
+        // Assert
+        assert!(!result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_available_room_invalid_hotel() {
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        let order_repo = Arc::new(MockOrderRepository::new());
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    1u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+
+        let service = make_service(hotel_repo, order_repo, Arc::new(occupied_repo));
+        let hotel_id = 99u64.into();
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+        );
+
+        let result = service
+            .get_available_room(hotel_id, date_range.unwrap())
+            .await;
+
+        println!("{:?}", result);
+
+        assert!(matches!(
+            result,
+            Err(HotelBookingServiceError::InvalidHotelId(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_booking_hotel_success() {
+        use chrono::NaiveDate;
+        use uuid::Uuid;
+
+        // 构造一个测试用的 Uuid
+        let order_uuid = Uuid::new_v4();
+
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let mut order_repo = mock_order_repository();
+        // 让 order_repo 在调用 find_hotel_order_by_uuid 时返回一个 Paid 状态的订单
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+
+        // update 也需要 mock 掉
+        order_repo.expect_update().returning(|_| Ok(()));
+
+        let order_repo = Arc::new(order_repo);
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+        occupied_repo.expect_find_by_order_uuid().returning(|_| {
+            Ok(vec![OccupiedRoom::new(
+                Some(1u64.into()),
+                1u64.into(),
+                101u64.into(),
+                HotelDateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                )
+                .unwrap(),
+                1u64.into(),
+            )])
+        });
+        occupied_repo.expect_save().returning(|_| Ok(101u64.into()));
+
+        let service = make_service(hotel_repo, order_repo, Arc::new(occupied_repo));
+
+        // 传入 order_uuid
+        let result = service.booking_hotel(order_uuid).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_booking_hotel_invalid_status() {
+        use chrono::NaiveDate;
+        use uuid::Uuid;
+
+        // 生成测试用的订单 UUID
+        let order_uuid = Uuid::new_v4();
+
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        // 创建 MockOrderRepository 并设置返回非 Paid 状态的订单
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            Uuid::new_v4(),
+            OrderStatus::Cancelled,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let mut order_repo = mock_order_repository();
+        // 让 order_repo 在调用 find_hotel_order_by_uuid 时返回一个 Paid 状态的订单
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+        order_repo.expect_update().returning(|_| Ok(()));
+
+        let order_repo = Arc::new(order_repo);
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+        occupied_repo.expect_save().returning(|_| Ok(101u64.into()));
+
+        let service = make_service(hotel_repo, order_repo, Arc::new(occupied_repo));
+
+        // 调用 booking_hotel 并传入 order_uuid
+        let result = service.booking_hotel(order_uuid).await;
+
+        // 断言返回错误类型为 InvalidOrderStatus
+        assert!(matches!(
+            result,
+            Err(HotelBookingServiceError::InvalidOrderStatus(_, _))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_cancel_hotel_success() {
+        use chrono::NaiveDate;
+        use rust_decimal::Decimal;
+        use uuid::Uuid;
+
+        // 生成测试用的订单 UUID
+        let order_uuid = Uuid::new_v4();
+
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new(
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        // 创建 BaseOrder，设置状态为 Ongoing
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Ongoing,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        // 创建 MockOrderRepository 并设置返回订单
+        let mut order_repo = mock_order_repository();
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+
+        // MockOccupiedRoomRepository 返回已占用房间
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo.expect_find_by_order_uuid().returning(|_| {
+            Ok(vec![OccupiedRoom::new(
+                Some(1u64.into()),
+                1u64.into(),
+                1u64.into(),
+                HotelDateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                )
+                .unwrap(),
+                1u64.into(),
+            )])
+        });
+
+        occupied_repo.expect_remove_many().returning(|_| Ok(()));
+
+        let mut order_repo = order_repo;
+        order_repo.expect_update().returning(|_| Ok(()));
+
+        let service = make_service(hotel_repo, Arc::new(order_repo), Arc::new(occupied_repo));
+
+        // 调用 cancel_hotel 并传入 order_uuid
+        let result = service.cancel_hotel(order_uuid).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_hotel_invalid_status() {
+        use chrono::NaiveDate;
+        use rust_decimal::Decimal;
+        use uuid::Uuid;
+
+        let order_uuid = Uuid::new_v4();
+
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new(
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Cancelled, // 非 Ongoing
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let mut order_repo = mock_order_repository();
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+
+        let occupied_repo = Arc::new(MockOccupiedRoomRepository::new());
+        let order_repo = Arc::new(order_repo);
+
+        let service = make_service(hotel_repo, order_repo, occupied_repo);
+
+        let result = service.cancel_hotel(order_uuid).await;
+        assert!(matches!(
+            result,
+            Err(HotelBookingServiceError::InvalidOrderStatus(_, _))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_booking_group_partial_fail_atomic_false() {
+        use chrono::NaiveDate;
+        use rust_decimal::Decimal;
+        use uuid::Uuid;
+
+        let order_uuid1 = Uuid::new_v4();
+        let order_uuid2 = Uuid::new_v4();
+
+        let hotel_uuid = Uuid::new_v4();
+        // ========== 酒店数据 ==========
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        // ========== 订单数据 ==========
+        let base_order1 = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid1,
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            101u64.into(), // 房间 ID 对应下面 OccupiedRoom
+        );
+
+        let base_order2 = BaseOrder::new(
+            Some(2u64.into()),
+            order_uuid2,
+            OrderStatus::Cancelled, // invalid
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(500, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(2u64.into()), None),
+            101u64.into(),
+        );
+
+        // ========== Mock OrderRepository ==========
+        let mut order_repo = mock_order_repository();
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid1)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order1.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid2)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order2.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+        order_repo.expect_update().returning(|_| Ok(()));
+
+        let order_repo = Arc::new(order_repo);
+
+        // ========== Mock OccupiedRoomRepository ==========
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    101u64.into(), // 与订单 room_id 对应
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+        occupied_repo.expect_save().returning(|_| Ok(101u64.into()));
+
+        let occupied_repo = Arc::new(occupied_repo);
+
+        // ========== 创建 Service ==========
+        let service = make_service(hotel_repo, order_repo, occupied_repo);
+
+        // ========== 执行测试 ==========
+        let result = service
+            .booking_group(vec![order_uuid1, order_uuid2], false)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_booking_group_partial_fail_atomic_true() {
+        use chrono::NaiveDate;
+        use rust_decimal::Decimal;
+        use uuid::Uuid;
+
+        let order_uuid1 = Uuid::new_v4();
+        let order_uuid2 = Uuid::new_v4();
+
+        let hotel_uuid = Uuid::new_v4();
+        let hotel_repo = Arc::new(MockHotelRepository {
+            hotel: Some(Hotel::new_full_unchecked(
+                Some(1u64.into()),
+                hotel_uuid,
+                "日升大酒店".to_string(),
+                City::new(
+                    Some(1u64.into()),
+                    "北京".to_string().into(),
+                    "北京市".to_string().into(),
+                ),
+                Station::new(Some(1u64.into()), "北京南".to_string(), 1u64.into()),
+                "日升路".to_string(),
+                vec![],
+                vec![],
+                0,
+                0,
+                vec![HotelRoomType::new(
+                    Some(101u64.into()),
+                    Some(1u64.into()),
+                    "大床房".to_string(),
+                    2,
+                    Decimal::new(1000, 2),
+                )],
+                "日升全程为您服务".to_string(),
+            )),
+            hotel_id: Some(1u64.into()),
+        });
+
+        let base_order1 = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid1,
+            OrderStatus::Ongoing,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let base_order2 = BaseOrder::new(
+            Some(2u64.into()),
+            order_uuid2,
+            OrderStatus::Cancelled, // invalid
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(500, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(2u64.into()), None),
+            1u64.into(),
+        );
+
+        let mut order_repo = mock_order_repository();
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid1)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order1.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+        order_repo
+            .expect_find_hotel_order_by_uuid()
+            .withf(move |uuid| *uuid == order_uuid2)
+            .returning(move |_| {
+                Ok(Some(HotelOrder::new(
+                    base_order2.clone(),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                )))
+            });
+        order_repo.expect_update().returning(|_| Ok(()));
+
+        let mut occupied_repo = MockOccupiedRoomRepository::new();
+        occupied_repo
+            .expect_find_possible_occupied_range()
+            .returning(|_, _| {
+                Ok(vec![OccupiedRoom::new(
+                    Some(1u64.into()),
+                    1u64.into(),
+                    101u64.into(),
+                    HotelDateRange::new(
+                        NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2025, 9, 2).unwrap(),
+                    )
+                    .unwrap(),
+                    1u64.into(),
+                )])
+            });
+        occupied_repo.expect_save().returning(|_| Ok(101u64.into()));
+
+        let order_repo = Arc::new(order_repo);
+
+        let service = make_service(hotel_repo, order_repo, Arc::new(occupied_repo));
+
+        let result = service
+            .booking_group(vec![order_uuid1, order_uuid2], true)
+            .await;
+
+        assert!(result.is_ok());
     }
 }
