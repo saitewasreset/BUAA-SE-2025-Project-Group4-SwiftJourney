@@ -7,11 +7,11 @@ use base::application::commands::train_dish::OrderTrainDishCommand;
 use base::application::service::train_dish::{
     TrainDishApplicationService, TrainDishOrderRequestDTO,
 };
-use base::application::service::transaction::TransactionInfoDTO;
 use base::application::{
     commands::dish_query::DishQueryDTO,
     service::dish_query::{DishQueryService, TrainDishInfoDTO},
 };
+use shared::internal::order::dto::TransactionInfoDTO;
 
 #[post("/query")]
 pub async fn query_dish(

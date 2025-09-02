@@ -7,8 +7,11 @@ use base::application::commands::transaction::{
 };
 use base::application::service::transaction::{
     BalanceInfoDTO, PaymentConfirmationDTO, PaymentPasswordInfoDTO, RechargeDTO,
-    TransactionApplicationService, TransactionGenerateDTO, TransactionInfoDTO,
+    TransactionApplicationService, TransactionGenerateDTO,
 };
+
+use shared::internal::order::dto::TransactionInfoDTO;
+
 use sea_orm::prelude::Uuid;
 use serde::Deserialize;
 
