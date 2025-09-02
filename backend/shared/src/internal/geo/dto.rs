@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -27,3 +29,9 @@ pub struct StationDTO {
     pub name: String,
     pub city_id: u64,
 }
+
+// province -> vec<city>
+pub type CityInfoDTO = HashMap<String, Vec<String>>;
+
+// city -> vec<station>
+pub type CityStationInfoDTO = HashMap<String, Vec<String>>;

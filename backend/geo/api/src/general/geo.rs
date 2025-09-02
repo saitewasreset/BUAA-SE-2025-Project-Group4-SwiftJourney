@@ -1,6 +1,6 @@
 use crate::general::web;
 use actix_web::get;
-use geo_base::application::service::geo::{CityStationInfoDTO, GeoApplicationService};
+use geo_base::application::service::geo::{CityInfoDTO, CityStationInfoDTO, GeoApplicationService};
 use shared::api::{ApiResponse, ApplicationErrorBox};
 
 #[get("/city_stations")]
@@ -14,7 +14,7 @@ pub async fn get_city_station_info(
 #[get("/city")]
 pub async fn get_city_info(
     geo_service: web::Data<dyn GeoApplicationService>,
-) -> Result<ApiResponse<CityStationInfoDTO>, ApplicationErrorBox> {
+) -> Result<ApiResponse<CityInfoDTO>, ApplicationErrorBox> {
     let city_info = geo_service.get_city_info().await?;
     ApiResponse::ok(city_info)
 }
