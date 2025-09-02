@@ -2310,6 +2310,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "geo_api"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "actix-ws",
+ "anyhow",
+ "chrono",
+ "dotenvy",
+ "dyn-fmt",
+ "geo_base",
+ "migration",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "geo_base"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "id_macro",
+ "sea-orm",
+ "serde",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
