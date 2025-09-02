@@ -5,7 +5,7 @@ use crate::{
     api::InternalApiError,
     internal::object_storage::{
         command::{DeleteObjectCommand, ObjectQuery, PutObjectCommand},
-        dto::{ObjectCategory, ObjectInfo},
+        dto::ObjectInfo,
     },
 };
 

@@ -51,7 +51,7 @@ pub enum Relation {
     )]
     PersonInfo,
     #[sea_orm(
-        belongs_to = "super::transaction::Entity",
+        belongs_to = "ztransaction::Entity",
         from = "Column::PayTransactionId",
         to = "super::transaction::Column::Id",
         on_update = "NoAction",

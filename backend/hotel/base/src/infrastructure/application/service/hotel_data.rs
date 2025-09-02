@@ -1,10 +1,11 @@
 use crate::application::commands::hotel_data::LoadHotelCommand;
 use crate::application::service::hotel_data::HotelDataService;
-use crate::application::service::ports::geo::GeoPort;
 use crate::infrastructure::repository::hotel::save_raw_hotel;
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
 use shared::application_error::{ApplicationError, GeneralError};
+use shared::ports::geo::GeoPort;
+use shared::ports::object_storage::ObjectStoragePort;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, instrument};
@@ -12,7 +13,7 @@ use tracing::{error, instrument};
 pub struct HotelDataServiceImpl<GP, OS>
 where
     GP: GeoPort,
-    OS: ObjectStorageService,
+    OS: ObjectStoragePort,
 {
     debug: bool,
     data_base_path: PathBuf,
@@ -23,7 +24,7 @@ where
 impl<GP, OS> HotelDataServiceImpl<GP, OS>
 where
     GP: GeoPort,
-    OS: ObjectStorageService,
+    OS: ObjectStoragePort,
 {
     pub fn new(
         debug: bool,
@@ -44,7 +45,7 @@ where
 impl<GP, OS> HotelDataService for HotelDataServiceImpl<GP, OS>
 where
     GP: GeoPort,
-    OS: ObjectStorageService,
+    OS: ObjectStoragePort
 {
     fn is_debug_mode(&self) -> bool {
         self.debug

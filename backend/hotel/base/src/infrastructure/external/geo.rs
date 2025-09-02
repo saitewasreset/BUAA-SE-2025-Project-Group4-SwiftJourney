@@ -1,8 +1,8 @@
-use crate::application::service::ports::geo::GeoPort;
 use async_trait::async_trait;
 use shared::api::{ApiEndpoint, GeoInternalServiceApi, InternalApiError, SuperClient};
 use shared::application_error::GeneralError;
 use shared::internal::geo::dto::{CityInfoDTO, CityStationInfoDTO};
+use shared::ports::geo::GeoPort;
 use tracing::error;
 
 pub struct HttpGeoApplicationService {

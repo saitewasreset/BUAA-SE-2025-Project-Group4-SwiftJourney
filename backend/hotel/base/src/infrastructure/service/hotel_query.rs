@@ -3,11 +3,9 @@ use crate::application::service::hotel::HotelGeneralInfoDTO;
 use crate::domain::model::hotel::{
     Hotel, HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId,
 };
-use crate::domain::repository::city::CityRepository;
 use crate::domain::repository::hotel::HotelRepository;
 use crate::domain::repository::hotel_rating::HotelRatingRepository;
 use crate::domain::repository::occupied_room::OccupiedRoomRepository;
-use crate::domain::repository::station::StationRepository;
 use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -15,45 +13,41 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use shared::domain::Identifiable;
+use shared::ports::geo::GeoPort;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
 
-pub struct HotelQueryServiceImpl<HR, HRR, CR, SR, ORR>
+pub struct HotelQueryServiceImpl<HR, HRR, GP, ORR>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    CR: CityRepository,
-    SR: StationRepository,
+    GP: GeoPort,
     ORR: OccupiedRoomRepository,
 {
     hotel_repository: Arc<HR>,
     hotel_rating_repository: Arc<HRR>,
-    city_repository: Arc<CR>,
-    station_repository: Arc<SR>,
+    geo_port: Arc<GP>,
     occupied_room_repository: Arc<ORR>,
 }
 
-impl<HR, HRR, CR, SR, ORR> HotelQueryServiceImpl<HR, HRR, CR, SR, ORR>
+impl<HR, HRR, GP, ORR> HotelQueryServiceImpl<HR, HRR, GP, ORR>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    CR: CityRepository,
-    SR: StationRepository,
+    GP: GeoPort,
     ORR: OccupiedRoomRepository,
 {
     pub fn new(
         hotel_repository: Arc<HR>,
         hotel_rating_repository: Arc<HRR>,
-        city_repository: Arc<CR>,
-        station_repository: Arc<SR>,
+        geo_port: Arc<GP>,
         occupied_room_repository: Arc<ORR>,
     ) -> Self {
         Self {
             hotel_repository,
             hotel_rating_repository,
-            city_repository,
-            station_repository,
+            geo_port,
             occupied_room_repository,
         }
     }
@@ -135,12 +129,11 @@ where
 }
 
 #[async_trait]
-impl<HR, HRR, CR, SR, ORR> HotelQueryService for HotelQueryServiceImpl<HR, HRR, CR, SR, ORR>
+impl<HR, HRR, GP, ORR> HotelQueryService for HotelQueryServiceImpl<HR, HRR, GP, ORR>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    CR: CityRepository,
-    SR: StationRepository,
+    GP: GeoPort,
     ORR: OccupiedRoomRepository,
 {
     async fn find_hotels_by_target(
