@@ -3,25 +3,15 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "hotel_order")]
+#[sea_orm(table_name = "occupied_room")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub uuid: Uuid,
     pub hotel_id: i32,
+    pub room_type_id: i32,
     pub begin_date: Date,
     pub end_date: Date,
-    pub hotel_room_type_id: i32,
     pub person_info_id: i32,
-    pub pay_transaction_id: Option<i32>,
-    pub refund_transaction_id: Option<i32>,
-    #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
-    pub price: Decimal,
-    pub amount: i32,
-    pub create_time: DateTimeWithTimeZone,
-    pub active_time: DateTimeWithTimeZone,
-    pub complete_time: DateTimeWithTimeZone,
-    pub status: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -36,7 +26,7 @@ pub enum Relation {
     Hotel,
     #[sea_orm(
         belongs_to = "super::hotel_room_type::Entity",
-        from = "Column::HotelRoomTypeId",
+        from = "Column::RoomTypeId",
         to = "super::hotel_room_type::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
@@ -50,22 +40,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PersonInfo,
-    #[sea_orm(
-        belongs_to = "ztransaction::Entity",
-        from = "Column::PayTransactionId",
-        to = "super::transaction::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Transaction2,
-    #[sea_orm(
-        belongs_to = "super::transaction::Entity",
-        from = "Column::RefundTransactionId",
-        to = "super::transaction::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Transaction1,
 }
 
 impl Related<super::hotel::Entity> for Entity {

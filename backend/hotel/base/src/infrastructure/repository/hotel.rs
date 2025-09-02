@@ -1,11 +1,6 @@
+use crate::DbId;
 use crate::domain::model::hotel::{Hotel, HotelId, HotelRoomType, HotelRoomTypeId};
-use crate::domain::repository::city::CityRepository;
 use crate::domain::repository::hotel::HotelRepository;
-use crate::domain::repository::station::StationRepository;
-use crate::domain::service::object_storage::{ObjectCategory, ObjectStorageService};
-use crate::domain::service::{AggregateManagerImpl, DiffInfo};
-use crate::infrastructure::repository::city::CityDataConverter;
-use crate::infrastructure::repository::station::StationDataConverter;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -13,13 +8,18 @@ use rust_decimal::prelude::FromPrimitive;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, TransactionTrait};
 use sea_orm::{ColumnTrait, Select};
 use sea_orm::{QueryFilter, QuerySelect};
+use shared::api::InternalApiError;
 use shared::data::HotelData;
-use shared::domain::model::city::CityId;
-use shared::domain::model::station::StationId;
+use shared::domain::model::city::{City, CityId, CityName, ProvinceName};
+use shared::domain::model::station::{Station, StationId};
+use shared::domain::{AggregateManagerImpl, DiffInfo};
 use shared::domain::{
-    DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
-    TypedDiff,
+    DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
+use shared::internal::object_storage::command::PutObjectCommand;
+use shared::internal::object_storage::dto::ObjectCategory;
+use shared::ports::geo::GeoPort;
+use shared::ports::object_storage::ObjectStoragePort;
 use shared::{DB_CHUNK_SIZE, impl_db_id_from_u64};
 use std::collections::HashMap;
 use std::fs;
@@ -30,11 +30,16 @@ use uuid::Uuid;
 
 impl_db_id_from_u64!(HotelId, i32, "hotel id");
 impl_db_id_from_u64!(HotelRoomTypeId, i32, "hotel room type id");
+impl_db_id_from_u64!(CityId, i32, "city id");
+impl_db_id_from_u64!(StationId, i32, "station id");
+
+pub struct CityStationPack {
+    pub city_entity_map: HashMap<CityId, City>,
+    pub station_entity_map: HashMap<StationId, Station>,
+}
 
 pub struct HotelDoPack {
     hotel: crate::models::hotel::Model,
-    city: crate::models::city::Model,
-    station: crate::models::station::Model,
     room_type_list: Vec<crate::models::hotel_room_type::Model>,
 }
 
@@ -79,16 +84,35 @@ impl HotelRoomTypeDataConverter {
 pub struct HotelDataConverter;
 
 impl HotelDataConverter {
-    pub fn make_from_do(hotel_do_pack: HotelDoPack) -> Result<Hotel, anyhow::Error> {
+    pub fn make_from_do(
+        hotel_do_pack: HotelDoPack,
+        city_station_pack: &CityStationPack,
+    ) -> Result<Hotel, anyhow::Error> {
         let mut room_type_list = Vec::with_capacity(hotel_do_pack.room_type_list.len());
 
         for model in hotel_do_pack.room_type_list {
             room_type_list.push(HotelRoomTypeDataConverter::make_from_do(model)?);
         }
 
-        let city = CityDataConverter::make_from_do(hotel_do_pack.city)?;
+        let city = city_station_pack
+            .city_entity_map
+            .get(&CityId::from(hotel_do_pack.hotel.city_id))
+            .cloned()
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no city found for city id = {} for hotel id = {}",
+                hotel_do_pack.hotel.city_id,
+                hotel_do_pack.hotel.id
+            )))?;
 
-        let station = StationDataConverter::make_from_do(hotel_do_pack.station)?;
+        let station = city_station_pack
+            .station_entity_map
+            .get(&StationId::from(hotel_do_pack.hotel.station_id))
+            .cloned()
+            .ok_or(RepositoryError::InconsistentState(anyhow!(
+                "no city found for station id = {} for hotel id = {}",
+                hotel_do_pack.hotel.station_id,
+                hotel_do_pack.hotel.id
+            )))?;
 
         let phone: Vec<String> =
             serde_json::from_value(hotel_do_pack.hotel.phone).context(format!(
@@ -153,13 +177,20 @@ impl HotelDataConverter {
     }
 }
 
-pub struct HotelRepositoryImpl {
+pub struct HotelRepositoryImpl<GP>
+where
+    GP: GeoPort + 'static + Send + Sync,
+{
     db: DatabaseConnection,
     aggregate_manager: Arc<Mutex<AggregateManagerImpl<Hotel>>>,
+    geo_port: Arc<GP>,
 }
 
-impl HotelRepositoryImpl {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<GP> HotelRepositoryImpl<GP>
+where
+    GP: GeoPort + 'static + Send + Sync,
+{
+    pub fn new(db: DatabaseConnection, geo_port: Arc<GP>) -> Self {
         let detect_changes_fn = |diff: DiffInfo<Hotel>| {
             let mut result = MultiEntityDiff::new();
 
@@ -234,7 +265,43 @@ impl HotelRepositoryImpl {
             aggregate_manager: Arc::new(Mutex::new(AggregateManagerImpl::new(Box::new(
                 detect_changes_fn,
             )))),
+            geo_port,
         }
+    }
+
+    async fn internal_build_city_station_pack(&self) -> Result<CityStationPack, InternalApiError> {
+        let db_city_list = self.geo_port.db_get_cities().await?;
+
+        let db_station_list = self.geo_port.db_get_stations().await?;
+
+        let city_entity_map = db_city_list
+            .into_iter()
+            .map(|x| {
+                (
+                    CityId::from(x.id),
+                    City::new(
+                        Some(CityId::from(x.id)),
+                        CityName::from(x.name.clone()),
+                        ProvinceName::from(x.province.clone()),
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        let station_entity_map = db_station_list
+            .into_iter()
+            .map(|x| {
+                (
+                    StationId::from(x.id),
+                    Station::new(Some(StationId::from(x.id)), x.name, CityId::from(x.city_id)),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        Ok(CityStationPack {
+            city_entity_map,
+            station_entity_map,
+        })
     }
 
     pub async fn query_hotel_eagerly(
@@ -243,6 +310,12 @@ impl HotelRepositoryImpl {
             Select<crate::models::hotel::Entity>,
         ) -> Select<crate::models::hotel::Entity>,
     ) -> Result<Vec<Hotel>, RepositoryError> {
+        let city_station_pack = self
+            .internal_build_city_station_pack()
+            .await
+            .inspect_err(|e| error!("Failed to build city station pack {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
         let room_type_list = crate::models::hotel_room_type::Entity::find()
             .all(&self.db)
             .await
@@ -261,24 +334,13 @@ impl HotelRepositoryImpl {
         }
 
         let r = builder(crate::models::hotel::Entity::find())
-            .find_also_related(crate::models::city::Entity)
-            .find_also_related(crate::models::station::Entity)
             .all(&self.db)
             .await
             .context("Failed to load hotel")?;
 
         let mut result = Vec::with_capacity(r.len());
 
-        for (hotel_model, city_model, station_model) in r {
-            let city_model = city_model.ok_or(RepositoryError::InconsistentState(anyhow!(
-                "City not found for hotel id: {}",
-                hotel_model.id
-            )))?;
-
-            let station_model = station_model.ok_or(RepositoryError::InconsistentState(
-                anyhow!("Station not found for hotel id: {}", hotel_model.id),
-            ))?;
-
+        for (hotel_model) in r {
             let room_type_list = room_type_list_by_hotel_id
                 .get(&hotel_model.id)
                 .cloned()
@@ -289,56 +351,13 @@ impl HotelRepositoryImpl {
 
             let hotel_do_pack = HotelDoPack {
                 hotel: hotel_model,
-                city: city_model,
-                station: station_model,
                 room_type_list,
             };
 
-            result.push(HotelDataConverter::make_from_do(hotel_do_pack)?);
-        }
-
-        Ok(result)
-    }
-
-    pub async fn query_hotel_lazily(
-        &self,
-        builder: impl FnOnce(
-            Select<crate::models::hotel::Entity>,
-        ) -> Select<crate::models::hotel::Entity>,
-    ) -> Result<Vec<Hotel>, RepositoryError> {
-        let r = builder(crate::models::hotel::Entity::find())
-            .find_also_related(crate::models::city::Entity)
-            .find_also_related(crate::models::station::Entity)
-            .all(&self.db)
-            .await
-            .context("Failed to load hotel")?;
-
-        let mut result = Vec::with_capacity(r.len());
-
-        for (hotel_model, city_model, station_model) in r {
-            let city_model = city_model.ok_or(RepositoryError::InconsistentState(anyhow!(
-                "City not found for hotel id: {}",
-                hotel_model.id
-            )))?;
-
-            let station_model = station_model.ok_or(RepositoryError::InconsistentState(
-                anyhow!("Station not found for hotel id: {}", hotel_model.id),
-            ))?;
-
-            let room_type_list = crate::models::hotel_room_type::Entity::find()
-                .filter(crate::models::hotel_room_type::Column::HotelId.eq(hotel_model.id))
-                .all(&self.db)
-                .await
-                .context("Failed to load room types for hotel id")?;
-
-            let hotel_do_pack = HotelDoPack {
-                hotel: hotel_model,
-                city: city_model,
-                station: station_model,
-                room_type_list,
-            };
-
-            result.push(HotelDataConverter::make_from_do(hotel_do_pack)?);
+            result.push(HotelDataConverter::make_from_do(
+                hotel_do_pack,
+                &city_station_pack,
+            )?);
         }
 
         Ok(result)
@@ -346,7 +365,10 @@ impl HotelRepositoryImpl {
 }
 
 #[async_trait]
-impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
+impl<GP> DbRepositorySupport<Hotel> for HotelRepositoryImpl<GP>
+where
+    GP: GeoPort + 'static + Send + Sync,
+{
     type Manager = AggregateManagerImpl<Hotel>;
     fn get_aggregate_manager(&self) -> Arc<Mutex<Self::Manager>> {
         Arc::clone(&self.aggregate_manager)
@@ -385,23 +407,18 @@ impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
     }
 
     async fn on_select(&self, id: HotelId) -> Result<Option<Hotel>, RepositoryError> {
+        let city_station_pack = self
+            .internal_build_city_station_pack()
+            .await
+            .inspect_err(|e| error!("Failed to build city station pack {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
         let r = crate::models::hotel::Entity::find_by_id(id.to_db_value())
-            .find_also_related(crate::models::city::Entity)
-            .find_also_related(crate::models::station::Entity)
             .one(&self.db)
             .await
             .context(format!("Failed to find hotel for id: {}", id.to_db_value()))?;
 
-        if let Some((hotel_model, city_model, station_model)) = r {
-            let city_model = city_model.ok_or(RepositoryError::InconsistentState(anyhow!(
-                "City not found for hotel id: {}",
-                id.to_db_value()
-            )))?;
-
-            let station_model = station_model.ok_or(RepositoryError::InconsistentState(
-                anyhow!("Station not found for hotel id: {}", id.to_db_value()),
-            ))?;
-
+        if let Some(hotel_model) = r {
             let room_type_list = crate::models::hotel_room_type::Entity::find()
                 .filter(crate::models::hotel_room_type::Column::HotelId.eq(id.to_db_value()))
                 .all(&self.db)
@@ -413,12 +430,10 @@ impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
 
             let hotel_do_pack = HotelDoPack {
                 hotel: hotel_model,
-                city: city_model,
-                station: station_model,
                 room_type_list,
             };
 
-            let r = HotelDataConverter::make_from_do(hotel_do_pack)?;
+            let r = HotelDataConverter::make_from_do(hotel_do_pack, &city_station_pack)?;
 
             Ok(Some(r))
         } else {
@@ -527,7 +542,10 @@ impl DbRepositorySupport<Hotel> for HotelRepositoryImpl {
 }
 
 #[async_trait]
-impl HotelRepository for HotelRepositoryImpl {
+impl<GP> HotelRepository for HotelRepositoryImpl<GP>
+where
+    GP: GeoPort + 'static + Send + Sync,
+{
     async fn get_id_by_uuid(&self, uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
         let result: Option<i32> = crate::models::hotel::Entity::find()
             .select_only()
@@ -590,25 +608,33 @@ impl HotelRepository for HotelRepositoryImpl {
 }
 
 #[instrument(skip_all)]
-pub async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectStorageService>(
-    city_repository: Arc<C>,
-    station_repository: Arc<S>,
-    object_storage: Arc<OS>,
+pub async fn save_raw_hotel<OP: ObjectStoragePort, GP: GeoPort>(
+    object_storage_port: Arc<OP>,
+    geo_port: Arc<GP>,
     db: &DatabaseConnection,
     data_base_path: &Path,
     hotel_data: HotelData,
 ) -> Result<(), RepositoryError> {
+    let db_city_list = geo_port
+        .db_get_cities()
+        .await
+        .inspect_err(|e| error!("Failed to get db cities: {:?}", e))
+        .map_err(|e| RepositoryError::Db(e.into()))?;
+
+    let db_station_list = geo_port
+        .db_get_stations()
+        .await
+        .inspect_err(|e| error!("Failed to get db stations: {:?}", e))
+        .map_err(|e| RepositoryError::Db(e.into()))?;
+
     let tx = db.begin().await.context("Failed to begin transaction")?;
 
-    let cities = city_repository.load().await?;
-    let stations = station_repository.load().await?;
-
-    let city_name_to_city = cities
+    let city_name_to_city = db_city_list
         .into_iter()
         .map(|c| (c.name().to_string(), c))
         .collect::<HashMap<_, _>>();
 
-    let station_name_to_station = stations
+    let station_name_to_station = db_station_list
         .into_iter()
         .map(|s| (s.name().to_string(), s))
         .collect::<HashMap<_, _>>();
@@ -669,11 +695,17 @@ pub async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectS
                             error!("failed load hotel image: {}", e);
                         })?;
 
-                    let uuid = object_storage
-                        .put_object(ObjectCategory::Hotel, "image/jpeg", image_data)
+                    let put_object_command = PutObjectCommand {
+                        object_category: ObjectCategory::Hotel,
+                        content_type: "image/jpeg".to_string(),
+                        object: image_data,
+                    };
+
+                    let uuid = object_storage_port
+                        .put_object(put_object_command)
                         .await
                         .map_err(|e| {
-                            error!("failed save image: {}", e);
+                            error!("failed save image: {:?}", e);
 
                             RepositoryError::Db(e.into())
                         })?;

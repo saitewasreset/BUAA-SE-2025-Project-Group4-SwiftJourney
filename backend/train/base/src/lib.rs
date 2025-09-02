@@ -3,6 +3,8 @@ pub mod domain;
 pub mod infrastructure;
 pub mod models;
 
+pub use shared::{Unverified, Verified};
+
 pub trait DbId {
     type DbType;
 

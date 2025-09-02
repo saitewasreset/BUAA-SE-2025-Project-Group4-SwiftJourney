@@ -29,8 +29,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     City,
-    #[sea_orm(has_many = "super::hotel_order::Entity")]
-    HotelOrder,
     #[sea_orm(has_many = "super::hotel_rating::Entity")]
     HotelRating,
     #[sea_orm(has_many = "super::hotel_room_type::Entity")]
@@ -50,12 +48,6 @@ pub enum Relation {
 impl Related<super::city::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::City.def()
-    }
-}
-
-impl Related<super::hotel_order::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::HotelOrder.def()
     }
 }
 

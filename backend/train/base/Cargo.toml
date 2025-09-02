@@ -1,0 +1,23 @@
+[package]
+name = "train_base"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+id_macro = { path = "../../id_macro" }
+itertools = "0.13"
+log = "0.4"
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid", "with-json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+shared = { path = "../../shared" }
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+uuid = { version = "1.8", features = ["v4", "serde"] }
+petgraph = "0.6"
+rust_decimal = { version = "1.33", features = ["serde-with-str", "db-postgres"] }
+lapin = "3.2.1"
