@@ -1,10 +1,10 @@
-use crate::domain::RepositoryError;
 use crate::domain::model::order::{
     DishOrder, HotelOrder, Order, OrderStatus, TakeawayOrder, TrainOrder,
 };
 use crate::domain::repository::order::OrderRepository;
-use crate::domain::service::order::OrderService;
 use crate::domain::service::order::order_dto::*;
+use crate::domain::service::order::OrderService;
+use crate::domain::RepositoryError;
 
 use crate::domain::model::user::UserId;
 use async_trait::async_trait;
@@ -213,5 +213,236 @@ where
                 origin_departure_time.time().num_seconds_from_midnight() as i32,
             )
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::hotel::HotelDateRange;
+    use crate::domain::model::order::{BaseOrder, OrderTimeInfo, PaymentInfo};
+    use crate::domain::model::personal_info::PreferredSeatLocation;
+    use crate::domain::model::train::{SeatType, SeatTypeName};
+    use crate::domain::model::train_schedule::{Seat, SeatLocationInfo, SeatStatus, StationRange};
+    use crate::domain::model::transaction::Transaction;
+    use crate::domain::repository::mock::order::MockOrderRepository;
+    use crate::domain::repository::order::TrainOrderRelatedData;
+    use anyhow::anyhow;
+    use chrono::{DateTime, FixedOffset, NaiveDate};
+    use rust_decimal::Decimal;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    fn make_service(repo: MockOrderRepository) -> OrderServiceImpl<MockOrderRepository> {
+        OrderServiceImpl::new(Arc::new(repo), 8) // 假设 tz_offset_hour = 8
+    }
+
+    // ---------- convert_order_to_dto 测试 ----------
+    #[tokio::test]
+    async fn test_convert_order_to_dto_train_success() {
+        let mut repo = MockOrderRepository::new();
+
+        repo.expect_get_train_order_related_data()
+            .returning(|_, _, _| {
+                Ok(TrainOrderRelatedData {
+                    train_number: "G123".to_string(),
+                    departure_station: "Beijing".to_string(),
+                    arrival_station: "Shanghai".to_string(),
+                    departure_time: Default::default(),
+                    arrival_time: Default::default(),
+                    origin_station: "Beijing".to_string(),
+                    terminal_station: "Shanghai".to_string(),
+                    origin_departure_time: Default::default(),
+                    terminal_arrival_time: Default::default(),
+                    name: "Alice".to_string(),
+                })
+            });
+
+        let service = make_service(repo);
+
+        let order_uuid = Uuid::new_v4();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let train_order = TrainOrder::new(
+            base_order,
+            1u64.into(),
+            Some(Seat::new(
+                1u64.into(),
+                SeatType::new(
+                    Some(1u64.into()),
+                    SeatTypeName::from_unchecked("二等座".to_string()),
+                    1,
+                    Decimal::new(1000, 2),
+                ),
+                SeatLocationInfo {
+                    carriage: 3,
+                    row: 11,
+                    location: 'A',
+                },
+                SeatStatus::Occupied,
+            )),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            Some(PreferredSeatLocation::A),
+            StationRange::from_unchecked(1u64.into(), 1u64.into()),
+        );
+
+        let order = Box::new(train_order);
+
+        let dto = service.convert_order_to_dto(order).await.unwrap();
+        match dto {
+            OrderInfoDto::Train(train) => {
+                assert_eq!(train.train_number, "G123");
+                assert_eq!(train.departure_station, "Beijing");
+            }
+            _ => panic!("expected train order dto"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_convert_order_to_dto_train_fail() {
+        let mut repo = MockOrderRepository::new();
+        repo.expect_get_train_order_related_data()
+            .returning(|_, _, _| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let service = make_service(repo);
+
+        let order_uuid = Uuid::new_v4();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let train_order = TrainOrder::new(
+            base_order,
+            1u64.into(),
+            Some(Seat::new(
+                1u64.into(),
+                SeatType::new(
+                    Some(1u64.into()),
+                    SeatTypeName::from_unchecked("二等座".to_string()),
+                    1,
+                    Decimal::new(1000, 2),
+                ),
+                SeatLocationInfo {
+                    carriage: 3,
+                    row: 11,
+                    location: 'A',
+                },
+                SeatStatus::Occupied,
+            )),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            Some(PreferredSeatLocation::A),
+            StationRange::from_unchecked(1u64.into(), 1u64.into()),
+        );
+
+        let order = Box::new(train_order);
+
+        let result = service.convert_order_to_dto(order).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_convert_order_to_dto_hotel_success() {
+        let mut repo = MockOrderRepository::new();
+        repo.expect_get_hotel_order_related_data().returning(|_| {
+            Ok(crate::domain::repository::order::HotelOrderRelatedData {
+                hotel_id: Uuid::new_v4(),
+                name: "Alice".to_string(),
+                room_type: "Deluxe".to_string(),
+                hotel_name: "Hilton".to_string(),
+            })
+        });
+
+        let service = make_service(repo);
+
+        let order_uuid = Uuid::new_v4();
+
+        let base_order = BaseOrder::new(
+            Some(1u64.into()),
+            order_uuid,
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Transaction::now(), Transaction::now(), Transaction::now()),
+            Decimal::new(1000, 2),
+            Decimal::ONE,
+            PaymentInfo::new(Some(1u64.into()), None),
+            1u64.into(),
+        );
+
+        let hotel_id = 1u64.into();
+        let hotel_room_type_id = 1u64.into();
+
+        let hotel_order = HotelOrder::new(
+            base_order,
+            hotel_id,
+            hotel_room_type_id,
+            HotelDateRange::new(
+                NaiveDate::from_ymd_opt(2025, 9, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2025, 9, 3).unwrap(),
+            )
+            .unwrap(),
+        );
+
+        let order = Box::new(hotel_order);
+
+        let dto = service.convert_order_to_dto(order).await.unwrap();
+        match dto {
+            OrderInfoDto::Hotel(hotel) => {
+                assert_eq!(hotel.hotel_name, "Hilton");
+            }
+            _ => panic!("expected hotel order dto"),
+        }
+    }
+
+    // ---------- verify_train_order 测试 ----------
+    #[tokio::test]
+    async fn test_verify_train_order_success() {
+        let mut repo = MockOrderRepository::new();
+        repo.expect_verify_train_order()
+            .returning(|_, _, _, _| Ok(true));
+
+        let service = make_service(repo);
+        let user_id = 1u64.into();
+        let dt: DateTime<FixedOffset> =
+            DateTime::parse_from_rfc3339("2025-08-30T08:00:00+08:00").unwrap();
+
+        let result = service
+            .verify_train_order(user_id, "G123".to_string(), dt)
+            .await
+            .unwrap();
+        assert!(result);
+    }
+
+    #[tokio::test]
+    async fn test_verify_train_order_fail() {
+        let mut repo = MockOrderRepository::new();
+        repo.expect_verify_train_order()
+            .returning(|_, _, _, _| Err(RepositoryError::Db(anyhow!("db error"))));
+
+        let service = make_service(repo);
+        let user_id = 1u64.into();
+        let dt: DateTime<FixedOffset> =
+            DateTime::parse_from_rfc3339("2025-08-30T08:00:00+08:00").unwrap();
+
+        let result = service
+            .verify_train_order(user_id, "G123".to_string(), dt)
+            .await;
+        assert!(result.is_err());
     }
 }
