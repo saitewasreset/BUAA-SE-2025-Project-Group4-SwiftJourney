@@ -106,3 +106,12 @@ pub const API_NOT_FOUND_MESSAGE_TEMPLATE: &str =
 
 pub const API_INTERNAL_SERVER_ERROR_MESSAGE: &str =
     "Multiplayer Session Ended: an internal server error has occurred";
+
+pub const HOTEL_MAX_BOOKING_DAYS: u32 = 7;
+pub const HOTEL_MAX_COMMENT_LENGTH: usize = 8192;
+
+pub const DB_CHUNK_SIZE: usize = 4096;
+
+pub const MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER: usize = 3;
+
+pub const ORDER_STATUS_UPDATE_INTERVAL_SECONDS: u64 = 60; // seconds
