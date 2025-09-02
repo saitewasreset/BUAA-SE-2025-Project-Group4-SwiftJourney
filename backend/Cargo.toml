@@ -1,15 +1,17 @@
 [workspace]
 members = [
-	"apps/api",
-	"base",
-	"shared",
-	"migration",
-	"id_macro",
-	"user/base",
-	"user/api",
-	"geo/base",
-	"geo/api",
-	"hotel/base",
-	"hotel/api",
+    "apps/api",
+    "base",
+    "shared",
+    "migration",
+    "id_macro",
+    "user/base",
+    "user/api",
+    "geo/base",
+    "geo/api",
+    "train/base",
+    "train/api",
+    "hotel/base",
+    "hotel/api",
 ]
 resolver = "2"
