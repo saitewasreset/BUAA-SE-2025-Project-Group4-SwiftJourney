@@ -9,5 +9,7 @@ members = [
 	"user/api",
 	"geo/base",
 	"geo/api",
+	"hotel/base",
+	"hotel/api",
 ]
 resolver = "2"

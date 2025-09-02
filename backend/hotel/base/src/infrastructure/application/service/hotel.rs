@@ -1,0 +1,517 @@
+use crate::application::commands::hotel::{
+    HotelInfoQuery, HotelOrderInfoQuery, HotelQuery, NewCommentCommand, QuotaQuery,
+};
+use crate::application::service::hotel::{
+    HotelCommentDTO, HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO,
+    HotelRoomDetailInfoDTO, HotelService, HotelServiceError,
+};
+use crate::domain::model::hotel::{HotelDateRange, Rating};
+use crate::domain::repository::hotel::HotelRepository;
+use crate::domain::service::hotel_booking::HotelBookingService;
+use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
+use crate::domain::service::hotel_rating::{HotelRatingService, HotelRatingServiceError};
+use async_trait::async_trait;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use shared::HOTEL_MAX_BOOKING_DAYS;
+use shared::application_error::{ApplicationError, GeneralError};
+use shared::domain::Identifiable;
+use shared::domain::model::session::SessionId;
+use shared::domain::model::user::UserId;
+use shared::internal::user::command::{SessionQuery, UserInfoQuery};
+use shared::internal::user::dto::{SessionDTO, UserCombinedInfoDTO};
+use shared::ports::user::UserPort;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::{error, instrument};
+
+pub struct HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+where
+    HRS: HotelRatingService,
+    HQS: HotelQueryService,
+    HBS: HotelBookingService,
+    HR: HotelRepository,
+    UP: UserPort,
+{
+    hotel_rating_service: Arc<HRS>,
+    hotel_query_service: Arc<HQS>,
+    hotel_booking_service: Arc<HBS>,
+    hotel_repository: Arc<HR>,
+    user_port: Arc<UP>,
+}
+
+impl<HRS, HQS, HBS, HR, UP> HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+where
+    HRS: HotelRatingService,
+    HQS: HotelQueryService,
+    HBS: HotelBookingService,
+    HR: HotelRepository,
+    UP: UserPort,
+{
+    pub fn new(
+        hotel_rating_service: Arc<HRS>,
+        hotel_query_service: Arc<HQS>,
+        hotel_booking_service: Arc<HBS>,
+        hotel_repository: Arc<HR>,
+        user_port: Arc<UP>,
+    ) -> Self {
+        HotelServiceImpl {
+            hotel_rating_service,
+            hotel_query_service,
+            hotel_booking_service,
+            hotel_repository,
+            user_port,
+        }
+    }
+
+    pub async fn internal_get_user_dto_from_session_id(
+        &self,
+        session_id: SessionId,
+    ) -> Result<UserCombinedInfoDTO, Box<dyn ApplicationError>> {
+        let session = self
+            .internal_get_session_dto_from_session_id(session_id)
+            .await?;
+
+        let user_dto = self
+            .user_port
+            .get_user_info(UserInfoQuery {
+                user_id: session.user_id,
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to get user by user id: {:?}", e);
+                GeneralError::InternalServerError
+            })?
+            .ok_or_else(|| {
+                error!(
+                    "Inconsistent: no user found for user id: {:?}",
+                    session.user_id
+                );
+
+                GeneralError::InternalServerError
+            })?;
+
+        Ok(user_dto)
+    }
+
+    pub async fn internal_get_session_dto_from_session_id(
+        &self,
+        session_id: SessionId,
+    ) -> Result<SessionDTO, Box<dyn ApplicationError>> {
+        let session = self
+            .user_port
+            .get_session(SessionQuery {
+                session_id: session_id.to_string(),
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to get user ID by session: {:?}", e);
+                GeneralError::InternalServerError
+            })?
+            .ok_or(GeneralError::InvalidSessionId)?;
+
+        Ok(session)
+    }
+
+    pub async fn internal_get_user_id_from_session_id(
+        &self,
+        session_id: SessionId,
+    ) -> Result<UserId, Box<dyn ApplicationError>> {
+        let session = self
+            .internal_get_session_dto_from_session_id(session_id)
+            .await?;
+
+        Ok(UserId::from(session.user_id))
+    }
+
+    pub async fn internal_verify_session(
+        &self,
+        session_id: SessionId,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        self.internal_get_session_dto_from_session_id(session_id)
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<HRS, HQS, HBS, HR, UP> HotelService for HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+where
+    HRS: HotelRatingService,
+    HQS: HotelQueryService,
+    HBS: HotelBookingService,
+    HR: HotelRepository,
+    UP: UserPort,
+{
+    #[instrument(skip(self))]
+    async fn get_quota(
+        &self,
+        query: QuotaQuery,
+    ) -> Result<HotelCommentQuotaDTO, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
+
+        let user_id = self
+            .internal_get_user_id_from_session_id(session_id)
+            .await?;
+
+        let quota = self
+            .hotel_rating_service
+            .get_hotel_comment_quota(query.hotel_id, user_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel comment quota: {:?}", e);
+
+                match e {
+                    HotelRatingServiceError::InvalidHotelUuid(uuid) => {
+                        GeneralError::NotFound(format!("Invalid hotel uuid: {}", uuid))
+                    }
+                    _ => GeneralError::InternalServerError,
+                }
+            })?;
+
+        let used = self
+            .hotel_rating_service
+            .get_current_comment_count(query.hotel_id, user_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel comment count: {:?}", e);
+                GeneralError::InternalServerError
+            })?;
+
+        Ok(HotelCommentQuotaDTO { quota, used })
+    }
+
+    async fn new_comment(
+        &self,
+        command: NewCommentCommand,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(command.session_id.as_str())
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
+
+        let user_id = self
+            .internal_get_user_id_from_session_id(session_id)
+            .await?;
+
+        let rating = Rating::try_from(
+            Decimal::from_f64(command.rating)
+                .ok_or(HotelServiceError::InvalidRating(command.rating))?,
+        )
+        .map_err(|_for_super_earth| HotelServiceError::InvalidRating(command.rating))?;
+
+        self.hotel_rating_service
+            .add_comment(command.hotel_id, user_id, rating, command.comment)
+            .await
+            .map_err(|e| match e {
+                HotelRatingServiceError::InvalidHotelUuid(uuid) => Box::new(GeneralError::NotFound(
+                    format!("Invalid hotel uuid: {}", uuid),
+                ))
+                    as Box<dyn ApplicationError>,
+                HotelRatingServiceError::NoCommentsQuotaLeft(_, _) => {
+                    Box::new(HotelServiceError::CommentCountExceed) as Box<dyn ApplicationError>
+                }
+                HotelRatingServiceError::CommentLengthExceed { limit, actual } => {
+                    Box::new(HotelServiceError::CommentLengthExceed { limit, actual })
+                        as Box<dyn ApplicationError>
+                }
+                e => {
+                    error!("Failed to add hotel comment: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        Ok(())
+    }
+
+    async fn query_hotels(
+        &self,
+        query: HotelQuery,
+    ) -> Result<Vec<HotelGeneralInfoDTO>, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?;
+
+        self.internal_verify_session(session_id).await?;
+
+        let date_range = match (query.begin_date, query.end_date) {
+            (None, None) => None,
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                    "Both dates must be specified or none".into(),
+                )));
+            }
+            (Some(begin), Some(end)) => {
+                if end <= begin {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "End date must be after begin date".into(),
+                    )));
+                }
+
+                let duration = end.signed_duration_since(begin).num_days();
+                if duration > HOTEL_MAX_BOOKING_DAYS as i64 {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        format!("Stay cannot exceed {} days", HOTEL_MAX_BOOKING_DAYS),
+                    )));
+                }
+
+                match HotelDateRange::new(begin, end) {
+                    Ok(range) => Some(range),
+                    Err(e) => {
+                        return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                            e.to_string(),
+                        )));
+                    }
+                }
+            }
+        };
+
+        let hotel_infos = self
+            .hotel_query_service
+            .query_hotels(
+                &query.target,
+                &query.target_type,
+                query.search.as_deref(),
+                date_range.as_ref(),
+            )
+            .await
+            .map_err(|e| match e {
+                HotelQueryError::TargetNotFound(target) => {
+                    Box::new(HotelServiceError::TargetNotFound(target)) as Box<dyn ApplicationError>
+                }
+                HotelQueryError::InvalidDateRange(msg) => {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(msg))
+                        as Box<dyn ApplicationError>
+                }
+                _ => {
+                    error!("Failed to query hotels: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                }
+            })?;
+
+        Ok(hotel_infos)
+    }
+
+    async fn query_hotel_info(
+        &self,
+        query: HotelInfoQuery,
+    ) -> Result<HotelDetailInfoDTO, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_| GeneralError::InvalidSessionId)?;
+
+        self.internal_verify_session(session_id).await?;
+
+        let user_info_list = self.user_port.db_get_user_info().await.map_err(|e| {
+            error!("Failed to get db user info list: {:?}", e);
+            GeneralError::InternalServerError
+        })?;
+
+        let user_id_to_name = user_info_list
+            .into_iter()
+            .map(|x| (x.id, x.name))
+            .collect::<HashMap<_, _>>();
+
+        let hotel_id = self
+            .hotel_repository
+            .get_id_by_uuid(query.hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel id by uuid: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                query.hotel_id
+            ))) as Box<dyn ApplicationError>)?;
+
+        let hotel = self
+            .hotel_repository
+            .find(hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to find hotel: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(GeneralError::InternalServerError)
+            .inspect_err(|_for_super_earth| {
+                error!("inconsistent state: hotel id {} not found, but get_id_by_uuid({}) returned the id", hotel_id, query.hotel_id);
+            })?;
+
+        let comments = self
+            .hotel_rating_service
+            .get_comments(query.hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel comments: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        let mut comment_dtos = Vec::with_capacity(comments.len());
+        for c in comments {
+            let user_name = user_id_to_name
+                .get(&c.user_id().into())
+                .cloned()
+                .unwrap_or_else(|| {
+                    error!(
+                        "No user associated with user_id: {}",
+                        i32::from(c.user_id())
+                    );
+
+                    "Avenger-1".to_string()
+                });
+
+            comment_dtos.push(HotelCommentDTO {
+                user_name,
+                comment_time: c.time().to_rfc3339(),
+                rating: Decimal::from(c.rating()).to_f64().unwrap_or(0.0),
+                comment: c.text().to_string(),
+            });
+        }
+
+        let hotel_rating = self
+            .hotel_rating_service
+            .get_hotel_rating(query.hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel rating: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        let picture = if hotel.images().is_empty() {
+            None
+        } else {
+            Some(
+                hotel
+                    .images()
+                    .iter()
+                    .map(|img_uuid| format!("/resource/hotel/images/{}", img_uuid))
+                    .collect(),
+            )
+        };
+
+        Ok(HotelDetailInfoDTO {
+            hotel_id: query.hotel_id.to_string(),
+            name: hotel.name().to_string(),
+            address: hotel.address().to_string(),
+            phone: hotel.phone().clone(),
+            info: hotel.info().clone(),
+            picture,
+            rating: Decimal::from(hotel_rating).to_f64().unwrap_or(0.0),
+            rating_count: hotel.total_rating_count(),
+            total_bookings: hotel.total_booking_count(),
+            comments: comment_dtos,
+        })
+    }
+
+    async fn query_hotel_order_info(
+        &self,
+        query: HotelOrderInfoQuery,
+    ) -> Result<HashMap<String, HotelRoomDetailInfoDTO>, Box<dyn ApplicationError>> {
+        let session_id = SessionId::try_from(query.session_id.as_str())
+            .map_err(|_| GeneralError::InvalidSessionId)?;
+
+        self.internal_verify_session(session_id).await?;
+
+        let hotel_id = self
+            .hotel_repository
+            .get_id_by_uuid(query.hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel id by uuid: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                query.hotel_id
+            ))) as Box<dyn ApplicationError>)?;
+
+        let hotel = self
+            .hotel_repository
+            .find(hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to find hotel: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(GeneralError::InternalServerError).inspect_err(|_for_super_earth| {
+            error!("inconsistent state: hotel id {} not found, but get_id_by_uuid({}) returned the id", hotel_id, query.hotel_id);
+        })?;
+
+        let date_range = match (query.begin_date, query.end_date) {
+            (None, None) => None,
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                    "Both dates must be specified or none".into(),
+                )));
+            }
+            (Some(begin), Some(end)) => {
+                if end <= begin {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "End date must be after begin date".into(),
+                    )));
+                }
+
+                let duration = end.signed_duration_since(begin).num_days();
+                if duration > HOTEL_MAX_BOOKING_DAYS as i64 {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        format!("Stay cannot exceed {} days", HOTEL_MAX_BOOKING_DAYS),
+                    )));
+                }
+
+                match HotelDateRange::new(begin, end) {
+                    Ok(range) => Some(range),
+                    Err(e) => {
+                        return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                            e.to_string(),
+                        )));
+                    }
+                }
+            }
+        };
+
+        let mut result = HashMap::new();
+
+        let available_rooms = if let Some(ref range) = date_range {
+            self.hotel_booking_service
+                .get_available_room(hotel_id, *range)
+                .await
+                .map_err(|e| {
+                    error!("Failed to get available rooms: {:?}", e);
+                    Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                })?
+        } else {
+            HashMap::new()
+        };
+
+        for room_type in hotel.room_type_list() {
+            let type_name = room_type.type_name().clone();
+            let capacity = room_type.capacity();
+            let room_type_id = room_type.get_id();
+
+            let remain_count = if date_range.is_some() {
+                if let Some(room_id) = room_type_id {
+                    available_rooms
+                        .get(&room_id)
+                        .map(|status| status.remain_count)
+                        .unwrap_or(0)
+                } else {
+                    capacity
+                }
+            } else {
+                capacity
+            };
+
+            let price = room_type.price().to_f64().unwrap_or(0.0);
+
+            result.insert(
+                type_name,
+                HotelRoomDetailInfoDTO {
+                    capacity,
+                    remain_count,
+                    price,
+                },
+            );
+        }
+
+        Ok(result)
+    }
+}

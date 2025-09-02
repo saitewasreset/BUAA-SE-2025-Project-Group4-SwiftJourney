@@ -32,6 +32,7 @@ pub mod domain;
 pub mod event;
 pub mod internal;
 pub mod macros;
+pub mod ports;
 pub mod utils;
 
 use phf::{Set, phf_set};
@@ -70,6 +71,10 @@ impl MicroService {
             MicroService::Message => "message",
         }
     }
+
+    pub fn hostname(&self) -> &'static str {
+        self.name()
+    }
 }
 
 // 手动实现 Display 特征
@@ -77,6 +82,13 @@ impl std::fmt::Display for MicroService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // 直接调用辅助方法，将小写名称写入格式化器
         write!(f, "{}", self.name())
+    }
+}
+
+pub trait InternalApi {
+    fn name(&self) -> &'static str;
+    fn path(&self) -> String {
+        format!("/internal/{}", self.name())
     }
 }
 

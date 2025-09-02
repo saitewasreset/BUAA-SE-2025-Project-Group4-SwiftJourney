@@ -1,15 +1,16 @@
 use crate::application_error::ApplicationError;
 use crate::{
     API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_CODE, API_FORBIDDEN_MESSAGE_TEMPLATE,
-    API_SUCCESS_CODE, API_SUCCESS_MESSAGE,
+    API_SUCCESS_CODE, API_SUCCESS_MESSAGE, InternalApi,
 };
 use actix_web::body::BoxBody;
 use actix_web::http::header::ContentType;
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, HttpResponse, Responder, ResponseError};
 use dyn_fmt::AsStrFormatExt;
-use serde::Serialize;
+use reqwest::Client;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::{env, fs};
 use thiserror::Error;
@@ -86,7 +87,7 @@ pub struct AppConfig {
     pub server_name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ApiResponse<T>
 where
     T: Serialize,
@@ -209,4 +210,231 @@ pub fn read_file_env(target_env: &str) -> Option<String> {
     }
 
     result
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UserInternalServiceApi {
+    VerifyPassword,
+    VerifyPaymentPassword,
+    SetPaymentPassword,
+    ClearWrongPaymentPasswordTried,
+    GetSession,
+    GetUserInfo,
+    DbGetUserInfo,
+    DbGetPersonalInfo,
+}
+
+impl InternalApi for UserInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            UserInternalServiceApi::VerifyPassword => "verify_password",
+            UserInternalServiceApi::VerifyPaymentPassword => "verify_payment_password",
+            UserInternalServiceApi::SetPaymentPassword => "set_payment_password",
+            UserInternalServiceApi::ClearWrongPaymentPasswordTried => {
+                "clear_wrong_payment_password_tried"
+            }
+            UserInternalServiceApi::GetSession => "get_session",
+            UserInternalServiceApi::GetUserInfo => "get_user_info",
+            UserInternalServiceApi::DbGetUserInfo => "db_get_user_info",
+            UserInternalServiceApi::DbGetPersonalInfo => "db_get_personal_info",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GeoInternalServiceApi {
+    GetCities,
+    GetStations,
+    DbGetCities,
+    DbGetStations,
+    SaveCityProvinceMap,
+    SaveStationCityMap,
+}
+
+impl InternalApi for GeoInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            GeoInternalServiceApi::GetCities => "get_cities",
+            GeoInternalServiceApi::GetStations => "get_stations",
+            GeoInternalServiceApi::DbGetCities => "db_get_cities",
+            GeoInternalServiceApi::DbGetStations => "db_get_stations",
+            GeoInternalServiceApi::SaveCityProvinceMap => "save_city_province_map",
+            GeoInternalServiceApi::SaveStationCityMap => "save_station_city_map",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TrainInternalServiceApi {
+    GetTrainByNumber,
+    GetTrainScheduleByTrainIdAndOriginDepartureTime,
+}
+
+impl InternalApi for TrainInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            TrainInternalServiceApi::GetTrainByNumber => "get_train_by_number",
+            TrainInternalServiceApi::GetTrainScheduleByTrainIdAndOriginDepartureTime => {
+                "get_train_schedule_by_train_id_and_origin_departure_time"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DishInternalServiceApi {
+    SaveRawDish,
+    SaveRawTakeaway,
+}
+
+impl InternalApi for DishInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            DishInternalServiceApi::SaveRawDish => "save_raw_dish",
+            DishInternalServiceApi::SaveRawTakeaway => "save_raw_takeaway",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OrderInternalServiceApi {
+    NewTransaction,
+    RefundTransaction,
+    ConvertOrderToDto,
+    VerifyTrainOrder,
+    UpdateOrder,
+    GetOrderListByUserId,
+}
+
+impl InternalApi for OrderInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            OrderInternalServiceApi::NewTransaction => "new_transaction",
+            OrderInternalServiceApi::RefundTransaction => "refund_transaction",
+            OrderInternalServiceApi::ConvertOrderToDto => "convert_order_to_dto",
+            OrderInternalServiceApi::VerifyTrainOrder => "verify_train_order",
+            OrderInternalServiceApi::UpdateOrder => "update_order",
+            OrderInternalServiceApi::GetOrderListByUserId => "get_order_list_by_user_id",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ObjectStorageServiceInternalServiceApi {
+    PutObject,
+    GetObject,
+    DeleteObject,
+}
+
+impl InternalApi for ObjectStorageServiceInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            ObjectStorageServiceInternalServiceApi::PutObject => "put_object",
+            ObjectStorageServiceInternalServiceApi::GetObject => "get_object",
+            ObjectStorageServiceInternalServiceApi::DeleteObject => "delete_object",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ApiEndpoint {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Display for ApiEndpoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.host, self.port)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum InternalApiError {
+    #[error("network error: {0}")]
+    NetworkError(reqwest::Error),
+    #[error("invalid json: {0}")]
+    InvalidJson(serde_json::Error),
+    #[error("API error: {status}, {message}")]
+    ApiError { status: u16, message: String },
+}
+
+impl From<reqwest::Error> for InternalApiError {
+    fn from(value: reqwest::Error) -> Self {
+        InternalApiError::NetworkError(value)
+    }
+}
+
+impl From<serde_json::Error> for InternalApiError {
+    fn from(value: serde_json::Error) -> Self {
+        InternalApiError::InvalidJson(value)
+    }
+}
+
+pub struct SuperClient {
+    client: Client,
+    api_endpoint: ApiEndpoint,
+}
+impl SuperClient {
+    pub fn new(api_endpoint: ApiEndpoint) -> Self {
+        let client = Client::default();
+
+        Self {
+            client,
+            api_endpoint,
+        }
+    }
+}
+
+impl SuperClient {
+    fn get_url_for_api(&self, api: impl InternalApi) -> String {
+        format!("http://{}{}", self.api_endpoint, api.path())
+    }
+
+    pub async fn get<Return>(&self, api: impl InternalApi) -> Result<Return, InternalApiError>
+    where
+        Return: Serialize + DeserializeOwned + Default,
+    {
+        let response = self.client.get(self.get_url_for_api(api)).send().await?;
+
+        let payload: ApiResponse<Return> = response.json().await?;
+
+        if payload.code != API_SUCCESS_CODE {
+            return Err(InternalApiError::ApiError {
+                status: payload.code as u16,
+                message: payload.message,
+            });
+        }
+
+        Ok(payload.data.unwrap())
+    }
+
+    pub async fn post<Data, Return>(
+        &self,
+        api: impl InternalApi,
+        data: Data,
+    ) -> Result<Return, InternalApiError>
+    where
+        Data: Serialize + DeserializeOwned,
+        Return: Serialize + DeserializeOwned,
+    {
+        let serialized = serde_json::to_vec(&data).unwrap();
+
+        let response = self
+            .client
+            .post(self.get_url_for_api(api))
+            .body(serialized)
+            .send()
+            .await?;
+
+        let payload: ApiResponse<Return> = response.json().await?;
+
+        if payload.code != API_SUCCESS_CODE {
+            return Err(InternalApiError::ApiError {
+                status: payload.code as u16,
+                message: payload.message,
+            });
+        }
+
+        Ok(payload.data.unwrap())
+    }
 }
