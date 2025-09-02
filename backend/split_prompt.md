@@ -6,6 +6,97 @@
 
 阅读下列微服务拆分方案，根据给出的参考步骤，按要求从已完成的单体应用中完成指定微服务的拆分。
 
+`User`微服务已完成拆分，当你不清楚某些信息时，可参考`User`微服务（相关文件在`user`下）。
+
+`User`微服务的目录结构如下：
+
+```text
+user/
+├── api
+│   ├── Cargo.toml
+│   └── src
+│       ├── internal.rs
+│       ├── lib.rs
+│       ├── main.rs
+│       └── user
+│           ├── mod.rs
+│           ├── personal_info.rs
+│           ├── user_info.rs
+│           └── user_manager.rs
+└── base
+    ├── Cargo.toml
+    └── src
+        ├── application
+        │   ├── commands
+        │   │   ├── mod.rs
+        │   │   ├── personal_info.rs
+        │   │   ├── user_manager.rs
+        │   │   └── user_profile.rs
+        │   ├── mod.rs
+        │   └── service
+        │       ├── internal.rs
+        │       ├── mod.rs
+        │       ├── personal_info.rs
+        │       ├── user_manager.rs
+        │       └── user_profile.rs
+        ├── domain
+        │   ├── model
+        │   │   ├── mod.rs
+        │   │   ├── password.rs
+        │   │   ├── personal_info.rs
+        │   │   ├── session_config.rs
+        │   │   ├── session.rs
+        │   │   └── user.rs
+        │   ├── mod.rs
+        │   ├── repository
+        │   │   ├── mod.rs
+        │   │   ├── personal_info.rs
+        │   │   ├── session.rs
+        │   │   └── user.rs
+        │   └── service
+        │       ├── mod.rs
+        │       ├── password.rs
+        │       ├── session.rs
+        │       └── user.rs
+        ├── infrastructure
+        │   ├── application
+        │   │   ├── mod.rs
+        │   │   └── service
+        │   │       ├── mod.rs
+        │   │       ├── personal_info.rs
+        │   │       ├── user_manager.rs
+        │   │       └── user_profile.rs
+        │   ├── mod.rs
+        │   ├── repository
+        │   │   ├── mod.rs
+        │   │   ├── personal_info.rs
+        │   │   ├── session.rs
+        │   │   └── user.rs
+        │   └── service
+        │       ├── internal.rs
+        │       ├── mod.rs
+        │       ├── password.rs
+        │       ├── session.rs
+        │       └── user.rs
+        ├── lib.rs
+        └── models
+            ├── mod.rs
+            ├── person_info.rs
+            └── user.rs
+
+19 directories, 53 files
+```
+
+请先在项目顶层Cargo Workspace的`Cargo.toml`中添加`*_base`、`*_api`的member。
+
+你总体上需要完成如下两个步骤：
+
+1. 拆分Application Service、Domain Service，并根据要求设计Internal Service，这些操作将在`*_base`中完成，例如，对于`User`微服务，相关文件在`user/base`下
+2. 通过Actix Web暴露外部API和内部API，两者需要使用不同的HttpServer在不同的端口上运行，这些操作将在`*_api`中完成，例如，对于`User`微服务，相关文件在`user/api`下，你可以参考`user/api/main.rs`来设置HttpServer
+
+
+**注意：在为微服务创建Cargo.toml并选择依赖时，请先读取`base/Cargo.toml`，确定依赖的版本，避免版本冲突**
+
 ## 微服务拆分方案
 
 下面每小节表示一个拆分后的微服务，每个微服务中包含：
@@ -91,6 +182,23 @@ Events：
   - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 - `TakeawayDishUpdatedEvent()`
   - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
+
+对于跨微服务调用（即，一个微服务需要调用另一个微服务的Internal Service），请使用HTTP请求进行，请求的目标主机名为对应`MicroService`枚举变体上的`.name`方法（例如，`MicroService::User.name()`），目标端口为23333，目标路径为`/internal/{name}`，其中`name`是对应Internal Service的方法名（例如，`verify_password`）。对于有参数的方法（例如，`verify_password`）发送POST请求，请求体为JSON，对应于相应的参数（例如，对于`verify_password`，JSON可以为：`{user_id: 123, raw_password: "Avenger-1"}`）；对于无参数的方法（例如，`db_get_user_info`）发送GET请求。
+
+请通过端口-适配器模式实现上述跨微服务调用（使用`reqwest`作为HTTP客户端）：
+
+核心原则
+- 端口-适配器：应用层只依赖端口 trait（如 TransactionPort），HTTP 细节封装在基础设施层适配器中。
+- 同步查询、异步变更：跨服务的读取用同步 HTTP；跨服务的状态变更优先通过事件驱动实现最终一致。
+
+目录与职责
+- application/service/ports/*：定义外部依赖的端口（例如 TransactionPort），返回 TransactionInfoDTO，保持与现有流程兼容。
+- infrastructure/external/*：实现端口的 HTTP 客户端（如 HttpOrderClient）。
+- infrastructure/application/service/*：应用服务实现（如 HotelOrderServiceImpl），只组合端口与领域/仓储，业务流程清晰。
+- api/src/main.rs：组装依赖与路由，按环境变量注入各外部服务的 base URL。
+
+调用链（简图）
+Hotel API -> HotelOrderServiceImpl -> TransactionPort -> HttpOrderClient(HTTP) -> Order 微服务
 
 ### User(Err: 90XXX)
 
@@ -650,6 +758,21 @@ Repository:
 - `NotifyRepository`
 
 ## 参考步骤
+
+为了避免违反Rust的孤儿原则，需要为每个微服务创建单独的`DbId`实现，方法如下：
+
+在相应微服务的`base/lib.rs`中，例如，对于`Train`微服务，为`train/base/src/lib.rs`，添加：
+
+```rust
+pub trait DbId {
+    type DbType;
+
+    fn to_db_value(&self) -> Self::DbType;
+    fn from_db_value(value: Self::DbType) -> Result<Self, anyhow::Error>
+    where
+        Self: Sized;
+}
+```
 
 1. 读取对应微服务 Internal Service 中的内容，确认要新增的内部接口。
 
