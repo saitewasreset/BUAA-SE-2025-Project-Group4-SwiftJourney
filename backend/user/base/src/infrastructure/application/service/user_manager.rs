@@ -8,6 +8,7 @@
 //!   - 用户服务(`UserService`)
 //!   - 用户仓储(`UserRepository`)
 //!   - 会话管理服务(`SessionManagerService`)
+use crate::DbId;
 use crate::application::commands::user_manager::{
     UserLoginCommand, UserLogoutCommand, UserRegisterCommand, UserUpdatePasswordCommand,
 };
@@ -22,7 +23,7 @@ use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::user::UserService;
 use async_trait::async_trait;
 use shared::application_error::{ApplicationError, GeneralError};
-use shared::domain::{DbId, Identifiable};
+use shared::domain::Identifiable;
 use std::sync::Arc;
 use tracing::{error, warn};
 

@@ -5,6 +5,7 @@
 //! - 领域模型与数据库模型之间的转换
 //! - 变更追踪与聚合管理
 
+use crate::DbId;
 use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, RealName, User, UserId, UserInfo,
@@ -16,7 +17,6 @@ use async_trait::async_trait;
 use email_address::EmailAddress;
 use sea_orm::ColumnTrait;
 use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, QueryFilter};
-use shared::domain::DbId;
 use shared::domain::{
     AggregateManager, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, Repository,
     RepositoryError, TypedDiff,

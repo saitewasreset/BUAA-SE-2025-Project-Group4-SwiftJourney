@@ -5,6 +5,7 @@
 //! - 领域模型与数据库模型之间的转换
 //! - 变更追踪与聚合管理
 
+use crate::DbId;
 use crate::domain::model::personal_info::{PersonalInfo, PersonalInfoId, PreferredSeatLocation};
 use crate::domain::model::user::{IdentityCardId, RealName};
 use crate::domain::repository::personal_info::PersonalInfoRepository;
@@ -15,7 +16,7 @@ use sea_orm::{
 };
 use shared::domain::{AggregateManagerImpl, DiffInfo};
 use shared::domain::{
-    DbId, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
+    DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
 use shared::impl_db_id_from_u64;
 use std::sync::{Arc, Mutex};
