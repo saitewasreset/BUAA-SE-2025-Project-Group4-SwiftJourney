@@ -1,4 +1,5 @@
 pub mod dish_booking;
+pub mod geo;
 pub mod hotel_booking;
 pub mod hotel_query;
 pub mod hotel_rating;

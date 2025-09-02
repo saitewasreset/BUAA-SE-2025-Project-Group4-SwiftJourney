@@ -7,12 +7,12 @@
 //! - 火车站的增删改查
 //! - 车站与城市的关联管理
 //! - 车站名称验证和唯一性检查
-use crate::domain::Identifiable;
 use crate::domain::model::city::CityId;
 use crate::domain::model::station::{Station, StationId};
 use crate::domain::repository::station::StationRepository;
 use crate::domain::service::geo::{GeoService, GeoServiceError};
 use crate::domain::service::station::{StationService, StationServiceError};
+use crate::domain::Identifiable;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -236,10 +236,280 @@ where
         to_city: &str,
     ) -> Result<Vec<(StationId, StationId)>, StationServiceError> {
         let from_list = self.get_station_by_city_name(from_city).await?;
-        let to_list   = self.get_station_by_city_name(to_city).await?;
+        let to_list = self.get_station_by_city_name(to_city).await?;
         Ok(from_list
             .iter()
-            .flat_map(|f| to_list.iter().map(move |t| (f.get_id().unwrap(), t.get_id().unwrap())))
+            .flat_map(|f| {
+                to_list
+                    .iter()
+                    .map(move |t| (f.get_id().unwrap(), t.get_id().unwrap()))
+            })
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::{City, CityName, ProvinceName};
+    use crate::domain::model::station::Station;
+    use crate::domain::repository::mock::station::MockStationRepository;
+    use crate::domain::service::mock::geo::MockGeoService;
+    use anyhow::anyhow;
+    use std::sync::Arc;
+
+    // -------------------------
+    // get_stations 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_get_stations_success() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_load().returning(|| {
+            Ok(vec![Station::new(
+                Some(1u64.into()),
+                "Station1".to_string(),
+                1u64.into(),
+            )])
+        });
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let stations = service.get_stations().await.unwrap();
+        assert_eq!(stations.len(), 1);
+        assert_eq!(stations[0].name(), "Station1");
+    }
+
+    #[tokio::test]
+    async fn test_get_stations_fail() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_load()
+            .returning(|| Err(crate::domain::RepositoryError::Db(anyhow!("fail"))));
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let result = service.get_stations().await;
+        assert!(result.is_err());
+    }
+
+    // -------------------------
+    // get_station_by_city 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_get_station_by_city_success() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find_by_city().returning(|_| {
+            Ok(vec![Station::new(
+                Some(1u64.into()),
+                "S1".to_string(),
+                1u64.into(),
+            )])
+        });
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let stations = service.get_station_by_city(1u64.into()).await.unwrap();
+        assert_eq!(stations.len(), 1);
+        assert_eq!(stations[0].name(), "S1");
+    }
+
+    #[tokio::test]
+    async fn test_get_station_by_city_fail() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find_by_city()
+            .returning(|_| Err(crate::domain::RepositoryError::Db(anyhow!("fail"))));
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let result = service.get_station_by_city(1u64.into()).await;
+        assert!(result.is_err());
+    }
+
+    // -------------------------
+    // get_station_by_name 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_get_station_by_name_success() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find_by_name().returning(|_| {
+            Ok(Some(Station::new(
+                Some(1u64.into()),
+                "S1".to_string(),
+                1u64.into(),
+            )))
+        });
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let station = service.get_station_by_name("S1".to_string()).await.unwrap();
+        assert!(station.is_some());
+        assert_eq!(station.unwrap().name(), "S1");
+    }
+
+    #[tokio::test]
+    async fn test_get_station_by_name_fail() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find_by_name()
+            .returning(|_| Err(crate::domain::RepositoryError::Db(anyhow!("fail"))));
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let result = service.get_station_by_name("S1".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    // -------------------------
+    // add_station 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_add_station_success() {
+        let mut repo = MockStationRepository::new();
+        // 修改原 station 而不是 clone
+        repo.expect_save().returning(|station: &mut Station| {
+            station.set_id(1u64.into()); // 直接给 station 赋值
+            Ok(1u64.into())
+        });
+
+        let mut geo_service = MockGeoService::new();
+        geo_service.expect_get_city_by_name().returning(|_| {
+            Ok(Some(City::new(
+                Some(1u64.into()),
+                CityName::from("City1".to_string()),
+                ProvinceName::from("Province1".to_string()),
+            )))
+        });
+
+        let service = StationServiceImpl::new(Arc::new(repo), Arc::new(geo_service));
+
+        let id = service
+            .add_station("S1".to_string(), "City1".to_string())
+            .await
+            .unwrap();
+        assert_eq!(id, 1u64.into());
+    }
+
+    #[tokio::test]
+    async fn test_add_station_fail_invalid_city() {
+        let repo = MockStationRepository::new();
+
+        let mut geo_service = MockGeoService::new();
+        geo_service
+            .expect_get_city_by_name()
+            .returning(|_| Ok(None));
+
+        let service = StationServiceImpl::new(Arc::new(repo), Arc::new(geo_service));
+
+        let result = service
+            .add_station("S1".to_string(), "CityNotExist".to_string())
+            .await;
+        assert!(matches!(
+            result,
+            Err(StationServiceError::InvalidGeoInfo(_))
+        ));
+    }
+
+    // -------------------------
+    // modify_station 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_modify_station_success() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find().returning(|_| {
+            Ok(Some(Station::new(
+                Some(1u64.into()),
+                "Old".to_string(),
+                1u64.into(),
+            )))
+        });
+        repo.expect_save().returning(|_| Ok(1u64.into()));
+
+        let mut geo_service = MockGeoService::new();
+        geo_service.expect_get_city_by_name().returning(|_| {
+            Ok(Some(City::new(
+                Some(1u64.into()),
+                CityName::from("City1".to_string()),
+                ProvinceName::from("Province1".to_string()),
+            )))
+        });
+
+        let service = StationServiceImpl::new(Arc::new(repo), Arc::new(geo_service));
+
+        let result = service
+            .modify_station(1u64.into(), "New".to_string(), "City1".to_string())
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_modify_station_fail_no_station() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find().returning(|_| Ok(None));
+
+        let mut geo_service = MockGeoService::new();
+        geo_service.expect_get_city_by_name().returning(|_| {
+            Ok(Some(City::new(
+                Some(1u64.into()),
+                CityName::from("City1".to_string()),
+                ProvinceName::from("Province1".to_string()),
+            )))
+        });
+
+        let service = StationServiceImpl::new(Arc::new(repo), Arc::new(geo_service));
+
+        let result = service
+            .modify_station(1u64.into(), "New".to_string(), "City1".to_string())
+            .await;
+        assert!(matches!(
+            result,
+            Err(StationServiceError::NoSuchStationId(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_modify_station_fail_invalid_city() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_find().returning(|_| {
+            Ok(Some(Station::new(
+                Some(1u64.into()),
+                "Old".to_string(),
+                1u64.into(),
+            )))
+        });
+
+        let mut geo_service = MockGeoService::new();
+        geo_service
+            .expect_get_city_by_name()
+            .returning(|_| Ok(None));
+
+        let service = StationServiceImpl::new(Arc::new(repo), Arc::new(geo_service));
+
+        let result = service
+            .modify_station(1u64.into(), "New".to_string(), "CityNotExist".to_string())
+            .await;
+        assert!(matches!(
+            result,
+            Err(StationServiceError::InvalidGeoInfo(_))
+        ));
+    }
+
+    // -------------------------
+    // delete_station 测试
+    // -------------------------
+    #[tokio::test]
+    async fn test_delete_station_success() {
+        let mut repo = MockStationRepository::new();
+        repo.expect_remove().returning(|_| Ok(()));
+
+        let geo_service = Arc::new(MockGeoService::new());
+        let service = StationServiceImpl::new(Arc::new(repo), geo_service);
+
+        let station = Station::new(Some(1u64.into()), "S1".to_string(), 1u64.into());
+        let result = service.delete_station(station).await;
+        assert!(result.is_ok());
     }
 }
