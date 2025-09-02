@@ -1,3 +1,13 @@
 [workspace]
-members = ["apps/api", "base", "shared", "migration", "id_macro", "user/base", "user/api"]
+members = [
+	"apps/api",
+	"base",
+	"shared",
+	"migration",
+	"id_macro",
+	"user/base",
+	"user/api",
+	"geo/base",
+	"geo/api",
+]
 resolver = "2"
