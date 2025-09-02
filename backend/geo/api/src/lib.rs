@@ -1,2 +1,2 @@
-pub mod geo;
+pub mod general;
 pub mod internal;

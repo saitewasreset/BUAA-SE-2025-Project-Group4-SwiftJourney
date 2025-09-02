@@ -1,8 +1,10 @@
 use actix_web::{App, HttpServer, web};
 use geo_base::application::service::geo::{GeoApplicationService, GeoApplicationServiceImpl};
+use geo_base::application::service::internal::GeoInternalService;
 use geo_base::infrastructure::repository::city::CityRepositoryImpl;
 use geo_base::infrastructure::repository::station::StationRepositoryImpl;
 use geo_base::infrastructure::service::geo::GeoServiceImpl;
+use geo_base::infrastructure::service::internal::GeoInternalServiceImpl;
 use geo_base::infrastructure::service::station::StationServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
@@ -48,15 +50,21 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&station_service_impl),
     ));
 
+    let geo_internal_service_impl = Arc::new(GeoInternalServiceImpl::new(
+        Arc::clone(&city_repository_impl),
+        Arc::clone(&station_repository_impl),
+    ));
+
     let geo_app_service: web::Data<dyn GeoApplicationService> =
         web::Data::from(geo_app_service_impl as Arc<dyn GeoApplicationService>);
 
-    let internal_conn = conn.clone();
+    let geo_internal_service: web::Data<dyn GeoInternalService> =
+        web::Data::from(geo_internal_service_impl as Arc<dyn GeoInternalService>);
 
     tokio::task::spawn(async move {
         HttpServer::new(move || {
             App::new()
-                .app_data(internal_conn.clone())
+                .app_data(geo_internal_service.clone())
                 .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
                 .wrap(TracingLogger::default())
                 .service(web::scope("/internal").configure(geo_api::internal::scoped_config))
@@ -73,7 +81,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(geo_app_service.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
-            .service(web::scope("/api").configure(geo_api::geo::scoped_config))
+            .service(
+                web::scope("/api")
+                    .service(web::scope("/general").configure(geo_api::general::scoped_config)),
+            )
     })
     .bind(("0.0.0.0", 8081))?
     .run()
