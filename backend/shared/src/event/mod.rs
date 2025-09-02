@@ -129,6 +129,12 @@ pub struct EventRegistry {
     deserializers: HashMap<EventType, Deserializer>,
 }
 
+impl Default for EventRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventRegistry {
     /// 创建一个新的、空的 `EventRegistry`。
     pub fn new() -> Self {
@@ -175,11 +181,7 @@ impl EventRegistry {
         &self,
         event_package: &EventPackage,
     ) -> Option<Result<Box<dyn Any + Send + Sync>, serde_json::Error>> {
-        if let Some(deserializer) = self.deserializers.get(&event_package.name) {
-            Some(deserializer(event_package.event.clone()))
-        } else {
-            None
-        }
+        self.deserializers.get(&event_package.name).map(|deserializer| deserializer(event_package.event.clone()))
     }
 }
 
