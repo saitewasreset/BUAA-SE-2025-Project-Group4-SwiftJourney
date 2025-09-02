@@ -1,3 +1,4 @@
+use crate::DbId;
 use crate::domain::model::city::{City, CityId, ProvinceName};
 use crate::domain::repository::city::CityRepository;
 use crate::models::city::Model;
@@ -7,9 +8,8 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 use sea_orm::{ColumnTrait, Select};
 use shared::data::CityData;
-use shared::domain::{DbId, Identifiable, Repository, RepositoryError, transform_list};
+use shared::domain::{Identifiable, Repository, RepositoryError, transform_list};
 use tracing::{debug, error, instrument, trace};
-
 pub struct CityRepositoryImpl {
     db: DatabaseConnection,
 }

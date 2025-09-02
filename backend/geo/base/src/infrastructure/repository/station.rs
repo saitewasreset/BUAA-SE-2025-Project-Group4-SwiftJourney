@@ -1,3 +1,4 @@
+use crate::DbId;
 use crate::domain::model::city::CityId;
 use crate::domain::model::station::{Station, StationId};
 use crate::domain::repository::station::StationRepository;
@@ -9,7 +10,7 @@ use sea_orm::{
     TransactionTrait,
 };
 use shared::data::StationData;
-use shared::domain::{DbId, Identifiable, Repository, RepositoryError, transform_list};
+use shared::domain::{Identifiable, Repository, RepositoryError, transform_list};
 use tracing::{debug, error, instrument, trace};
 
 pub struct StationRepositoryImpl {
