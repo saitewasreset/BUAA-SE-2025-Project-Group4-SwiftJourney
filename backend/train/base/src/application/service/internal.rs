@@ -1,11 +1,6 @@
 use async_trait::async_trait;
-use shared::domain::model::train::{SeatType, Train};
-use shared::domain::model::train_schedule::{StationRange, TrainSchedule};
-use shared::domain::Identifiable;
 use shared::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
-use shared::internal::train::dto::{
-    SeatTypeDTO, StationRangeDTO, TrainDTO, TrainScheduleDTO,
-};
+use shared::internal::train::dto::{TrainDTO, TrainScheduleDTO};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,8 +10,6 @@ pub enum TrainInternalServiceError {
     #[error(transparent)]
     RelatedServiceError(#[from] anyhow::Error),
 }
-
-
 
 #[async_trait]
 pub trait TrainInternalService: 'static + Send + Sync {
