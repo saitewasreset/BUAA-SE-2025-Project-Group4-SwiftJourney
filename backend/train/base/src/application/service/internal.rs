@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use shared::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
+use shared::internal::train::command::{
+    GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
+};
 use shared::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
 use thiserror::Error;
 

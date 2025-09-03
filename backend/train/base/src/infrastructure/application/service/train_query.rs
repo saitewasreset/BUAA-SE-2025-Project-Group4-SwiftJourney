@@ -26,32 +26,29 @@ use shared::utils::TimeMeter;
 use std::collections::HashMap;
 use tracing::{error, info, instrument};
 
-pub struct TrainQueryServiceImpl<T, GP, W, RR, TR, SR>
+pub struct TrainQueryServiceImpl<T, GP, W, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     GP: GeoPort + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     RR: RouteRepository,
     TR: TrainRepository,
-    SR: StationRepository,
 {
     train_schedule_service: Arc<T>,
     geo_port: Arc<GP>,
     route_service: Arc<W>,
     route_repository: Arc<RR>,
     train_repository: Arc<TR>,
-    station_repository: Arc<SR>,
     tz_offset_hour: i32,
 }
 
-impl<T, GP, W, RR, TR, SR> TrainQueryServiceImpl<T, GP, W, RR, TR, SR>
+impl<T, GP, W, RR, TR> TrainQueryServiceImpl<T, GP, W, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     GP: GeoPort + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     RR: RouteRepository,
     TR: TrainRepository,
-    SR: StationRepository,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -60,7 +57,6 @@ where
         route_service: Arc<W>,
         route_repository: Arc<RR>,
         train_repository: Arc<TR>,
-        station_repository: Arc<SR>,
         tz_offset_hour: i32,
     ) -> Self {
         TrainQueryServiceImpl {
@@ -69,7 +65,6 @@ where
             route_service,
             route_repository,
             train_repository,
-            station_repository,
             tz_offset_hour,
         }
     }
@@ -131,14 +126,13 @@ where
 }
 
 #[async_trait]
-impl<T, GP, W, RR, TR, SR> TrainQueryService for TrainQueryServiceImpl<T, GP, W, RR, TR, SR>
+impl<T, GP, W, RR, TR> TrainQueryService for TrainQueryServiceImpl<T, GP, W, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     GP: GeoPort + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     RR: RouteRepository,
     TR: TrainRepository,
-    SR: StationRepository,
 {
     #[instrument(skip(self))]
     async fn query_train(
@@ -361,8 +355,8 @@ where
         let mut infos = Vec::new();
 
         let station_list = self
-            .station_repository
-            .load()
+            .geo_port
+            .db_get_stations()
             .await
             .inspect_err(|e| error!("failed to load stations: {:?}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
@@ -371,12 +365,7 @@ where
 
         let station_id_to_name = station_list
             .into_iter()
-            .map(|s| {
-                (
-                    s.get_id().expect("Station should have id"),
-                    s.name().to_string(),
-                )
-            })
+            .map(|s| (StationId::from(s.id as u64), s.name))
             .collect::<HashMap<_, _>>();
 
         let train_list = self
@@ -495,11 +484,18 @@ where
             .collect();
 
         let station_list = self
-            .station_repository
-            .load()
+            .geo_port
+            .db_get_stations()
             .await
             .inspect_err(|e| error!("failed to load stations: {:?}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+
+        meter.meter("load stations");
+
+        let station_id_to_name = station_list
+            .into_iter()
+            .map(|s| (StationId::from(s.id as u64), s.name))
+            .collect::<HashMap<_, _>>();
 
         meter.meter("load stations");
 
@@ -515,16 +511,6 @@ where
         let train_id_to_train = train_list
             .into_iter()
             .map(|t| (t.get_id().expect("Train should have id"), t))
-            .collect::<HashMap<_, _>>();
-
-        let station_id_to_name = station_list
-            .into_iter()
-            .map(|s| {
-                (
-                    s.get_id().expect("Station should have id"),
-                    s.name().to_string(),
-                )
-            })
             .collect::<HashMap<_, _>>();
 
         let mut solutions = Vec::new();
@@ -676,14 +662,13 @@ where
     }
 }
 
-impl<T, GP, W, RR, TR, SR> TrainQueryServiceImpl<T, GP, W, RR, TR, SR>
+impl<T, GP, W, RR, TR> TrainQueryServiceImpl<T, GP, W, RR, TR>
 where
     T: TrainScheduleService + 'static + Send + Sync,
     GP: GeoPort + 'static + Send + Sync,
     W: RouteService + 'static + Send + Sync,
     RR: RouteRepository,
     TR: TrainRepository,
-    SR: StationRepository,
 {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(self, routes, station_id_to_name))]

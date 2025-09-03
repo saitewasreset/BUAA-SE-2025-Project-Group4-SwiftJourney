@@ -181,7 +181,9 @@ impl EventRegistry {
         &self,
         event_package: &EventPackage,
     ) -> Option<Result<Box<dyn Any + Send + Sync>, serde_json::Error>> {
-        self.deserializers.get(&event_package.name).map(|deserializer| deserializer(event_package.event.clone()))
+        self.deserializers
+            .get(&event_package.name)
+            .map(|deserializer| deserializer(event_package.event.clone()))
     }
 }
 
@@ -337,5 +339,168 @@ mod tests {
         // We expect `Some(Err(...))`
         assert!(result.is_some());
         assert!(result.unwrap().is_err());
+    }
+}
+
+/// 城市数据已更新。
+///
+/// 触发位置:
+/// - `load_city`: `base/src/infrastructure/application/service/train_data.rs:165`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CityUpdatedEvent;
+
+impl Event for CityUpdatedEvent {
+    fn event_type() -> EventType {
+        "city_updated_event".to_string()
+    }
+}
+
+/// 车站数据已更新。
+///
+/// 触发位置:
+/// - `load_station`: `base/src/infrastructure/application/service/train_data.rs:188`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StationUpdatedEvent;
+
+impl Event for StationUpdatedEvent {
+    fn event_type() -> EventType {
+        "station_updated_event".to_string()
+    }
+}
+
+/// 用户信息（个人资料、密码等）已更新。
+///
+/// 触发位置:
+/// - `set_profile`: `base/src/infrastructure/application/service/user_profile.rs:162`
+/// - `register`: `base/src/infrastructure/application/service/user_manager.rs:101`
+/// - `update_password`: `base/src/infrastructure/application/service/user_manager.rs:215`
+/// - `set_payment_password`: `base/src/infrastructure/application/service/transaction.rs:211`
+///
+/// 注意：分析时发现一个潜在问题，`wrong_payment_password_tried` 的值似乎并未在相关操作中被更新。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserUpdatedEvent;
+
+impl Event for UserUpdatedEvent {
+    fn event_type() -> EventType {
+        "user_updated_event".to_string()
+    }
+}
+
+/// 用户的个人身份信息已更新。
+///
+/// 触发位置:
+/// - `set_personal_info`: `base/src/infrastructure/application/service/personal_info.rs:140`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersonalInfoUpdatedEvent;
+
+impl Event for PersonalInfoUpdatedEvent {
+    fn event_type() -> EventType {
+        "personal_info_updated_event".to_string()
+    }
+}
+
+/// 列车基础信息已更新。
+///
+/// 触发位置:
+/// - `save_raw_train_number`: `base/src/infrastructure/repository/train.rs:953`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrainUpdatedEvent;
+
+impl Event for TrainUpdatedEvent {
+    fn event_type() -> EventType {
+        "train_updated_event".to_string()
+    }
+}
+
+/// 列车时刻表已更新。
+///
+/// 触发位置:
+/// - `auto_plan_schedule`: `base/src/infrastructure/service/train_schedule.rs:288`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrainScheduleUpdatedEvent;
+
+impl Event for TrainScheduleUpdatedEvent {
+    fn event_type() -> EventType {
+        "train_schedule_updated_event".to_string()
+    }
+}
+
+/// 路线信息已更新。
+///
+/// 触发位置:
+/// - `save_raw_train_number`: `base/src/infrastructure/repository/train.rs:953`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteUpdatedEvent;
+
+impl Event for RouteUpdatedEvent {
+    fn event_type() -> EventType {
+        "route_updated_event".to_string()
+    }
+}
+
+/// 座位类型或其映射关系已更新。
+///
+/// 触发位置:
+/// - `load_train_type`: `base/src/infrastructure/application/service/train_data.rs:218`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SeatTypeUpdatedEvent;
+
+impl Event for SeatTypeUpdatedEvent {
+    fn event_type() -> EventType {
+        "seat_type_updated_event".to_string()
+    }
+}
+
+/// 酒店信息（包括评论、订单处理等）已更新。
+///
+/// 触发位置:
+/// - `load_hotel`: `base/src/infrastructure/application/service/hotel_data.rs:62`
+/// - `new_comment`: `base/src/infrastructure/application/service/hotel.rs:126`
+/// - `process_hotel_orders`: `base/src/infrastructure/application/service/hotel_order.rs:336`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HotelUpdatedEvent;
+
+impl Event for HotelUpdatedEvent {
+    fn event_type() -> EventType {
+        "hotel_updated_event".to_string()
+    }
+}
+
+/// 酒店房型信息已更新。
+///
+/// 触发位置:
+/// - `load_hotel`: `base/src/infrastructure/application/service/hotel_data.rs:62`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HotelRoomTypeUpdatedEvent;
+
+impl Event for HotelRoomTypeUpdatedEvent {
+    fn event_type() -> EventType {
+        "hotel_room_type_updated_event".to_string()
+    }
+}
+
+/// 火车餐菜品信息已更新。
+///
+/// 触发位置:
+/// - `load_dish_takeaway`: `base/src/infrastructure/application/service/train_data.rs:263`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DishUpdatedEvent;
+
+impl Event for DishUpdatedEvent {
+    fn event_type() -> EventType {
+        "dish_updated_event".to_string()
+    }
+}
+
+/// 外卖菜品信息已更新。
+///
+/// 触发位置:
+/// - `load_dish_takeaway`: `base/src/infrastructure/application/service/train_data.rs:263`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TakeawayDishUpdatedEvent;
+
+impl Event for TakeawayDishUpdatedEvent {
+    fn event_type() -> EventType {
+        "takeaway_dish_updated_event".to_string()
     }
 }

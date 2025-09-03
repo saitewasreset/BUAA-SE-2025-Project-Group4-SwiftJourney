@@ -22,6 +22,7 @@ use crate::DbId;
 use crate::Verified;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
+use crate::infrastructure::service::event::TrainEventServiceImpl;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
@@ -37,7 +38,9 @@ use shared::domain::model::train::{
 use shared::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use shared::domain::transform_list;
 use shared::domain::{Identifiable, Repository, RepositoryError};
-use shared::impl_db_id_from_u64;
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, RouteUpdatedEvent, TrainUpdatedEvent};
+use shared::{MicroService, impl_db_id_from_u64};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Deref;
@@ -956,6 +959,7 @@ pub async fn save_raw_train_number<T: RouteRepository>(
     train_number_data: TrainNumberData,
     route_repository: Arc<T>,
     db: &DatabaseConnection,
+    event_service: Arc<dyn EventService>,
 ) -> Result<(), RepositoryError> {
     let txn = db
         .begin()
@@ -1089,6 +1093,20 @@ pub async fn save_raw_train_number<T: RouteRepository>(
 
     trace!("Commit transaction");
     txn.commit().await.context("failed to commit transaction")?;
+
+    if let Err(e) = event_service
+        .publish_event(EventPackage::new(MicroService::Train, TrainUpdatedEvent))
+        .await
+    {
+        error!("Failed to publish train updated event: {:?}", e);
+    }
+
+    if let Err(e) = event_service
+        .publish_event(EventPackage::new(MicroService::Train, RouteUpdatedEvent))
+        .await
+    {
+        error!("Failed to publish route updated event: {:?}", e);
+    }
 
     Ok(())
 }

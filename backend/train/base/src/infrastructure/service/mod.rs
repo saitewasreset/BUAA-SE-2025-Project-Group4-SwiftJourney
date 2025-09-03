@@ -1,4 +1,4 @@
-mod event;
+pub mod event;
 pub mod internal;
 pub mod route;
 pub mod train_booking;

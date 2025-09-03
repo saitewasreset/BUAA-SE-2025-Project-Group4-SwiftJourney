@@ -8,12 +8,15 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDate, TimeDelta};
 use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::MicroService;
 use shared::domain::ServiceError;
 use shared::domain::model::route::{Route, RouteId};
 use shared::domain::model::station::StationId;
 use shared::domain::model::train::{TrainId, TrainNumber};
 use shared::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use shared::domain::{Identifiable, RepositoryError};
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, TrainScheduleUpdatedEvent};
 use shared::utils::TimeMeter;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -22,12 +25,13 @@ use tracing::{error, info, instrument, warn};
 
 // Step 1: Define generics parameter over `RouteService` service
 // Exercise 1.2.1D - 3: Your code here. (1 / 6)
-pub struct TrainScheduleServiceImpl<RS, TR, TSR, RR>
+pub struct TrainScheduleServiceImpl<RS, TR, TSR, RR, ES>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
+    ES: EventService,
 {
     // Step 2: Add struct filed to store an implementation of `RouteService` service
     // Exercise 1.2.1D - 3: Your code here. (2 / 6)
@@ -35,21 +39,24 @@ where
     train_repository: Arc<TR>,
     train_schedule_repository: Arc<TSR>,
     route_repository: Arc<RR>,
+    event_service: Arc<ES>,
     tz_offset_hour: i32,
 }
 
-impl<RS, TR, TSR, RR> TrainScheduleServiceImpl<RS, TR, TSR, RR>
+impl<RS, TR, TSR, RR, ES> TrainScheduleServiceImpl<RS, TR, TSR, RR, ES>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
+    ES: EventService,
 {
     pub fn new(
         route_service: Arc<RS>,
         train_repository: Arc<TR>,
         train_schedule_repository: Arc<TSR>,
         route_repository: Arc<RR>,
+        event_service: Arc<ES>,
         tz_offset_hour: i32,
     ) -> Self {
         Self {
@@ -57,6 +64,7 @@ where
             train_repository,
             train_schedule_repository,
             route_repository,
+            event_service,
             tz_offset_hour,
         }
     }
@@ -132,12 +140,13 @@ fn build_outgoing_index(connections: &[Connection]) -> HashMap<StationId, Vec<us
 const MIN_TRANSFER_SEC: u32 = 10 * 60; // ≥10 分钟
 const MAX_TRANSFER_SEC: u32 = 3 * 60 * 60; // ≤3 小时
 
-impl<RS, TR, TSR, RR> TrainScheduleServiceImpl<RS, TR, TSR, RR>
+impl<RS, TR, TSR, RR, ES> TrainScheduleServiceImpl<RS, TR, TSR, RR, ES>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
+    ES: EventService,
 {
     #[instrument(skip(self))]
     #[allow(clippy::type_complexity)]
@@ -196,12 +205,13 @@ where
 }
 
 #[async_trait]
-impl<RS, TR, TSR, RR> TrainScheduleService for TrainScheduleServiceImpl<RS, TR, TSR, RR>
+impl<RS, TR, TSR, RR, ES> TrainScheduleService for TrainScheduleServiceImpl<RS, TR, TSR, RR, ES>
 where
     RS: RouteService + 'static + Send + Sync,
     TR: TrainRepository + 'static + Send + Sync,
     TSR: TrainScheduleRepository,
     RR: RouteRepository,
+    ES: EventService,
 {
     #[instrument(skip(self))]
     async fn add_schedule(
@@ -362,6 +372,18 @@ where
             })?;
 
         info!("schedules saved");
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(
+                MicroService::Train,
+                TrainScheduleUpdatedEvent,
+            ))
+            .await
+        {
+            error!("Failed to publish train schedule updated event: {:?}", e);
+        }
+
         Ok(())
     }
 

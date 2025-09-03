@@ -1,16 +1,10 @@
-use actix_web::{
-    post,
-    web::{self, Bytes, Data},
-    HttpRequest,
-};
+use actix_web::{HttpRequest, post, web::Bytes, web::Data};
 use serde::{Deserialize, Serialize};
-use shared::{
-    api::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body},
-    application_error::{ApplicationError, GeneralError},
-    API_SUCCESS_CODE, API_SUCCESS_MESSAGE,
-};
-use train_base::application::service::train_order::{OrderPacksDTO, TrainOrderService};
+use shared::api::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
+use shared::application_error::{ApplicationError, GeneralError};
+use shared::{API_SUCCESS_CODE, API_SUCCESS_MESSAGE};
 use tracing::error;
+use train_base::application::service::train_order::{OrderPacksDTO, TrainOrderService};
 
 /// 用于响应的交易信息
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,8 +38,7 @@ pub async fn create_train_order(
     if transaction_result.transaction_id.is_nil() {
         error!("No transaction was created");
         return Err(ApplicationErrorBox::from(
-            Box::new(GeneralError::InternalServerError)
-                as Box<dyn shared::application_error::ApplicationError>,
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>,
         ));
     }
 
@@ -58,8 +51,4 @@ pub async fn create_train_order(
             status: "unpaid".to_string(),
         }),
     })
-}
-
-pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(create_train_order);
 }
