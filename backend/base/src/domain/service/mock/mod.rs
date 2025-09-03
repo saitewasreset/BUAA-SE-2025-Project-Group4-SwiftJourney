@@ -11,5 +11,6 @@ pub mod station;
 pub mod takeaway_booking;
 pub mod train_booking;
 pub mod train_schedule;
+pub mod train_seat;
 pub mod train_type;
 pub mod transaction;

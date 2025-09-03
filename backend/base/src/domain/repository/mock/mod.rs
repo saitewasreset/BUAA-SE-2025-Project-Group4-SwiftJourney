@@ -6,6 +6,7 @@ pub mod occupied_room;
 pub mod order;
 pub mod personal_info;
 pub mod route;
+pub mod seat_availability;
 pub mod station;
 pub mod takeaway;
 pub mod train;

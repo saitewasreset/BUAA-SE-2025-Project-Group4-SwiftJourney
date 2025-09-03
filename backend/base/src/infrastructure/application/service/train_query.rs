@@ -35,6 +35,7 @@
 // HINT: You may refer to `UserManagerServiceImpl` for example
 use std::sync::Arc;
 
+
 use crate::application::commands::train_query::{
     DirectTrainQueryCommand, TrainQueryValidate, TrainScheduleQueryCommand,
     TransferTrainQueryCommand,
@@ -44,7 +45,6 @@ use crate::application::service::train_query::{
     TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::application::{ApplicationError, GeneralError};
-use crate::domain::Identifiable;
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::Train;
 use crate::domain::repository::route::RouteRepository;
@@ -54,6 +54,7 @@ use crate::domain::service::route::RouteService;
 use crate::domain::service::session::SessionManagerService;
 use crate::domain::service::station::StationService;
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
+use crate::domain::Identifiable;
 use async_trait::async_trait;
 use chrono::{Duration, FixedOffset, NaiveDate};
 use rust_decimal::prelude::ToPrimitive;
@@ -960,10 +961,28 @@ mod tests {
     impl TrainScheduleService for SchSvcStub {
         async fn add_schedule(
             &self,
-            _train_id: crate::domain::model::train::TrainId,
+            _train_id: TrainId,
             _date: NaiveDate,
         ) -> Result<(), TrainScheduleServiceError> {
             Ok(())
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(self.schedules.lock().unwrap().clone())
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            train_number: String,
+            date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(self
+                .sched_by_number
+                .lock()
+                .unwrap()
+                .get(&(train_number, date))
+                .cloned())
         }
         async fn auto_plan_schedule(
             &self,
@@ -994,24 +1013,6 @@ mod tests {
             TrainScheduleServiceError,
         > {
             Ok(self.transfer.lock().unwrap().clone())
-        }
-        async fn get_schedule_by_train_number_and_date(
-            &self,
-            train_number: String,
-            date: NaiveDate,
-        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(self
-                .sched_by_number
-                .lock()
-                .unwrap()
-                .get(&(train_number, date))
-                .cloned())
-        }
-        async fn get_schedules(
-            &self,
-            _date: NaiveDate,
-        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(self.schedules.lock().unwrap().clone())
         }
         async fn get_station_arrival_time(
             &self,
@@ -1102,11 +1103,6 @@ mod tests {
     }
     #[async_trait]
     impl RouteService for RtSvcStub {
-        async fn get_routes(
-            &self,
-        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
-            Ok(self.routes.lock().unwrap().clone())
-        }
         async fn get_route_map(
             &self,
         ) -> Result<
@@ -1132,6 +1128,11 @@ mod tests {
                     )),
                 ),
             )
+        }
+        async fn get_routes(
+            &self,
+        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
+            Ok(self.routes.lock().unwrap().clone())
         }
     }
 
@@ -1196,11 +1197,11 @@ mod tests {
         async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
-            Ok(RouteId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
         }
     }
 
@@ -1257,11 +1258,11 @@ mod tests {
         async fn find(&self, _id: TrainId) -> Result<Option<Train>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
-            Ok(TrainId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Train) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
+            Ok(TrainId::from(0u64))
         }
     }
 
@@ -1294,11 +1295,11 @@ mod tests {
         async fn find(&self, _id: StationId) -> Result<Option<Station>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
-            Ok(StationId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Station) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
+            Ok(StationId::from(0u64))
         }
     }
 
@@ -1321,7 +1322,7 @@ mod tests {
     }
 
     fn mk_train(tid: u64, number: &str, route_id: RouteId) -> Train {
-        let mut seats = std::collections::HashMap::new();
+        let mut seats = HashMap::new();
         let st = SeatType::new(
             Some(SeatTypeId::from(1u64)),
             SeatTypeName::from_unchecked("二等座".into()),
@@ -1703,11 +1704,11 @@ mod tests {
         async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
-            Ok(RouteId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
         }
     }
 
@@ -1735,11 +1736,11 @@ mod tests {
         async fn find(&self, _id: RouteId) -> Result<Option<Route>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
-            Ok(RouteId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Route) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Route) -> Result<RouteId, RepositoryError> {
+            Ok(RouteId::from(0u64))
         }
     }
 
@@ -1809,17 +1810,6 @@ mod tests {
     struct RtSvcErrGetRoutes;
     #[async_trait]
     impl RouteService for RtSvcErrGetRoutes {
-        async fn get_routes(
-            &self,
-        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
-            Err(
-                crate::domain::service::route::RouteServiceError::InfrastructureError(
-                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
-                        anyhow::anyhow!("db"),
-                    )),
-                ),
-            )
-        }
         async fn get_route_map(
             &self,
         ) -> Result<
@@ -1838,6 +1828,17 @@ mod tests {
             &self,
             _stops: Vec<crate::domain::model::route::Stop>,
         ) -> Result<RouteId, crate::domain::service::route::RouteServiceError> {
+            Err(
+                crate::domain::service::route::RouteServiceError::InfrastructureError(
+                    crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
+                        anyhow::anyhow!("db"),
+                    )),
+                ),
+            )
+        }
+        async fn get_routes(
+            &self,
+        ) -> Result<Vec<Route>, crate::domain::service::route::RouteServiceError> {
             Err(
                 crate::domain::service::route::RouteServiceError::InfrastructureError(
                     crate::domain::service::ServiceError::RepositoryError(RepositoryError::Db(
@@ -1875,11 +1876,11 @@ mod tests {
         async fn find(&self, _id: StationId) -> Result<Option<Station>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
-            Ok(StationId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Station) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Station) -> Result<StationId, RepositoryError> {
+            Ok(StationId::from(0u64))
         }
     }
 
@@ -1934,11 +1935,11 @@ mod tests {
         async fn find(&self, _id: TrainId) -> Result<Option<Train>, RepositoryError> {
             Ok(None)
         }
-        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
-            Ok(TrainId::from(0u64))
-        }
         async fn remove(&self, _aggregate: Train) -> Result<(), RepositoryError> {
             Ok(())
+        }
+        async fn save(&self, _aggregate: &mut Train) -> Result<TrainId, RepositoryError> {
+            Ok(TrainId::from(0u64))
         }
     }
 
@@ -1947,10 +1948,23 @@ mod tests {
     impl TrainScheduleService for SchSvcErrDirect {
         async fn add_schedule(
             &self,
-            _train_id: crate::domain::model::train::TrainId,
+            _train_id: TrainId,
             _date: NaiveDate,
         ) -> Result<(), TrainScheduleServiceError> {
             Ok(())
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
         }
         async fn auto_plan_schedule(
             &self,
@@ -1980,19 +1994,6 @@ mod tests {
             )>,
             TrainScheduleServiceError,
         > {
-            Ok(vec![])
-        }
-        async fn get_schedule_by_train_number_and_date(
-            &self,
-            _train_number: String,
-            _date: NaiveDate,
-        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(None)
-        }
-        async fn get_schedules(
-            &self,
-            _date: NaiveDate,
-        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
             Ok(vec![])
         }
         async fn get_station_arrival_time(
@@ -2016,10 +2017,23 @@ mod tests {
     impl TrainScheduleService for SchSvcErrTransfer {
         async fn add_schedule(
             &self,
-            _train_id: crate::domain::model::train::TrainId,
+            _train_id: TrainId,
             _date: NaiveDate,
         ) -> Result<(), TrainScheduleServiceError> {
             Ok(())
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(vec![])
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
         }
         async fn auto_plan_schedule(
             &self,
@@ -2050,19 +2064,6 @@ mod tests {
             TrainScheduleServiceError,
         > {
             Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
-        }
-        async fn get_schedule_by_train_number_and_date(
-            &self,
-            _train_number: String,
-            _date: NaiveDate,
-        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(None)
-        }
-        async fn get_schedules(
-            &self,
-            _date: NaiveDate,
-        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(vec![])
         }
         async fn get_station_arrival_time(
             &self,
@@ -2085,10 +2086,23 @@ mod tests {
     impl TrainScheduleService for SchSvcErrGetSchedules {
         async fn add_schedule(
             &self,
-            _train_id: crate::domain::model::train::TrainId,
+            _train_id: TrainId,
             _date: NaiveDate,
         ) -> Result<(), TrainScheduleServiceError> {
             Ok(())
+        }
+        async fn get_schedules(
+            &self,
+            _date: NaiveDate,
+        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
+            Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
+        }
+        async fn get_schedule_by_train_number_and_date(
+            &self,
+            _train_number: String,
+            _date: NaiveDate,
+        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
+            Ok(None)
         }
         async fn auto_plan_schedule(
             &self,
@@ -2119,19 +2133,6 @@ mod tests {
             TrainScheduleServiceError,
         > {
             Ok(vec![])
-        }
-        async fn get_schedule_by_train_number_and_date(
-            &self,
-            _train_number: String,
-            _date: NaiveDate,
-        ) -> Result<Option<TrainSchedule>, TrainScheduleServiceError> {
-            Ok(None)
-        }
-        async fn get_schedules(
-            &self,
-            _date: NaiveDate,
-        ) -> Result<Vec<TrainSchedule>, TrainScheduleServiceError> {
-            Err(TrainScheduleServiceError::InvalidTrainNumber("bad".into()))
         }
         async fn get_station_arrival_time(
             &self,
