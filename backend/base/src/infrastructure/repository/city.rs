@@ -362,3 +362,167 @@ impl CityRepositoryImpl {
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::{CityId, CityName};
+    use crate::models::city::ActiveModel;
+    use sea_orm::{
+        ActiveModelTrait, ActiveValue::Set, ConnectionTrait, Database, DatabaseConnection,
+    };
+
+    /// 初始化内存数据库，并创建 city 表
+    async fn setup_in_memory_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+
+        // 创建 city 表
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            r#"
+        CREATE TABLE city (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            province TEXT NOT NULL
+        );
+        "#
+            .to_owned(),
+        ))
+        .await
+        .unwrap();
+
+        db
+    }
+
+    /// 插入示例城市数据
+    async fn insert_city(db: &DatabaseConnection, id: Option<u64>, name: &str, province: &str) {
+        let am = ActiveModel {
+            id: match id {
+                Some(i) => Set(i as i32),
+                None => ActiveValue::NotSet,
+            },
+            name: Set(name.to_string()),
+            province: Set(province.to_string()),
+        };
+        am.insert(db).await.unwrap();
+    }
+
+    fn sample_city(id: Option<u64>) -> City {
+        let city = City::new(
+            id.map(CityId::from),
+            CityName::from("Shanghai".to_string()),
+            ProvinceName::from("Shanghai Province".to_string()),
+        );
+        city
+    }
+
+    #[tokio::test]
+    async fn test_find_city_success() {
+        let db = setup_in_memory_db().await;
+        insert_city(&db, Some(1), "Shanghai", "Shanghai Province").await;
+
+        let repo = CityRepositoryImpl::new(db);
+        let city_id = CityId::from(1u64);
+        let result = repo.find(city_id).await.unwrap();
+
+        assert!(result.is_some());
+        let city = result.unwrap();
+        assert_eq!(city.name(), &CityName::from("Shanghai".to_string()));
+        assert_eq!(
+            city.province(),
+            &ProvinceName::from("Shanghai Province".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_find_city_not_found() {
+        let db = setup_in_memory_db().await;
+        let repo = CityRepositoryImpl::new(db);
+
+        let city_id = CityId::from(999u64);
+        let result = repo.find(city_id).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_city_success() {
+        let db = setup_in_memory_db().await;
+        let repo = CityRepositoryImpl::new(db);
+        let mut city = sample_city(None);
+
+        let city_id = repo.save(&mut city).await.unwrap();
+        assert_eq!(city.get_id().unwrap(), city_id);
+
+        // 确认数据库插入成功
+        let inserted = repo.find(city_id).await.unwrap().unwrap();
+        assert_eq!(inserted.name(), &CityName::from("Shanghai".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_remove_city_success() {
+        let db = setup_in_memory_db().await;
+        insert_city(&db, Some(1), "Shanghai", "Shanghai Province").await;
+
+        let repo = CityRepositoryImpl::new(db);
+        let city = sample_city(Some(1));
+        let result = repo.remove(city).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_name_success() {
+        let db = setup_in_memory_db().await;
+        insert_city(&db, Some(1), "Shanghai", "Shanghai Province").await;
+
+        let repo = CityRepositoryImpl::new(db);
+        let result = repo.find_by_name("Shanghai").await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name(), &CityName::from("Shanghai".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_find_by_name_not_found() {
+        let db = setup_in_memory_db().await;
+        let repo = CityRepositoryImpl::new(db);
+
+        let result = repo.find_by_name("Beijing").await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_success() {
+        let db = setup_in_memory_db().await;
+        let repo = CityRepositoryImpl::new(db);
+
+        let raw_data_vec = vec![
+            ("Shanghai".to_string(), "Shanghai Province".to_string()),
+            ("Beijing".to_string(), "Beijing Province".to_string()),
+        ];
+
+        // 转成 HashMap
+        let city_data: CityData = raw_data_vec.into_iter().collect();
+
+        let result = repo.save_raw(city_data).await;
+
+        assert!(result.is_ok());
+
+        // 验证数据库已有数据
+        let cities = repo.load().await.unwrap();
+        assert_eq!(cities.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_find_by_province_success() {
+        let db = setup_in_memory_db().await;
+        insert_city(&db, Some(1), "Shanghai", "Shanghai Province").await;
+        insert_city(&db, Some(2), "Beijing", "Beijing Province").await;
+
+        let repo = CityRepositoryImpl::new(db);
+        let result = repo
+            .find_by_province(ProvinceName::from("Shanghai Province".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name(), &CityName::from("Shanghai".to_string()));
+    }
+}
