@@ -13,5 +13,7 @@ members = [
     #"train/api",
     #"hotel/base",
     #"hotel/api",
+    #"dish/base",
+    #"dish/api",
 ]
 resolver = "2"
