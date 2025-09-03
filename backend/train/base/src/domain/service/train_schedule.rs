@@ -71,7 +71,7 @@ pub trait TrainScheduleService: 'static + Send + Sync {
         &self,
         train_schedule_id: TrainScheduleId,
         station_id: StationId,
-    ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError>;
+    ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError>;
 
     async fn get_terminal_arrival_time(
         &self,

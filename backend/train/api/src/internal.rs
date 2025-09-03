@@ -7,7 +7,7 @@ use shared::{
     application_error::ApplicationError,
     internal::train::{
         command::{GetTrainByNumberQuery, GetTrainScheduleQuery},
-        dto::{TrainDTO, TrainScheduleDTO},
+        dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO},
     },
 };
 use train_base::application::service::internal::TrainInternalService;
@@ -42,7 +42,21 @@ pub async fn get_train_schedule(
     ApiResponse::ok(result)
 }
 
+#[post("/get_terminal_arrival_time")]
+pub async fn get_terminal_arrival_time(
+    body: Bytes,
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Option<TerminalArrivalTimeDTO>>, ApplicationErrorBox> {
+    let query: GetTerminalArrivalTimeQuery = parse_request_body(body)?;
+
+    let result = train_internal_service
+        .get_terminal_arrival_time(query)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_train_by_number)
-        .service(get_train_schedule);
+    cfg.service(get_train_by_number).service(get_train_schedule);
 }

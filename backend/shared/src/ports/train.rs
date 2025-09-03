@@ -1,6 +1,8 @@
 use crate::api::InternalApiError;
-use crate::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
-use crate::internal::train::dto::{TrainDTO, TrainScheduleDTO};
+use crate::internal::train::command::{
+    GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
+};
+use crate::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -14,4 +16,9 @@ pub trait TrainPort: 'static + Send + Sync {
         &self,
         query: GetTrainScheduleQuery,
     ) -> Result<Option<TrainScheduleDTO>, InternalApiError>;
+
+    async fn get_terminal_arrival_time(
+        &self,
+        query: GetTerminalArrivalTimeQuery,
+    ) -> Result<Option<TerminalArrivalTimeDTO>, InternalApiError>;
 }

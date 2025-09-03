@@ -731,7 +731,7 @@ where
         &self,
         train_schedule_id: TrainScheduleId,
         station_id: StationId,
-    ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError> {
+    ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
         let today = chrono::Local::now().date_naive();
         let mut found_schedule = None;
 

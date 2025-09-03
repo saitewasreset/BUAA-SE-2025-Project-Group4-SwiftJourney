@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use sea_orm::prelude::Decimal;
+use sea_orm::prelude::{DateTimeWithTimeZone, Decimal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,6 +29,11 @@ pub struct TrainScheduleDTO {
     pub origin_departure_time: i32,
     pub route_id: u64,
     pub seat_availability_map: HashMap<StationRangeDTO, HashMap<SeatTypeDTO, u64>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TerminalArrivalTimeDTO {
+    pub time: DateTimeWithTimeZone,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use shared::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
-use shared::internal::train::dto::{TrainDTO, TrainScheduleDTO};
+use shared::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,4 +22,9 @@ pub trait TrainInternalService: 'static + Send + Sync {
         &self,
         query: GetTrainScheduleQuery,
     ) -> Result<Option<TrainScheduleDTO>, TrainInternalServiceError>;
+
+    async fn get_terminal_arrival_time(
+        &self,
+        query: GetTerminalArrivalTimeQuery,
+    ) -> Result<Option<TerminalArrivalTimeDTO>, TrainInternalServiceError>;
 }

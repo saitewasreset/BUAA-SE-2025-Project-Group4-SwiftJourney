@@ -268,6 +268,7 @@ impl InternalApi for GeoInternalServiceApi {
 pub enum TrainInternalServiceApi {
     GetTrainByNumber,
     GetTrainScheduleByTrainIdAndOriginDepartureTime,
+    GetTerminalArrivalTime,
 }
 
 impl InternalApi for TrainInternalServiceApi {
@@ -277,6 +278,7 @@ impl InternalApi for TrainInternalServiceApi {
             TrainInternalServiceApi::GetTrainScheduleByTrainIdAndOriginDepartureTime => {
                 "get_train_schedule_by_train_id_and_origin_departure_time"
             }
+            TrainInternalServiceApi::GetTerminalArrivalTime => "get_terminal_arrival_time",
         }
     }
 }
