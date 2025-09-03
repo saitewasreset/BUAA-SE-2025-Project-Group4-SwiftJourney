@@ -8,8 +8,8 @@
     </TestPlan>
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Test Users">
-        <intProp name="ThreadGroup.num_threads">100</intProp>
-        <intProp name="ThreadGroup.ramp_time">50</intProp>
+        <intProp name="ThreadGroup.num_threads">1000</intProp>
+        <intProp name="ThreadGroup.ramp_time">100</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器">
@@ -24,7 +24,7 @@
           <boolProp name="CookieManager.controlledByThreadGroup">true</boolProp>
         </CookieManager>
         <hashTree/>
-        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值" enabled="true">
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值">
           <stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>
           <stringProp name="HTTPSampler.port">8080</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
@@ -35,7 +35,7 @@
           <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
         </ConfigTestElement>
         <hashTree/>
-        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP信息头管理器" enabled="true">
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP信息头管理器">
           <collectionProp name="HeaderManager.headers">
             <elementProp name="" elementType="Header">
               <stringProp name="Header.name">Content-Type</stringProp>
@@ -44,7 +44,7 @@
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV 数据文件设置" enabled="true">
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="用户数据">
           <stringProp name="filename">/home/lancezer/Project/SuperSwiftJourney/JMeter/user.csv</stringProp>
           <stringProp name="fileEncoding">UTF-8</stringProp>
           <stringProp name="variableNames">phone,username,password,name,identityCardId</stringProp>
@@ -56,22 +56,34 @@
           <stringProp name="shareMode">shareMode.all</stringProp>
         </CSVDataSet>
         <hashTree/>
-        <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="用户定义的变量">
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="车站对数据">
+          <stringProp name="filename">/home/lancezer/Project/SuperSwiftJourney/JMeter/cityPairs.csv</stringProp>
+          <stringProp name="fileEncoding">UTF-8</stringProp>
+          <stringProp name="variableNames">departureCity,arrivalCity</stringProp>
+          <boolProp name="ignoreFirstLine">true</boolProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">false</boolProp>
+          <boolProp name="stopThread">true</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+        </CSVDataSet>
+        <hashTree/>
+        <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="日期">
           <collectionProp name="Arguments.arguments">
             <elementProp name="date" elementType="Argument">
               <stringProp name="Argument.name">date</stringProp>
-              <stringProp name="Argument.value">${__timeShift(yyyy-MM-dd,,P3D,,)}</stringProp>
+              <stringProp name="Argument.value">${__timeShift(yyyy-MM-dd,,P2D,,)}</stringProp>
               <stringProp name="Argument.metadata">=</stringProp>
             </elementProp>
             <elementProp name="date2" elementType="Argument">
               <stringProp name="Argument.name">date2</stringProp>
-              <stringProp name="Argument.value">${__timeShift(yyyy-MM-dd,,P2D,,)}</stringProp>
+              <stringProp name="Argument.value">${__timeShift(yyyy-MM-dd,,P3D,,)}</stringProp>
               <stringProp name="Argument.metadata">=</stringProp>
             </elementProp>
           </collectionProp>
         </Arguments>
         <hashTree/>
-        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="响应断言" enabled="true">
+        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="响应断言">
           <collectionProp name="Asserion.test_strings">
             <stringProp name="723337899">&quot;code&quot;:200</stringProp>
           </collectionProp>
@@ -82,43 +94,29 @@
           <stringProp name="Assertion.scope">all</stringProp>
         </ResponseAssertion>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get Mode">
-          <stringProp name="HTTPSampler.path">/api/general/mode</stringProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Register">
+          <stringProp name="HTTPSampler.path">/api/user/register</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="用户定义的变量">
-            <collectionProp name="Arguments.arguments"/>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree/>
-        <OnceOnlyController guiclass="OnceOnlyControllerGui" testclass="OnceOnlyController" testname="仅一次控制器" enabled="true"/>
-        <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Register" enabled="true">
-            <stringProp name="HTTPSampler.path">/api/user/register</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <stringProp name="HTTPSampler.method">POST</stringProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-              <collectionProp name="Arguments.arguments">
-                <elementProp name="" elementType="HTTPArgument">
-                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{&#xd;
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&#xd;
   &quot;phone&quot;: &quot;${phone}&quot;,&#xd;
   &quot;username&quot;: &quot;${username}&quot;,&#xd;
   &quot;password&quot;: &quot;${password}&quot;,&#xd;
   &quot;name&quot;: &quot;${name}&quot;,&#xd;
   &quot;identityCardId&quot;: &quot;${identityCardId}&quot;&#xd;
 }</stringProp>
-                  <stringProp name="Argument.metadata">=</stringProp>
-                </elementProp>
-              </collectionProp>
-            </elementProp>
-          </HTTPSamplerProxy>
-          <hashTree/>
-        </hashTree>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree/>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login">
           <stringProp name="HTTPSampler.path">/api/user/login</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -236,8 +234,8 @@
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
-  &quot;departureCity&quot;: &quot;天津市&quot;,&#xd;
-  &quot;arrivalCity&quot;: &quot;南京市&quot;,&#xd;
+  &quot;departureCity&quot;: &quot;${departureCity}&quot;,&#xd;
+  &quot;arrivalCity&quot;: &quot;${arrivalCity}&quot;,&#xd;
   &quot;departureDate&quot;: &quot;${date}&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
@@ -252,94 +250,77 @@
             <stringProp name="parameters"></stringProp>
             <stringProp name="script">import groovy.json.JsonSlurper
 
-// 获取响应数据
+// 获取上一个采样器的响应数据
 def response = prev.getResponseDataAsString()
 
-// 解析JSON
-def json = new JsonSlurper().parseText(response)
+// 初始化变量
+vars.put(&quot;solutionsCount&quot;, &quot;0&quot;)
+vars.put(&quot;trainNumber&quot;, &quot;N/A&quot;)
+vars.put(&quot;originDepartureTime&quot;, &quot;N/A&quot;)
+vars.put(&quot;departureStation&quot;, &quot;N/A&quot;)
+vars.put(&quot;arrivalStation&quot;, &quot;N/A&quot;)
+vars.put(&quot;seatType&quot;, &quot;N/A&quot;)
 
-// 提取所需字段
-def firstSolution = json.data.solutions[0]
-vars.put(&quot;trainNumber&quot;, firstSolution.trainNumber)
-vars.put(&quot;originDepartureTime&quot;, firstSolution.originDepartureTime)
-vars.put(&quot;departureStation&quot;, firstSolution.departureStation)
-vars.put(&quot;arrivalStation&quot;, firstSolution.arrivalStation)
-
-// 提取seatInfo的第一个键
-def seatTypes = firstSolution.seatInfo.keySet()
-if (!seatTypes.isEmpty()) {
-    def firstSeatType = seatTypes.iterator().next()
-    vars.put(&quot;seatType&quot;, firstSeatType)
-} else {
-    vars.put(&quot;seatType&quot;, &quot;NOT_FOUND&quot;)
-}</stringProp>
+if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
+	// 解析JSON响应
+	def jsonSlurper = new JsonSlurper()
+	def jsonResponse = jsonSlurper.parseText(response)
+	
+	// 提取solutions数组
+	def solutions = jsonResponse.data.solutions
+	
+	// 1. 提取solutions数量
+	vars.put(&quot;solutionsCount&quot;, solutions.size().toString())
+	
+	// 检查是否存在解决方案
+	if (solutions &amp;&amp; !solutions.isEmpty()) {
+	    def firstSolution = solutions[0]
+	    
+	    // 2. 提取各个字段
+	    vars.put(&quot;trainNumber&quot;, firstSolution.trainNumber)
+	    vars.put(&quot;originDepartureTime&quot;, firstSolution.originDepartureTime)
+	    vars.put(&quot;departureStation&quot;, firstSolution.departureStation)
+	    vars.put(&quot;arrivalStation&quot;, firstSolution.arrivalStation)
+	    
+	    // 3. 提取seatInfo的第一个键
+	    def seatInfo = firstSolution.seatInfo
+	    if (seatInfo &amp;&amp; !seatInfo.isEmpty()) {
+	        def firstSeatType = seatInfo.keySet().iterator().next()
+	        vars.put(&quot;seatType&quot;, firstSeatType)
+	    } else {
+	        vars.put(&quot;seatType&quot;, &quot;N/A&quot;)
+	    }
+	} else {
+	    // 如果没有解决方案，设置默认值
+	    vars.put(&quot;trainNumber&quot;, &quot;N/A&quot;)
+	    vars.put(&quot;originDepartureTime&quot;, &quot;N/A&quot;)
+	    vars.put(&quot;departureStation&quot;, &quot;N/A&quot;)
+	    vars.put(&quot;arrivalStation&quot;, &quot;N/A&quot;)
+	    vars.put(&quot;seatType&quot;, &quot;N/A&quot;)
+	}
+}
+</stringProp>
             <stringProp name="scriptLanguage">groovy</stringProp>
           </JSR223PostProcessor>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Train Query 2">
-          <stringProp name="HTTPSampler.path">/api/train/schedule/query_direct</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-  &quot;departureCity&quot;: &quot;泉州市&quot;,&#xd;
-  &quot;arrivalCity&quot;: &quot;黄山市&quot;,&#xd;
-  &quot;departureDate&quot;: &quot;${date2}&quot;&#xd;
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="IF 控制器">
+          <stringProp name="IfController.condition">${__jexl3(${solutionsCount} &gt; 0,)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
         <hashTree>
-          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="get ticket info var 2">
-            <stringProp name="cacheKey">true</stringProp>
-            <stringProp name="filename"></stringProp>
-            <stringProp name="parameters"></stringProp>
-            <stringProp name="script">import groovy.json.JsonSlurper
-
-// 获取响应数据
-def response = prev.getResponseDataAsString()
-
-// 解析JSON
-def json = new JsonSlurper().parseText(response)
-
-// 提取所需字段
-def firstSolution = json.data.solutions[0]
-vars.put(&quot;trainNumber2&quot;, firstSolution.trainNumber)
-vars.put(&quot;originDepartureTime2&quot;, firstSolution.originDepartureTime)
-vars.put(&quot;departureStation2&quot;, firstSolution.departureStation)
-vars.put(&quot;arrivalStation2&quot;, firstSolution.arrivalStation)
-
-// 提取seatInfo的第一个键
-def seatTypes = firstSolution.seatInfo.keySet()
-if (!seatTypes.isEmpty()) {
-    def firstSeatType = seatTypes.iterator().next()
-    vars.put(&quot;seatType2&quot;, firstSeatType)
-} else {
-    vars.put(&quot;seatType2&quot;, &quot;NOT_FOUND&quot;)
-}</stringProp>
-            <stringProp name="scriptLanguage">groovy</stringProp>
-          </JSR223PostProcessor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Book Ticket">
-          <stringProp name="HTTPSampler.path">/api/train/order/new</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">[&#xd;
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Book Ticket">
+            <stringProp name="HTTPSampler.path">/api/train/order/new</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">[&#xd;
   {&#xd;
     &quot;atomic&quot;: false,&#xd;
     &quot;orderList&quot;: [&#xd;
@@ -354,95 +335,39 @@ if (!seatTypes.isEmpty()) {
     ]&#xd;
   }&#xd;
 ]</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="get transactionId var">
-            <stringProp name="JSONPostProcessor.referenceNames">transactionId</stringProp>
-            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.transactionId</stringProp>
-            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
-          </JSONPostProcessor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Book Ticket 2">
-          <stringProp name="HTTPSampler.path">/api/train/order/new</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">[&#xd;
-  {&#xd;
-    &quot;atomic&quot;: false,&#xd;
-    &quot;orderList&quot;: [&#xd;
-      {&#xd;
-        &quot;trainNumber&quot;: &quot;${trainNumber2}&quot;,&#xd;
-        &quot;originDepartureTime&quot;: &quot;${originDepartureTime2}&quot;,&#xd;
-        &quot;departureStation&quot;: &quot;${departureStation2}&quot;,&#xd;
-        &quot;arrivalStation&quot;: &quot;${arrivalStation2}&quot;,&#xd;
-        &quot;personalId&quot;: &quot;${personalId}&quot;,&#xd;
-        &quot;seatType&quot;: &quot;${seatType2}&quot;&#xd;
-      }&#xd;
-    ]&#xd;
-  }&#xd;
-]</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="get transactionId2 var">
-            <stringProp name="JSONPostProcessor.referenceNames">transactionId2</stringProp>
-            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.transactionId</stringProp>
-            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
-          </JSONPostProcessor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Pay Transaction">
-          <stringProp name="HTTPSampler.path">/api/payment/pay/${transactionId}</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="get transactionId var">
+              <stringProp name="JSONPostProcessor.referenceNames">transactionId</stringProp>
+              <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.transactionId</stringProp>
+              <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+            </JSONPostProcessor>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Pay Transaction">
+            <stringProp name="HTTPSampler.path">/api/payment/pay/${transactionId}</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
   &quot;userPassword&quot;: &quot;${password}&quot;&#xd;
 }</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Pay Transaction 2">
-          <stringProp name="HTTPSampler.path">/api/payment/pay/${transactionId2}</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-  &quot;userPassword&quot;: &quot;${password}&quot;&#xd;
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree/>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+        </hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get Trasaction Info">
           <stringProp name="HTTPSampler.path">/api/payment/</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
