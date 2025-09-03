@@ -12,7 +12,6 @@
 //! - `DishOrder`: 结构体，表示火车餐订单。
 //! - `TakeawayOrder`: 结构体，表示外卖订单。
 use super::personal_info::PreferredSeatLocation;
-use crate::Verified;
 use crate::domain::model::dish::DishId;
 use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomTypeId};
 use crate::domain::model::personal_info::PersonalInfoId;
@@ -21,7 +20,8 @@ use crate::domain::model::train::SeatTypeName;
 use crate::domain::model::train_schedule::{Seat, StationRange, TrainScheduleId};
 use crate::domain::model::transaction::TransactionId;
 use crate::domain::{Aggregate, Entity, Identifiable, Identifier};
-use dyn_clone::{DynClone, clone_trait_object};
+use crate::Verified;
+use dyn_clone::{clone_trait_object, DynClone};
 use id_macro::define_id_type;
 use rust_decimal::Decimal;
 use sea_orm::prelude::DateTimeWithTimeZone;
@@ -112,7 +112,7 @@ impl From<&OrderStatus> for &'static str {
     }
 }
 
-impl std::fmt::Display for OrderStatus {
+impl Display for OrderStatus {
     /// 格式化输出 `OrderStatus` 枚举类型。
     ///
     /// Arguments:
@@ -120,7 +120,7 @@ impl std::fmt::Display for OrderStatus {
     ///
     /// Returns:
     /// - 格式化结果。
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", <&OrderStatus as Into<&'static str>>::into(self))
     }
 }
@@ -1090,9 +1090,8 @@ mod tests {
         );
         // 构造合法的已验证类型
         let schedule_id = TrainScheduleId::from(1u64);
-        let seat_type: SeatTypeName<crate::Verified> =
-            SeatTypeName::from_unchecked("二等座".to_string());
-        let station_range: StationRange<crate::Verified> =
+        let seat_type: SeatTypeName<Verified> = SeatTypeName::from_unchecked("二等座".to_string());
+        let station_range: StationRange<Verified> =
             StationRange::from_unchecked(StationId::from(1u64), StationId::from(2u64));
 
         let mut order = TrainOrder::new(base, schedule_id, None, seat_type, None, station_range);
