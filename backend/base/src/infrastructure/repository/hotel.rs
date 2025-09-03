@@ -1,4 +1,3 @@
-use crate::DB_CHUNK_SIZE;
 use crate::domain::model::city::CityId;
 use crate::domain::model::hotel::{Hotel, HotelId, HotelRoomType, HotelRoomTypeId};
 use crate::domain::model::station::StationId;
@@ -13,10 +12,11 @@ use crate::domain::{
 };
 use crate::infrastructure::repository::city::CityDataConverter;
 use crate::infrastructure::repository::station::StationDataConverter;
-use anyhow::{Context, anyhow};
+use crate::DB_CHUNK_SIZE;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, TransactionTrait};
 use sea_orm::{ColumnTrait, Select};
 use sea_orm::{QueryFilter, QuerySelect};
@@ -765,4 +765,293 @@ pub async fn save_raw_hotel<C: CityRepository, S: StationRepository, OS: ObjectS
     tx.commit().await.context("Failed to commit transaction")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::{City, CityName, ProvinceName};
+    use crate::domain::model::station::Station;
+    use crate::domain::repository::mock::city::MockCityRepository;
+    use crate::domain::repository::mock::station::MockStationRepository;
+    use crate::domain::service::mock::object_storage::MockObjectStorageService;
+    use rust_decimal::Decimal;
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
+    use shared::data::HotelInfo;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    async fn setup_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+
+        // 创建表
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            r#"
+            CREATE TABLE city (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        province TEXT NOT NULL
+    );
+            CREATE TABLE station (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        city_id INTEGER NOT NULL
+    );
+            CREATE TABLE hotel (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                city_id INTEGER NOT NULL,
+                station_id INTEGER NOT NULL,
+                address TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                images TEXT NOT NULL,
+                total_rating_count INTEGER NOT NULL,
+                total_booking_count INTEGER NOT NULL,
+                info TEXT NOT NULL
+            );
+            CREATE TABLE hotel_room_type (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hotel_id INTEGER NOT NULL,
+        type_name TEXT NOT NULL,
+        capacity INTEGER NOT NULL,
+        price REAL NOT NULL
+    );
+            "#,
+        ))
+        .await
+        .unwrap();
+
+        db
+    }
+
+    fn sample_city(id: u64, name: &str, province: &str) -> City {
+        City::new(
+            Some(id.into()),
+            CityName::from(name.to_string()),
+            ProvinceName::from(province.to_string()),
+        )
+    }
+
+    fn sample_station(id: u64, name: &str, city_id: u64) -> Station {
+        Station::new(Some(id.into()), name.to_string(), city_id.into())
+    }
+
+    fn sample_hotel_data(city: &City, station: &Station, tmp_dir: &tempfile::TempDir) -> HotelData {
+        let mut room_info = HashMap::new();
+        room_info.insert(
+            "Single".to_string(),
+            shared::data::HotelRoomType {
+                capacity: 2,
+                price: 100.0,
+            },
+        );
+
+        let dummy_img = tmp_dir.path().join("dummy.jpg");
+        fs::write(&dummy_img, b"dummy image").unwrap();
+
+        vec![HotelInfo {
+            name: "HotelA".to_string(),
+            city: city.name().to_string(),
+            station: Some(station.name().to_string()),
+            address: "AddressA".to_string(),
+            info: "InfoA".to_string(),
+            phone: vec!["123456".to_string()],
+            images: vec!["dummy.jpg".to_string()],
+            room_info,
+            comments: vec![],
+        }]
+    }
+
+    #[tokio::test]
+    async fn test_hotel_crud() {
+        let db = setup_db().await;
+        let repo = HotelRepositoryImpl::new(db.clone());
+
+        // 插入 city & station
+        let city = sample_city(1, "CityA", "ProvinceA");
+        let station = sample_station(1, "StationA", 1);
+
+        let city_id = city.get_id().unwrap().to_db_value();
+        let station_id = station.get_id().unwrap().to_db_value();
+
+        // city 表
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            format!(
+                "INSERT INTO city (id, name, province) VALUES ({}, '{}', '{}')",
+                city_id,
+                city.name().to_string(),
+                city.province().to_string() // 注意把 ProvinceName 转成 String
+            ),
+        ))
+        .await
+        .unwrap();
+
+        // station 表
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            format!(
+                "INSERT INTO station (id, name, city_id) VALUES ({}, '{}', {})",
+                station_id,
+                station.name().to_string(),
+                station.city_id().to_db_value()
+            ),
+        ))
+        .await
+        .unwrap();
+
+        // 新增 hotel
+        let mut hotel = Hotel::new(
+            "HotelA".to_string(),
+            city.clone(),
+            station.clone(),
+            "AddressA".to_string(),
+            "InfoA".to_string(),
+        );
+        hotel.add_phone("123456".to_string());
+        hotel.add_room_type(HotelRoomType::new(
+            None,
+            None,
+            "Single".to_string(),
+            2,
+            Decimal::from_f64(100.0).unwrap(),
+        ));
+
+        // Insert
+        let hotel_id = repo.on_insert(hotel.clone()).await.unwrap();
+        hotel.set_id(hotel_id);
+
+        // Select
+        let loaded = repo.on_select(hotel_id).await.unwrap().unwrap();
+        assert_eq!(loaded.name(), "HotelA");
+
+        // Update
+        let mut new_hotel = loaded.clone();
+        new_hotel.add_phone("987654".to_string());
+
+        // 手动构造 diff
+        let mut diff = MultiEntityDiff::new();
+        diff.add_change(TypedDiff::new(
+            DiffType::Modified,
+            Some(loaded.clone()),
+            Some(new_hotel.clone()),
+        ));
+        repo.on_update(diff).await.unwrap();
+
+        let updated = repo.on_select(hotel_id).await.unwrap().unwrap();
+        assert!(updated.phone().contains(&"987654".to_string()));
+
+        // Delete
+        repo.on_delete(updated.clone()).await.unwrap();
+        let deleted = repo.on_select(hotel_id).await.unwrap();
+        assert!(deleted.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_hotel_success() {
+        let db = setup_db().await;
+        let tmp_dir = tempdir().unwrap();
+
+        let mut city_repo = MockCityRepository::new();
+        city_repo
+            .expect_load()
+            .returning(|| Ok(vec![sample_city(1, "CityA", "ProvinceA")]));
+
+        let mut station_repo = MockStationRepository::new();
+        station_repo
+            .expect_load()
+            .returning(|| Ok(vec![sample_station(1, "StationA", 1)]));
+
+        let mut object_storage = MockObjectStorageService::new();
+        object_storage
+            .expect_put_object()
+            .returning(|_, _, _| Ok(Uuid::new_v4()));
+
+        let hotel_data = sample_hotel_data(
+            &sample_city(1, "CityA", "ProvinceA"),
+            &sample_station(1, "StationA", 1),
+            &tmp_dir,
+        );
+
+        let result = save_raw_hotel(
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            Arc::new(object_storage),
+            &db,
+            tmp_dir.path(),
+            hotel_data,
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_hotel_city_not_found() {
+        let db = setup_db().await;
+        let tmp_dir = tempdir().unwrap();
+
+        let mut city_repo = MockCityRepository::new();
+        city_repo.expect_load().returning(|| Ok(vec![]));
+
+        let mut station_repo = MockStationRepository::new();
+        station_repo
+            .expect_load()
+            .returning(|| Ok(vec![sample_station(1, "StationA", 1)]));
+
+        let object_storage = Arc::new(MockObjectStorageService::new());
+
+        let hotel_data = sample_hotel_data(
+            &sample_city(1, "CityA", "ProvinceA"),
+            &sample_station(1, "StationA", 1),
+            &tmp_dir,
+        );
+
+        let result = save_raw_hotel(
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            object_storage,
+            &db,
+            tmp_dir.path(),
+            hotel_data,
+        )
+        .await;
+        assert!(matches!(result, Err(RepositoryError::InconsistentState(_))));
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_hotel_station_not_found() {
+        let db = setup_db().await;
+        let tmp_dir = tempdir().unwrap();
+
+        let mut city_repo = MockCityRepository::new();
+        city_repo
+            .expect_load()
+            .returning(|| Ok(vec![sample_city(1, "CityA", "ProvinceA")]));
+
+        let mut station_repo = MockStationRepository::new();
+        station_repo.expect_load().returning(|| Ok(vec![]));
+
+        let object_storage = Arc::new(MockObjectStorageService::new());
+
+        let hotel_data = sample_hotel_data(
+            &sample_city(1, "CityA", "ProvinceA"),
+            &sample_station(1, "StationA", 1),
+            &tmp_dir,
+        );
+
+        let result = save_raw_hotel(
+            Arc::new(city_repo),
+            Arc::new(station_repo),
+            object_storage,
+            &db,
+            tmp_dir.path(),
+            hotel_data,
+        )
+        .await;
+        assert!(matches!(result, Err(RepositoryError::InconsistentState(_))));
+    }
 }
