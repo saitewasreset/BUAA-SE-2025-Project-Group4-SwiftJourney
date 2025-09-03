@@ -1,4 +1,4 @@
-use crate::application_error::ApplicationError;
+pub use crate::application_error::ApplicationError;
 use crate::{
     API_BAD_REQUEST_MESSAGE_TEMPLATE, API_FORBIDDEN_CODE, API_FORBIDDEN_MESSAGE_TEMPLATE,
     API_SUCCESS_CODE, API_SUCCESS_MESSAGE, InternalApi,

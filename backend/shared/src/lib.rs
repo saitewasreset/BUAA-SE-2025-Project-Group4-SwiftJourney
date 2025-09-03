@@ -32,9 +32,11 @@ pub mod domain;
 pub mod event;
 pub mod internal;
 pub mod macros;
+pub mod messaging;
 pub mod ports;
 pub mod utils;
 
+use crate::api::ApiEndpoint;
 use phf::{Set, phf_set};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -74,6 +76,17 @@ impl MicroService {
 
     pub fn hostname(&self) -> &'static str {
         self.name()
+    }
+
+    pub fn internal_port(&self) -> u16 {
+        23333
+    }
+
+    pub fn internal_api_endpoint(&self) -> ApiEndpoint {
+        ApiEndpoint {
+            host: self.hostname().to_string(),
+            port: self.internal_port(),
+        }
     }
 }
 
@@ -127,3 +140,5 @@ pub const DB_CHUNK_SIZE: usize = 4096;
 pub const MAX_CONCURRENT_WEBSOCKET_SESSION_PER_USER: usize = 3;
 
 pub const ORDER_STATUS_UPDATE_INTERVAL_SECONDS: u64 = 60; // seconds
+
+pub const RABBITMQ_ORDER_STATUS_EXCHANGE_NAME: &str = "order_status_exchange";
