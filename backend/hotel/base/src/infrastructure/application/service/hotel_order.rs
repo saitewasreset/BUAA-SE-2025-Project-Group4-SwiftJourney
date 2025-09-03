@@ -9,6 +9,7 @@ use chrono::{Datelike, NaiveDate, TimeZone};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::MicroService;
 use shared::application_error::{ApplicationError, GeneralError};
 use shared::domain::Identifiable;
 use shared::domain::model::hotel::HotelDateRange;
@@ -16,6 +17,8 @@ use shared::domain::model::order::{BaseOrder, Order, OrderStatus, OrderTimeInfo,
 use shared::domain::model::order::{HotelOrder, OrderType};
 use shared::domain::model::personal_info::PersonalInfoId;
 use shared::domain::model::user::UserId;
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, HotelUpdatedEvent};
 use shared::internal::order::command::{
     NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand,
 };
@@ -27,31 +30,35 @@ use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-pub struct HotelOrderServiceImpl<HR, HBS, OP, UP> {
+pub struct HotelOrderServiceImpl<HR, HBS, OP, UP, ES> {
     hotel_repository: Arc<HR>,
     hotel_booking_service: Arc<HBS>,
     order_port: Arc<OP>,
     user_port: Arc<UP>,
+    event_service: Arc<ES>,
 }
 
-impl<HR, HBS, OP, UP> HotelOrderServiceImpl<HR, HBS, OP, UP>
+impl<HR, HBS, OP, UP, ES> HotelOrderServiceImpl<HR, HBS, OP, UP, ES>
 where
     HR: HotelRepository,
     HBS: HotelBookingService,
     OP: OrderPort,
     UP: UserPort,
+    ES: EventService,
 {
     pub fn new(
         hotel_repository: Arc<HR>,
         hotel_booking_service: Arc<HBS>,
         order_port: Arc<OP>,
         user_port: Arc<UP>,
+        event_service: Arc<ES>,
     ) -> Self {
         Self {
             hotel_repository,
             hotel_booking_service,
             order_port,
             user_port,
+            event_service,
         }
     }
 
@@ -319,12 +326,13 @@ where
 }
 
 #[async_trait]
-impl<HR, HBS, OP, UP> HotelOrderService for HotelOrderServiceImpl<HR, HBS, OP, UP>
+impl<HR, HBS, OP, UP, ES> HotelOrderService for HotelOrderServiceImpl<HR, HBS, OP, UP, ES>
 where
     HR: HotelRepository,
     HBS: HotelBookingService,
     OP: OrderPort,
     UP: UserPort,
+    ES: EventService,
 {
     #[instrument(skip(self, hotel_orders), fields(session_id = %session_id))]
     async fn process_hotel_orders(
@@ -378,6 +386,14 @@ where
                 error!("Failed to create transaction: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Hotel, HotelUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish hotel event: {:?}", e);
+        }
 
         Ok(TransactionInfoDTO {
             transaction_id,

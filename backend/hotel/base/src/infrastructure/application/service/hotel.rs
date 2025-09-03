@@ -12,41 +12,46 @@ use crate::domain::service::hotel_rating::{HotelRatingService, HotelRatingServic
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use shared::HOTEL_MAX_BOOKING_DAYS;
 use shared::application_error::{ApplicationError, GeneralError};
 use shared::domain::Identifiable;
 use shared::domain::model::hotel::{HotelDateRange, Rating};
 use shared::domain::model::session::SessionId;
 use shared::domain::model::user::UserId;
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, HotelUpdatedEvent};
 use shared::internal::user::command::{SessionQuery, UserInfoQuery};
 use shared::internal::user::dto::{SessionDTO, UserCombinedInfoDTO};
 use shared::ports::user::UserPort;
+use shared::{HOTEL_MAX_BOOKING_DAYS, MicroService};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, instrument};
 
-pub struct HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+pub struct HotelServiceImpl<HRS, HQS, HBS, HR, UP, ES>
 where
     HRS: HotelRatingService,
     HQS: HotelQueryService,
     HBS: HotelBookingService,
     HR: HotelRepository,
     UP: UserPort,
+    ES: EventService,
 {
     hotel_rating_service: Arc<HRS>,
     hotel_query_service: Arc<HQS>,
     hotel_booking_service: Arc<HBS>,
     hotel_repository: Arc<HR>,
     user_port: Arc<UP>,
+    event_service: Arc<ES>,
 }
 
-impl<HRS, HQS, HBS, HR, UP> HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+impl<HRS, HQS, HBS, HR, UP, ES> HotelServiceImpl<HRS, HQS, HBS, HR, UP, ES>
 where
     HRS: HotelRatingService,
     HQS: HotelQueryService,
     HBS: HotelBookingService,
     HR: HotelRepository,
     UP: UserPort,
+    ES: EventService,
 {
     pub fn new(
         hotel_rating_service: Arc<HRS>,
@@ -54,6 +59,7 @@ where
         hotel_booking_service: Arc<HBS>,
         hotel_repository: Arc<HR>,
         user_port: Arc<UP>,
+        event_service: Arc<ES>,
     ) -> Self {
         HotelServiceImpl {
             hotel_rating_service,
@@ -61,6 +67,7 @@ where
             hotel_booking_service,
             hotel_repository,
             user_port,
+            event_service,
         }
     }
 
@@ -136,13 +143,14 @@ where
 }
 
 #[async_trait]
-impl<HRS, HQS, HBS, HR, UP> HotelService for HotelServiceImpl<HRS, HQS, HBS, HR, UP>
+impl<HRS, HQS, HBS, HR, UP, ES> HotelService for HotelServiceImpl<HRS, HQS, HBS, HR, UP, ES>
 where
     HRS: HotelRatingService,
     HQS: HotelQueryService,
     HBS: HotelBookingService,
     HR: HotelRepository,
     UP: UserPort,
+    ES: EventService,
 {
     #[instrument(skip(self))]
     async fn get_quota(
@@ -220,6 +228,14 @@ where
                     Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
                 }
             })?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Hotel, HotelUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish hotel event: {:?}", e);
+        }
 
         Ok(())
     }

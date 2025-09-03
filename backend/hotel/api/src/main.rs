@@ -11,6 +11,7 @@ use hotel_base::infrastructure::application::service::hotel_order::HotelOrderSer
 use hotel_base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use hotel_base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use hotel_base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
+use hotel_base::infrastructure::service::event::HotelEventServiceImpl;
 use hotel_base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
 use hotel_base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use hotel_base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
@@ -18,6 +19,7 @@ use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{AppConfig, MAX_BODY_LENGTH, read_file_env};
+use shared::event::queue::EventService;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -39,6 +41,7 @@ async fn main() -> std::io::Result<()> {
     let server_name = read_file_env("SERVER_NAME").expect("cannot get server name");
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
 
     let data_base_path = read_file_env("DATA_PATH").expect("cannot get data path");
 
@@ -75,6 +78,21 @@ async fn main() -> std::io::Result<()> {
         MicroService::Geo.internal_api_endpoint(),
     ));
 
+    let event_service_impl = HotelEventServiceImpl::new(
+        &rabbitmq_url,
+        conn.clone(),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&user_port_impl),
+    )
+    .await
+    .expect("failed to create event service");
+
+    event_service_impl
+        .clone()
+        .init_consumer()
+        .await
+        .expect("failed to init consumer");
+
     let object_storage_impl = Arc::new(HttpObjectStoragePortImpl::new(
         MicroService::ObjectStorage.internal_api_endpoint(),
     ));
@@ -91,6 +109,7 @@ async fn main() -> std::io::Result<()> {
         data_base_path,
         Arc::clone(&geo_port_impl),
         Arc::clone(&object_storage_impl),
+        Arc::clone(&event_service_impl),
     ));
 
     let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
@@ -118,6 +137,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&hotel_booking_service_impl),
         Arc::clone(&hotel_repository_impl),
         Arc::clone(&user_port_impl),
+        Arc::clone(&event_service_impl),
     ));
 
     let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
@@ -125,6 +145,7 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&hotel_booking_service_impl),
         Arc::clone(&order_port_impl),
         Arc::clone(&user_port_impl),
+        Arc::clone(&event_service_impl),
     ));
 
     let hotel_data_service: web::Data<dyn HotelDataService> =
