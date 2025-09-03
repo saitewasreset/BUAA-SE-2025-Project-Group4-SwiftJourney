@@ -302,7 +302,7 @@ pub enum OrderInternalServiceApi {
     RefundTransaction,
     ConvertOrderToDto,
     VerifyTrainOrder,
-    UpdateOrder,
+    UpdateOrders,
     GetOrderListByUserId,
 }
 
@@ -313,7 +313,7 @@ impl InternalApi for OrderInternalServiceApi {
             OrderInternalServiceApi::RefundTransaction => "refund_transaction",
             OrderInternalServiceApi::ConvertOrderToDto => "convert_order_to_dto",
             OrderInternalServiceApi::VerifyTrainOrder => "verify_train_order",
-            OrderInternalServiceApi::UpdateOrder => "update_order",
+            OrderInternalServiceApi::UpdateOrders => "update_orders",
             OrderInternalServiceApi::GetOrderListByUserId => "get_order_list_by_user_id",
         }
     }
