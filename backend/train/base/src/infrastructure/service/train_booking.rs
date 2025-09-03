@@ -10,34 +10,37 @@ use async_trait::async_trait;
 use shared::domain::ServiceError;
 use shared::domain::model::order::{Order, OrderStatus, TrainOrder};
 use shared::domain::{Identifiable, RepositoryError};
+use shared::internal::order::command::{OrderByUuidQuery, UpdateOrdersCommand};
+use shared::ports::order::OrderPort;
+use std::any::Any;
 use std::ops::Deref;
 use std::sync::Arc;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
-pub struct TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
+pub struct TrainBookingServiceImpl<TSR, TSS, TRR, OP, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TRR: TrainRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     SAR: SeatAvailabilityRepository,
     TTCS: TrainTypeConfigurationService,
 {
     train_schedule_repository: Arc<TSR>,
     train_seat_service: Arc<TSS>,
     train_repository: Arc<TRR>,
-    order_repository: Arc<OR>,
+    order_port: Arc<OP>,
     seat_availability_repository: Arc<SAR>,
     train_type_configuration_service: Arc<TTCS>,
 }
 
-impl<TSR, TSS, TRR, OR, SAR, TTCS> TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
+impl<TSR, TSS, TRR, OP, SAR, TTCS> TrainBookingServiceImpl<TSR, TSS, TRR, OP, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TRR: TrainRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     SAR: SeatAvailabilityRepository,
     TTCS: TrainTypeConfigurationService,
 {
@@ -46,7 +49,7 @@ where
         train_schedule_repository: Arc<TSR>,
         train_seat_service: Arc<TSS>,
         train_repository: Arc<TRR>,
-        order_repository: Arc<OR>,
+        order_port: Arc<OP>,
         seat_availability_repository: Arc<SAR>,
         train_type_configuration_service: Arc<TTCS>,
     ) -> Self {
@@ -54,7 +57,7 @@ where
             train_schedule_repository,
             train_seat_service,
             train_repository,
-            order_repository,
+            order_port,
             seat_availability_repository,
             train_type_configuration_service,
         }
@@ -62,13 +65,13 @@ where
 }
 
 #[async_trait]
-impl<TSR, TSS, TRR, OR, SAR, TTCS> TrainBookingService
-    for TrainBookingServiceImpl<TSR, TSS, TRR, OR, SAR, TTCS>
+impl<TSR, TSS, TRR, OP, SAR, TTCS> TrainBookingService
+    for TrainBookingServiceImpl<TSR, TSS, TRR, OP, SAR, TTCS>
 where
     TSR: TrainScheduleRepository,
     TSS: TrainSeatService,
     TRR: TrainRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     SAR: SeatAvailabilityRepository,
     TTCS: TrainTypeConfigurationService,
 {
@@ -77,13 +80,32 @@ where
         info!("Booking train order: {}", order_uuid);
 
         let mut train_order = match self
-            .order_repository
-            .find_train_order_by_uuid(order_uuid)
+            .order_port
+            .get_order_by_uuid(OrderByUuidQuery { order_uuid })
             .await
         {
-            Ok(Some(order)) => order,
+            Ok(Some(order)) => {
+                let order_dyn: Box<dyn Order> = order.into();
+
+                let order_type = order_dyn.order_type();
+
+                if let Ok(train_order) = (order_dyn as Box<dyn Any>).downcast::<TrainOrder>() {
+                    *train_order
+                } else {
+                    warn!(
+                        "Cannot downcast order as Box<TrainOrder> order uuid = {} order type = {}",
+                        order_uuid, order_type,
+                    );
+
+                    return Err(TrainBookingServiceError::InvalidOrder(order_uuid));
+                }
+            }
             Ok(None) => return Err(TrainBookingServiceError::InvalidOrder(order_uuid)),
-            Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
+            Err(err) => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(err.into()),
+                ));
+            }
         };
 
         info!("Found train order: {:?}", train_order);
@@ -250,10 +272,17 @@ where
         train_order.set_status(OrderStatus::Ongoing);
         train_order.set_seat(Some(seat.clone()));
 
-        self.order_repository
-            .update(Box::new(train_order))
+        self.order_port
+            .update_orders(UpdateOrdersCommand {
+                orders: vec![(Box::new(train_order) as Box<dyn Order>).as_ref().into()],
+            })
             .await
-            .map_err(|err| TrainBookingServiceError::InfrastructureError(err.into()))?;
+            .inspect_err(|e| error!("Failed to update order: {}", e))
+            .map_err(|err| {
+                TrainBookingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    err.into(),
+                ))
+            })?;
 
         info!(
             "Train order {} successfully booked with seat: {:?}",
@@ -265,13 +294,32 @@ where
     #[instrument(skip(self))]
     async fn cancel_ticket(&self, order_uuid: Uuid) -> Result<(), TrainBookingServiceError> {
         let mut train_order = match self
-            .order_repository
-            .find_train_order_by_uuid(order_uuid)
+            .order_port
+            .get_order_by_uuid(OrderByUuidQuery { order_uuid })
             .await
         {
-            Ok(Some(order)) => order,
+            Ok(Some(order)) => {
+                let order_dyn: Box<dyn Order> = order.into();
+
+                let order_type = order_dyn.order_type();
+
+                if let Ok(train_order) = (order_dyn as Box<dyn Any>).downcast::<TrainOrder>() {
+                    *train_order
+                } else {
+                    warn!(
+                        "Cannot downcast order as Box<TrainOrder> order uuid = {} order type = {}",
+                        order_uuid, order_type,
+                    );
+
+                    return Err(TrainBookingServiceError::InvalidOrder(order_uuid));
+                }
+            }
             Ok(None) => return Err(TrainBookingServiceError::InvalidOrder(order_uuid)),
-            Err(err) => return Err(TrainBookingServiceError::InfrastructureError(err.into())),
+            Err(err) => {
+                return Err(TrainBookingServiceError::InfrastructureError(
+                    ServiceError::RelatedServiceError(err.into()),
+                ));
+            }
         };
 
         info!("Cancelling train order: {:?}", train_order);
@@ -330,10 +378,17 @@ where
 
         train_order.set_status(OrderStatus::Cancelled);
 
-        self.order_repository
-            .update(Box::new(train_order))
+        self.order_port
+            .update_orders(UpdateOrdersCommand {
+                orders: vec![(Box::new(train_order) as Box<dyn Order>).as_ref().into()],
+            })
             .await
-            .map_err(|err| TrainBookingServiceError::InfrastructureError(err.into()))?;
+            .inspect_err(|e| error!("Failed to update order: {}", e))
+            .map_err(|err| {
+                TrainBookingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    err.into(),
+                ))
+            })?;
 
         Ok(())
     }
@@ -351,24 +406,35 @@ where
         let mut failed_orders: Vec<TrainOrder> = Vec::new();
 
         for order_uuid in order_uuid_list.iter() {
-            let order = self
-                .order_repository
-                .find_train_order_by_uuid(*order_uuid)
+            let order = match self
+                .order_port
+                .get_order_by_uuid(OrderByUuidQuery {
+                    order_uuid: *order_uuid,
+                })
                 .await
-                .inspect_err(|e| error!("Failed to find train order by uuid {}: {}", order_uuid, e))
-                .map_err(|e| {
-                    TrainBookingServiceError::InfrastructureError(ServiceError::RepositoryError(e))
-                })?
-                .ok_or_else(|| {
-                    error!("Inconsistent: no order with uuid {}", order_uuid);
+            {
+                Ok(Some(order)) => {
+                    let order_dyn: Box<dyn Order> = order.into();
+                    let order_type = order_dyn.order_type();
 
-                    TrainBookingServiceError::InfrastructureError(ServiceError::RepositoryError(
-                        RepositoryError::InconsistentState(anyhow!(
-                            "Inconsistent: no order with uuid {}",
-                            order_uuid
-                        )),
-                    ))
-                })?;
+                    if let Ok(train_order) = (order_dyn as Box<dyn Any>).downcast::<TrainOrder>() {
+                        *train_order
+                    } else {
+                        warn!(
+                            "Cannot downcast order as Box<TrainOrder> order uuid = {} order type = {}",
+                            order_uuid, order_type,
+                        );
+
+                        return Err(TrainBookingServiceError::InvalidOrder(*order_uuid));
+                    }
+                }
+                Ok(None) => return Err(TrainBookingServiceError::InvalidOrder(*order_uuid)),
+                Err(err) => {
+                    return Err(TrainBookingServiceError::InfrastructureError(
+                        ServiceError::RelatedServiceError(err.into()),
+                    ));
+                }
+            };
 
             let result = self.booking_ticket(*order_uuid).await;
 

@@ -1,14 +1,14 @@
 use crate::application::service::internal::{TrainInternalService, TrainInternalServiceError};
-use shared::domain::model::train::{TrainId, TrainNumber};
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
+use shared::domain::RepositoryError;
+use shared::domain::model::train::{TrainId, TrainNumber};
 use shared::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
 use shared::internal::train::dto::{TrainDTO, TrainScheduleDTO};
 use std::sync::Arc;
 use tracing::{error, instrument};
-use shared::{Verified, domain::RepositoryError};
 
 pub struct TrainInternalServiceImpl<TR, TSR>
 where
@@ -43,7 +43,7 @@ where
         &self,
         query: GetTrainByNumberQuery,
     ) -> Result<Option<TrainDTO>, TrainInternalServiceError> {
-        let train_number = TrainNumber::<Verified>::from_unchecked(query.train_number);
+        let train_number = TrainNumber::from_unchecked(query.train_number);
         let result = self
             .train_repository
             .find_by_train_number(train_number)
@@ -66,9 +66,9 @@ where
     ) -> Result<Option<TrainScheduleDTO>, TrainInternalServiceError> {
         let train_id = TrainId::from(query.train_id);
         let origin_departure_time = DateTime::parse_from_rfc3339(&query.origin_departure_time)
-            .map_err(|_|
-                TrainInternalServiceError::InvalidDateTimeFormat(query.origin_departure_time),
-            )?;
+            .map_err(|_| {
+                TrainInternalServiceError::InvalidDateTimeFormat(query.origin_departure_time)
+            })?;
 
         let schedule = self
             .train_schedule_repository

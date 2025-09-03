@@ -1,39 +1,42 @@
 use crate::domain::service::train_booking::TrainBookingService;
 use async_trait::async_trait;
 use shared::domain::model::order::{Order, OrderStatus, OrderType};
+use shared::internal::order::command::RefundTransactionCommand;
+use shared::internal::order::dto::InternalOrderDTO;
 use shared::messaging::order_status::{
     OrderStatusConsumerError, OrderStatusMessagePack, RabbitMQOrderStatusConsumer,
 };
+use shared::ports::order::OrderPort;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 
-pub struct TrainOrderStatusConsumer<TBS, TS>
+pub struct TrainOrderStatusConsumer<TBS, OP>
 where
     TBS: TrainBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
     train_booking_service: Arc<TBS>,
-    transaction_service: Arc<TS>,
+    order_port: Arc<OP>,
 }
 
-impl<TBS, TS> TrainOrderStatusConsumer<TBS, TS>
+impl<TBS, OP> TrainOrderStatusConsumer<TBS, OP>
 where
     TBS: TrainBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
-    pub fn new(train_booking_service: Arc<TBS>, transaction_service: Arc<TS>) -> Self {
+    pub fn new(train_booking_service: Arc<TBS>, order_port: Arc<OP>) -> Self {
         Self {
             train_booking_service,
-            transaction_service,
+            order_port,
         }
     }
 }
 
 #[async_trait]
-impl<TBS, TS> RabbitMQOrderStatusConsumer for TrainOrderStatusConsumer<TBS, TS>
+impl<TBS, OP> RabbitMQOrderStatusConsumer for TrainOrderStatusConsumer<TBS, OP>
 where
     TBS: TrainBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
     fn binding_key(&self) -> &'static str {
         OrderType::Train.message_queue_name()
@@ -74,14 +77,18 @@ where
                 .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
 
             if !tx.is_empty() {
-                let tx_list_boxed = tx
+                let tx_list_dto: Vec<InternalOrderDTO> = tx
                     .into_iter()
-                    .map(|tx| Box::new(tx) as Box<dyn Order>)
+                    .map(|tx| (Box::new(tx) as Box<dyn Order>).as_ref().into())
                     .collect::<Vec<_>>();
 
-                self.transaction_service
-                    .refund_transaction(message_pack.transaction_uuid, &tx_list_boxed)
+                self.order_port
+                    .refund_transaction(RefundTransactionCommand {
+                        transaction_id: message_pack.transaction_uuid,
+                        to_refund_orders: tx_list_dto,
+                    })
                     .await
+                    .inspect_err(|e| error!("Failed to send refund transaction: {:?}", e))
                     .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
             }
         }

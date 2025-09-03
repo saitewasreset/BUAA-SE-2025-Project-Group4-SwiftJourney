@@ -49,6 +49,7 @@ use std::sync::{Arc, Mutex};
 use tracing::error;
 
 impl_db_id_from_u64!(SeatAvailabilityId, i32, "seat availability");
+impl_db_id_from_u64!(PersonalInfoId, i32, "personal info");
 
 /// 座位可用性数据转换器
 ///

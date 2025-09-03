@@ -59,7 +59,7 @@ where
             })?;
 
         for station in db_station_list {
-            let station_id = StationId::from(station.id);
+            let station_id = StationId::from(station.id as u64);
             let index = graph.add_node(station_id);
             id_to_index.insert(station_id, index);
         }

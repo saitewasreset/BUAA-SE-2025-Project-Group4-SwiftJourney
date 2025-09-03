@@ -15,14 +15,15 @@ use crate::application::commands::train_data::{
     LoadTrainTypeCommand,
 };
 use crate::application::service::train_data::TrainDataService;
-use shared::application_error::{ApplicationError, GeneralError, ModeError};
 use crate::domain::repository::route::RouteRepository;
-use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::infrastructure::repository::train::{save_raw_train_number, save_raw_train_type};
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
+use shared::application_error::{ApplicationError, GeneralError, ModeError};
 use shared::data::{DishData, TakeawayData};
+use shared::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
+use shared::ports::geo::GeoPort;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -45,33 +46,24 @@ use tracing::{error, instrument, warn};
 /// - `station_repository`: 火车站仓储
 /// - `train_repository`: 列车仓储
 /// - `route_repository`: 路线仓储
-pub struct TrainDataServiceImpl<C, S, T, R, TS, OSS>
+pub struct TrainDataServiceImpl<GP, T, R>
 where
-    C: CityRepository,
-    S: StationRepository,
+    GP: GeoPort,
     T: TrainRepository,
     R: RouteRepository,
-    TS: TakeawayShopRepository,
-    OSS: ObjectStorageService,
 {
     debug: bool,
     data_path: PathBuf,
-    city_repository: Arc<C>,
-    station_repository: Arc<S>,
+    geo_port: Arc<GP>,
     train_repository: Arc<T>,
     route_repository: Arc<R>,
-    takeaway_shop_repository: Arc<TS>,
-    object_storage_service: Arc<OSS>,
 }
 
-impl<C, S, T, R, TS, OSS> TrainDataServiceImpl<C, S, T, R, TS, OSS>
+impl<GP, T, R> TrainDataServiceImpl<GP, T, R>
 where
-    C: CityRepository,
-    S: StationRepository,
+    GP: GeoPort,
     T: TrainRepository,
     R: RouteRepository,
-    TS: TakeawayShopRepository,
-    OSS: ObjectStorageService,
 {
     /// 创建新的火车数据加载服务实例
     ///
@@ -88,22 +80,16 @@ where
     pub fn new(
         debug: bool,
         data_path: PathBuf,
-        city_repository: Arc<C>,
-        station_repository: Arc<S>,
+        geo_port: Arc<GP>,
         train_repository: Arc<T>,
         route_repository: Arc<R>,
-        takeaway_shop_repository: Arc<TS>,
-        object_storage_service: Arc<OSS>,
     ) -> Self {
         Self {
             debug,
             data_path,
-            city_repository,
-            station_repository,
+            geo_port,
             train_repository,
             route_repository,
-            takeaway_shop_repository,
-            object_storage_service,
         }
     }
 
@@ -127,14 +113,11 @@ where
 }
 
 #[async_trait]
-impl<C, S, T, R, TS, OSS> TrainDataService for TrainDataServiceImpl<C, S, T, R, TS, OSS>
+impl<GP, T, R> TrainDataService for TrainDataServiceImpl<GP, T, R>
 where
-    C: CityRepository,
-    S: StationRepository,
+    GP: GeoPort,
     T: TrainRepository,
     R: RouteRepository,
-    TS: TakeawayShopRepository,
-    OSS: ObjectStorageService,
 {
     /// 检查是否启用调试模式
     ///
@@ -159,10 +142,14 @@ where
     #[instrument(skip_all)]
     async fn load_city(&self, command: LoadCityCommand) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
-        self.city_repository.save_raw(command).await.map_err(|e| {
-            error!("Error saving city: {:?}", e);
-            GeneralError::InternalServerError
-        })?;
+
+        let city_province_map: HashMap<String, String> = command;
+
+        self.geo_port
+            .save_city_province_map(SaveCityProvinceMapCommand { city_province_map })
+            .await
+            .inspect_err(|e| error!("Error saving city province: {:?}", e))
+            .map_err(|e| GeneralError::InternalServerError)?;
 
         Ok(())
     }
@@ -186,13 +173,14 @@ where
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        self.station_repository
-            .save_raw(command)
+        let station_city_map: HashMap<String, String> =
+            command.into_iter().map(|x| (x.name, x.city)).collect();
+
+        self.geo_port
+            .save_station_city_map(SaveStationCityMapCommand { station_city_map })
             .await
-            .map_err(|e| {
-                error!("Error saving station: {:?}", e);
-                GeneralError::InternalServerError
-            })?;
+            .inspect_err(|e| error!("Error saving stations: {:?}", e))
+            .map_err(|e| GeneralError::InternalServerError)?;
 
         Ok(())
     }

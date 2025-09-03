@@ -86,7 +86,7 @@ where
 
         Ok(db_station_list
             .into_iter()
-            .map(|info| (info.name, StationId::from(info.id)))
+            .map(|info| (info.name, StationId::from(info.id as u64)))
             .collect())
     }
 
@@ -109,16 +109,21 @@ where
     ) -> Result<Vec<StationId>, Box<dyn ApplicationError>> {
         match (station_opt, city_opt) {
             (Some(s), None) => {
-                let id = station_name_to_id
+                let id = *station_name_to_id
                     .get(s)
-                    .ok_or(TrainQueryServiceError::InvalidStationId)?
-                    .get_id()
-                    .unwrap();
+                    .ok_or(TrainQueryServiceError::InvalidStationId)?;
                 Ok(vec![id])
             }
             (None, Some(city)) => {
-                let stations = city_name_to_station_name.get(city).unwrap_or_default();
-                Ok(stations.into_iter().filter_map(|st| st.get_id()).collect())
+                let stations = city_name_to_station_name
+                    .get(city)
+                    .cloned()
+                    .unwrap_or_default();
+                Ok(stations
+                    .into_iter()
+                    .filter_map(|st| station_name_to_id.get(&st))
+                    .copied()
+                    .collect())
             }
             _ => Err(Box::new(TrainQueryServiceError::InconsistentQuery)),
         }
@@ -183,7 +188,7 @@ where
         let station_id_to_name = station_name_to_id
             .into_iter()
             .map(|(k, v)| (v, k))
-            .collect();
+            .collect::<HashMap<_, _>>();
 
         let mut stopping_station_list = Vec::with_capacity(route.stops().len());
 
