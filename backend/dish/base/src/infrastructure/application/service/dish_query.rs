@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use shared::application_error::{ApplicationError, GeneralError};
+use shared::internal::user::command::SessionQuery;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
@@ -7,93 +9,75 @@ use crate::application::commands::dish_query::DishQueryDTO;
 use crate::application::service::dish_query::{
     DishInfoDTO, DishQueryService, TakeawayDTO, TakeawayDishInfoDTO, TrainDishInfoDTO,
 };
-use crate::application::{ApplicationError, GeneralError};
-use crate::domain::repository::{
-    dish::DishRepository, takeaway::TakeawayShopRepository, train::TrainRepository,
-};
-use crate::domain::service::order::OrderService;
-use crate::domain::service::session::SessionManagerService;
-use crate::domain::service::station::StationService;
-use crate::domain::service::train_schedule::TrainScheduleService;
-use crate::domain::service::train_type::{
-    TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
-};
+
+use crate::domain::repository::{dish::DishRepository, takeaway::TakeawayShopRepository};
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::domain::Identifiable;
 use shared::domain::model::session::SessionId;
-use shared::domain::model::train::TrainNumber;
+use shared::internal::order::command::VerifyTrainOrderQuery;
+use shared::internal::train::command::{GetTerminalArrivalTimeQuery, GetTrainByNumberQuery};
+use shared::ports::geo::GeoPort;
+use shared::ports::order::OrderPort;
+use shared::ports::train::TrainPort;
+use shared::ports::user::UserPort;
 use shared::utils::TimeMeter;
 use std::collections::HashMap;
 
-pub struct DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, OS>
+pub struct DishQueryServiceImpl<DR, TSR, GP, OP, TP, UP>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
-    TR: TrainRepository,
-    SMS: SessionManagerService,
-    TSS: TrainScheduleService,
-    TTCS: TrainTypeConfigurationService,
-    SS: StationService,
-    OS: OrderService,
+    GP: GeoPort,
+    OP: OrderPort,
+    TP: TrainPort,
+    UP: UserPort,
 {
     dish_repository: Arc<DR>,
     takeaway_shop_repository: Arc<TSR>,
-    train_repository: Arc<TR>,
-    session_manager: Arc<SMS>,
-    train_schedule_service: Arc<TSS>,
-    train_type_configuration_service: Arc<TTCS>,
-    station_service: Arc<SS>,
-    order_service: Arc<OS>,
+    geo_port: Arc<GP>,
+    order_port: Arc<OP>,
+    train_port: Arc<TP>,
+    user_port: Arc<UP>,
 }
 
-impl<DR, TSR, TR, SMS, TSS, TTCS, SS, OS> DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, OS>
+impl<DR, TSR, GP, OP, TP, UP> DishQueryServiceImpl<DR, TSR, GP, OP, TP, UP>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
-    TR: TrainRepository,
-    SMS: SessionManagerService,
-    TSS: TrainScheduleService,
-    TTCS: TrainTypeConfigurationService,
-    SS: StationService,
-    OS: OrderService,
+    GP: GeoPort,
+    OP: OrderPort,
+    TP: TrainPort,
+    UP: UserPort,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dish_repository: Arc<DR>,
         takeaway_shop_repository: Arc<TSR>,
-        train_repository: Arc<TR>,
-        session_manager: Arc<SMS>,
-        train_schedule_service: Arc<TSS>,
-        train_type_configuration_service: Arc<TTCS>,
-        station_service: Arc<SS>,
-        order_service: Arc<OS>,
+        geo_port: Arc<GP>,
+        order_port: Arc<OP>,
+        train_port: Arc<TP>,
+        user_port: Arc<UP>,
     ) -> Self {
         DishQueryServiceImpl {
             dish_repository,
             takeaway_shop_repository,
-            train_repository,
-            session_manager,
-            train_schedule_service,
-            train_type_configuration_service,
-            station_service,
-            order_service,
+            geo_port,
+            order_port,
+            train_port,
+            user_port,
         }
     }
 }
 
 #[async_trait]
-impl<DR, TSR, TR, SMS, TSS, TTCS, SS, OS> DishQueryService
-    for DishQueryServiceImpl<DR, TSR, TR, SMS, TSS, TTCS, SS, OS>
+impl<DR, TSR, GP, OP, TP, UP> DishQueryService for DishQueryServiceImpl<DR, TSR, GP, OP, TP, UP>
 where
     DR: DishRepository,
     TSR: TakeawayShopRepository,
-    TR: TrainRepository,
-    SMS: SessionManagerService,
-    TSS: TrainScheduleService,
-    TTCS: TrainTypeConfigurationService,
-    SS: StationService,
-    OS: OrderService,
+    GP: GeoPort,
+    OP: OrderPort,
+    TP: TrainPort,
+    UP: UserPort,
 {
     #[instrument(skip(self))]
     async fn query_dish(
@@ -107,30 +91,35 @@ where
             .map_err(|_| Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
         let user_id = self
-            .session_manager
-            .get_user_id_by_session(session_id)
+            .user_port
+            .get_session(SessionQuery {
+                session_id: session_id.to_string(),
+            })
             .await
             .map_err(|e| {
-                error!("Failed to get user id: {:?}", e);
+                error!("Failed to get session: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
-            .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
-
-        // 先假设车次经过了验证，然后查询是否存在，若不存在，则直接返回错误
+            .ok_or(GeneralError::InvalidSessionId)?
+            .user_id;
 
         meter.meter("verify session");
 
         let train_number = self
-            .train_type_configuration_service
-            .verify_train_number(TrainNumber::from(query.train_number.clone()))
+            .train_port
+            .get_train_by_number(GetTrainByNumberQuery {
+                train_number: query.train_number,
+            })
             .await
-            .map_err(|e| match e {
-                TrainTypeConfigurationServiceError::InfrastructureError(e) => {
-                    error!("Infrastructure error while verifying train number: {:?}", e);
-                    GeneralError::InternalServerError
-                }
-                _ => GeneralError::NotFound(format!("invalid trainNumber: {}", query.train_number)),
-            })?;
+            .map_err(|e| {
+                error!("Failed to get train: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or_else(|| {
+                error!("Train number {} not found", query.train_number);
+                GeneralError::NotFound(format!("Train number {} not found", query.train_number))
+            })?
+            .number;
 
         let origin_departure_time = DateTimeWithTimeZone::parse_from_rfc3339(
             &query.origin_departure_time,
@@ -145,13 +134,27 @@ where
         meter.meter("verify train number");
 
         let terminal_arrival_time = self
-            .train_schedule_service
-            .get_terminal_arrival_time(train_number.clone(), origin_departure_time)
+            .train_port
+            .get_terminal_arrival_time(GetTerminalArrivalTimeQuery {
+                train_number: train_number.clone(),
+                origin_departure_time,
+            })
             .await
             .map_err(|e| {
-                error!("Failed to get terminal arrival time: {:?}", e);
+                error!("Failed to get terminal arrival: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-            })?;
+            })?
+            .ok_or_else(|| {
+                error!(
+                    "Terminal arrival time not found for train number {}",
+                    train_number
+                );
+                GeneralError::NotFound(format!(
+                    "Terminal arrival time not found for train number {}",
+                    train_number
+                ))
+            })?
+            .time;
 
         meter.meter("get terminal arrival time");
 
@@ -183,21 +186,25 @@ where
         meter.meter("transform dish");
 
         let train = self
-            .train_repository
-            .find_by_train_number(train_number.clone())
+            .train_port
+            .get_train_by_number(train_number.clone())
             .await
             .map_err(|e| {
                 error!("Failed to find train by number: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or_else(|| {
+                error!("Train number {} not found", train_number);
+                GeneralError::NotFound(format!("Train number {} not found", train_number))
             })?;
 
         meter.meter("load train");
 
-        let route_id = train.default_route_id();
+        let route_id = train.default_route_id;
 
         let shop_by_stop = self
             .takeaway_shop_repository
-            .find_by_train_route(route_id)
+            .find_by_train_route(route_id.into())
             .await
             .map_err(|e| {
                 error!("Failed to find shops by train route: {:?}", e);
@@ -208,7 +215,7 @@ where
 
         let mut takeaway_map = HashMap::new();
 
-        let stations = self.station_service.get_stations().await.map_err(|e| {
+        let stations = self.geo_port.get_stations().await.map_err(|e| {
             error!("Failed to get stations: {:?}", e);
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
@@ -258,8 +265,12 @@ where
         meter.meter("check ticket ownership");
 
         let can_booking = self
-            .order_service
-            .verify_train_order(user_id, train_number.to_string(), origin_departure_time)
+            .order_port
+            .verify_train_order(VerifyTrainOrderQuery {
+                user_id,
+                train_number: train_number.to_string(),
+                origin_departure_time,
+            })
             .await
             .map_err(|e| {
                 error!("Failed to verify train order: {:?}", e);

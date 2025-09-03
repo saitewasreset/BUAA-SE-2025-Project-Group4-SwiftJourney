@@ -1,10 +1,5 @@
-use crate::domain::model::dish::{Dish, DishId, DishTime};
-use crate::domain::model::train::{TrainId, TrainNumber};
+use crate::DbId;
 use crate::domain::repository::dish::DishRepository;
-use crate::domain::repository::train::TrainRepository;
-use crate::domain::service::object_storage::{ObjectCategory, ObjectStorageService};
-use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
-use crate::{DB_CHUNK_SIZE, Verified};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -13,6 +8,14 @@ use sea_orm::QueryFilter;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
 use sea_orm::{ColumnTrait, TransactionTrait};
 use shared::data::DishData;
+use shared::domain::model::dish::{Dish, DishId, DishTime};
+use shared::domain::model::train::{TrainId, TrainNumber};
+use shared::domain::{Identifiable, Repository, RepositoryError};
+use shared::internal::object_storage::command::PutObjectCommand;
+use shared::internal::object_storage::dto::ObjectCategory;
+use shared::ports::object_storage::ObjectStoragePort;
+use shared::ports::train::TrainPort;
+use shared::{DB_CHUNK_SIZE, Verified, impl_db_id_from_u64};
 use std::collections::HashMap;
 use std::fs;
 use std::ops::Deref;
@@ -158,11 +161,11 @@ impl DishRepository for DishRepositoryImpl {
     }
 }
 
-pub async fn save_raw_dish<T: TrainRepository, OS: ObjectStorageService>(
+pub async fn save_raw_dish<TP: TrainPort, OSP: ObjectStoragePort>(
     data: DishData,
     data_path: &Path,
-    train_repository: Arc<T>,
-    object_storage_service: Arc<OS>,
+    train_port: Arc<TP>,
+    object_storage_port: Arc<OSP>,
     db: &DatabaseConnection,
 ) -> Result<(), RepositoryError> {
     let tx = db
@@ -175,7 +178,7 @@ pub async fn save_raw_dish<T: TrainRepository, OS: ObjectStorageService>(
 
     let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
 
-    let train_list = train_repository
+    let train_list = train_port
         .get_trains()
         .await
         .inspect_err(|e| {
@@ -212,8 +215,12 @@ pub async fn save_raw_dish<T: TrainRepository, OS: ObjectStorageService>(
                         error!("failed load dish image: {}", e);
                     })?;
 
-                let uuid = object_storage_service
-                    .put_object(ObjectCategory::Dish, "image/jpeg", image_data)
+                let uuid = object_storage_port
+                    .put_object(PutObjectCommand {
+                        object_category: ObjectCategory::Dish,
+                        content_type: "image/jpeg".to_owned(),
+                        object: image_data,
+                    })
                     .await
                     .map_err(|e| {
                         error!("failed save image: {}", e);

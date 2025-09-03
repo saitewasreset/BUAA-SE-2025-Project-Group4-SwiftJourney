@@ -1,20 +1,23 @@
 use async_trait::async_trait;
-use shared::domain::model::order::{DishOrder, Order, OrderStatus};
+use shared::domain::model::order::{Order, OrderStatus, TakeawayOrder};
+use shared::internal::order::command::OrderByUuidQuery;
 use shared::ports::order::OrderPort;
 use std::sync::Arc;
 use tracing::{error, instrument};
 use uuid::Uuid;
 
-use crate::domain::service::dish_booking::{DishBookingService, DishBookingServiceError};
+use crate::domain::service::takeaway_booking::{
+    TakeawayBookingService, TakeawayBookingServiceError,
+};
 
-pub struct DishBookingServiceImpl<OP>
+pub struct TakeawayBookingServiceImpl<OP>
 where
     OP: OrderPort,
 {
     order_repository: Arc<OP>,
 }
 
-impl<OP> DishBookingServiceImpl<OP>
+impl<OP> TakeawayBookingServiceImpl<OP>
 where
     OP: OrderPort,
 {
@@ -24,26 +27,26 @@ where
 }
 
 #[async_trait]
-impl<OP> DishBookingService for DishBookingServiceImpl<OP>
+impl<OP> TakeawayBookingService for TakeawayBookingServiceImpl<OP>
 where
     OP: OrderPort,
 {
     #[instrument(skip(self))]
-    async fn booking_dish(&self, order_uuid: Uuid) -> Result<(), DishBookingServiceError> {
+    async fn booking_takeaway(&self, order_uuid: Uuid) -> Result<(), TakeawayBookingServiceError> {
         let mut order = self
             .order_repository
-            .find_dish_order_by_uuid(order_uuid)
+            .get_order_by_uuid(OrderByUuidQuery { order_uuid })
             .await?
-            .ok_or(DishBookingServiceError::InvalidOrder(order_uuid))?;
+            .ok_or(TakeawayBookingServiceError::InvalidOrder(order_uuid))?;
 
         if order.order_status() != OrderStatus::Paid {
-            return Err(DishBookingServiceError::InvalidOrderStatus(
+            return Err(TakeawayBookingServiceError::InvalidOrderStatus(
                 order_uuid,
                 order.order_status(),
             ));
         }
 
-        // 火车餐订单总是会成功
+        // 外卖订单总是会成功
 
         order.set_status(OrderStatus::Ongoing);
 
@@ -58,15 +61,15 @@ where
     }
 
     #[instrument(skip(self))]
-    async fn cancel_dish(&self, order_uuid: Uuid) -> Result<(), DishBookingServiceError> {
+    async fn cancel_takeaway(&self, order_uuid: Uuid) -> Result<(), TakeawayBookingServiceError> {
         let mut order = self
             .order_repository
-            .find_dish_order_by_uuid(order_uuid)
+            .get_order_by_uuid(OrderByUuidQuery { order_uuid })
             .await?
-            .ok_or(DishBookingServiceError::InvalidOrder(order_uuid))?;
+            .ok_or(TakeawayBookingServiceError::InvalidOrder(order_uuid))?;
 
         if order.order_status() != OrderStatus::Ongoing {
-            return Err(DishBookingServiceError::InvalidOrderStatus(
+            return Err(TakeawayBookingServiceError::InvalidOrderStatus(
                 order_uuid,
                 order.order_status(),
             ));
@@ -84,18 +87,18 @@ where
         Ok(())
     }
 
-    /// 对于合法的火车餐订单，总是会成功，故本函数固定返回空的退款订单列表
+    /// 对于合法的外卖订单，总是会成功，故本函数固定返回空的退款订单列表
     #[instrument(skip(self))]
     async fn booking_group(
         &self,
         order_uuid_list: Vec<Uuid>,
         _atomic: bool,
-    ) -> Result<Vec<DishOrder>, DishBookingServiceError> {
+    ) -> Result<Vec<TakeawayOrder>, TakeawayBookingServiceError> {
         let mut success_booking_order_list = Vec::new();
 
         for order_uuid in order_uuid_list {
-            if let Err(e) = self.booking_dish(order_uuid).await {
-                error!("Failed to book dish: {:?}", e);
+            if let Err(e) = self.booking_takeaway(order_uuid).await {
+                error!("Failed to book takeaway: {:?}", e);
                 break;
             } else {
                 success_booking_order_list.push(order_uuid);

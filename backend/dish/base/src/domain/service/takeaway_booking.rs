@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use shared::domain::model::order::{DishOrder, OrderStatus};
+use shared::domain::model::order::{OrderStatus, TakeawayOrder};
 use shared::domain::model::transaction::TransactionStatus;
 use shared::domain::{RepositoryError, ServiceError};
 use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
-pub enum DishBookingServiceError {
+pub enum TakeawayBookingServiceError {
     /// 底层基础设施错误（如数据库访问失败）
     #[error("an infrastructure error occurred: {0}")]
     InfrastructureError(ServiceError),
@@ -20,21 +20,21 @@ pub enum DishBookingServiceError {
     InvalidTransactionStatus(Uuid, TransactionStatus),
 }
 
-impl From<RepositoryError> for DishBookingServiceError {
+impl From<RepositoryError> for TakeawayBookingServiceError {
     fn from(value: RepositoryError) -> Self {
-        DishBookingServiceError::InfrastructureError(ServiceError::RepositoryError(value))
+        TakeawayBookingServiceError::InfrastructureError(ServiceError::RepositoryError(value))
     }
 }
 
 #[async_trait]
-pub trait DishBookingService: 'static + Send + Sync {
-    async fn booking_dish(&self, order_uuid: Uuid) -> Result<(), DishBookingServiceError>;
-    async fn cancel_dish(&self, order_uuid: Uuid) -> Result<(), DishBookingServiceError>;
+pub trait TakeawayBookingService: 'static + Send + Sync {
+    async fn booking_takeaway(&self, order_uuid: Uuid) -> Result<(), TakeawayBookingServiceError>;
+    async fn cancel_takeaway(&self, order_uuid: Uuid) -> Result<(), TakeawayBookingServiceError>;
 
     // 返回要退款的订单
     async fn booking_group(
         &self,
         order_uuid_list: Vec<Uuid>,
         atomic: bool,
-    ) -> Result<Vec<DishOrder>, DishBookingServiceError>;
+    ) -> Result<Vec<TakeawayOrder>, TakeawayBookingServiceError>;
 }
