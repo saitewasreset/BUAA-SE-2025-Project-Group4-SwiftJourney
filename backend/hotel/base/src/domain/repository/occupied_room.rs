@@ -1,5 +1,5 @@
-use crate::domain::model::hotel::{HotelDateRange, HotelId, OccupiedRoom};
 use async_trait::async_trait;
+use shared::domain::model::hotel::{HotelDateRange, HotelId, OccupiedRoom};
 use shared::domain::{Repository, RepositoryError};
 use uuid::Uuid;
 

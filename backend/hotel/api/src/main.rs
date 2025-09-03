@@ -2,30 +2,32 @@
  * Even if we lose our way, we keep on moving.
  */
 use actix_web::{App, HttpServer, web};
+use hotel_base::application::service::hotel::HotelService;
+use hotel_base::application::service::hotel_data::HotelDataService;
+use hotel_base::application::service::hotel_order::HotelOrderService;
+use hotel_base::infrastructure::application::service::hotel::HotelServiceImpl;
+use hotel_base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
+use hotel_base::infrastructure::application::service::hotel_order::HotelOrderServiceImpl;
+use hotel_base::infrastructure::repository::hotel::HotelRepositoryImpl;
+use hotel_base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
+use hotel_base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
+use hotel_base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
+use hotel_base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
+use hotel_base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
-use shared::api::{MAX_BODY_LENGTH, read_file_env};
+use shared::MicroService;
+use shared::api::{AppConfig, MAX_BODY_LENGTH, read_file_env};
+use shared::ports::impls::geo::HttpGeoPortImpl;
+use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
+use shared::ports::impls::order::HttpOrderPortImpl;
+use shared::ports::impls::user::HttpUserPortImpl;
+use std::env;
+use std::env::VarError;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
-use hotel_base::application::service::internal::UserInternalService;
-use hotel_base::application::service::personal_info::PersonalInfoService;
-use hotel_base::application::service::user_manager::UserManagerService;
-use hotel_base::application::service::user_profile::UserProfileService;
-use hotel_base::domain::model::session_config::SessionConfig;
-use hotel_base::domain::repository::session::SessionRepositoryConfig;
-use hotel_base::domain::repository::user::UserRepository;
-use hotel_base::domain::service::session::SessionManagerService;
-use hotel_base::domain::service::user::UserService;
-use hotel_base::infrastructure::application::service::personal_info::PersonalInfoServiceImpl;
-use hotel_base::infrastructure::application::service::user_manager::UserManagerServiceImpl;
-use hotel_base::infrastructure::application::service::user_profile::UserProfileServiceImpl;
-use hotel_base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
-use hotel_base::infrastructure::repository::session::SessionRepositoryImpl;
-use hotel_base::infrastructure::repository::user::UserRepositoryImpl;
-use hotel_base::infrastructure::service::internal::UserInternalServiceImpl;
-use hotel_base::infrastructure::service::password::Argon2PasswordServiceImpl;
-use hotel_base::infrastructure::service::session::SessionManagerServiceImpl;
-use hotel_base::infrastructure::service::user::UserServiceImpl;
 
 #[actix_web::main]
 
@@ -34,7 +36,19 @@ async fn main() -> std::io::Result<()> {
     let _ = dotenvy::dotenv();
     tracing_subscriber::fmt::init();
 
+    let server_name = read_file_env("SERVER_NAME").expect("cannot get server name");
+
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+
+    let data_base_path = read_file_env("DATA_PATH").expect("cannot get data path");
+
+    let data_base_path = PathBuf::from_str(&data_base_path).expect("cannot parse data path");
+
+    let debug_mode = match env::var("DEBUG") {
+        Ok(_) => true,
+        Err(VarError::NotPresent) => false,
+        Err(VarError::NotUnicode(_)) => true,
+    };
 
     let conn = Database::connect(&database_url)
         .await
@@ -44,39 +58,57 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
-    let session_manager_service_impl =
-        Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
-            Arc::new(SessionRepositoryImpl::new(
-                SessionRepositoryConfig::default(),
-            )),
-            SessionConfig::default(),
-        ));
+    let app_config = AppConfig {
+        debug: debug_mode,
+        server_name,
+    };
+
+    let order_port_impl = Arc::new(HttpOrderPortImpl::new(
+        MicroService::Order.internal_api_endpoint(),
+    ));
+
+    let user_port_impl = Arc::new(HttpUserPortImpl::new(
+        MicroService::User.internal_api_endpoint(),
+    ));
+
+    let geo_port_impl = Arc::new(HttpGeoPortImpl::new(
+        MicroService::Geo.internal_api_endpoint(),
+    ));
+
+    let object_storage_impl = Arc::new(HttpObjectStoragePortImpl::new(
+        MicroService::ObjectStorage.internal_api_endpoint(),
+    ));
+
+    let hotel_repository_impl = Arc::new(HotelRepositoryImpl::new(
+        conn.clone(),
+        Arc::clone(&geo_port_impl),
+    ));
+    let hotel_rating_repository_impl = Arc::new(HotelRatingRepositoryImpl::new(conn.clone()));
+    let occupied_room_repository_impl = Arc::new(OccupiedRoomRepositoryImpl::new(conn.clone()));
 
     let hotel_data_service_impl = Arc::new(HotelDataServiceImpl::new(
         app_config.debug,
         data_base_path,
-        Arc::clone(&city_repository_impl),
-        Arc::clone(&station_repository_impl),
-        Arc::clone(&s3_object_storage_service_impl),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&object_storage_impl),
     ));
 
     let hotel_rating_service_impl = Arc::new(HotelRatingServiceImpl::new(
         Arc::clone(&hotel_repository_impl),
         Arc::clone(&hotel_rating_repository_impl),
-        Arc::clone(&order_repository_impl),
+        Arc::clone(&order_port_impl),
     ));
 
     let hotel_booking_service_impl = Arc::new(HotelBookingServiceImpl::new(
         Arc::clone(&hotel_repository_impl),
-        Arc::clone(&order_repository_impl),
+        Arc::clone(&order_port_impl),
         Arc::clone(&occupied_room_repository_impl),
     ));
 
     let hotel_query_service_impl = Arc::new(HotelQueryServiceImpl::new(
         Arc::clone(&hotel_repository_impl),
         Arc::clone(&hotel_rating_repository_impl),
-        Arc::clone(&city_repository_impl),
-        Arc::clone(&station_repository_impl),
+        Arc::clone(&geo_port_impl),
         Arc::clone(&occupied_room_repository_impl),
     ));
 
@@ -85,59 +117,35 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&hotel_query_service_impl),
         Arc::clone(&hotel_booking_service_impl),
         Arc::clone(&hotel_repository_impl),
-        Arc::clone(&user_repository_impl),
-        Arc::clone(&session_manager_service_impl),
+        Arc::clone(&user_port_impl),
     ));
 
-    let train_seat_service_impl = Arc::new(TrainSeatServiceImpl::new(
-        Arc::clone(&seat_availability_repository_impl),
-        Arc::clone(&route_repository_impl),
-        Arc::clone(&train_type_service_impl),
-        Arc::clone(&train_schedule_repository_impl),
+    let hotel_order_service_impl = Arc::new(HotelOrderServiceImpl::new(
+        Arc::clone(&hotel_repository_impl),
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&order_port_impl),
+        Arc::clone(&user_port_impl),
     ));
 
-    let train_type_configuration_service_impl = Arc::new(TrainTypeConfigurationServiceImpl::new(
-        Arc::clone(&train_repository_impl),
-    ));
+    let hotel_data_service: web::Data<dyn HotelDataService> =
+        web::Data::from(hotel_data_service_impl as Arc<dyn HotelDataService>);
 
-    let train_booking_service_impl = Arc::new(TrainBookingServiceImpl::new(
-        Arc::clone(&train_schedule_repository_impl),
-        Arc::clone(&train_seat_service_impl),
-        Arc::clone(&train_repository_impl),
-        Arc::clone(&order_repository_impl),
-        Arc::clone(&seat_availability_repository_impl),
-        Arc::clone(&train_type_configuration_service_impl),
-    ));
+    let hotel_service: web::Data<dyn HotelService> =
+        web::Data::from(hotel_service_impl as Arc<dyn HotelService>);
 
-    tokio::task::spawn(async move {
-        HttpServer::new(move || {
-            App::new()
-                .app_data(user_internal_service.clone())
-                .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
-                .wrap(TracingLogger::default())
-                .service(web::scope("/internal").configure(user_api::internal::scoped_config))
-        })
-        .bind(("0.0.0.0", 23333))
-        .unwrap()
-        .run()
-        .await
-        .unwrap();
-    });
+    let hotel_order_service: web::Data<dyn HotelOrderService> =
+        web::Data::from(hotel_order_service_impl as Arc<dyn HotelOrderService>);
 
     HttpServer::new(move || {
         App::new()
-            .app_data(session_manager_service.clone())
-            .app_data(user_repository.clone())
-            .app_data(user_service.clone())
-            .app_data(user_manager_service.clone())
-            .app_data(user_profile_service.clone())
-            .app_data(personal_info_service.clone())
-            .app_data(conn.clone())
+            .app_data(hotel_data_service.clone())
+            .app_data(hotel_service.clone())
+            .app_data(hotel_order_service.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
             .service(
                 web::scope("/api")
-                    .service(web::scope("/user").configure(user_api::user::scoped_config)),
+                    .service(web::scope("/hotel").configure(hotel_api::hotel::scoped_config)),
             )
     })
     .bind(("0.0.0.0", 8080))?

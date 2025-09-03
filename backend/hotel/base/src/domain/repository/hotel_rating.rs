@@ -1,5 +1,5 @@
-use crate::domain::model::hotel::{HotelId, HotelRating, Rating};
 use async_trait::async_trait;
+use shared::domain::model::hotel::{HotelId, HotelRating, Rating};
 use shared::domain::model::user::UserId;
 use shared::domain::{Repository, RepositoryError};
 

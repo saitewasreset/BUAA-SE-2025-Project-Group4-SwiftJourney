@@ -1,5 +1,4 @@
 use crate::DbId;
-use crate::domain::model::hotel::{Hotel, HotelId, HotelRoomType, HotelRoomTypeId};
 use crate::domain::repository::hotel::HotelRepository;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -11,6 +10,7 @@ use sea_orm::{QueryFilter, QuerySelect};
 use shared::api::InternalApiError;
 use shared::data::HotelData;
 use shared::domain::model::city::{City, CityId, CityName, ProvinceName};
+use shared::domain::model::hotel::{Hotel, HotelId, HotelRoomType, HotelRoomTypeId};
 use shared::domain::model::station::{Station, StationId};
 use shared::domain::{AggregateManagerImpl, DiffInfo};
 use shared::domain::{
@@ -96,7 +96,7 @@ impl HotelDataConverter {
 
         let city = city_station_pack
             .city_entity_map
-            .get(&CityId::from(hotel_do_pack.hotel.city_id))
+            .get(&CityId::from(hotel_do_pack.hotel.city_id as u64))
             .cloned()
             .ok_or(RepositoryError::InconsistentState(anyhow!(
                 "no city found for city id = {} for hotel id = {}",
@@ -106,7 +106,7 @@ impl HotelDataConverter {
 
         let station = city_station_pack
             .station_entity_map
-            .get(&StationId::from(hotel_do_pack.hotel.station_id))
+            .get(&StationId::from(hotel_do_pack.hotel.station_id as u64))
             .cloned()
             .ok_or(RepositoryError::InconsistentState(anyhow!(
                 "no city found for station id = {} for hotel id = {}",
@@ -278,9 +278,9 @@ where
             .into_iter()
             .map(|x| {
                 (
-                    CityId::from(x.id),
+                    CityId::from(x.id as u64),
                     City::new(
-                        Some(CityId::from(x.id)),
+                        Some(CityId::from(x.id as u64)),
                         CityName::from(x.name.clone()),
                         ProvinceName::from(x.province.clone()),
                     ),
@@ -292,8 +292,12 @@ where
             .into_iter()
             .map(|x| {
                 (
-                    StationId::from(x.id),
-                    Station::new(Some(StationId::from(x.id)), x.name, CityId::from(x.city_id)),
+                    StationId::from(x.id as u64),
+                    Station::new(
+                        Some(StationId::from(x.id as u64)),
+                        x.name,
+                        CityId::from(x.city_id as u64),
+                    ),
                 )
             })
             .collect::<HashMap<_, _>>();
@@ -340,7 +344,7 @@ where
 
         let mut result = Vec::with_capacity(r.len());
 
-        for (hotel_model) in r {
+        for hotel_model in r {
             let room_type_list = room_type_list_by_hotel_id
                 .get(&hotel_model.id)
                 .cloned()
@@ -563,7 +567,7 @@ where
     }
 
     async fn find_by_uuid(&self, uuid: Uuid) -> Result<Option<Hotel>, RepositoryError> {
-        self.query_hotel_lazily(|q| q.filter(crate::models::hotel::Column::Uuid.eq(uuid)))
+        self.query_hotel_eagerly(|q| q.filter(crate::models::hotel::Column::Uuid.eq(uuid)))
             .await
             .map(|x| x.into_iter().next())
     }
@@ -631,12 +635,12 @@ pub async fn save_raw_hotel<OP: ObjectStoragePort, GP: GeoPort>(
 
     let city_name_to_city = db_city_list
         .into_iter()
-        .map(|c| (c.name().to_string(), c))
+        .map(|c| (c.name.clone(), c))
         .collect::<HashMap<_, _>>();
 
     let station_name_to_station = db_station_list
         .into_iter()
-        .map(|s| (s.name().to_string(), s))
+        .map(|s| (s.name.clone(), s))
         .collect::<HashMap<_, _>>();
 
     let mut images_cache: HashMap<PathBuf, Uuid> = HashMap::new();
@@ -673,8 +677,16 @@ pub async fn save_raw_hotel<OP: ObjectStoragePort, GP: GeoPort>(
 
             let mut hotel = Hotel::new(
                 hotel_info.name,
-                city,
-                station,
+                City::new(
+                    Some(CityId::from(city.id as u64)),
+                    CityName::from(city.name),
+                    ProvinceName::from(city.province),
+                ),
+                Station::new(
+                    Some(StationId::from(station.id as u64)),
+                    station.name,
+                    CityId::from(station.city_id as u64),
+                ),
                 hotel_info.address,
                 hotel_info.info,
             );

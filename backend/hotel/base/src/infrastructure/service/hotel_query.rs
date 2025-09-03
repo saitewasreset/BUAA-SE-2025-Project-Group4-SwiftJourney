@@ -1,8 +1,5 @@
 use crate::application::commands::hotel::TargetType;
 use crate::application::service::hotel::HotelGeneralInfoDTO;
-use crate::domain::model::hotel::{
-    Hotel, HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId,
-};
 use crate::domain::repository::hotel::HotelRepository;
 use crate::domain::repository::hotel_rating::HotelRatingRepository;
 use crate::domain::repository::occupied_room::OccupiedRoomRepository;
@@ -13,6 +10,11 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use shared::domain::Identifiable;
+use shared::domain::model::city::CityId;
+use shared::domain::model::hotel::{
+    Hotel, HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId,
+};
+use shared::domain::model::station::StationId;
 use shared::ports::geo::GeoPort;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -142,41 +144,47 @@ where
         target_type: &TargetType,
         search_term: Option<&str>,
     ) -> Result<Vec<Hotel>, HotelQueryError> {
+        let cities = self
+            .geo_port
+            .db_get_cities()
+            .await
+            .inspect_err(|e| error!("Failed to get cities: {:?}", e))
+            .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?;
+
+        let stations = self
+            .geo_port
+            .db_get_stations()
+            .await
+            .inspect_err(|e| error!("Failed to get stations: {:?}", e))
+            .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?;
+
+        let city_name_to_id = cities
+            .into_iter()
+            .map(|x| (x.name, CityId::from(x.id as u64)))
+            .collect::<HashMap<_, _>>();
+
+        let station_name_to_id = stations
+            .into_iter()
+            .map(|x| (x.name, StationId::from(x.id as u64)))
+            .collect::<HashMap<_, _>>();
+
         let hotels = match target_type {
-            TargetType::City => {
-                let cities = self
-                    .city_repository
-                    .find_by_name(target)
+            TargetType::City => match city_name_to_id.get(target) {
+                Some(city_id) => self
+                    .hotel_repository
+                    .find_by_city(*city_id, search_term)
                     .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?;
-
-                if cities.is_empty() {
-                    return Err(HotelQueryError::TargetNotFound(target.to_string()));
-                }
-
-                // 匹配城市应该只有一个
-                let city = &cities[0];
-
-                let city_id = city.get_id().expect("City should have an ID");
-                self.hotel_repository
-                    .find_by_city(city_id, search_term)
+                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?,
+                None => return Err(HotelQueryError::TargetNotFound(target.to_string())),
+            },
+            TargetType::Station => match station_name_to_id.get(target) {
+                Some(station_id) => self
+                    .hotel_repository
+                    .find_by_station(*station_id, search_term)
                     .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?
-            }
-            TargetType::Station => {
-                let station = self
-                    .station_repository
-                    .find_by_name(target)
-                    .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?
-                    .ok_or_else(|| HotelQueryError::TargetNotFound(target.to_string()))?;
-
-                let station_id = station.get_id().expect("Station should have an ID");
-                self.hotel_repository
-                    .find_by_station(station_id, search_term)
-                    .await
-                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?
-            }
+                    .map_err(|e| HotelQueryError::RepositoryError(e.to_string()))?,
+                None => return Err(HotelQueryError::TargetNotFound(target.to_string())),
+            },
         };
 
         Ok(hotels)

@@ -1,11 +1,11 @@
 use crate::DbId;
-use crate::domain::model::hotel::{HotelId, HotelRating, HotelRatingId, Rating};
 use crate::domain::repository::hotel_rating::HotelRatingRepository;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, Select};
 use sea_orm::{ColumnTrait, DatabaseBackend, FromQueryResult, Statement};
+use shared::domain::model::hotel::{HotelId, HotelRating, HotelRatingId, Rating};
 use shared::domain::model::user::UserId;
 use shared::domain::{Identifiable, Repository, RepositoryError};
 use shared::impl_db_id_from_u64;

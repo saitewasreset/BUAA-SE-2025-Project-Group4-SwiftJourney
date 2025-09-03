@@ -1,56 +1,84 @@
-use crate::domain::model::hotel::{
-    HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId, OccupiedRoom,
-};
 use crate::domain::repository::hotel::HotelRepository;
 use crate::domain::repository::occupied_room::OccupiedRoomRepository;
-use crate::domain::repository::order::OrderRepository;
 use crate::domain::service::hotel_booking::{HotelBookingService, HotelBookingServiceError};
-use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use rust_decimal::prelude::ToPrimitive;
-use shared::domain::model::order::{HotelOrder, Order, OrderStatus};
-use shared::domain::{Identifiable, RepositoryError};
+use shared::domain::model::hotel::{
+    HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId, OccupiedRoom,
+};
+use shared::domain::model::order::{HotelOrder, Order, OrderStatus, OrderType};
+use shared::domain::{Identifiable, ServiceError};
+use shared::internal::order::command::{OrderByUuidQuery, UpdateOrdersCommand};
+use shared::ports::order::OrderPort;
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
-pub struct HotelBookingServiceImpl<HR, OR, ORR>
+pub struct HotelBookingServiceImpl<HR, OP, ORR>
 where
     HR: HotelRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     ORR: OccupiedRoomRepository,
 {
     hotel_repository: Arc<HR>,
-    order_repository: Arc<OR>,
+    order_port: Arc<OP>,
     occupied_room_repository: Arc<ORR>,
 }
 
-impl<HR, OR, ORR> HotelBookingServiceImpl<HR, OR, ORR>
+impl<HR, OP, ORR> HotelBookingServiceImpl<HR, OP, ORR>
 where
     HR: HotelRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     ORR: OccupiedRoomRepository,
 {
     pub fn new(
         hotel_repository: Arc<HR>,
-        order_repository: Arc<OR>,
+        order_port: Arc<OP>,
         occupied_room_repository: Arc<ORR>,
     ) -> Self {
         Self {
             hotel_repository,
-            order_repository,
+            order_port,
             occupied_room_repository,
         }
+    }
+
+    async fn get_hotel_order(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<HotelOrder, HotelBookingServiceError> {
+        let order = self
+            .order_port
+            .get_order_by_uuid(OrderByUuidQuery { order_uuid })
+            .await
+            .inspect_err(|e| error!("Failed to load hotel order: {}", e))
+            .map_err(|e| {
+                HotelBookingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
+            })?
+            .ok_or(HotelBookingServiceError::InvalidOrder(order_uuid))?;
+
+        let order: Box<dyn Order> = order.into();
+
+        if order.order_type() != OrderType::Hotel {
+            return Err(HotelBookingServiceError::InvalidOrder(order_uuid));
+        }
+
+        let order = *(order as Box<dyn Any>).downcast::<HotelOrder>().unwrap();
+
+        Ok(order)
     }
 }
 
 #[async_trait]
-impl<HR, OR, ORR> HotelBookingService for HotelBookingServiceImpl<HR, OR, ORR>
+impl<HR, OP, ORR> HotelBookingService for HotelBookingServiceImpl<HR, OP, ORR>
 where
     HR: HotelRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
     ORR: OccupiedRoomRepository,
 {
     #[instrument(skip(self))]
@@ -172,12 +200,7 @@ where
 
     #[instrument(skip(self))]
     async fn booking_hotel(&self, order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
-        let mut order = self
-            .order_repository
-            .find_hotel_order_by_uuid(order_uuid)
-            .await
-            .inspect_err(|e| error!("Failed to load hotel order: {}", e))?
-            .ok_or(HotelBookingServiceError::InvalidOrder(order_uuid))?;
+        let mut order = self.get_hotel_order(order_uuid).await?;
 
         if order.order_status() != OrderStatus::Paid {
             return Err(HotelBookingServiceError::InvalidOrderStatus(
@@ -219,21 +242,24 @@ where
 
         order.set_status(OrderStatus::Ongoing);
 
-        self.order_repository
-            .update(Box::new(order))
+        self.order_port
+            .update_orders(UpdateOrdersCommand {
+                orders: vec![(Box::new(order) as Box<dyn Order>).as_ref().into()],
+            })
             .await
-            .inspect_err(|e| error!("Failed to update order status: {}", e))?;
+            .inspect_err(|e| error!("Failed to update order status: {:?}", e))
+            .map_err(|e| {
+                HotelBookingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
+            })?;
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     async fn cancel_hotel(&self, order_uuid: Uuid) -> Result<(), HotelBookingServiceError> {
-        let mut order = self
-            .order_repository
-            .find_hotel_order_by_uuid(order_uuid)
-            .await?
-            .ok_or(HotelBookingServiceError::InvalidOrder(order_uuid))?;
+        let mut order = self.get_hotel_order(order_uuid).await?;
 
         if order.order_status() != OrderStatus::Ongoing {
             return Err(HotelBookingServiceError::InvalidOrderStatus(
@@ -253,10 +279,17 @@ where
 
         order.set_status(OrderStatus::Cancelled);
 
-        self.order_repository
-            .update(Box::new(order))
+        self.order_port
+            .update_orders(UpdateOrdersCommand {
+                orders: vec![(Box::new(order) as Box<dyn Order>).as_ref().into()],
+            })
             .await
-            .inspect_err(|e| error!("Failed to update order status: {}", e))?;
+            .inspect_err(|e| error!("Failed to update order status: {:?}", e))
+            .map_err(|e| {
+                HotelBookingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                    e.into(),
+                ))
+            })?;
 
         Ok(())
     }
@@ -298,20 +331,7 @@ where
         let mut result = Vec::with_capacity(failed_booking_order_list.len());
 
         for order_uuid in failed_booking_order_list {
-            result.push(
-                self.order_repository
-                    .find_hotel_order_by_uuid(order_uuid)
-                    .await
-                    .context(format!(
-                        "Failed to find hotel order by uuid: {}",
-                        order_uuid
-                    ))
-                    .map_err(RepositoryError::Db)?
-                    .ok_or(RepositoryError::InconsistentState(anyhow!(
-                        "no hotel order record for uuid: {}",
-                        order_uuid
-                    )))?,
-            );
+            result.push(self.get_hotel_order(order_uuid).await?);
         }
 
         Ok(result)

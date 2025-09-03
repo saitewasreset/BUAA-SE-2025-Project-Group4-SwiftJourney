@@ -1,45 +1,47 @@
-use crate::domain::model::hotel::{HotelRating, Rating};
 use crate::domain::repository::hotel::HotelRepository;
 use crate::domain::repository::hotel_rating::HotelRatingRepository;
-use crate::domain::repository::order::OrderRepository;
 use crate::domain::service::hotel_rating::{HotelRatingService, HotelRatingServiceError};
 use async_trait::async_trait;
 use chrono::Local;
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::HOTEL_MAX_COMMENT_LENGTH;
-use shared::domain::model::order::{Order, OrderStatus};
+use shared::domain::ServiceError;
+use shared::domain::model::hotel::{HotelRating, Rating};
+use shared::domain::model::order::{Order, OrderStatus, OrderType};
 use shared::domain::model::user::UserId;
+use shared::internal::order::command::UserOrderListQuery;
+use shared::ports::order::OrderPort;
 use std::sync::Arc;
 use tracing::{error, instrument};
 use uuid::Uuid;
 
-pub struct HotelRatingServiceImpl<HR, HRR, OR>
+pub struct HotelRatingServiceImpl<HR, HRR, OP>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
 {
     hotel_repository: Arc<HR>,
     hotel_rating_repository: Arc<HRR>,
-    order_repository: Arc<OR>,
+    order_port: Arc<OP>,
 }
 
-impl<HR, HRR, OR> HotelRatingServiceImpl<HR, HRR, OR>
+impl<HR, HRR, OP> HotelRatingServiceImpl<HR, HRR, OP>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
 {
     pub fn new(
         hotel_repository: Arc<HR>,
         hotel_rating_repository: Arc<HRR>,
-        order_repository: Arc<OR>,
+        order_port: Arc<OP>,
     ) -> Self {
         Self {
             hotel_repository,
             hotel_rating_repository,
-            order_repository,
+            order_port,
         }
     }
 
@@ -51,11 +53,11 @@ where
 }
 
 #[async_trait]
-impl<HR, HRR, OR> HotelRatingService for HotelRatingServiceImpl<HR, HRR, OR>
+impl<HR, HRR, OP> HotelRatingService for HotelRatingServiceImpl<HR, HRR, OP>
 where
     HR: HotelRepository,
     HRR: HotelRatingRepository,
-    OR: OrderRepository,
+    OP: OrderPort,
 {
     #[instrument(skip(self))]
     async fn get_hotel_rating(&self, hotel_uuid: Uuid) -> Result<Rating, HotelRatingServiceError> {
@@ -93,16 +95,29 @@ where
             .await
             .inspect_err(|e| error!("Failed to get hotel id by uuid {}: {}", hotel_uuid, e))?
         {
-            let current_user_hotel_orders = self
-                .order_repository
-                .find_hotel_order_by_userid(user_id, hotel_id)
+            let user_order_list = self
+                .order_port
+                .get_order_list_by_user_id(UserOrderListQuery {
+                    user_id: user_id.into(),
+                })
                 .await
                 .inspect_err(|e| {
                     error!(
-                        "Failed to find hotel order by user id {} hotel id {}: {}",
+                        "Failed to find order by user id {} hotel id {}: {:?}",
                         user_id, hotel_id, e
                     )
+                })
+                .map_err(|e| {
+                    HotelRatingServiceError::InfrastructureError(ServiceError::RelatedServiceError(
+                        e.into(),
+                    ))
                 })?;
+
+            let current_user_hotel_orders = user_order_list
+                .into_iter()
+                .map(|x| Into::<Box<dyn Order>>::into(x))
+                .filter(|x| x.order_type() == OrderType::Hotel)
+                .collect::<Vec<_>>();
 
             let valid_count: i32 = current_user_hotel_orders
                 .iter()

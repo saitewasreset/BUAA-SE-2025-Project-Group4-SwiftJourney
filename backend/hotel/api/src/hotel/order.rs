@@ -1,10 +1,10 @@
-use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, post, web};
-use base::application::{
+use hotel_base::application::{
     commands::hotel_order::HotelOrderRequestsDTO, service::hotel_order::HotelOrderService,
 };
 use serde::{Deserialize, Serialize};
+use shared::api::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use shared::{API_SUCCESS_CODE, API_SUCCESS_MESSAGE};
 
 /// 用于响应的交易信息

@@ -5,7 +5,6 @@ use crate::application::service::hotel::{
     HotelCommentDTO, HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO,
     HotelRoomDetailInfoDTO, HotelService, HotelServiceError,
 };
-use crate::domain::model::hotel::{HotelDateRange, Rating};
 use crate::domain::repository::hotel::HotelRepository;
 use crate::domain::service::hotel_booking::HotelBookingService;
 use crate::domain::service::hotel_query::{HotelQueryError, HotelQueryService};
@@ -16,6 +15,7 @@ use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use shared::HOTEL_MAX_BOOKING_DAYS;
 use shared::application_error::{ApplicationError, GeneralError};
 use shared::domain::Identifiable;
+use shared::domain::model::hotel::{HotelDateRange, Rating};
 use shared::domain::model::session::SessionId;
 use shared::domain::model::user::UserId;
 use shared::internal::user::command::{SessionQuery, UserInfoQuery};
@@ -348,12 +348,12 @@ where
         let mut comment_dtos = Vec::with_capacity(comments.len());
         for c in comments {
             let user_name = user_id_to_name
-                .get(&c.user_id().into())
+                .get(&(u64::from(c.user_id()) as i32))
                 .cloned()
                 .unwrap_or_else(|| {
                     error!(
                         "No user associated with user_id: {}",
-                        i32::from(c.user_id())
+                        u64::from(c.user_id())
                     );
 
                     "Avenger-1".to_string()

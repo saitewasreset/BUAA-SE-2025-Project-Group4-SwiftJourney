@@ -1,6 +1,6 @@
-use crate::domain::model::hotel::{Hotel, HotelId};
 use async_trait::async_trait;
 use shared::domain::model::city::CityId;
+use shared::domain::model::hotel::{Hotel, HotelId};
 use shared::domain::model::station::StationId;
 use shared::domain::{Repository, RepositoryError};
 use uuid::Uuid;

@@ -1,8 +1,8 @@
 use crate::application::commands::hotel::TargetType;
 use crate::application::service::hotel::HotelGeneralInfoDTO;
-use crate::domain::model::hotel::{Hotel, HotelDateRange, HotelId};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
+use shared::domain::model::hotel::{Hotel, HotelDateRange, HotelId};
 use std::collections::HashMap;
 use thiserror::Error;
 

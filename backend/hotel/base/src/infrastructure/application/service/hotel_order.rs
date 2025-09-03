@@ -2,14 +2,8 @@ use crate::application::commands::hotel_order::HotelOrderRequestDTO;
 use crate::application::commands::hotel_order::HotelOrderRequestsDTO;
 use crate::application::service::hotel::HotelServiceError;
 use crate::application::service::hotel_order::HotelOrderService;
-use crate::application::service::transaction::TransactionInfoDTO;
-use crate::domain::model::hotel::HotelDateRange;
 use crate::domain::repository::hotel::HotelRepository;
-use crate::domain::repository::order::OrderRepository;
-use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::hotel_booking::HotelBookingService;
-use crate::domain::service::session::SessionManagerService;
-use crate::domain::service::transaction::TransactionService;
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate, TimeZone};
 use rust_decimal::Decimal;
@@ -17,54 +11,53 @@ use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use shared::application_error::{ApplicationError, GeneralError};
 use shared::domain::Identifiable;
-use shared::domain::model::order::HotelOrder;
+use shared::domain::model::hotel::HotelDateRange;
 use shared::domain::model::order::{BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo};
-use shared::domain::model::session::SessionId;
+use shared::domain::model::order::{HotelOrder, OrderType};
+use shared::domain::model::personal_info::PersonalInfoId;
 use shared::domain::model::user::UserId;
+use shared::internal::order::command::{
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand,
+};
+use shared::internal::order::dto::TransactionInfoDTO;
+use shared::internal::user::command::SessionQuery;
+use shared::ports::order::OrderPort;
+use shared::ports::user::UserPort;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-pub struct HotelOrderServiceImpl<HR, HBS, OR, TS, SMS, PIR> {
+pub struct HotelOrderServiceImpl<HR, HBS, OP, UP> {
     hotel_repository: Arc<HR>,
     hotel_booking_service: Arc<HBS>,
-    order_repository: Arc<OR>,
-    transaction_service: Arc<TS>,
-    session_manager: Arc<SMS>,
-    personal_info_repository: Arc<PIR>,
+    order_port: Arc<OP>,
+    user_port: Arc<UP>,
 }
 
-impl<HR, HBS, OR, TS, SMS, PIR> HotelOrderServiceImpl<HR, HBS, OR, TS, SMS, PIR>
+impl<HR, HBS, OP, UP> HotelOrderServiceImpl<HR, HBS, OP, UP>
 where
     HR: HotelRepository,
     HBS: HotelBookingService,
-    OR: OrderRepository,
-    TS: TransactionService,
-    SMS: SessionManagerService,
-    PIR: PersonalInfoRepository,
+    OP: OrderPort,
+    UP: UserPort,
 {
     pub fn new(
         hotel_repository: Arc<HR>,
         hotel_booking_service: Arc<HBS>,
-        order_repository: Arc<OR>,
-        transaction_service: Arc<TS>,
-        session_manager: Arc<SMS>,
-        personal_info_repository: Arc<PIR>,
+        order_port: Arc<OP>,
+        user_port: Arc<UP>,
     ) -> Self {
         Self {
             hotel_repository,
             hotel_booking_service,
-            order_repository,
-            transaction_service,
-            session_manager,
-            personal_info_repository,
+            order_port,
+            user_port,
         }
     }
 
     async fn validate_and_create_hotel_order(
         &self,
         dto: &HotelOrderRequestDTO,
-        user_id: UserId,
     ) -> Result<Box<dyn Order>, Box<dyn ApplicationError>> {
         let hotel_uuid = Uuid::parse_str(&dto.hotel_id).map_err(|_| {
             Box::new(GeneralError::BadRequest(format!(
@@ -163,26 +156,20 @@ where
             }
         };
 
-        let personal_infos = self
-            .personal_info_repository
-            .find_by_user_id(user_id)
-            .await
-            .map_err(|e| {
-                error!("Database error when finding personal info: {:?}", e);
-                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-            })?;
+        let personal_infos = self.user_port.db_get_personal_info().await.map_err(|e| {
+            error!("Error while finding personal info: {:?}", e);
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
 
         let personal_info = personal_infos
             .into_iter()
-            .find(|info| info.uuid() == personal_uuid)
+            .find(|info| info.uuid == personal_uuid)
             .ok_or(Box::new(GeneralError::NotFound(format!(
                 "invalid personal info uuid: {}",
                 personal_uuid
             ))) as Box<dyn ApplicationError>)?;
 
-        let personal_info_id = personal_info
-            .get_id()
-            .ok_or(Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?;
+        let personal_info_id = PersonalInfoId::from(personal_info.id as u64);
 
         let days = date_range
             .end_date()
@@ -291,12 +278,16 @@ where
 
                 for order_uuid in order_uuids.clone() {
                     match self
-                        .order_repository
-                        .find_hotel_order_by_uuid(order_uuid)
+                        .order_port
+                        .get_order_by_uuid(OrderByUuidQuery { order_uuid })
                         .await
                     {
                         Ok(Some(order)) => {
-                            to_refund_orders.push(Box::new(order));
+                            let order_dyn: Box<dyn Order> = order.into();
+
+                            if order_dyn.order_type() == OrderType::Hotel {
+                                to_refund_orders.push(order_dyn);
+                            }
                         }
                         Ok(None) => {
                             error!("Order {} not found for refund", order_uuid);
@@ -307,8 +298,14 @@ where
                     }
                 }
 
-                self.transaction_service
-                    .refund_transaction(transaction_id, &to_refund_orders)
+                self.order_port
+                    .refund_transaction(RefundTransactionCommand {
+                        transaction_id,
+                        to_refund_orders: to_refund_orders
+                            .into_iter()
+                            .map(|x| x.as_ref().into())
+                            .collect(),
+                    })
                     .await
                     .map_err(|e| {
                         error!("Failed to create refund transaction: {:?}", e);
@@ -322,15 +319,12 @@ where
 }
 
 #[async_trait]
-impl<HR, HBS, OR, TS, SMS, PIR> HotelOrderService
-    for HotelOrderServiceImpl<HR, HBS, OR, TS, SMS, PIR>
+impl<HR, HBS, OP, UP> HotelOrderService for HotelOrderServiceImpl<HR, HBS, OP, UP>
 where
     HR: HotelRepository,
     HBS: HotelBookingService,
-    OR: OrderRepository,
-    TS: TransactionService,
-    SMS: SessionManagerService,
-    PIR: PersonalInfoRepository,
+    OP: OrderPort,
+    UP: UserPort,
 {
     #[instrument(skip(self, hotel_orders), fields(session_id = %session_id))]
     async fn process_hotel_orders(
@@ -345,12 +339,9 @@ where
             );
         }
 
-        let session_id = SessionId::try_from(session_id.as_str())
-            .map_err(|_| Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
-
-        let user_id = self
-            .session_manager
-            .get_user_id_by_session(session_id)
+        let user = self
+            .user_port
+            .get_session(SessionQuery { session_id })
             .await
             .map_err(|e| {
                 error!("Failed to get user id: {:?}", e);
@@ -358,11 +349,11 @@ where
             })?
             .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
 
+        let user_id = UserId::from(user.user_id);
+
         let mut orders: Vec<Box<dyn Order>> = Vec::new();
         for order_dto in &hotel_orders {
-            let order = self
-                .validate_and_create_hotel_order(order_dto, user_id)
-                .await?;
+            let order = self.validate_and_create_hotel_order(order_dto).await?;
             orders.push(order);
         }
 
@@ -376,8 +367,12 @@ where
             .sum::<f64>();
 
         let transaction_id = self
-            .transaction_service
-            .new_transaction(user_id, orders, true)
+            .order_port
+            .new_transaction(NewTransactionCommand {
+                user_id: user_id.into(),
+                orders: orders.into_iter().map(|x| x.as_ref().into()).collect(),
+                atomic: true,
+            })
             .await
             .map_err(|e| {
                 error!("Failed to create transaction: {:?}", e);

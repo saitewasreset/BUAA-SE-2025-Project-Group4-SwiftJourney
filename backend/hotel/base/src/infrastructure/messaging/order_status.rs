@@ -1,39 +1,41 @@
 use crate::domain::service::hotel_booking::HotelBookingService;
 use async_trait::async_trait;
 use shared::domain::model::order::{Order, OrderStatus, OrderType};
+use shared::internal::order::command::RefundTransactionCommand;
 use shared::messaging::order_status::{
     OrderStatusConsumerError, OrderStatusMessagePack, RabbitMQOrderStatusConsumer,
 };
+use shared::ports::order::OrderPort;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 
-pub struct HotelOrderStatusConsumer<HBS, TS>
+pub struct HotelOrderStatusConsumer<HBS, OP>
 where
     HBS: HotelBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
     hotel_booking_service: Arc<HBS>,
-    transaction_service: Arc<TS>,
+    order_port: Arc<OP>,
 }
 
-impl<HBS, TS> HotelOrderStatusConsumer<HBS, TS>
+impl<HBS, OP> HotelOrderStatusConsumer<HBS, OP>
 where
     HBS: HotelBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
-    pub fn new(hotel_booking_service: Arc<HBS>, transaction_service: Arc<TS>) -> Self {
+    pub fn new(hotel_booking_service: Arc<HBS>, order_port: Arc<OP>) -> Self {
         Self {
             hotel_booking_service,
-            transaction_service,
+            order_port,
         }
     }
 }
 
 #[async_trait]
-impl<HBS, TS> RabbitMQOrderStatusConsumer for HotelOrderStatusConsumer<HBS, TS>
+impl<HBS, OP> RabbitMQOrderStatusConsumer for HotelOrderStatusConsumer<HBS, OP>
 where
     HBS: HotelBookingService,
-    TS: TransactionService,
+    OP: OrderPort,
 {
     fn binding_key(&self) -> &'static str {
         OrderType::Hotel.message_queue_name()
@@ -78,8 +80,14 @@ where
                 .map(|tx| Box::new(tx) as Box<dyn Order>)
                 .collect::<Vec<_>>();
 
-            self.transaction_service
-                .refund_transaction(message_pack.transaction_uuid, &tx_list_boxed)
+            self.order_port
+                .refund_transaction(RefundTransactionCommand {
+                    transaction_id: message_pack.transaction_uuid,
+                    to_refund_orders: tx_list_boxed
+                        .into_iter()
+                        .map(|x| x.as_ref().into())
+                        .collect(),
+                })
                 .await
                 .map_err(|e| OrderStatusConsumerError::RelatedServiceError(e.into()))?;
         }

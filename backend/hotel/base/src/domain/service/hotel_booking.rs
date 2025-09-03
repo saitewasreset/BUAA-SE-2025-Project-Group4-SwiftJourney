@@ -1,7 +1,7 @@
-use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId};
 use async_trait::async_trait;
 use shared::domain::RepositoryError;
 use shared::domain::ServiceError;
+use shared::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomStatus, HotelRoomTypeId};
 use shared::domain::model::order::{HotelOrder, OrderStatus};
 use std::collections::HashMap;
 use thiserror::Error;

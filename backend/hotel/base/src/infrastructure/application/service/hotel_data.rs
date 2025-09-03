@@ -10,42 +10,42 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, instrument};
 
-pub struct HotelDataServiceImpl<GP, OS>
+pub struct HotelDataServiceImpl<GP, OP>
 where
     GP: GeoPort,
-    OS: ObjectStoragePort,
+    OP: ObjectStoragePort,
 {
     debug: bool,
     data_base_path: PathBuf,
     geo_port: Arc<GP>,
-    object_storage_service: Arc<OS>,
+    object_storage_port: Arc<OP>,
 }
 
-impl<GP, OS> HotelDataServiceImpl<GP, OS>
+impl<GP, OP> HotelDataServiceImpl<GP, OP>
 where
     GP: GeoPort,
-    OS: ObjectStoragePort,
+    OP: ObjectStoragePort,
 {
     pub fn new(
         debug: bool,
         data_base_path: PathBuf,
         geo_port: Arc<GP>,
-        object_storage_service: Arc<OS>,
+        object_storage_port: Arc<OP>,
     ) -> Self {
         HotelDataServiceImpl {
             debug,
             data_base_path,
             geo_port,
-            object_storage_service,
+            object_storage_port,
         }
     }
 }
 
 #[async_trait]
-impl<GP, OS> HotelDataService for HotelDataServiceImpl<GP, OS>
+impl<GP, OP> HotelDataService for HotelDataServiceImpl<GP, OP>
 where
     GP: GeoPort,
-    OS: ObjectStoragePort
+    OP: ObjectStoragePort,
 {
     fn is_debug_mode(&self) -> bool {
         self.debug
@@ -58,9 +58,8 @@ where
         db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         save_raw_hotel(
-            Arc::clone(&self.city_repository),
-            Arc::clone(&self.station_repository),
-            Arc::clone(&self.object_storage_service),
+            Arc::clone(&self.object_storage_port),
+            Arc::clone(&self.geo_port),
             db,
             &self.data_base_path,
             command,

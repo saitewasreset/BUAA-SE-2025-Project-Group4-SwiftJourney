@@ -1,19 +1,19 @@
 use std::collections::HashMap;
 
-use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::web::Bytes;
 use actix_web::{HttpRequest, get, post, web};
-use base::application::GeneralError;
-use base::application::commands::hotel::{
+use chrono::NaiveDate;
+use hotel_base::application::commands::hotel::{
     HotelInfoQuery, HotelOrderInfoQuery, HotelQuery, NewCommentCommand, QuotaQuery, TargetType,
 };
-use base::application::service::hotel::{
+use hotel_base::application::service::hotel::{
     HotelCommentQuotaDTO, HotelDetailInfoDTO, HotelGeneralInfoDTO, HotelRoomDetailInfoDTO,
     HotelService, NewHotelCommentDTO,
 };
-use chrono::NaiveDate;
 use order::create_hotel_order;
 use serde::Deserialize;
+use shared::api::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
+use shared::application_error::{ApplicationError, GeneralError};
 use uuid::Uuid;
 
 mod order;
@@ -120,7 +120,7 @@ async fn query_hotels(
         Some(
             NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
                 Box::new(GeneralError::BadRequest("Invalid begin date format".into()))
-                    as Box<dyn base::application::ApplicationError>
+                    as Box<dyn ApplicationError>
             })?,
         )
     } else {
@@ -131,7 +131,7 @@ async fn query_hotels(
         Some(
             NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
                 Box::new(GeneralError::BadRequest("Invalid end date format".into()))
-                    as Box<dyn base::application::ApplicationError>
+                    as Box<dyn ApplicationError>
             })?,
         )
     } else {
@@ -180,7 +180,7 @@ async fn get_hotel_order_info(
         Some(
             NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
                 Box::new(GeneralError::BadRequest("Invalid begin date format".into()))
-                    as Box<dyn base::application::ApplicationError>
+                    as Box<dyn ApplicationError>
             })?,
         )
     } else {
@@ -191,7 +191,7 @@ async fn get_hotel_order_info(
         Some(
             NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
                 Box::new(GeneralError::BadRequest("Invalid end date format".into()))
-                    as Box<dyn base::application::ApplicationError>
+                    as Box<dyn ApplicationError>
             })?,
         )
     } else {

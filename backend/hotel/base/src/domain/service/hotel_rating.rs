@@ -1,7 +1,7 @@
-use crate::domain::model::hotel::{HotelRating, Rating};
 use async_trait::async_trait;
 use shared::domain::RepositoryError;
 use shared::domain::ServiceError;
+use shared::domain::model::hotel::{HotelRating, Rating};
 use shared::domain::model::user::UserId;
 use thiserror::Error;
 use uuid::Uuid;
