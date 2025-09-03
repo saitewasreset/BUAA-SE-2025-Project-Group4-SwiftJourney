@@ -475,6 +475,7 @@ Service:
   - `+new_transaction(user_id: UserId, orders: Vec<Box<dyn Order>>, atomic: bool) -> Result<Uuid>;`
   - `+refund_transaction(transaction_id: Uuid, to_refund_orders: &[Box<dyn Order>]) -> Result<Uuid>;`
   - `+convert_order_to_dto(order: Box<dyn Order>) -> Result<OrderInfoDto>;`
+  - `+get_order_by_uuid(order_uuid: Uuid) -> Result<Option<Box<dyn Order>>>;`
   - `+verify_train_order(user_id: UserId, train_number: String, origin_departure_time: DateTimeWithTimeZone) -> Result<bool>;`
   - `update_order(order: Vec<Box<dyn Order>>)`
   - `get_order_list_by_user_id(user_id: UserId) -> Vec<Box<dyn Order>>`
