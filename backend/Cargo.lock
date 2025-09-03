@@ -1897,64 +1897,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dish_api"
-version = "0.1.0"
-dependencies = [
- "actix-files",
- "actix-web",
- "actix-ws",
- "chrono",
- "dish_base",
- "dotenvy",
- "dyn-fmt",
- "migration",
- "sea-orm",
- "serde",
- "serde_json",
- "shared",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-actix-web",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "dish_base"
-version = "0.1.0"
-dependencies = [
- "actix-ws",
- "anyhow",
- "argon2",
- "async-trait",
- "aws-sdk-s3",
- "chrono",
- "claims",
- "dashmap",
- "dyn-clone",
- "dyn-fmt",
- "email_address",
- "id_macro",
- "lapin 2.5.3",
- "mockall",
- "petgraph",
- "phf",
- "regex",
- "rust_decimal",
- "sea-orm",
- "serde",
- "serde_json",
- "shared",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3498,6 +3440,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62948e14d923ea95ea2c7c86c71013138b66525b86bdc08d2dcc262bdb497b87"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "object_storage_api"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "actix-ws",
+ "chrono",
+ "dotenvy",
+ "dyn-fmt",
+ "migration",
+ "object_storage_base",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "object_storage_base"
+version = "0.1.0"
+dependencies = [
+ "actix-ws",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "aws-sdk-s3",
+ "chrono",
+ "claims",
+ "dashmap",
+ "dyn-clone",
+ "dyn-fmt",
+ "email_address",
+ "id_macro",
+ "lapin 2.5.3",
+ "mockall",
+ "petgraph",
+ "phf",
+ "regex",
+ "reqwest",
+ "rust_decimal",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

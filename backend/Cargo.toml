@@ -15,5 +15,7 @@ members = [
     #"hotel/api",
     #"dish/base",
     #"dish/api",
+    "object_storage/base",
+    "object_storage/api"
 ]
 resolver = "2"
