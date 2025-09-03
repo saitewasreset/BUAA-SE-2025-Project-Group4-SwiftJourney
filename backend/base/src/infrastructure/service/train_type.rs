@@ -7,7 +7,6 @@
 //! - 列车类型和车次编号的验证
 //! - 座位类型配置管理
 //! - 列车车次的增删改查操作
-use crate::domain::Identifiable;
 use crate::domain::model::route::RouteId;
 use crate::domain::model::train::{SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use crate::domain::model::train_schedule::{SeatId, SeatLocationInfo};
@@ -15,6 +14,7 @@ use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::train_type::{
     TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
 };
+use crate::domain::Identifiable;
 use crate::{Unverified, Verified};
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -317,5 +317,288 @@ where
         self.train_repository.remove(train).await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::route::RouteId;
+    use crate::domain::model::train::{
+        SeatType, SeatTypeName, Train, TrainId, TrainNumber, TrainType,
+    };
+    use crate::domain::model::train_schedule::SeatLocationInfo;
+    use crate::domain::repository::mock::train::MockTrainRepository;
+    use crate::domain::service::train_type::TrainTypeConfigurationServiceError;
+    use rust_decimal::Decimal;
+    use std::collections::{HashMap, HashSet};
+
+    fn sample_train() -> Train {
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            100,
+            Decimal::new(5000, 2),
+        );
+        let seat_map = vec![(seat_type.name().to_string(), seat_type)]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        Train::new(
+            Some(1u64.into()),
+            TrainNumber::from_unchecked("G123".to_string()),
+            TrainType::from_unchecked("高铁".to_string()),
+            seat_map,
+            RouteId::from(1u64),
+            0,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_verify_seat_type_name_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_seat_type()
+            .returning(|_| Ok(HashSet::from(["二等座".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_seat_type_name(
+                TrainId::from(1u64),
+                SeatTypeName::from("二等座".to_string()),
+            )
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_seat_type_name_fail() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_seat_type()
+            .returning(|_| Ok(HashSet::from(["一等座".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_seat_type_name(
+                TrainId::from(1u64),
+                SeatTypeName::from("二等座".to_string()),
+            )
+            .await;
+
+        assert!(matches!(
+            res,
+            Err(TrainTypeConfigurationServiceError::InvalidSeatType(_, _))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_verify_train_number_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_train_number()
+            .returning(|| Ok(HashSet::from(["G123".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_train_number(TrainNumber::from("G123".to_string()))
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_train_number_fail() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_train_number()
+            .returning(|| Ok(HashSet::from(["D456".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_train_number(TrainNumber::from("G123".to_string()))
+            .await;
+
+        assert!(matches!(
+            res,
+            Err(TrainTypeConfigurationServiceError::InvalidTrainNumber(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_verify_train_type_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_train_type()
+            .returning(|| Ok(HashSet::from(["高铁".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_train_type(TrainType::from("高铁".to_string()))
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_train_type_fail() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_verified_train_type()
+            .returning(|| Ok(HashSet::from(["动车".to_string()])));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .verify_train_type(TrainType::from("高铁".to_string()))
+            .await;
+
+        assert!(matches!(
+            res,
+            Err(TrainTypeConfigurationServiceError::InvalidTrainType(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_seat_id_map_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_find().returning(|_| Ok(Some(sample_train())));
+        repo.expect_get_seat_id_map().returning(|_| {
+            Ok(HashMap::from([(
+                SeatTypeName::from_unchecked("二等座".into()),
+                vec![(
+                    1u64.into(),
+                    SeatLocationInfo {
+                        carriage: 1,
+                        row: 1,
+                        location: 'A',
+                    },
+                )],
+            )]))
+        });
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service.get_seat_id_map(TrainId::from(1u64)).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_seat_id_map_fail_no_train() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_find().returning(|_| Ok(None));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service.get_seat_id_map(TrainId::from(1u64)).await;
+        assert!(matches!(
+            res,
+            Err(TrainTypeConfigurationServiceError::NoSuchTrainId(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_trains_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_get_trains()
+            .returning(|| Ok(vec![sample_train()]));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service.get_trains().await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_train_by_number_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_find_by_train_number()
+            .returning(|_| Ok(sample_train()));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .get_train_by_number(TrainNumber::from_unchecked("G123".into()))
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_train_type_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_save().returning(|train| {
+            train.set_id(TrainId::from(1u64));
+            Ok(TrainId::from(1u64))
+        });
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            100,
+            Decimal::new(5000, 2),
+        );
+
+        let res = service
+            .add_train_type(
+                TrainNumber::from_unchecked("G123".into()),
+                TrainType::from_unchecked("高铁".into()),
+                vec![seat_type],
+                RouteId::from(1u64),
+                0,
+            )
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_modify_train_type_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_find().returning(|_| Ok(Some(sample_train())));
+        repo.expect_save().returning(|_| Ok(TrainId::from(1u64)));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            100,
+            Decimal::new(5000, 2),
+        );
+
+        let res = service
+            .modify_train_type(
+                TrainId::from(1u64),
+                TrainNumber::from_unchecked("G123".into()),
+                TrainType::from_unchecked("高铁".into()),
+                vec![seat_type],
+                RouteId::from(1u64),
+                0,
+            )
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_modify_train_type_fail_no_train() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_find().returning(|_| Ok(None));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service
+            .modify_train_type(
+                TrainId::from(1u64),
+                TrainNumber::from_unchecked("G123".into()),
+                TrainType::from_unchecked("高铁".into()),
+                vec![],
+                RouteId::from(1u64),
+                0,
+            )
+            .await;
+
+        assert!(matches!(
+            res,
+            Err(TrainTypeConfigurationServiceError::NoSuchTrainId(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_remove_train_type_success() {
+        let mut repo = MockTrainRepository::new();
+        repo.expect_remove().returning(|_| Ok(()));
+        let service = TrainTypeConfigurationServiceImpl::new(Arc::new(repo));
+
+        let res = service.remove_train_type(sample_train()).await;
+        assert!(res.is_ok());
     }
 }
