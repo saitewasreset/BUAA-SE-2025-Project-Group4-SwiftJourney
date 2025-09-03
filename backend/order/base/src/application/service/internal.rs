@@ -6,8 +6,8 @@ use shared::domain::model::order::OrderStatus;
 use shared::domain::model::transaction::{RefundError, TransactionAmountAbs, TransactionStatus};
 use shared::domain::model::user::UserId;
 use shared::internal::order::command::{
-    NewTransactionCommand, RefundTransactionCommand, UpdateOrdersCommand, UserOrderListQuery,
-    VerifyTrainOrderQuery,
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand, UpdateOrdersCommand,
+    UserOrderListQuery, VerifyTrainOrderQuery,
 };
 use shared::internal::order::dto::InternalOrderDTO;
 use thiserror::Error;
@@ -132,6 +132,11 @@ pub trait OrderInternalService: 'static + Send + Sync {
         &self,
         command: RefundTransactionCommand,
     ) -> Result<Uuid, OrderInternalServiceError>;
+
+    async fn get_order_by_uuid(
+        &self,
+        query: OrderByUuidQuery,
+    ) -> Result<Option<InternalOrderDTO>, OrderInternalServiceError>;
 
     async fn verify_train_order(
         &self,

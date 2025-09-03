@@ -1,7 +1,7 @@
 use crate::api::InternalApiError;
 use crate::internal::order::command::{
-    NewTransactionCommand, RefundTransactionCommand, UpdateOrdersCommand, UserOrderListQuery,
-    VerifyTrainOrderQuery,
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand, UpdateOrdersCommand,
+    UserOrderListQuery, VerifyTrainOrderQuery,
 };
 use crate::internal::order::dto::InternalOrderDTO;
 use async_trait::async_trait;
@@ -18,6 +18,11 @@ pub trait OrderPort: 'static + Send + Sync {
         &self,
         command: RefundTransactionCommand,
     ) -> Result<Uuid, InternalApiError>;
+
+    async fn get_order_by_uuid(
+        &self,
+        query: OrderByUuidQuery,
+    ) -> Result<Option<InternalOrderDTO>, InternalApiError>;
 
     async fn verify_train_order(
         &self,

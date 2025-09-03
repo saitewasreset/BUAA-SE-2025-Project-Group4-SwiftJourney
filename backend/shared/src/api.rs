@@ -302,6 +302,7 @@ impl InternalApi for DishInternalServiceApi {
 pub enum OrderInternalServiceApi {
     NewTransaction,
     RefundTransaction,
+    GetOrderByUuid,
     ConvertOrderToDto,
     VerifyTrainOrder,
     UpdateOrders,
@@ -313,6 +314,7 @@ impl InternalApi for OrderInternalServiceApi {
         match self {
             OrderInternalServiceApi::NewTransaction => "new_transaction",
             OrderInternalServiceApi::RefundTransaction => "refund_transaction",
+            OrderInternalServiceApi::GetOrderByUuid => "get_order_by_uuid",
             OrderInternalServiceApi::ConvertOrderToDto => "convert_order_to_dto",
             OrderInternalServiceApi::VerifyTrainOrder => "verify_train_order",
             OrderInternalServiceApi::UpdateOrders => "update_orders",

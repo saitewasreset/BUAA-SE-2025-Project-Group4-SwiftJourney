@@ -189,6 +189,10 @@ impl TrainSchedule {
             .get(&seat_type)
             .expect("seat type should exist")
     }
+
+    pub fn seat_availability_map(&self) -> &SeatAvailabilityMap {
+        &self.seat_availability_map
+    }
 }
 
 define_id_type!(SeatAvailability);

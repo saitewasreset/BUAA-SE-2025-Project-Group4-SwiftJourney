@@ -17,6 +17,11 @@ pub struct RefundTransactionCommand {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OrderByUuidQuery {
+    pub order_uuid: Uuid,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VerifyTrainOrderQuery {
     pub user_id: u64,
     pub train_number: String,

@@ -173,6 +173,11 @@ pub trait OrderRepository: 'static + Send + Sync {
 
     async fn load_all_active_orders(&self) -> Result<Vec<Box<dyn Order>>, RepositoryError>;
 
+    async fn load_order_by_uuid(
+        &self,
+        order_uuid: Uuid,
+    ) -> Result<Option<Box<dyn Order>>, RepositoryError>;
+
     async fn load_orders_by_user_id(
         &self,
         user_id: UserId,

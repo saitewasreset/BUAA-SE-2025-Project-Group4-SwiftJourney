@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use shared::domain::model::order::Order;
 use shared::domain::model::user::UserId;
 use shared::internal::order::command::{
-    NewTransactionCommand, RefundTransactionCommand, UpdateOrdersCommand, UserOrderListQuery,
-    VerifyTrainOrderQuery,
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand, UpdateOrdersCommand,
+    UserOrderListQuery, VerifyTrainOrderQuery,
 };
 use shared::internal::order::dto::InternalOrderDTO;
 use std::sync::Arc;
@@ -87,6 +87,25 @@ where
             .inspect_err(|e| error!("Failed to create a transaction: {:?}", e))?;
 
         Ok(transaction_uuid)
+    }
+
+    async fn get_order_by_uuid(
+        &self,
+        query: OrderByUuidQuery,
+    ) -> Result<Option<InternalOrderDTO>, OrderInternalServiceError> {
+        let dyn_order_opt = self
+            .order_repository
+            .load_order_by_uuid(query.order_uuid)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "Failed to get order by uuid: {:?} uuid = {}",
+                    e, query.order_uuid
+                )
+            })
+            .map_err(|e| OrderInternalServiceError::RelatedServiceError(e.into()))?;
+
+        Ok(dyn_order_opt.map(|x| x.as_ref().into()))
     }
 
     async fn verify_train_order(

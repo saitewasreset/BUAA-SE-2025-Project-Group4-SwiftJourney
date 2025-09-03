@@ -1,7 +1,7 @@
 use crate::api::{ApiEndpoint, InternalApiError, OrderInternalServiceApi, SuperClient};
 use crate::internal::order::command::{
-    NewTransactionCommand, RefundTransactionCommand, UpdateOrdersCommand, UserOrderListQuery,
-    VerifyTrainOrderQuery,
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand, UpdateOrdersCommand,
+    UserOrderListQuery, VerifyTrainOrderQuery,
 };
 use crate::internal::order::dto::InternalOrderDTO;
 use crate::ports::order::OrderPort;
@@ -41,6 +41,23 @@ impl OrderPort for HttpOrderPortImpl {
             .post(OrderInternalServiceApi::RefundTransaction, command)
             .await
             .inspect_err(|e| error!("Failed to refund transaction: {:?}", e))
+    }
+
+    async fn get_order_by_uuid(
+        &self,
+        query: OrderByUuidQuery,
+    ) -> Result<Option<InternalOrderDTO>, InternalApiError> {
+        let order_uuid = query.order_uuid;
+
+        self.super_client
+            .post(OrderInternalServiceApi::GetOrderByUuid, query)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    "Failed to query order for uuid: {:?} uuid = {}",
+                    e, order_uuid
+                )
+            })
     }
 
     async fn verify_train_order(
