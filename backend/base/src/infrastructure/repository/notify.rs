@@ -23,7 +23,6 @@ impl NotifyRepositoryImpl {
 }
 
 mod ser_order {
-    use crate::Verified;
     use crate::domain::model::dish::DishId;
     use crate::domain::model::hotel::{HotelDateRange, HotelId, HotelRoomTypeId};
     use crate::domain::model::order::{
@@ -39,6 +38,7 @@ mod ser_order {
     };
     use crate::domain::model::transaction::TransactionId;
     use crate::domain::{DbId, Identifiable};
+    use crate::Verified;
     use anyhow::anyhow;
     use chrono::NaiveDate;
     use rust_decimal::Decimal;
@@ -752,5 +752,178 @@ impl NotifyRepository for NotifyRepositoryImpl {
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::message::{OrderNotify, TripNotify};
+    use crate::domain::model::order::{
+        BaseOrder, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
+    };
+    use crate::domain::model::train::SeatTypeName;
+    use crate::domain::model::train_schedule::StationRange;
+    use crate::domain::model::user::UserId;
+    use crate::domain::repository::notify::NotifyRepository;
+    use crate::domain::DbId;
+    use chrono::Utc;
+    use sea_orm::{ConnectionTrait, Database, Statement};
+    use uuid::Uuid;
+
+    // 初始化数据库 + 建表
+    async fn setup_repo() -> NotifyRepositoryImpl {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+
+        // message 表
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            r#"
+            CREATE TABLE message (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message_type TEXT NOT NULL,
+                time BIGINT NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL
+            );
+            "#,
+        ))
+        .await
+        .unwrap();
+
+        // 最小 user 表
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            r#"
+            CREATE TABLE user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT
+            );
+            "#,
+        ))
+        .await
+        .unwrap();
+
+        NotifyRepositoryImpl::new(db)
+    }
+
+    // 创建一个最简单的 OrderNotify
+    fn sample_order_notify(user_id: i32) -> OrderNotify {
+        let base_order = BaseOrder::new(
+            None,
+            Uuid::new_v4(),
+            OrderStatus::Paid,
+            OrderTimeInfo::new(Utc::now().into(), Utc::now().into(), Utc::now().into()),
+            10.into(),
+            100.into(),
+            PaymentInfo::new(None, None),
+            DbId::from_db_value(user_id).unwrap(),
+        );
+        OrderNotify::new(
+            None,
+            UserId::from_db_value(user_id).unwrap(),
+            "Test order".to_string(),
+            Utc::now().into(),
+            Box::new(TrainOrder::new(
+                base_order,
+                DbId::from_db_value(1).unwrap(),
+                None,
+                SeatTypeName::from_unchecked("A".to_string()),
+                None,
+                StationRange::from_unchecked(
+                    DbId::from_db_value(1).unwrap(),
+                    DbId::from_db_value(2).unwrap(),
+                ),
+            )),
+        )
+    }
+
+    // 创建一个最简单的 TripNotify
+    fn sample_trip_notify(user_id: i32) -> TripNotify {
+        TripNotify::new(
+            None,
+            UserId::from_db_value(user_id).unwrap(),
+            "Trip notify".to_string(),
+            Utc::now().into(),
+            "T123".to_string(),
+            Utc::now().into(),
+            "StationA".to_string(),
+            "StationB".to_string(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_save_and_find_order_notify_success() {
+        let repo = setup_repo().await;
+
+        let mut notify = sample_order_notify(1);
+        let id = repo.save(&mut notify).await.unwrap();
+
+        let found = repo.find_order(id).await.unwrap().unwrap();
+        assert_eq!(found.title(), "Test order");
+    }
+
+    #[tokio::test]
+    async fn test_save_and_find_trip_notify_success() {
+        let repo = setup_repo().await;
+
+        let mut notify = sample_trip_notify(1);
+        let id = repo.save(&mut notify).await.unwrap();
+
+        let found = repo.find_trip(id).await.unwrap().unwrap();
+        assert_eq!(found.title(), "Trip notify");
+    }
+
+    #[tokio::test]
+    async fn test_find_order_wrong_type_should_fail() {
+        let repo = setup_repo().await;
+
+        let mut notify = sample_trip_notify(1);
+        let id = repo.save(&mut notify).await.unwrap();
+
+        let result = repo.find_order(id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_find_trip_wrong_type_should_fail() {
+        let repo = setup_repo().await;
+
+        let mut notify = sample_order_notify(1);
+        let id = repo.save(&mut notify).await.unwrap();
+
+        let result = repo.find_trip(id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_remove_success() {
+        let repo = setup_repo().await;
+
+        let mut notify = sample_order_notify(1);
+        let id = repo.save(&mut notify).await.unwrap();
+
+        repo.remove(id).await.unwrap();
+
+        let found = repo.find_order(id).await.unwrap();
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_load_by_user_id_success() {
+        let repo = setup_repo().await;
+
+        let mut notify1 = sample_order_notify(1);
+        let mut notify2 = sample_trip_notify(1);
+
+        repo.save(&mut notify1).await.unwrap();
+        repo.save(&mut notify2).await.unwrap();
+
+        let all = repo
+            .load_by_user_id(UserId::from_db_value(1).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
     }
 }
