@@ -1,4 +1,3 @@
-use crate::Verified;
 use crate::domain::model::route::{Route, RouteId};
 use crate::domain::model::station::StationId;
 use crate::domain::model::train::{TrainId, TrainNumber};
@@ -6,10 +5,11 @@ use crate::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
-use crate::domain::service::ServiceError;
 use crate::domain::service::route::{RouteGraph, RouteService};
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
+use crate::domain::service::ServiceError;
 use crate::domain::{Identifiable, RepositoryError};
+use crate::Verified;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDate, TimeDelta};
@@ -568,7 +568,7 @@ where
     #[instrument(skip(self, pairs))]
     async fn transfer_schedules(
         &self,
-        date: chrono::NaiveDate,
+        date: NaiveDate,
         pairs: &[(StationId, StationId)],
     ) -> Result<
         Vec<(
@@ -731,7 +731,7 @@ where
         &self,
         train_schedule_id: TrainScheduleId,
         station_id: StationId,
-    ) -> Result<sea_orm::prelude::DateTimeWithTimeZone, TrainScheduleServiceError> {
+    ) -> Result<DateTimeWithTimeZone, TrainScheduleServiceError> {
         let today = chrono::Local::now().date_naive();
         let mut found_schedule = None;
 
@@ -865,5 +865,369 @@ where
         let arrival_time = origin_departure_time + TimeDelta::seconds(terminal_arrival_offset);
 
         Ok(arrival_time)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::train::{Train, TrainType};
+    use crate::domain::repository::mock::{
+        route::MockRouteRepository, train::MockTrainRepository,
+        train_schedule::MockTrainScheduleRepository,
+    };
+    use crate::domain::service::mock::route::{mock_route_service, FakeRouteService};
+    // 用新的 fake
+    use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    fn build_service(
+        route_service: FakeRouteService,
+        train_repo: MockTrainRepository,
+        ts_repo: MockTrainScheduleRepository,
+        route_repo: MockRouteRepository,
+    ) -> TrainScheduleServiceImpl<
+        FakeRouteService,
+        MockTrainRepository,
+        MockTrainScheduleRepository,
+        MockRouteRepository,
+    > {
+        TrainScheduleServiceImpl::new(
+            Arc::new(route_service),
+            Arc::new(train_repo),
+            Arc::new(ts_repo),
+            Arc::new(route_repo),
+            8, // 东八区
+        )
+    }
+
+    fn sample_train(id: u64) -> Train {
+        Train::new(
+            Some(id.into()),
+            TrainNumber::from_unchecked("G1".to_string()),
+            TrainType::from_unchecked("G".to_string()),
+            HashMap::new(),
+            1u64.into(),
+            3600,
+        )
+    }
+
+    fn sample_schedule(train_id: u64, date: NaiveDate) -> TrainSchedule {
+        TrainSchedule::new(
+            Some(train_id.into()),
+            train_id.into(),
+            date,
+            3600,
+            1u64.into(),
+        )
+    }
+
+    fn sample_route(route_id: u64) -> Route {
+        let mut route = Route::new(Some(route_id.into()));
+        route.add_stop(Some(1u64.into()), 1u64.into(), 0, 1, 1);
+        route.add_stop(Some(2u64.into()), 2u64.into(), 2, 3, 2);
+        route.add_stop(Some(3u64.into()), 3u64.into(), 4, 5, 3);
+        route
+    }
+
+    #[tokio::test]
+    async fn test_add_schedule_success() {
+        let mut train_repo = MockTrainRepository::new();
+        train_repo
+            .expect_find()
+            .returning(|_| Ok(Some(sample_train(1))));
+
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_save().returning(|_| Ok(1u64.into()));
+
+        let route_service = mock_route_service();
+        let route_repo = MockRouteRepository::new();
+
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+        let res = service
+            .add_schedule(1u64.into(), NaiveDate::from_ymd_opt(2025, 1, 1).unwrap())
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_schedule_invalid_train() {
+        let mut train_repo = MockTrainRepository::new();
+        train_repo.expect_find().returning(|_| Ok(None));
+
+        let ts_repo = MockTrainScheduleRepository::new();
+        let route_service = mock_route_service();
+        let route_repo = MockRouteRepository::new();
+
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+        let res = service
+            .add_schedule(99u64.into(), NaiveDate::from_ymd_opt(2025, 1, 1).unwrap())
+            .await;
+        assert!(matches!(
+            res,
+            Err(TrainScheduleServiceError::InvalidTrainId(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_schedules_success() {
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_find_by_date().returning(|_| {
+            Ok(vec![sample_schedule(
+                1,
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )])
+        });
+
+        let train_repo = MockTrainRepository::new();
+        let route_service = mock_route_service();
+        let route_repo = MockRouteRepository::new();
+
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+        let res = service
+            .get_schedules(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap())
+            .await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_schedule_by_train_number_and_date_found() {
+        let mut train_repo = MockTrainRepository::new();
+        train_repo
+            .expect_find_by_train_number()
+            .returning(|_| Ok(sample_train(1)));
+
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_find_by_id_and_date().returning(|_, _| {
+            Ok(Some(sample_schedule(
+                1,
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )))
+        });
+
+        let route_service = mock_route_service();
+        let route_repo = MockRouteRepository::new();
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+
+        let res = service
+            .get_schedule_by_train_number_and_date(
+                "G1".to_string(),
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )
+            .await;
+        assert!(res.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_schedule_by_train_number_and_date_not_found() {
+        let mut train_repo = MockTrainRepository::new();
+        train_repo
+            .expect_find_by_train_number()
+            .returning(|_| Ok(sample_train(1)));
+
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo
+            .expect_find_by_id_and_date()
+            .returning(|_, _| Ok(None));
+
+        let route_service = mock_route_service();
+        let route_repo = MockRouteRepository::new();
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+
+        let res = service
+            .get_schedule_by_train_number_and_date(
+                "G1".to_string(),
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )
+            .await;
+        assert!(res.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_direct_schedules_success() {
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_find_by_date().returning(|_| {
+            Ok(vec![sample_schedule(
+                1,
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )])
+        });
+
+        let route_service = {
+            let fake = mock_route_service();
+            fake.routes.lock().unwrap().push(sample_route(1));
+            fake
+        };
+
+        let train_repo = MockTrainRepository::new();
+        let route_repo = MockRouteRepository::new();
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+
+        let res = service
+            .direct_schedules(
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+                &[(1u64.into(), 3u64.into())],
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_transfer_schedules_none() {
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_find_by_date().returning(|_| Ok(vec![]));
+
+        let route_service = {
+            let fake = mock_route_service();
+            fake.routes.lock().unwrap().push(sample_route(1));
+            fake.graph.lock().unwrap().replace(petgraph::Graph::new());
+            fake
+        };
+
+        let train_repo = MockTrainRepository::new();
+        let route_repo = MockRouteRepository::new();
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+
+        let res = service
+            .transfer_schedules(
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+                &[(1u64.into(), 3u64.into())],
+            )
+            .await;
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_station_arrival_time_success() {
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        let schedule = sample_schedule(1, NaiveDate::from_ymd_opt(2025, 1, 1).unwrap());
+        ts_repo
+            .expect_find_by_date()
+            .returning(move |_| Ok(vec![schedule.clone()]));
+
+        let route_service = {
+            let fake = mock_route_service();
+            fake.routes.lock().unwrap().push(sample_route(1));
+            fake
+        };
+
+        let train_repo = MockTrainRepository::new();
+        let route_repo = MockRouteRepository::new();
+
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+        let res = service
+            .get_station_arrival_time(1u64.into(), 2u64.into())
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_terminal_arrival_time_success() {
+        let mut train_repo = MockTrainRepository::new();
+        train_repo
+            .expect_find_by_train_number()
+            .returning(|_| Ok(sample_train(1)));
+
+        let mut ts_repo = MockTrainScheduleRepository::new();
+        ts_repo.expect_find_by_id_and_date().returning(|_, _| {
+            Ok(Some(sample_schedule(
+                1,
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )))
+        });
+
+        let mut route_repo = MockRouteRepository::new();
+        route_repo
+            .expect_find()
+            .returning(|_| Ok(Some(sample_route(1))));
+
+        let route_service = mock_route_service();
+
+        let service = build_service(route_service, train_repo, ts_repo, route_repo);
+
+        let naive_date = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let naive_time = naive_date.and_hms_opt(1, 0, 0).unwrap();
+        let fixed_offset = FixedOffset::east_opt(8 * 3600).unwrap();
+        let origin_departure_time: DateTime<FixedOffset> =
+            fixed_offset.from_utc_datetime(&naive_time);
+
+        let res = service
+            .get_terminal_arrival_time(
+                TrainNumber::from_unchecked("G1".to_string()),
+                origin_departure_time,
+            )
+            .await;
+
+        assert!(res.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod route_service_failure_tests {
+    use super::*;
+    use crate::domain::model::route::Stop;
+    use crate::domain::service::mock::route::FakeRouteService;
+    use crate::domain::service::route::RouteServiceError;
+
+    #[tokio::test]
+    async fn test_get_routes_failure() {
+        let route_service = FakeRouteService::with_error(RouteServiceError::InfrastructureError(
+            ServiceError::RelatedServiceError(anyhow!("mock error")),
+        ));
+
+        let res = route_service.get_routes().await;
+        assert!(res.is_err());
+        if let Err(RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e))) =
+            res
+        {
+            assert!(e.to_string().contains("mock error"));
+        } else {
+            panic!("Expected InfrastructureError");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_route_map_failure() {
+        let route_service = FakeRouteService::with_error(RouteServiceError::InfrastructureError(
+            ServiceError::RelatedServiceError(anyhow!("mock error")),
+        ));
+
+        let res = route_service.get_route_map().await;
+        assert!(res.is_err());
+        if let Err(RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e))) =
+            res
+        {
+            assert!(e.to_string().contains("mock error"));
+        } else {
+            panic!("Expected InfrastructureError");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_route_failure() {
+        let route_service = FakeRouteService::with_error(RouteServiceError::InfrastructureError(
+            ServiceError::RelatedServiceError(anyhow!("mock error")),
+        ));
+
+        let stops = vec![Stop::new(
+            Some(1u64.into()),
+            Some(1u64.into()),
+            1u64.into(),
+            0,
+            1,
+            0,
+        )];
+        let res = route_service.add_route(stops).await;
+        assert!(res.is_err());
+        if let Err(RouteServiceError::InfrastructureError(ServiceError::RelatedServiceError(e))) =
+            res
+        {
+            assert!(e.to_string().contains("mock error"));
+        } else {
+            panic!("Expected InfrastructureError");
+        }
     }
 }

@@ -6,6 +6,7 @@ pub mod hotel_rating;
 pub mod message;
 pub mod object_storage;
 pub mod order;
+pub mod route;
 pub mod session;
 pub mod station;
 pub mod takeaway_booking;
