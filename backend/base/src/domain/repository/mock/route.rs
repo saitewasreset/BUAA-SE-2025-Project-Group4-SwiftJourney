@@ -2,11 +2,11 @@
 
 use crate::domain::model::route::{Route, RouteId};
 use crate::domain::model::train_schedule::TrainScheduleId;
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::{Repository, RepositoryError};
 use async_trait::async_trait;
 use mockall::mock;
 use shared::data::RouteStationInfo;
-use crate::domain::repository::route::RouteRepository;
 
 mock! {
     pub RouteRepository {}
@@ -31,6 +31,6 @@ mock! {
     }
 }
 
-pub fn mock_route_repository() -> impl RouteRepository {
+pub fn mock_route_repository() -> MockRouteRepository {
     MockRouteRepository::new()
 }

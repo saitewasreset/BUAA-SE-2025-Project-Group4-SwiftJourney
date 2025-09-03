@@ -1,4 +1,3 @@
-use crate::Verified;
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::route::Route;
 use crate::domain::model::train::{SeatType, SeatTypeName};
@@ -11,11 +10,12 @@ use crate::domain::repository::seat_availability::{
     OccupiedSeatInfoMap, SeatAvailabilityRepository,
 };
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
-use crate::domain::service::ServiceError;
 use crate::domain::service::train_seat::{TrainSeatService, TrainSeatServiceError};
 use crate::domain::service::train_type::TrainTypeConfigurationService;
+use crate::domain::service::ServiceError;
 use crate::domain::{DbId, Identifiable, RepositoryError};
-use anyhow::{Context, anyhow};
+use crate::Verified;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -453,5 +453,346 @@ where
             })?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::personal_info::PersonalInfoId;
+    use crate::domain::model::route::Route;
+    use crate::domain::model::train::{SeatType, SeatTypeId, SeatTypeName};
+    use crate::domain::model::train_schedule::{
+        Seat, SeatAvailability, SeatAvailabilityId, SeatLocationInfo, SeatStatus, StationRange,
+        TrainSchedule, TrainScheduleId,
+    };
+    use crate::domain::repository::mock::route::mock_route_repository;
+    use crate::domain::repository::mock::seat_availability::mock_seat_availability_repository;
+    use crate::domain::repository::mock::train_schedule::mock_train_schedule_repository;
+    use crate::domain::service::mock::train_type::mock_train_type_service;
+    use chrono::NaiveDate;
+    use rust_decimal::Decimal;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_available_seats_count_success() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let mut route_repo = mock_route_repository();
+        let type_service = mock_train_type_service();
+        let schedule_repo = mock_train_schedule_repository();
+
+        let seat_type = SeatType::new(
+            Some(SeatTypeId::from(1u64)),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            1,
+            Decimal::new(1000, 2),
+        );
+        let station_range = StationRange::from_unchecked(1u64.into(), 2u64.into());
+        let seat_availability = SeatAvailability::new(
+            Some(SeatAvailabilityId::from(1u64)),
+            TrainScheduleId::from(1u64),
+            seat_type.clone(),
+            station_range,
+        );
+
+        seat_repo
+            .expect_find()
+            .returning(move |_| Ok(Some(seat_availability.clone())));
+        seat_repo
+            .expect_get_train_schedule_occupied_seat()
+            .returning(|_| {
+                // seat_type_id = 1 对应的空 map
+                let mut map: OccupiedSeatInfoMap = HashMap::new();
+                map.insert(1, HashMap::new());
+                Ok(map)
+            });
+
+        // route with 2 stops
+        let mut route = Route::new(Some(1u64.into()));
+        route.add_stop(Some(1u64.into()), 1u64.into(), 0, 1, 1);
+        route.add_stop(Some(2u64.into()), 2u64.into(), 2, 3, 2);
+
+        route_repo
+            .expect_get_by_train_schedule()
+            .returning(move |_| Ok(Some(route.clone())));
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let count = service
+            .available_seats_count(SeatAvailabilityId::from(1u64))
+            .await
+            .unwrap();
+        assert_eq!(count, 0); // 没有占用座位 → 可用座位数为 0
+    }
+
+    #[tokio::test]
+    async fn test_available_seats_count_invalid_id() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let route_repo = mock_route_repository();
+        let type_service = mock_train_type_service();
+        let schedule_repo = mock_train_schedule_repository();
+
+        seat_repo.expect_find().returning(|_| Ok(None));
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let res = service
+            .available_seats_count(SeatAvailabilityId::from(999u64))
+            .await;
+        assert!(matches!(
+            res,
+            Err(TrainSeatServiceError::InvalidSeatAvailability(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_reserve_seat_success() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let route_repo = mock_route_repository();
+        let mut type_service = mock_train_type_service();
+        let mut schedule_repo = mock_train_schedule_repository();
+
+        let mut train_schedule = TrainSchedule::new(
+            Some(1u64.into()),
+            1u64.into(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            0,
+            1u64.into(),
+        );
+
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            1,
+            Decimal::new(1000, 2),
+        );
+        let station_range = StationRange::from_unchecked(1u64.into(), 2u64.into());
+        let seat_availability = SeatAvailability::new(
+            Some(SeatAvailabilityId::from(1u64)),
+            TrainScheduleId::from(1u64),
+            seat_type.clone(),
+            station_range,
+        );
+
+        seat_repo
+            .expect_find_by_schedule_seat_type_station_range()
+            .returning(move |_, _, _| Ok(Some(seat_availability.clone())));
+        seat_repo
+            .expect_save()
+            .returning(|_| Ok(SeatAvailabilityId::from(1u64)));
+
+        let schedule_for_mock = train_schedule.clone();
+        schedule_repo
+            .expect_find()
+            .returning(move |_| Ok(Some(schedule_for_mock.clone())));
+
+        type_service.expect_get_seat_id_map().returning(|_| {
+            Ok(std::collections::HashMap::from([(
+                SeatTypeName::from_unchecked("二等座".to_string()),
+                vec![(
+                    1u64.into(),
+                    SeatLocationInfo {
+                        carriage: 1,
+                        row: 1,
+                        location: 'A',
+                    },
+                )],
+            )]))
+        });
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let seat = service
+            .reserve_seat(
+                &mut train_schedule,
+                station_range,
+                seat_type,
+                SeatLocationInfo {
+                    carriage: 1,
+                    row: 1,
+                    location: 'A',
+                },
+                PersonalInfoId::from(1u64),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(seat.location_info().carriage, 1);
+    }
+
+    #[tokio::test]
+    async fn test_reserve_seat_fail_no_seat_in_map() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let route_repo = mock_route_repository();
+        let mut type_service = mock_train_type_service();
+        let mut schedule_repo = mock_train_schedule_repository();
+
+        let mut train_schedule = TrainSchedule::new(
+            Some(1u64.into()),
+            1u64.into(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            0,
+            1u64.into(),
+        );
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("一等座".to_string()),
+            1,
+            Decimal::new(1000, 2),
+        );
+        let station_range = StationRange::from_unchecked(1u64.into(), 2u64.into());
+
+        seat_repo
+            .expect_find_by_schedule_seat_type_station_range()
+            .returning(|_, _, _| Ok(None));
+        seat_repo.expect_save().returning(|seat_availability| {
+            seat_availability.set_id(SeatAvailabilityId::from(1u64));
+            Ok(SeatAvailabilityId::from(1u64))
+        });
+
+        let schedule_for_mock = train_schedule.clone();
+        schedule_repo
+            .expect_find()
+            .returning(move |_| Ok(Some(schedule_for_mock.clone())));
+
+        type_service
+            .expect_get_seat_id_map()
+            .returning(|_| Ok(Default::default()));
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let res = service
+            .reserve_seat(
+                &mut train_schedule,
+                station_range,
+                seat_type,
+                SeatLocationInfo {
+                    carriage: 1,
+                    row: 1,
+                    location: 'A',
+                },
+                PersonalInfoId::from(1u64),
+            )
+            .await;
+
+        assert!(matches!(
+            res,
+            Err(TrainSeatServiceError::InfrastructureError(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_free_seat_success() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let route_repo = mock_route_repository();
+        let type_service = mock_train_type_service();
+        let schedule_repo = mock_train_schedule_repository();
+
+        let seat_type = SeatType::new(
+            Some(1u64.into()),
+            SeatTypeName::from_unchecked("二等座".to_string()),
+            1,
+            Decimal::new(1000, 2),
+        );
+        let station_range = StationRange::from_unchecked(1u64.into(), 2u64.into());
+        let mut seat_availability = SeatAvailability::new(
+            Some(SeatAvailabilityId::from(1u64)),
+            TrainScheduleId::from(1u64),
+            seat_type.clone(),
+            station_range,
+        );
+
+        let seat = Seat::new(
+            1u64.into(),
+            seat_type.clone(),
+            SeatLocationInfo {
+                carriage: 1,
+                row: 1,
+                location: 'A',
+            },
+            SeatStatus::Occupied,
+        );
+
+        seat_availability.add_occupied_seat(seat.clone(), PersonalInfoId::from(1u64));
+
+        seat_repo
+            .expect_find()
+            .returning(move |_| Ok(Some(seat_availability.clone())));
+        seat_repo
+            .expect_save()
+            .returning(|_| Ok(SeatAvailabilityId::from(1u64)));
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let res = service
+            .free_seat(SeatAvailabilityId::from(1u64), seat)
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_free_seat_invalid_id() {
+        let mut seat_repo = mock_seat_availability_repository();
+        let route_repo = mock_route_repository();
+        let type_service = mock_train_type_service();
+        let schedule_repo = mock_train_schedule_repository();
+
+        seat_repo.expect_find().returning(|_| Ok(None));
+
+        let service = TrainSeatServiceImpl::new(
+            Arc::new(seat_repo),
+            Arc::new(route_repo),
+            Arc::new(type_service),
+            Arc::new(schedule_repo),
+        );
+
+        let seat = Seat::new(
+            1u64.into(),
+            SeatType::new(
+                Some(1u64.into()),
+                SeatTypeName::from_unchecked("二等座".to_string()),
+                1,
+                Decimal::new(1000, 2),
+            ),
+            SeatLocationInfo {
+                carriage: 1,
+                row: 1,
+                location: 'A',
+            },
+            SeatStatus::Occupied,
+        );
+
+        let res = service
+            .free_seat(SeatAvailabilityId::from(999u64), seat)
+            .await;
+        assert!(matches!(
+            res,
+            Err(TrainSeatServiceError::InvalidSeatAvailability(_))
+        ));
     }
 }
