@@ -6,11 +6,11 @@
 //! - 路线仓储接口(`RouteRepository`)
 //!
 //! 注意：具体实现应放在基础设施层(`infrastructure::repository`)。
+use async_trait::async_trait;
+use shared::data::RouteStationInfo;
 use shared::domain::model::route::{Route, RouteId};
 use shared::domain::model::train_schedule::TrainScheduleId;
 use shared::domain::{Repository, RepositoryError};
-use async_trait::async_trait;
-use shared::data::RouteStationInfo;
 
 /// 路线仓储接口
 ///
@@ -42,6 +42,8 @@ pub trait RouteRepository: Repository<Route> {
     /// # Returns
     /// 成功时返回所有车次路线的列表；失败时返回`RepositoryError`。
     async fn load(&self) -> Result<Vec<Route>, RepositoryError>;
+
+    async fn load_all_raw(&self) -> Result<Vec<crate::models::route::Model>, RepositoryError>;
 
     async fn get_by_train_schedule(
         &self,

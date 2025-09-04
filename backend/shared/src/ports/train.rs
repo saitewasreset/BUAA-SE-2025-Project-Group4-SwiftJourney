@@ -3,7 +3,7 @@ use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 
@@ -30,4 +30,8 @@ pub trait TrainPort: 'static + Send + Sync {
         &self,
         query: VerifyTrainNumberQuery,
     ) -> Result<bool, InternalApiError>;
+
+    async fn db_get_trains(&self) -> Result<Vec<DbTrainDTO>, InternalApiError>;
+
+    async fn db_get_routes(&self) -> Result<Vec<DbRouteDTO>, InternalApiError>;
 }

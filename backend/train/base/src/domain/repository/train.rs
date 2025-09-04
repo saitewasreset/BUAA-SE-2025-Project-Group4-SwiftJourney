@@ -6,11 +6,12 @@
 //! - 列车车次仓储接口(`TrainRepository`)
 //!
 //! 注意：具体实现应放在基础设施层(`infrastructure::repository`)。
+use async_trait::async_trait;
 use shared::Verified;
+use shared::api::InternalApiError;
 use shared::domain::model::train::{SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use shared::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use shared::domain::{Repository, RepositoryError};
-use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
 /// 列车车次仓储接口
@@ -45,6 +46,8 @@ use std::collections::{HashMap, HashSet};
 /// 如果发生错误（如数据库连接失败），将返回`RepositoryError`。
 #[async_trait]
 pub trait TrainRepository: Repository<Train> + 'static + Send + Sync {
+    async fn load_all_raw(&self) -> Result<Vec<crate::models::train::Model>, RepositoryError>;
+
     /// 获取所有已验证的车次编号（字符串）。
     ///
     /// # Returns

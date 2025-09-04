@@ -4,6 +4,7 @@ use actix_web::{
 };
 use chrono::{DateTime, FixedOffset};
 use shared::internal::train::command::{GetTerminalArrivalTimeQuery, VerifyTrainNumberQuery};
+use shared::internal::train::dto::{DbRouteDTO, DbTrainDTO};
 use shared::{
     api::{ApiResponse, ApplicationErrorBox, parse_request_body},
     application_error::ApplicationError,
@@ -86,6 +87,35 @@ pub async fn verify_train_number(
     ApiResponse::ok(result)
 }
 
+#[get("/db_get_trains")]
+pub async fn db_get_trains(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<DbTrainDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .db_get_trains()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
+#[get("/db_get_routes")]
+pub async fn db_get_routes(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<DbRouteDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .db_get_routes()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_train_by_number).service(get_train_schedule);
+    cfg.service(get_train_by_number)
+        .service(get_train_schedule)
+        .service(get_trains)
+        .service(verify_train_number)
+        .service(db_get_trains)
+        .service(db_get_routes);
 }

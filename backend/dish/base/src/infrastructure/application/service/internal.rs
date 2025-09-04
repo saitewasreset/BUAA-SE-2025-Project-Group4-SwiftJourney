@@ -7,9 +7,11 @@ use rust_decimal::prelude::FromPrimitive;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, TransactionTrait};
 use shared::domain::model::station::StationId;
 use shared::domain::model::train::TrainId;
+use shared::event::queue::EventService;
+use shared::event::{DishUpdatedEvent, EventPackage, TakeawayDishUpdatedEvent};
 use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
 use shared::{
-    DB_CHUNK_SIZE,
+    DB_CHUNK_SIZE, MicroService,
     domain::{
         RepositoryError,
         model::takeaway::{TakeawayDish, TakeawayShop},
@@ -22,12 +24,13 @@ use std::{collections::HashMap, fs, sync::Arc};
 use tracing::error;
 use uuid::Uuid;
 
-pub struct DishInternalServiceImpl<TSR, TP, GP, OSP>
+pub struct DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
 where
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
     OSP: ObjectStoragePort,
+    ES: EventService,
 {
     takeaway_shop_repository: Arc<TSR>,
     train_port: Arc<TP>,
@@ -35,14 +38,16 @@ where
     object_storage_port: Arc<OSP>,
     data_path: PathBuf,
     db: DatabaseConnection,
+    event_service: Arc<ES>,
 }
 
-impl<TSR, TP, GP, OSP> DishInternalServiceImpl<TSR, TP, GP, OSP>
+impl<TSR, TP, GP, OSP, ES> DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
 where
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
     OSP: ObjectStoragePort,
+    ES: EventService,
 {
     pub fn new(
         takeaway_shop_repository: Arc<TSR>,
@@ -51,6 +56,7 @@ where
         object_storage_port: Arc<OSP>,
         data_path: PathBuf,
         db: DatabaseConnection,
+        event_service: Arc<ES>,
     ) -> Self {
         Self {
             takeaway_shop_repository,
@@ -59,17 +65,19 @@ where
             object_storage_port,
             data_path,
             db,
+            event_service,
         }
     }
 }
 
 #[async_trait]
-impl<TSR, TP, GP, OSP> DishInternalService for DishInternalServiceImpl<TSR, TP, GP, OSP>
+impl<TSR, TP, GP, OSP, ES> DishInternalService for DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
 where
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
     OSP: ObjectStoragePort,
+    ES: EventService,
 {
     async fn save_raw_dish(&self, command: SaveRawDishCommand) -> Result<(), RepositoryError> {
         let tx = self
@@ -180,6 +188,15 @@ where
                 error!("failed to commit transaction: {}", e);
             })
             .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Dish, DishUpdatedEvent))
+            .await
+        {
+            error!("failed to publish dish event: {:?}", e);
+        }
+
         Ok(())
     }
 
@@ -273,6 +290,17 @@ where
             .inspect_err(|e| {
                 error!("failed to save takeaway: {}", e);
             })?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(
+                MicroService::Dish,
+                TakeawayDishUpdatedEvent,
+            ))
+            .await
+        {
+            error!("failed to publish takeaway dish updated event: {:?}", e);
+        }
 
         Ok(())
     }

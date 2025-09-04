@@ -14,6 +14,7 @@
 //! - 严格的数据一致性检查
 use crate::DbId;
 use crate::domain::repository::route::RouteRepository;
+use crate::models::train::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use sea_orm::{ActiveValue, DatabaseBackend, DatabaseConnection, Statement};
@@ -386,6 +387,17 @@ impl RouteRepository for RouteRepositoryImpl {
                     })?,
             );
         }
+
+        Ok(result)
+    }
+
+    #[instrument(skip_all)]
+    async fn load_all_raw(&self) -> Result<Vec<crate::models::route::Model>, RepositoryError> {
+        let result = crate::models::route::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load routes: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
 
         Ok(result)
     }

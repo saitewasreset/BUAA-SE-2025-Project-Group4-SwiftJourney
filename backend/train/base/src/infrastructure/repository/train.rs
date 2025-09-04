@@ -23,6 +23,7 @@ use crate::Verified;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::infrastructure::service::event::TrainEventServiceImpl;
+use crate::models::train::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
@@ -30,6 +31,7 @@ use sea_orm::{ActiveValue, DatabaseConnection, DbErr};
 use sea_orm::{ColumnTrait, ModelTrait};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
+use shared::api::InternalApiError;
 use shared::data::{TrainNumberData, TrainTypeData};
 use shared::domain::model::route::RouteId;
 use shared::domain::model::train::{
@@ -625,6 +627,17 @@ impl TrainRepositoryImpl {
 
 #[async_trait]
 impl TrainRepository for TrainRepositoryImpl {
+    #[instrument(skip_all)]
+    async fn load_all_raw(&self) -> Result<Vec<Model>, RepositoryError> {
+        let result = crate::models::train::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load trains: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(result)
+    }
+
     /// 获取已验证的车次编号集合
     ///
     /// # Returns

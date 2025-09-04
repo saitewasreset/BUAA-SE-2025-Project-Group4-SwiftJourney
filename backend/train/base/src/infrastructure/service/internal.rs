@@ -15,7 +15,7 @@ use shared::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use shared::internal::train::dto::{TrainDTO, TrainScheduleDTO};
+use shared::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
 use std::sync::Arc;
 use tracing::{error, instrument, warn};
 
@@ -204,5 +204,46 @@ where
                 }
             },
         }
+    }
+
+    #[instrument(skip(self))]
+    async fn db_get_trains(&self) -> Result<Vec<DbTrainDTO>, TrainInternalServiceError> {
+        let result = self
+            .train_repository
+            .load_all_raw()
+            .await
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbTrainDTO {
+                id: x.id,
+                number: x.number,
+                type_id: x.type_id,
+                default_origin_departure_time: x.default_origin_departure_time,
+                default_line_id: x.default_line_id,
+            })
+            .collect())
+    }
+
+    #[instrument(skip(self))]
+    async fn db_get_routes(&self) -> Result<Vec<DbRouteDTO>, TrainInternalServiceError> {
+        let result = self
+            .route_repository
+            .load_all_raw()
+            .await
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbRouteDTO {
+                id: x.id,
+                line_id: x.line_id,
+                station_id: x.station_id,
+                arrival_time: x.arrival_time,
+                departure_time: x.departure_time,
+                order: x.order,
+            })
+            .collect())
     }
 }

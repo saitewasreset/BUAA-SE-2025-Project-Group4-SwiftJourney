@@ -3,7 +3,7 @@ use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
 use crate::ports::train::TrainPort;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
@@ -71,5 +71,19 @@ impl TrainPort for HttpTrainPortImpl {
             .post(TrainInternalServiceApi::VerifyTrainNumber, query)
             .await
             .inspect_err(|e| error!("Failed to verify train number: {:?}", e))
+    }
+
+    async fn db_get_trains(&self) -> Result<Vec<DbTrainDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::DbGetTrains)
+            .await
+            .inspect_err(|e| error!("Failed to get db trains: {:?}", e))
+    }
+
+    async fn db_get_routes(&self) -> Result<Vec<DbRouteDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::DbGetRoutes)
+            .await
+            .inspect_err(|e| error!("Failed to get db routes: {:?}", e))
     }
 }

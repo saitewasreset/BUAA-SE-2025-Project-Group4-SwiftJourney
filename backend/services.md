@@ -75,16 +75,16 @@ Events：
   - `save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
 - `seat_type + seat_type_mapping: SeatTypeUpdatedEvent()`
   - `load_train_type`：`base/src/infrastructure/application/service/train_data.rs:218`
-- `HotelUpdatedEvent()`
+- `+HotelUpdatedEvent()`
   - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
   - `+new_comment`：`base/src/infrastructure/application/service/hotel.rs:126`
-  - `process_hotel_orders`：`base/src/infrastructure/application/service/hotel_order.rs:336`
-- `HotelRoomTypeUpdatedEvent()`
+  - `+process_hotel_orders`：`base/src/infrastructure/application/service/hotel_order.rs:336`
+- `+HotelRoomTypeUpdatedEvent()`
   - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
 - `DishUpdatedEvent()`
-  - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
+  - `+load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 - `TakeawayDishUpdatedEvent()`
-  - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
+  - `+load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 
 ## User(Err: 90XXX)
 

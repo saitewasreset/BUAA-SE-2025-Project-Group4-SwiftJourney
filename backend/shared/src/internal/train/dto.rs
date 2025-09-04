@@ -40,6 +40,25 @@ pub struct StationRangeDTO {
     pub to_station_id: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DbTrainDTO {
+    pub id: i32,
+    pub number: String,
+    pub type_id: i32,
+    pub default_origin_departure_time: i32,
+    pub default_line_id: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DbRouteDTO {
+    pub id: i32,
+    pub line_id: i64,
+    pub station_id: i32,
+    pub arrival_time: i32,
+    pub departure_time: i32,
+    pub order: i32,
+}
+
 impl From<Train> for TrainDTO {
     fn from(value: Train) -> Self {
         TrainDTO {

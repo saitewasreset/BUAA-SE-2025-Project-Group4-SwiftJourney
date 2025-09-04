@@ -1,3 +1,4 @@
+pub mod dish;
 pub mod geo;
 pub mod impls;
 pub mod object_storage;

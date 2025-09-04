@@ -6,10 +6,12 @@ use dish_base::infrastructure::application::service::dish_query::DishQueryServic
 use dish_base::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl;
 use dish_base::infrastructure::repository::dish::DishRepositoryImpl;
 use dish_base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
+use dish_base::infrastructure::service::event::DishEventServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::MAX_BODY_LENGTH;
+use shared::event::queue::EventService;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -31,6 +33,8 @@ async fn main() -> std::io::Result<()> {
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+
+    let rabbitmq_url = shared::api::read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
 
     let auto_schedule_days_str = read_file_env("AUTO_SCHEDULE_DAYS");
 
@@ -100,6 +104,15 @@ async fn main() -> std::io::Result<()> {
         tz_offset_hour as u32,
     ));
 
+    let dish_event_service_impl = DishEventServiceImpl::new(
+        &rabbitmq_url,
+        conn.clone(),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&train_port_impl),
+    )
+    .await
+    .expect("cannot connect to rabbitmq");
+
     let dish_internal_service_impl = Arc::new(
         dish_base::infrastructure::application::service::internal::DishInternalServiceImpl::new(
             Arc::clone(&takeaway_shop_repository_impl),
@@ -108,8 +121,14 @@ async fn main() -> std::io::Result<()> {
             Arc::clone(&object_storage_port_impl),
             data_base_path,
             conn.clone(),
+            Arc::clone(&dish_event_service_impl),
         ),
     );
+
+    dish_event_service_impl
+        .init_consumer()
+        .await
+        .expect("failed to init event consumer");
 
     let dish_query_service: web::Data<dyn DishQueryService> =
         web::Data::from(dish_query_service_impl as Arc<dyn DishQueryService>);
