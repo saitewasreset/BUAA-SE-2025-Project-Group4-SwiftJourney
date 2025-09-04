@@ -2,7 +2,7 @@ use crate::domain::Identifiable;
 use crate::domain::model::train::{SeatType, Train};
 use crate::domain::model::train_schedule::{StationRange, TrainSchedule};
 use chrono::NaiveDate;
-use sea_orm::prelude::Decimal;
+use sea_orm::prelude::{Date, Decimal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -57,6 +57,33 @@ pub struct DbRouteDTO {
     pub arrival_time: i32,
     pub departure_time: i32,
     pub order: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DbTrainScheduleDTO {
+    pub id: i32,
+    pub train_id: i32,
+    pub departure_date: Date,
+    pub origin_departure_time: i32,
+    pub line_id: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DbSeatTypeDTO {
+    pub id: i32,
+    pub type_name: String,
+    pub capacity: i32,
+    pub price: Decimal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DbSeatTypeMappingDTO {
+    pub train_type_id: i32,
+    pub seat_type_id: i32,
+    pub seat_id: i64,
+    pub carriage: i32,
+    pub row: i32,
+    pub location: String,
 }
 
 impl From<Train> for TrainDTO {

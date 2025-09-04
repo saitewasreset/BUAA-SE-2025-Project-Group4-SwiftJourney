@@ -47,6 +47,14 @@ use std::collections::{HashMap, HashSet};
 pub trait TrainRepository: Repository<Train> + 'static + Send + Sync {
     async fn load_all_raw(&self) -> Result<Vec<crate::models::train::Model>, RepositoryError>;
 
+    async fn load_all_seat_type_raw(
+        &self,
+    ) -> Result<Vec<crate::models::seat_type::Model>, RepositoryError>;
+
+    async fn load_all_seat_type_mapping_raw(
+        &self,
+    ) -> Result<Vec<crate::models::seat_type_mapping::Model>, RepositoryError>;
+
     /// 获取所有已验证的车次编号（字符串）。
     ///
     /// # Returns

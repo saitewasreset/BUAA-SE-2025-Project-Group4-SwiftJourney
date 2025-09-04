@@ -35,6 +35,7 @@ use sea_orm::{QueryFilter, Select};
 use shared::DB_CHUNK_SIZE;
 use shared::domain::{Identifiable, Repository, RepositoryError};
 use shared::impl_db_id_from_u64;
+use shared::internal::train::dto::DbTrainScheduleDTO;
 use std::collections::HashMap;
 use tracing::{error, instrument};
 
@@ -277,6 +278,26 @@ impl Repository<TrainSchedule> for TrainScheduleRepositoryImpl {
 
 #[async_trait]
 impl TrainScheduleRepository for TrainScheduleRepositoryImpl {
+    #[instrument(skip(self))]
+    async fn load_all_raw(&self) -> Result<Vec<DbTrainScheduleDTO>, RepositoryError> {
+        let result = crate::models::train_schedule::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load train schedule: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbTrainScheduleDTO {
+                id: x.id,
+                train_id: x.train_id,
+                departure_date: x.departure_date,
+                origin_departure_time: x.origin_departure_time,
+                line_id: x.line_id,
+            })
+            .collect())
+    }
+
     #[instrument(skip(self))]
     async fn find_by_date(&self, date: NaiveDate) -> Result<Vec<TrainSchedule>, RepositoryError> {
         Ok(self

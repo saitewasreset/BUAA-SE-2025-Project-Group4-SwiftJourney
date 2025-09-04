@@ -3,7 +3,10 @@ use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO, TrainDTO,
+    TrainScheduleDTO,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 
@@ -34,4 +37,11 @@ pub trait TrainPort: 'static + Send + Sync {
     async fn db_get_trains(&self) -> Result<Vec<DbTrainDTO>, InternalApiError>;
 
     async fn db_get_routes(&self) -> Result<Vec<DbRouteDTO>, InternalApiError>;
+
+    async fn db_get_train_schedule(&self) -> Result<Vec<DbTrainScheduleDTO>, InternalApiError>;
+
+    async fn db_get_seat_type(&self) -> Result<Vec<DbSeatTypeDTO>, InternalApiError>;
+
+    async fn db_get_seat_type_mapping(&self)
+    -> Result<Vec<DbSeatTypeMappingDTO>, InternalApiError>;
 }

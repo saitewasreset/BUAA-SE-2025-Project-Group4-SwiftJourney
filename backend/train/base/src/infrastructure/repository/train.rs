@@ -636,6 +636,32 @@ impl TrainRepository for TrainRepositoryImpl {
         Ok(result)
     }
 
+    #[instrument(skip_all)]
+    async fn load_all_seat_type_raw(
+        &self,
+    ) -> Result<Vec<crate::models::seat_type::Model>, RepositoryError> {
+        let result = crate::models::seat_type::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load seat type: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(result)
+    }
+
+    #[instrument(skip_all)]
+    async fn load_all_seat_type_mapping_raw(
+        &self,
+    ) -> Result<Vec<crate::models::seat_type_mapping::Model>, RepositoryError> {
+        let result = crate::models::seat_type_mapping::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load seat type mapping: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))?;
+
+        Ok(result)
+    }
+
     /// 获取已验证的车次编号集合
     ///
     /// # Returns

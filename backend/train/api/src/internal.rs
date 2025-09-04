@@ -4,7 +4,9 @@ use actix_web::{
 };
 use chrono::{DateTime, FixedOffset};
 use shared::internal::train::command::{GetTerminalArrivalTimeQuery, VerifyTrainNumberQuery};
-use shared::internal::train::dto::{DbRouteDTO, DbTrainDTO};
+use shared::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO,
+};
 use shared::{
     api::{ApiResponse, ApplicationErrorBox, parse_request_body},
     application_error::ApplicationError,
@@ -111,11 +113,50 @@ pub async fn db_get_routes(
     ApiResponse::ok(result)
 }
 
+#[get("/db_get_train_schedules")]
+pub async fn db_get_train_schedules(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<DbTrainScheduleDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .db_get_train_schedule()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
+#[get("/db_get_seat_types")]
+pub async fn db_get_seat_types(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<DbSeatTypeDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .db_get_seat_type()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
+#[get("/db_get_seat_type_mappings")]
+pub async fn db_get_seat_type_mappings(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<DbSeatTypeMappingDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .db_get_seat_type_mapping()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_train_by_number)
         .service(get_train_schedule)
         .service(get_trains)
         .service(verify_train_number)
         .service(db_get_trains)
-        .service(db_get_routes);
+        .service(db_get_routes)
+        .service(db_get_train_schedules)
+        .service(db_get_seat_types)
+        .service(db_get_seat_type_mappings);
 }

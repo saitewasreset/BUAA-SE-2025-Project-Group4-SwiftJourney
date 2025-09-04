@@ -5,7 +5,10 @@ use shared::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use shared::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
+use shared::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO, TrainDTO,
+    TrainScheduleDTO,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -61,4 +64,14 @@ pub trait TrainInternalService: 'static + Send + Sync {
     async fn db_get_trains(&self) -> Result<Vec<DbTrainDTO>, TrainInternalServiceError>;
 
     async fn db_get_routes(&self) -> Result<Vec<DbRouteDTO>, TrainInternalServiceError>;
+
+    async fn db_get_train_schedule(
+        &self,
+    ) -> Result<Vec<DbTrainScheduleDTO>, TrainInternalServiceError>;
+
+    async fn db_get_seat_type(&self) -> Result<Vec<DbSeatTypeDTO>, TrainInternalServiceError>;
+
+    async fn db_get_seat_type_mapping(
+        &self,
+    ) -> Result<Vec<DbSeatTypeMappingDTO>, TrainInternalServiceError>;
 }

@@ -1,11 +1,14 @@
+use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use shared::domain::model::train::TrainId;
 use shared::domain::model::train_schedule::TrainSchedule;
 use shared::domain::{Repository, RepositoryError};
-use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use shared::internal::train::dto::DbTrainScheduleDTO;
 
 #[async_trait]
 pub trait TrainScheduleRepository: Repository<TrainSchedule> {
+    async fn load_all_raw(&self) -> Result<Vec<DbTrainScheduleDTO>, RepositoryError>;
+
     async fn find_by_date(&self, date: NaiveDate) -> Result<Vec<TrainSchedule>, RepositoryError>;
 
     async fn find_by_id_and_date(

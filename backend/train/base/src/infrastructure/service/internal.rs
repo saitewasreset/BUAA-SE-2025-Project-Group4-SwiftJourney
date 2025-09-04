@@ -15,7 +15,10 @@ use shared::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use shared::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
+use shared::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO, TrainDTO,
+    TrainScheduleDTO,
+};
 use std::sync::Arc;
 use tracing::{error, instrument, warn};
 
@@ -247,5 +250,55 @@ where
                 order: x.order,
             })
             .collect())
+    }
+
+    async fn db_get_train_schedule(
+        &self,
+    ) -> Result<Vec<DbTrainScheduleDTO>, TrainInternalServiceError> {
+        self.train_schedule_repository
+            .load_all_raw()
+            .await
+            .inspect_err(|e| error!("Failed to load train schedule: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))
+    }
+
+    async fn db_get_seat_type(&self) -> Result<Vec<DbSeatTypeDTO>, TrainInternalServiceError> {
+        self.train_repository
+            .load_all_seat_type_raw()
+            .await
+            .inspect_err(|e| error!("Failed to load db seat type: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))
+            .map(|x| {
+                x.into_iter()
+                    .map(|x| DbSeatTypeDTO {
+                        id: x.id,
+                        type_name: x.type_name,
+                        capacity: x.capacity,
+                        price: x.price,
+                    })
+                    .collect()
+            })
+    }
+
+    async fn db_get_seat_type_mapping(
+        &self,
+    ) -> Result<Vec<DbSeatTypeMappingDTO>, TrainInternalServiceError> {
+        self.train_repository
+            .load_all_seat_type_mapping_raw()
+            .await
+            .inspect_err(|e| error!("Failed to load db seat type mapping: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))
+            .map(|x| {
+                x.into_iter()
+                    .map(|x| DbSeatTypeMappingDTO {
+                        train_type_id: x.train_type_id,
+                        seat_type_id: x.seat_type_id,
+                        seat_id: x.seat_id,
+                        carriage: x.carriage,
+                        row: x.row,
+                        location: x.location,
+                    })
+                    .collect()
+            })
     }
 }

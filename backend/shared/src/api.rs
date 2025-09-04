@@ -273,6 +273,9 @@ pub enum TrainInternalServiceApi {
     VerifyTrainNumber,
     DbGetTrains,
     DbGetRoutes,
+    DbGetTrainSchedules,
+    DbGetSeatTypes,
+    DbGetSeatTypeMappings,
 }
 
 impl InternalApi for TrainInternalServiceApi {
@@ -287,6 +290,9 @@ impl InternalApi for TrainInternalServiceApi {
             TrainInternalServiceApi::VerifyTrainNumber => "verify_train_number",
             TrainInternalServiceApi::DbGetTrains => "db_get_trains",
             TrainInternalServiceApi::DbGetRoutes => "db_get_routes",
+            TrainInternalServiceApi::DbGetTrainSchedules => "db_get_train_schedules",
+            TrainInternalServiceApi::DbGetSeatTypes => "db_get_seat_types",
+            TrainInternalServiceApi::DbGetSeatTypeMappings => "db_get_seat_type_mappings",
         }
     }
 }

@@ -3,7 +3,10 @@ use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{DbRouteDTO, DbTrainDTO, TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO, TrainDTO,
+    TrainScheduleDTO,
+};
 use crate::ports::train::TrainPort;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
@@ -85,5 +88,28 @@ impl TrainPort for HttpTrainPortImpl {
             .get(TrainInternalServiceApi::DbGetRoutes)
             .await
             .inspect_err(|e| error!("Failed to get db routes: {:?}", e))
+    }
+
+    async fn db_get_train_schedule(&self) -> Result<Vec<DbTrainScheduleDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::DbGetTrainSchedules)
+            .await
+            .inspect_err(|e| error!("Failed to get db train schedules: {:?}", e))
+    }
+
+    async fn db_get_seat_type(&self) -> Result<Vec<DbSeatTypeDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::DbGetSeatTypes)
+            .await
+            .inspect_err(|e| error!("Failed to get db seat types: {:?}", e))
+    }
+
+    async fn db_get_seat_type_mapping(
+        &self,
+    ) -> Result<Vec<DbSeatTypeMappingDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::DbGetSeatTypeMappings)
+            .await
+            .inspect_err(|e| error!("Failed to get db seat type mappings: {:?}", e))
     }
 }
