@@ -21,7 +21,7 @@ resources:
   - frontend.yaml
   - gateway-nginx.yaml
   - ingress.yaml
-  - hpa-backend.yaml
+  - hpa.yaml
   - metrics-server.yaml
 images:
   - name: saitewasreset/swiftjourney-user
