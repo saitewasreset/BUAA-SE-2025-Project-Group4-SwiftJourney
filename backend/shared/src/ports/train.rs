@@ -1,9 +1,11 @@
 use crate::api::InternalApiError;
 use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
+    VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{TrainDTO, TrainScheduleDTO};
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 
 #[async_trait]
 pub trait TrainPort: 'static + Send + Sync {
@@ -20,5 +22,12 @@ pub trait TrainPort: 'static + Send + Sync {
     async fn get_terminal_arrival_time(
         &self,
         query: GetTerminalArrivalTimeQuery,
-    ) -> Result<Option<TerminalArrivalTimeDTO>, InternalApiError>;
+    ) -> Result<DateTime<FixedOffset>, InternalApiError>;
+
+    async fn get_trains(&self) -> Result<Vec<TrainDTO>, InternalApiError>;
+
+    async fn verify_train_number(
+        &self,
+        query: VerifyTrainNumberQuery,
+    ) -> Result<bool, InternalApiError>;
 }

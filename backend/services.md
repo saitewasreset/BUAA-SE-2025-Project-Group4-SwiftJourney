@@ -76,11 +76,11 @@ Events：
 - `seat_type + seat_type_mapping: SeatTypeUpdatedEvent()`
   - `load_train_type`：`base/src/infrastructure/application/service/train_data.rs:218`
 - `HotelUpdatedEvent()`
-  - `load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
-  - `new_comment`：`base/src/infrastructure/application/service/hotel.rs:126`
+  - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
+  - `+new_comment`：`base/src/infrastructure/application/service/hotel.rs:126`
   - `process_hotel_orders`：`base/src/infrastructure/application/service/hotel_order.rs:336`
 - `HotelRoomTypeUpdatedEvent()`
-  - `load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
+  - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
 - `DishUpdatedEvent()`
   - `load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 - `TakeawayDishUpdatedEvent()`
@@ -206,6 +206,9 @@ Service:
 - Internal Service
   - `+get_train_by_number(train_number: String) -> Result<Train>`
   - `+get_train_schedule_by_train_id_and_origin_departure_time(train_id: TrainId, origin_departure_time: String) -> Result<Option<TrainSchedule>>`
+  - `+get_terminal_arrival_time(train_number: String, origin_departure_time: DateTimeWithTimeZone) -> Result<DateTimeWithTimeZone>`
+  - `+get_trains() -> Result<Vec<TrainDTO>>;`
+  - `+verify_train_number(train_number: String) -> Result<TrainNumber<Verified>>`
 - Domain Service
   - `TrainScheduleService`
     - `add_schedule(train_id: TrainId, date: NaiveDate) -> Result<()>;`

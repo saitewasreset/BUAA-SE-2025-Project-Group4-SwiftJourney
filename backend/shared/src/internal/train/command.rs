@@ -17,3 +17,8 @@ pub struct GetTerminalArrivalTimeQuery {
     pub train_number: String,
     pub origin_departure_time: DateTimeWithTimeZone,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyTrainNumberQuery {
+    pub train_number: String,
+}

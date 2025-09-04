@@ -1,10 +1,12 @@
 use crate::api::{ApiEndpoint, InternalApiError, SuperClient, TrainInternalServiceApi};
 use crate::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
+    VerifyTrainNumberQuery,
 };
-use crate::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
+use crate::internal::train::dto::{TrainDTO, TrainScheduleDTO};
 use crate::ports::train::TrainPort;
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 use tracing::error;
 
 pub struct HttpTrainPortImpl {
@@ -47,10 +49,27 @@ impl TrainPort for HttpTrainPortImpl {
     async fn get_terminal_arrival_time(
         &self,
         query: GetTerminalArrivalTimeQuery,
-    ) -> Result<Option<TerminalArrivalTimeDTO>, InternalApiError> {
+    ) -> Result<DateTime<FixedOffset>, InternalApiError> {
         self.super_client
             .post(TrainInternalServiceApi::GetTerminalArrivalTime, query)
             .await
             .inspect_err(|e| error!("Failed to get terminal arrival time: {:?}", e))
+    }
+
+    async fn get_trains(&self) -> Result<Vec<TrainDTO>, InternalApiError> {
+        self.super_client
+            .get(TrainInternalServiceApi::GetTrains)
+            .await
+            .inspect_err(|e| error!("Failed to get trains: {:?}", e))
+    }
+
+    async fn verify_train_number(
+        &self,
+        query: VerifyTrainNumberQuery,
+    ) -> Result<bool, InternalApiError> {
+        self.super_client
+            .post(TrainInternalServiceApi::VerifyTrainNumber, query)
+            .await
+            .inspect_err(|e| error!("Failed to verify train number: {:?}", e))
     }
 }

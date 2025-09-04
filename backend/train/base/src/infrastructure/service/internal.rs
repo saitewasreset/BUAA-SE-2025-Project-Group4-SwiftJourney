@@ -1,43 +1,66 @@
 use crate::application::service::internal::{TrainInternalService, TrainInternalServiceError};
+use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::repository::train_schedule::TrainScheduleRepository;
+use crate::domain::service::train_type::{
+    TrainTypeConfigurationService, TrainTypeConfigurationServiceError,
+};
+use anyhow::anyhow;
 use async_trait::async_trait;
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset, TimeDelta};
 use shared::domain::RepositoryError;
 use shared::domain::model::train::{TrainId, TrainNumber};
-use shared::internal::train::command::{GetTrainByNumberQuery, GetTrainScheduleQuery};
-use shared::internal::train::dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO};
-use shared::{Verified, domain::RepositoryError};
+use shared::domain::{Identifiable, ServiceError};
+use shared::internal::train::command::{
+    GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
+    VerifyTrainNumberQuery,
+};
+use shared::internal::train::dto::{TrainDTO, TrainScheduleDTO};
 use std::sync::Arc;
-use tracing::{error, instrument};
+use tracing::{error, instrument, warn};
 
-pub struct TrainInternalServiceImpl<TR, TSR>
+pub struct TrainInternalServiceImpl<TR, TTS, TSR, RR>
 where
     TR: TrainRepository,
+    TTS: TrainTypeConfigurationService,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     train_repository: Arc<TR>,
+    train_type_configuration_service: Arc<TTS>,
     train_schedule_repository: Arc<TSR>,
+    route_repository: Arc<RR>,
 }
 
-impl<TR, TSR> TrainInternalServiceImpl<TR, TSR>
+impl<TR, TTS, TSR, RR> TrainInternalServiceImpl<TR, TTS, TSR, RR>
 where
     TR: TrainRepository,
+    TTS: TrainTypeConfigurationService,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
-    pub fn new(train_repository: Arc<TR>, train_schedule_repository: Arc<TSR>) -> Self {
+    pub fn new(
+        train_repository: Arc<TR>,
+        train_type_configuration_service: Arc<TTS>,
+        train_schedule_repository: Arc<TSR>,
+        route_repository: Arc<RR>,
+    ) -> Self {
         Self {
             train_repository,
+            train_type_configuration_service,
             train_schedule_repository,
+            route_repository,
         }
     }
 }
 
 #[async_trait]
-impl<TR, TSR> TrainInternalService for TrainInternalServiceImpl<TR, TSR>
+impl<TR, TTS, TSR, RR> TrainInternalService for TrainInternalServiceImpl<TR, TTS, TSR, RR>
 where
     TR: TrainRepository,
+    TTS: TrainTypeConfigurationService,
     TSR: TrainScheduleRepository,
+    RR: RouteRepository,
 {
     #[instrument(skip(self))]
     async fn get_train_by_number(
@@ -70,9 +93,6 @@ where
             .map_err(|_| {
                 TrainInternalServiceError::InvalidDateTimeFormat(query.origin_departure_time)
             })?;
-            .map_err(|_| {
-                TrainInternalServiceError::InvalidDateTimeFormat(query.origin_departure_time)
-            })?;
 
         let schedule = self
             .train_schedule_repository
@@ -88,18 +108,22 @@ where
     async fn get_terminal_arrival_time(
         &self,
         query: GetTerminalArrivalTimeQuery,
-    ) -> Result<Option<TerminalArrivalTimeDTO>, TrainInternalServiceError> {
+    ) -> Result<DateTime<FixedOffset>, TrainInternalServiceError> {
+        let train_number = self
+            .train_type_configuration_service
+            .verify_train_number(TrainNumber::from(query.train_number.clone()))
+            .await
+            .map_err(|e| TrainInternalServiceError::InvalidTrainNumber(query.train_number))?;
+
         let train = self
             .train_repository
             .find_by_train_number(train_number.clone())
             .await
-            .inspect_err(|e| error!("Failed to get train for verified train number: {}", e))
-            .map_err(|e| {
-                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
-            })?;
+            .inspect_err(|e| error!("Failed to get train for verified train number: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?;
 
         let train_id = train.get_id().expect("train should have id");
-        let origin_departure_date = origin_departure_time.date_naive();
+        let origin_departure_date = query.origin_departure_time.date_naive();
 
         let train_schedule = self
             .train_schedule_repository
@@ -107,20 +131,18 @@ where
             .await
             .inspect_err(|e| {
                 error!(
-                    "Failed to get train schedule for train {} on date {}: {}",
+                    "Failed to get train schedule for train {} on date {}: {:?}",
                     train_id, origin_departure_date, e
                 )
             })
-            .map_err(|e| {
-                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
-            })?
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?
             .ok_or_else(|| {
                 warn!(
                     "no train schedule found for train {} on date {}",
                     train_id, origin_departure_date
                 );
 
-                TrainScheduleServiceError::InvalidTrainNumber(train_number.to_string())
+                TrainInternalServiceError::InvalidTrainNumber(train_number.to_string())
             })?;
 
         let route_id = train_schedule.route_id();
@@ -129,16 +151,12 @@ where
             .route_repository
             .find(route_id)
             .await
-            .inspect_err(|e| error!("Failed to get route for train schedule: {}", e))
-            .map_err(|e| {
-                TrainScheduleServiceError::InfrastructureError(ServiceError::RepositoryError(e))
-            })?
-            .ok_or(TrainScheduleServiceError::InfrastructureError(
-                ServiceError::RepositoryError(RepositoryError::InconsistentState(anyhow!(
-                    "no route found for route id: {}",
-                    route_id
-                ))),
-            ))?;
+            .inspect_err(|e| error!("Failed to get route for train schedule: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?
+            .ok_or(TrainInternalServiceError::RelatedServiceError(anyhow!(
+                "no route found for route id: {}",
+                route_id
+            )))?;
 
         let terminal_stop = route
             .stops()
@@ -148,9 +166,43 @@ where
 
         let terminal_arrival_offset = terminal_stop.arrival_time() as i64;
 
-        let arrival_time = origin_departure_time + TimeDelta::seconds(terminal_arrival_offset);
+        let arrival_time =
+            query.origin_departure_time + TimeDelta::seconds(terminal_arrival_offset);
 
         Ok(arrival_time)
     }
-}
 
+    #[instrument(skip(self))]
+    async fn get_trains(&self) -> Result<Vec<TrainDTO>, TrainInternalServiceError> {
+        let trains = self
+            .train_type_configuration_service
+            .get_trains()
+            .await
+            .inspect_err(|e| error!("Failed to get trains: {:?}", e))
+            .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?;
+
+        Ok(trains.into_iter().map(|x| x.into()).collect())
+    }
+
+    #[instrument(skip(self))]
+    async fn verify_train_number(
+        &self,
+        query: VerifyTrainNumberQuery,
+    ) -> Result<bool, TrainInternalServiceError> {
+        match self
+            .train_type_configuration_service
+            .verify_train_number(TrainNumber::from(query.train_number))
+            .await
+        {
+            Ok(_for_super_earth) => Ok(true),
+            Err(e) => match e {
+                TrainTypeConfigurationServiceError::InvalidTrainNumber(_) => Ok(false),
+                other => {
+                    error!("Failed to verify train number: {:?}", other);
+
+                    Err(TrainInternalServiceError::RelatedServiceError(other.into()))
+                }
+            },
+        }
+    }
+}

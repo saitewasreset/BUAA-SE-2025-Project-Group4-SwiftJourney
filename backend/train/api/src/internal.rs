@@ -1,13 +1,15 @@
 use actix_web::{
-    post,
+    get, post,
     web::{self, Bytes, Data},
 };
+use chrono::{DateTime, FixedOffset};
+use shared::internal::train::command::{GetTerminalArrivalTimeQuery, VerifyTrainNumberQuery};
 use shared::{
     api::{ApiResponse, ApplicationErrorBox, parse_request_body},
     application_error::ApplicationError,
     internal::train::{
         command::{GetTrainByNumberQuery, GetTrainScheduleQuery},
-        dto::{TerminalArrivalTimeDTO, TrainDTO, TrainScheduleDTO},
+        dto::{TrainDTO, TrainScheduleDTO},
     },
 };
 use train_base::application::service::internal::TrainInternalService;
@@ -46,11 +48,38 @@ pub async fn get_train_schedule(
 pub async fn get_terminal_arrival_time(
     body: Bytes,
     train_internal_service: Data<dyn TrainInternalService>,
-) -> Result<ApiResponse<Option<TerminalArrivalTimeDTO>>, ApplicationErrorBox> {
+) -> Result<ApiResponse<DateTime<FixedOffset>>, ApplicationErrorBox> {
     let query: GetTerminalArrivalTimeQuery = parse_request_body(body)?;
 
     let result = train_internal_service
         .get_terminal_arrival_time(query)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
+#[get("/get_trains")]
+pub async fn get_trains(
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<Vec<TrainDTO>>, ApplicationErrorBox> {
+    let result = train_internal_service
+        .get_trains()
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
+#[post("/verify_train_number")]
+pub async fn verify_train_number(
+    body: Bytes,
+    train_internal_service: Data<dyn TrainInternalService>,
+) -> Result<ApiResponse<bool>, ApplicationErrorBox> {
+    let query: VerifyTrainNumberQuery = parse_request_body(body)?;
+
+    let result = train_internal_service
+        .verify_train_number(query)
         .await
         .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
 

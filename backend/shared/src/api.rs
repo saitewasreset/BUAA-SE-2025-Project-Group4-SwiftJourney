@@ -269,6 +269,8 @@ pub enum TrainInternalServiceApi {
     GetTrainByNumber,
     GetTrainScheduleByTrainIdAndOriginDepartureTime,
     GetTerminalArrivalTime,
+    GetTrains,
+    VerifyTrainNumber,
 }
 
 impl InternalApi for TrainInternalServiceApi {
@@ -279,6 +281,8 @@ impl InternalApi for TrainInternalServiceApi {
                 "get_train_schedule_by_train_id_and_origin_departure_time"
             }
             TrainInternalServiceApi::GetTerminalArrivalTime => "get_terminal_arrival_time",
+            TrainInternalServiceApi::GetTrains => "get_trains",
+            TrainInternalServiceApi::VerifyTrainNumber => "verify_train_number",
         }
     }
 }

@@ -34,11 +34,6 @@ pub struct TrainScheduleDTO {
     pub seat_availability_map: HashMap<StationRangeDTO, HashMap<SeatTypeDTO, u64>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TerminalArrivalTimeDTO {
-    pub time: DateTimeWithTimeZone,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StationRangeDTO {
     pub from_station_id: u64,
