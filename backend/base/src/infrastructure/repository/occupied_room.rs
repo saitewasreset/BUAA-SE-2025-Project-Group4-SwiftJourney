@@ -221,7 +221,7 @@ impl OccupiedRoomRepository for OccupiedRoomRepositoryImpl {
     "occupied_room"."begin_date",
     "occupied_room"."end_date",
     "occupied_room"."person_info_id"
-FROM "occupied_room" 
+FROM "occupied_room"
     INNER JOIN "hotel_order"
         ON "occupied_room"."hotel_id" = "hotel_order"."hotel_id"
                AND "occupied_room"."room_type_id" = "hotel_order"."hotel_room_type_id"
@@ -272,5 +272,243 @@ WHERE
         tx.commit().await.context("Failed to commit transaction")?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+    use sea_orm::{ConnectionTrait, Database, DbBackend, DbConn, Schema, Statement};
+
+    use crate::models::occupied_room;
+
+    // ============ 内存数据库初始化 ============
+    async fn setup_in_memory_db() -> DbConn {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        // occupied_room 表
+        let stmt = schema.create_table_from_entity(occupied_room::Entity);
+        db.execute(db.get_database_backend().build(&stmt))
+            .await
+            .unwrap();
+
+        // hotel_order 表（find_by_order_uuid 用到 join）
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            r#"
+        CREATE TABLE hotel_order (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL,
+            hotel_id INTEGER NOT NULL,
+            hotel_room_type_id INTEGER NOT NULL,
+            begin_date TEXT NOT NULL,
+            end_date TEXT NOT NULL
+        )
+        "#
+            .to_owned(),
+        ))
+        .await
+        .unwrap();
+
+        // person_info 表
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            r#"
+        CREATE TABLE person_info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT
+        )
+        "#
+            .to_owned(),
+        ))
+        .await
+        .unwrap();
+
+        // hotel_room_type 表
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            r#"
+        CREATE TABLE hotel_room_type (
+            id INTEGER PRIMARY KEY AUTOINCREMENT
+        )
+        "#
+            .to_owned(),
+        ))
+        .await
+        .unwrap();
+
+        // hotel 表
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            r#"
+        CREATE TABLE hotel (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        )
+        "#
+            .to_owned(),
+        ))
+        .await
+        .unwrap();
+
+        // 插入一个 hotel 记录，保证 hotel_order 外键能用
+        db.execute(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            "INSERT INTO hotel (id, name) VALUES (?1, ?2)",
+            vec![1.into(), "Test Hotel".into()],
+        ))
+        .await
+        .unwrap();
+
+        // 插入测试需要的依赖数据
+        db.execute(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            "INSERT INTO person_info (id) VALUES (?1)",
+            vec![100.into()],
+        ))
+        .await
+        .unwrap();
+
+        db.execute(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            "INSERT INTO hotel_room_type (id) VALUES (?1)",
+            vec![10.into()],
+        ))
+        .await
+        .unwrap();
+
+        db
+    }
+
+    fn sample_room(id: Option<u64>) -> OccupiedRoom {
+        let hotel_id = HotelId::from_db_value(1).unwrap();
+        let room_type_id = HotelRoomTypeId::from_db_value(10).unwrap();
+        let personal_id = PersonalInfoId::from_db_value(100).unwrap();
+        let date_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 1, 4).unwrap(),
+        )
+        .unwrap();
+
+        OccupiedRoom::new(
+            id.map(|i| OccupiedRoomId::from_db_value(i as i32).unwrap()),
+            hotel_id,
+            room_type_id,
+            date_range,
+            personal_id,
+        )
+    }
+
+    // ============ 测试用例 ============
+
+    #[tokio::test]
+    async fn test_save_and_find_success() {
+        let db = setup_in_memory_db().await;
+        let repo = OccupiedRoomRepositoryImpl::new(db);
+
+        let mut room = sample_room(None);
+        let id = repo.save(&mut room).await.unwrap();
+
+        let loaded = repo.find(id).await.unwrap().unwrap();
+        assert_eq!(loaded.hotel_id(), room.hotel_id());
+    }
+
+    #[tokio::test]
+    async fn test_update_success() {
+        let db = setup_in_memory_db().await;
+        let repo = OccupiedRoomRepositoryImpl::new(db);
+
+        let mut room = sample_room(None);
+        let id = repo.save(&mut room).await.unwrap();
+
+        // 修改日期
+        let loaded: OccupiedRoom = repo.find(id).await.unwrap().unwrap();
+        let new_range = HotelDateRange::new(
+            NaiveDate::from_ymd_opt(2025, 2, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 2, 4).unwrap(),
+        )
+        .unwrap();
+        let mut new_room = OccupiedRoom::new(
+            Some(id),
+            loaded.hotel_id(),
+            loaded.hotel_room_type_id(),
+            new_range,
+            loaded.personal_info(),
+        );
+
+        repo.save(&mut new_room).await.unwrap();
+
+        let updated = repo.find(id).await.unwrap().unwrap();
+        assert_eq!(
+            updated.booking_date_range().begin_date(),
+            NaiveDate::from_ymd_opt(2025, 2, 1).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_success() {
+        let db = setup_in_memory_db().await;
+        let repo = OccupiedRoomRepositoryImpl::new(db);
+
+        let mut room = sample_room(None);
+        let id = repo.save(&mut room).await.unwrap();
+
+        repo.remove(room).await.unwrap();
+        let found = repo.find(id).await.unwrap();
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_date_range() {
+        let db = setup_in_memory_db().await;
+        let repo = OccupiedRoomRepositoryImpl::new(db);
+
+        let mut room = sample_room(None);
+        repo.save(&mut room).await.unwrap();
+
+        let results = repo
+            .find_by_date_range(
+                HotelId::from_db_value(1).unwrap(),
+                HotelDateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 1, 4).unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_save_count_and_remove_many() {
+        let db = setup_in_memory_db().await;
+        let repo = OccupiedRoomRepositoryImpl::new(db);
+
+        let room = sample_room(None);
+        repo.save_count(&room, 3).await.unwrap();
+
+        let results = repo
+            .find_by_date_range(
+                HotelId::from_db_value(1).unwrap(),
+                *room.booking_date_range(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 3);
+
+        repo.remove_many(results.clone()).await.unwrap();
+
+        let results_after = repo
+            .find_by_date_range(
+                HotelId::from_db_value(1).unwrap(),
+                *room.booking_date_range(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(results_after.len(), 0);
     }
 }
