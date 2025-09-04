@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use shared::domain::ServiceError;
 use shared::domain::model::order::{Order, OrderStatus, TrainOrder};
-use shared::domain::{Identifiable, RepositoryError};
+use shared::domain::Identifiable;
 use shared::internal::order::command::{OrderByUuidQuery, UpdateOrdersCommand};
 use shared::ports::order::OrderPort;
 use std::any::Any;

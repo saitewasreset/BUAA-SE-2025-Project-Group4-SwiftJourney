@@ -16,16 +16,17 @@ use crate::application::commands::train_data::{
 };
 use crate::application::service::train_data::TrainDataService;
 use crate::domain::repository::route::RouteRepository;
-use crate::domain::repository::train::TrainRepository;
 use crate::infrastructure::repository::train::{save_raw_train_number, save_raw_train_type};
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
 use shared::application_error::{ApplicationError, GeneralError, ModeError};
 use shared::data::{DishData, TakeawayData};
+use shared::event::queue::EventService;
+use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
 use shared::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
+use shared::ports::dish::DishPort;
 use shared::ports::geo::GeoPort;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, instrument, warn};
 
@@ -46,24 +47,27 @@ use tracing::{error, instrument, warn};
 /// - `station_repository`: 火车站仓储
 /// - `train_repository`: 列车仓储
 /// - `route_repository`: 路线仓储
-pub struct TrainDataServiceImpl<GP, T, R>
+pub struct TrainDataServiceImpl<GP, R, DP, ES>
 where
     GP: GeoPort,
-    T: TrainRepository,
     R: RouteRepository,
+    DP: DishPort,
+    ES: EventService,
 {
     debug: bool,
-    data_path: PathBuf,
     geo_port: Arc<GP>,
-    train_repository: Arc<T>,
     route_repository: Arc<R>,
+    dish_port: Arc<DP>,
+    event_service: Arc<ES>,
+    db: DatabaseConnection,
 }
 
-impl<GP, T, R> TrainDataServiceImpl<GP, T, R>
+impl<GP, R, DP, ES> TrainDataServiceImpl<GP, R, DP, ES>
 where
     GP: GeoPort,
-    T: TrainRepository,
     R: RouteRepository,
+    DP: DishPort,
+    ES: EventService,
 {
     /// 创建新的火车数据加载服务实例
     ///
@@ -79,17 +83,19 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         debug: bool,
-        data_path: PathBuf,
         geo_port: Arc<GP>,
-        train_repository: Arc<T>,
         route_repository: Arc<R>,
+        dish_port: Arc<DP>,
+        event_service: Arc<ES>,
+        db: DatabaseConnection,
     ) -> Self {
         Self {
             debug,
-            data_path,
             geo_port,
-            train_repository,
             route_repository,
+            dish_port,
+            event_service,
+            db,
         }
     }
 
@@ -113,11 +119,12 @@ where
 }
 
 #[async_trait]
-impl<GP, T, R> TrainDataService for TrainDataServiceImpl<GP, T, R>
+impl<GP, R, DP, ES> TrainDataService for TrainDataServiceImpl<GP, R, DP, ES>
 where
     GP: GeoPort,
-    T: TrainRepository,
     R: RouteRepository,
+    DP: DishPort,
+    ES: EventService,
 {
     /// 检查是否启用调试模式
     ///
@@ -149,7 +156,7 @@ where
             .save_city_province_map(SaveCityProvinceMapCommand { city_province_map })
             .await
             .inspect_err(|e| error!("Error saving city province: {:?}", e))
-            .map_err(|e| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(())
     }
@@ -180,7 +187,7 @@ where
             .save_station_city_map(SaveStationCityMapCommand { station_city_map })
             .await
             .inspect_err(|e| error!("Error saving stations: {:?}", e))
-            .map_err(|e| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(())
     }
@@ -201,11 +208,10 @@ where
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        save_raw_train_type(db, command).await.map_err(|e| {
+        save_raw_train_type(&self.db, command).await.map_err(|e| {
             error!("Error saving train type: {:?}", e);
             GeneralError::InternalServerError
         })?;
@@ -229,16 +235,20 @@ where
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        save_raw_train_number(command, Arc::clone(&self.route_repository), db)
-            .await
-            .map_err(|e| {
-                error!("Error saving train number: {:?}", e);
-                GeneralError::InternalServerError
-            })?;
+        save_raw_train_number(
+            command,
+            Arc::clone(&self.route_repository),
+            &self.db,
+            Arc::clone(&self.event_service) as Arc<dyn EventService>,
+        )
+        .await
+        .map_err(|e| {
+            error!("Error saving train number: {:?}", e);
+            GeneralError::InternalServerError
+        })?;
 
         Ok(())
     }
@@ -246,7 +256,6 @@ where
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>> {
         let mut dish_data: DishData = HashMap::new();
         let mut takeaway_data: TakeawayData = HashMap::new();
@@ -272,31 +281,19 @@ where
             }
         }
 
-        save_raw_dish(
-            dish_data,
-            &self.data_path,
-            Arc::clone(&self.train_repository),
-            Arc::clone(&self.object_storage_service),
-            db,
-        )
-        .await
-        .inspect_err(|e| {
-            error!("Error saving dish data: {:?}", e);
-        })
-        .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+        self.dish_port
+            .save_raw_dish(SaveRawDishCommand { dish: dish_data })
+            .await
+            .inspect_err(|e| error!("Error saving dish data: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
-        save_raw_takeaway(
-            takeaway_data,
-            &self.data_path,
-            Arc::clone(&self.takeaway_shop_repository),
-            Arc::clone(&self.station_repository),
-            Arc::clone(&self.object_storage_service),
-        )
-        .await
-        .inspect_err(|e| {
-            error!("Error saving takeaway data: {:?}", e);
-        })
-        .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+        self.dish_port
+            .save_raw_takeaway(SaveRawTakeawayCommand {
+                takeaway: takeaway_data,
+            })
+            .await
+            .inspect_err(|e| error!("Error while saving takeaway data: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(())
     }

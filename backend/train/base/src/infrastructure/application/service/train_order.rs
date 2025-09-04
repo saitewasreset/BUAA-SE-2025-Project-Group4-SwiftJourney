@@ -22,7 +22,6 @@ use shared::domain::model::order::{
     BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo, TrainOrder,
 };
 use shared::domain::model::personal_info::{PersonalInfoId, PreferredSeatLocation};
-use shared::domain::model::session::SessionId;
 use shared::domain::model::station::StationId;
 use shared::domain::model::train::SeatTypeName;
 use shared::domain::model::train_schedule::StationRange;
@@ -185,7 +184,7 @@ where
             .db_get_stations()
             .await
             .inspect_err(|e| error!("Failed to load db stations: {:?}", e))
-            .map_err(|e| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         let station_map = db_station_list
             .into_iter()
@@ -306,7 +305,7 @@ where
             .db_get_personal_info()
             .await
             .inspect_err(|e| error!("Failed to get db personal info: {:?}", e))
-            .map_err(|e| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         let personal_info = personal_infos
             .into_iter()

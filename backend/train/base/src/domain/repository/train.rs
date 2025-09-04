@@ -8,7 +8,6 @@
 //! 注意：具体实现应放在基础设施层(`infrastructure::repository`)。
 use async_trait::async_trait;
 use shared::Verified;
-use shared::api::InternalApiError;
 use shared::domain::model::train::{SeatTypeName, Train, TrainId, TrainNumber, TrainType};
 use shared::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use shared::domain::{Repository, RepositoryError};

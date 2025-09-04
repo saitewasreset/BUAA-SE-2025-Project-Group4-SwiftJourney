@@ -22,7 +22,6 @@ use crate::DbId;
 use crate::Verified;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::repository::train::TrainRepository;
-use crate::infrastructure::service::event::TrainEventServiceImpl;
 use crate::models::train::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -31,7 +30,6 @@ use sea_orm::{ActiveValue, DatabaseConnection, DbErr};
 use sea_orm::{ColumnTrait, ModelTrait};
 use sea_orm::{EntityTrait, TransactionTrait};
 use sea_orm::{QueryFilter, Select};
-use shared::api::InternalApiError;
 use shared::data::{TrainNumberData, TrainTypeData};
 use shared::domain::model::route::RouteId;
 use shared::domain::model::train::{

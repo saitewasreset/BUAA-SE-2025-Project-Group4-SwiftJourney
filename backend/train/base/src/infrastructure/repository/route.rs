@@ -14,7 +14,6 @@
 //! - 严格的数据一致性检查
 use crate::DbId;
 use crate::domain::repository::route::RouteRepository;
-use crate::models::train::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use sea_orm::{ActiveValue, DatabaseBackend, DatabaseConnection, Statement};

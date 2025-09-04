@@ -9,7 +9,6 @@ use crate::application::service::train_query::{
     TrainQueryService, TrainQueryServiceError, TransferSolutionDTO, TransferTrainQueryDTO,
 };
 use crate::domain::repository::route::RouteRepository;
-use crate::domain::repository::station::StationRepository;
 use crate::domain::repository::train::TrainRepository;
 use crate::domain::service::route::RouteService;
 use crate::domain::service::train_schedule::{TrainScheduleService, TrainScheduleServiceError};
@@ -77,7 +76,7 @@ where
             .db_get_stations()
             .await
             .inspect_err(|e| error!("Failed to get db stations: {:?}", e))
-            .map_err(|e| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(db_station_list
             .into_iter()
@@ -92,7 +91,9 @@ where
             .get_city_station_info()
             .await
             .inspect_err(|e| error!("Failed to get city station info: {:?}", e))
-            .map_err(|e| Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)
+            .map_err(|_for_super_earth| {
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })
     }
 
     fn resolve_station_ids(

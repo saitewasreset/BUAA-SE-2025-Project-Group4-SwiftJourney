@@ -3,17 +3,22 @@ use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
+use shared::ports::impls::dish::HttpDishPortImpl;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
 use shared::ports::impls::user::HttpUserPortImpl;
+use std::env;
+use std::env::VarError;
 use std::sync::Arc;
 use tokio;
 use tracing_actix_web::TracingLogger;
 use train_api::internal::scoped_config as internal_scoped_config;
 use train_base::application::service::internal::TrainInternalService;
+use train_base::application::service::train_data::TrainDataService;
 use train_base::application::service::train_order::TrainOrderService;
 use train_base::application::service::train_query::TrainQueryService;
 use train_base::domain::service::train_schedule::TrainScheduleService;
+use train_base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use train_base::infrastructure::application::service::train_order::TrainOrderServiceImpl;
 use train_base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
 use train_base::infrastructure::repository::route::RouteRepositoryImpl;
@@ -51,6 +56,12 @@ async fn main() -> std::io::Result<()> {
         None => 14,
     };
 
+    let debug_mode = match env::var("DEBUG") {
+        Ok(_) => true,
+        Err(VarError::NotPresent) => false,
+        Err(VarError::NotUnicode(_)) => true,
+    };
+
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
     let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
 
@@ -74,6 +85,10 @@ async fn main() -> std::io::Result<()> {
 
     let user_port = Arc::new(HttpUserPortImpl::new(
         MicroService::User.internal_api_endpoint(),
+    ));
+
+    let dish_port = Arc::new(HttpDishPortImpl::new(
+        MicroService::Dish.internal_api_endpoint(),
     ));
 
     // Domain Services
@@ -106,6 +121,7 @@ async fn main() -> std::io::Result<()> {
     .expect("cannot connect to rabbitmq");
 
     train_event_service_impl
+        .clone()
         .init_consumer()
         .await
         .expect("failed to init event consumer");
@@ -143,15 +159,28 @@ async fn main() -> std::io::Result<()> {
 
     let train_internal_service_impl = Arc::new(TrainInternalServiceImpl::new(
         train_repo.clone(),
+        train_type_config_service.clone(),
         train_schedule_repo.clone(),
+        route_repo.clone(),
+    ));
+
+    let train_data_service_impl = Arc::new(TrainDataServiceImpl::new(
+        debug_mode,
+        Arc::clone(&geo_port),
+        Arc::clone(&route_repo),
+        Arc::clone(&dish_port),
+        Arc::clone(&train_event_service_impl),
+        conn.clone(),
     ));
 
     let train_query_service: web::Data<dyn TrainQueryService> =
-        web::Data::from(train_query_service_impl);
+        web::Data::from(train_query_service_impl as Arc<dyn TrainQueryService>);
     let train_order_service: web::Data<dyn TrainOrderService> =
-        web::Data::from(train_order_service_impl);
+        web::Data::from(train_order_service_impl as Arc<dyn TrainOrderService>);
     let train_internal_service: web::Data<dyn TrainInternalService> =
-        web::Data::from(train_internal_service_impl);
+        web::Data::from(train_internal_service_impl as Arc<dyn TrainInternalService>);
+    let train_data_service: web::Data<dyn TrainDataService> =
+        web::Data::from(train_data_service_impl as Arc<dyn TrainDataService>);
 
     {
         let train_schedule_service_impl = Arc::clone(&train_schedule_service_impl);
@@ -182,9 +211,11 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(train_query_service.clone())
             .app_data(train_order_service.clone())
+            .app_data(train_data_service.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
             .service(web::scope("/api/train").configure(train_api::train::scoped_config))
+            .service(web::scope("/api/data").configure(train_api::data::scoped_config))
     })
     .bind(("0.0.0.0", 8080))?
     .run()

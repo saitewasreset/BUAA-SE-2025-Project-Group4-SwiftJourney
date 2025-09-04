@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use shared::application_error::ApplicationError;
 use shared::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
@@ -17,6 +18,20 @@ pub enum TrainInternalServiceError {
 
     #[error(transparent)]
     RelatedServiceError(#[from] anyhow::Error),
+}
+
+impl ApplicationError for TrainInternalServiceError {
+    fn error_code(&self) -> u32 {
+        match self {
+            TrainInternalServiceError::InvalidDateTimeFormat(_) => 92001,
+            TrainInternalServiceError::InvalidTrainNumber(_) => 92002,
+            TrainInternalServiceError::RelatedServiceError(_) => 92003,
+        }
+    }
+
+    fn error_message(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[async_trait]

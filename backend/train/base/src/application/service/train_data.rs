@@ -8,13 +8,12 @@
 //!
 //! 主要功能通过[`TrainDataService`] trait定义，包含各类基础数据的加载方法。
 //! 该服务由基础设施层实现，供应用层调用以初始化系统基础数据。
-use shared::application_error::ApplicationError;
 use crate::application::commands::train_data::{
     LoadCityCommand, LoadDishTakeawayCommand, LoadStationCommand, LoadTrainNumberCommand,
     LoadTrainTypeCommand,
 };
 use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
+use shared::application_error::ApplicationError;
 
 /// 列车数据服务接口
 ///
@@ -60,7 +59,6 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_type(
         &self,
         command: LoadTrainTypeCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     /// 加载列车车次数据
@@ -73,12 +71,10 @@ pub trait TrainDataService: 'static + Send + Sync {
     async fn load_train_number(
         &self,
         command: LoadTrainNumberCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 
     async fn load_dish_takeaway(
         &self,
         command: LoadDishTakeawayCommand,
-        db: &DatabaseConnection,
     ) -> Result<(), Box<dyn ApplicationError>>;
 }

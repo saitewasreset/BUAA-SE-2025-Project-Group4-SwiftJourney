@@ -8,9 +8,9 @@ use crate::domain::service::train_type::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, TimeDelta};
+use shared::domain::Identifiable;
 use shared::domain::RepositoryError;
 use shared::domain::model::train::{TrainId, TrainNumber};
-use shared::domain::{Identifiable, ServiceError};
 use shared::internal::train::command::{
     GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, GetTrainScheduleQuery,
     VerifyTrainNumberQuery,
@@ -113,7 +113,9 @@ where
             .train_type_configuration_service
             .verify_train_number(TrainNumber::from(query.train_number.clone()))
             .await
-            .map_err(|e| TrainInternalServiceError::InvalidTrainNumber(query.train_number))?;
+            .map_err(|_for_super_earth| {
+                TrainInternalServiceError::InvalidTrainNumber(query.train_number)
+            })?;
 
         let train = self
             .train_repository
