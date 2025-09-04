@@ -9,10 +9,10 @@ use crate::domain::{
     DbId, DbRepositorySupport, Diff, DiffType, Identifiable, MultiEntityDiff, RepositoryError,
     TypedDiff,
 };
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use sea_orm::{
     ActiveValue, DatabaseBackend, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue,
     Statement, TransactionTrait,
@@ -692,4 +692,200 @@ pub async fn save_raw_takeaway<
         })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::route::RouteId;
+    use crate::domain::model::station::StationId;
+    use crate::domain::model::takeaway::{TakeawayDish, TakeawayShop};
+    use crate::models::city::ActiveModel;
+    use rust_decimal::Decimal;
+    use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, Set};
+
+    async fn setup_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let builder = db.get_database_backend();
+        let schema = sea_orm::Schema::new(builder);
+
+        // 建表顺序：city -> station -> route -> takeaway_shop -> takeaway_dish
+        db.execute(builder.build(&schema.create_table_from_entity(crate::models::city::Entity)))
+            .await
+            .unwrap();
+        db.execute(builder.build(&schema.create_table_from_entity(crate::models::station::Entity)))
+            .await
+            .unwrap();
+        db.execute(builder.build(&schema.create_table_from_entity(crate::models::route::Entity)))
+            .await
+            .unwrap();
+        db.execute(
+            builder.build(&schema.create_table_from_entity(crate::models::takeaway_shop::Entity)),
+        )
+        .await
+        .unwrap();
+        db.execute(
+            builder.build(&schema.create_table_from_entity(crate::models::takeaway_dish::Entity)),
+        )
+        .await
+        .unwrap();
+
+        db
+    }
+
+    async fn insert_city(db: &DatabaseConnection, id: i32, name: &str) {
+        let city = ActiveModel {
+            id: Set(id),
+            name: Set(name.to_string()),
+            province: Set("province".to_string()),
+        };
+        city.insert(db).await.unwrap();
+    }
+
+    async fn insert_station(db: &DatabaseConnection, id: i32, name: &str, city_id: i32) {
+        let station = crate::models::station::ActiveModel {
+            id: Set(id),
+            name: Set(name.to_string()),
+            city_id: Set(city_id),
+        };
+        station.insert(db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_on_insert_and_select() {
+        let db = setup_db().await;
+
+        insert_city(&db, 1, "CityA").await;
+        insert_station(&db, 1, "StationA", 1).await;
+
+        let repo = TakeawayShopRepositoryImpl::new(db.clone());
+
+        // 创建 TakeawayShop + Dish
+        let mut shop = TakeawayShop::new("ShopA".to_string(), StationId::from_db_value(1).unwrap());
+        let dish = TakeawayDish::new(
+            None,
+            None,
+            "DishA".to_string(),
+            "TypeA".to_string(),
+            Decimal::from_f64(12.5).unwrap(),
+            vec![],
+        );
+        shop.add_dish(dish);
+
+        // 正向测试：插入
+        let shop_id = repo.on_insert(shop.clone()).await.unwrap();
+        assert!(shop_id.to_db_value() > 0);
+
+        // 正向测试：查询
+        let fetched = repo.on_select(shop_id).await.unwrap();
+        assert!(fetched.is_some());
+        let fetched = fetched.unwrap();
+        assert_eq!(fetched.name(), "ShopA");
+        assert_eq!(fetched.dishes().len(), 1);
+
+        // 反向测试：查询不存在 ID
+        let not_found = repo
+            .on_select(TakeawayShopId::from_db_value(9999).unwrap())
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_on_delete() {
+        let db = setup_db().await;
+        insert_city(&db, 1, "CityA").await;
+        insert_station(&db, 1, "StationA", 1).await;
+
+        let repo = TakeawayShopRepositoryImpl::new(db.clone());
+
+        let mut shop = TakeawayShop::new("ShopC".to_string(), StationId::from_db_value(1).unwrap());
+        let dish = TakeawayDish::new(
+            None,
+            None,
+            "DishName".to_string(), // 必须非空
+            "TypeA".to_string(),
+            Decimal::from_f64(12.5).unwrap(),
+            vec![],
+        );
+        shop.add_dish(dish);
+
+        // 插入，获取生成的 id
+        let shop_id = repo.on_insert(shop.clone()).await.unwrap();
+
+        // 设置 shop 的 id 为插入后的 id
+        shop.set_id(shop_id);
+
+        // 删除成功
+        repo.on_delete(shop).await.unwrap();
+
+        // 删除后不可查询
+        let fetched = repo.on_select(shop_id).await.unwrap();
+        assert!(fetched.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_train_route() {
+        let db = setup_db().await;
+        insert_city(&db, 1, "CityA").await;
+        insert_station(&db, 1, "StationA", 1).await;
+
+        let repo = TakeawayShopRepositoryImpl::new(db.clone());
+
+        // 先插入一个 shop
+        let mut shop = TakeawayShop::new("ShopD".to_string(), StationId::from_db_value(1).unwrap());
+        let dish = TakeawayDish::new(
+            None,
+            None,
+            "DishName".to_string(), // 必须非空
+            "TypeA".to_string(),
+            Decimal::from_f64(12.5).unwrap(),
+            vec![],
+        );
+        shop.add_dish(dish);
+        repo.on_insert(shop).await.unwrap();
+
+        // route_id 不存在
+        let empty = repo
+            .find_by_train_route(RouteId::from_db_value(9999).unwrap())
+            .await
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_save_many_atomic() {
+        let db = setup_db().await;
+        insert_city(&db, 1, "CityA").await;
+        insert_station(&db, 1, "StationA", 1).await;
+
+        let repo = TakeawayShopRepositoryImpl::new(db.clone());
+
+        let mut shop1 =
+            TakeawayShop::new("ShopE1".to_string(), StationId::from_db_value(1).unwrap());
+        shop1.add_dish(TakeawayDish::new(
+            None,
+            None,
+            "Dish1".to_string(),
+            "".to_string(),
+            Decimal::from_f64(10.0).unwrap(),
+            vec![],
+        ));
+
+        let mut shop2 =
+            TakeawayShop::new("ShopE2".to_string(), StationId::from_db_value(1).unwrap());
+        shop2.add_dish(TakeawayDish::new(
+            None,
+            None,
+            "Dish2".to_string(),
+            "".to_string(),
+            Decimal::from_f64(15.0).unwrap(),
+            vec![],
+        ));
+
+        let shops = vec![shop1, shop2];
+
+        // 正向测试：批量保存
+        repo.save_many_atomic(shops).await.unwrap();
+    }
 }
