@@ -1,5 +1,6 @@
 use crate::DbId;
 use crate::domain::repository::hotel::HotelRepository;
+use crate::models::hotel::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -550,6 +551,25 @@ impl<GP> HotelRepository for HotelRepositoryImpl<GP>
 where
     GP: GeoPort + 'static + Send + Sync,
 {
+    #[instrument(skip(self))]
+    async fn load_all_hotel_raw(&self) -> Result<Vec<Model>, RepositoryError> {
+        crate::models::hotel::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load hotels: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
+
+    #[instrument(skip(self))]
+    async fn load_all_hotel_room_type_raw(
+        &self,
+    ) -> Result<Vec<crate::models::hotel_room_type::Model>, RepositoryError> {
+        crate::models::hotel_room_type::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load hotel room type: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
     async fn get_id_by_uuid(&self, uuid: Uuid) -> Result<Option<HotelId>, RepositoryError> {
         let result: Option<i32> = crate::models::hotel::Entity::find()
             .select_only()

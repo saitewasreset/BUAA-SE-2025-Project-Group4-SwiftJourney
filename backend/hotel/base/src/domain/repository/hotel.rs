@@ -7,6 +7,13 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait HotelRepository: Repository<Hotel> {
+    async fn load_all_hotel_raw(&self)
+    -> Result<Vec<crate::models::hotel::Model>, RepositoryError>;
+
+    async fn load_all_hotel_room_type_raw(
+        &self,
+    ) -> Result<Vec<crate::models::hotel_room_type::Model>, RepositoryError>;
+
     async fn get_id_by_uuid(&self, uuid: Uuid) -> Result<Option<HotelId>, RepositoryError>;
     async fn find_by_uuid(&self, uuid: Uuid) -> Result<Option<Hotel>, RepositoryError>;
     async fn find_by_city(

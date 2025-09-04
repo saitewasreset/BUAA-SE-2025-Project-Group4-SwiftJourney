@@ -265,6 +265,21 @@ impl InternalApi for GeoInternalServiceApi {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HotelInternalServiceApi {
+    DbGetHotels,
+    DbGetHotelRoomTypes,
+}
+
+impl InternalApi for HotelInternalServiceApi {
+    fn name(&self) -> &'static str {
+        match self {
+            HotelInternalServiceApi::DbGetHotels => "db_get_hotels",
+            HotelInternalServiceApi::DbGetHotelRoomTypes => "db_get_hotel_room_types",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TrainInternalServiceApi {
     GetTrainByNumber,
     GetTrainScheduleByTrainIdAndOriginDepartureTime,

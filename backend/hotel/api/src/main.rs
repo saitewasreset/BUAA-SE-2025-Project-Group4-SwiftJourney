@@ -5,9 +5,11 @@ use actix_web::{App, HttpServer, web};
 use hotel_base::application::service::hotel::HotelService;
 use hotel_base::application::service::hotel_data::HotelDataService;
 use hotel_base::application::service::hotel_order::HotelOrderService;
+use hotel_base::application::service::internal::HotelInternalService;
 use hotel_base::infrastructure::application::service::hotel::HotelServiceImpl;
 use hotel_base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
 use hotel_base::infrastructure::application::service::hotel_order::HotelOrderServiceImpl;
+use hotel_base::infrastructure::application::service::internal::HotelInternalServiceImpl;
 use hotel_base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use hotel_base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use hotel_base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
@@ -148,6 +150,10 @@ async fn main() -> std::io::Result<()> {
         Arc::clone(&event_service_impl),
     ));
 
+    let hotel_internal_service_impl = Arc::new(HotelInternalServiceImpl::new(Arc::clone(
+        &hotel_repository_impl,
+    )));
+
     let hotel_data_service: web::Data<dyn HotelDataService> =
         web::Data::from(hotel_data_service_impl as Arc<dyn HotelDataService>);
 
@@ -156,6 +162,24 @@ async fn main() -> std::io::Result<()> {
 
     let hotel_order_service: web::Data<dyn HotelOrderService> =
         web::Data::from(hotel_order_service_impl as Arc<dyn HotelOrderService>);
+
+    let hotel_internal_service: web::Data<dyn HotelInternalService> =
+        web::Data::from(hotel_internal_service_impl as Arc<dyn HotelInternalService>);
+
+    tokio::task::spawn(async move {
+        HttpServer::new(move || {
+            App::new()
+                .app_data(hotel_internal_service.clone())
+                .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
+                .wrap(TracingLogger::default())
+                .service(web::scope("/internal").configure(hotel_api::internal::scoped_config))
+        })
+        .bind(("0.0.0.0", 23333))
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
+    });
 
     HttpServer::new(move || {
         App::new()
