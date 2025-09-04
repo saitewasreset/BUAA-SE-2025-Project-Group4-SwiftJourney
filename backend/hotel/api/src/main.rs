@@ -10,6 +10,7 @@ use hotel_base::infrastructure::application::service::hotel::HotelServiceImpl;
 use hotel_base::infrastructure::application::service::hotel_data::HotelDataServiceImpl;
 use hotel_base::infrastructure::application::service::hotel_order::HotelOrderServiceImpl;
 use hotel_base::infrastructure::application::service::internal::HotelInternalServiceImpl;
+use hotel_base::infrastructure::messaging::order_status::HotelOrderStatusConsumer;
 use hotel_base::infrastructure::repository::hotel::HotelRepositoryImpl;
 use hotel_base::infrastructure::repository::hotel_rating::HotelRatingRepositoryImpl;
 use hotel_base::infrastructure::repository::occupied_room::OccupiedRoomRepositoryImpl;
@@ -19,9 +20,11 @@ use hotel_base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use hotel_base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::{Database, DatabaseConnection};
+use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
 use shared::MicroService;
 use shared::api::{AppConfig, MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
+use shared::messaging::order_status::RabbitMQOrderStatusConsumer;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -167,6 +170,18 @@ async fn main() -> std::io::Result<()> {
         web::Data::from(hotel_internal_service_impl as Arc<dyn HotelInternalService>);
 
     let db_data: web::Data<DatabaseConnection> = web::Data::new(conn.clone());
+
+    let hotel_order_status_consumer = Box::new(HotelOrderStatusConsumer::new(
+        Arc::clone(&hotel_booking_service_impl),
+        Arc::clone(&order_port_impl),
+    ));
+
+    let order_status_consumer =
+        vec![hotel_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
 
     tokio::task::spawn(async move {
         HttpServer::new(move || {

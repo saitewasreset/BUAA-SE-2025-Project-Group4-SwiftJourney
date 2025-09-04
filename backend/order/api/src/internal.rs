@@ -4,8 +4,8 @@ use order_base::application::service::internal::OrderInternalService;
 use shared::api::{ApiResponse, ApplicationErrorBox, parse_request_body};
 use shared::application_error::ApplicationError;
 use shared::internal::order::command::{
-    NewTransactionCommand, RefundTransactionCommand, UpdateOrdersCommand, UserOrderListQuery,
-    VerifyTrainOrderQuery,
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand, UpdateOrdersCommand,
+    UserOrderListQuery, VerifyTrainOrderQuery,
 };
 use shared::internal::order::dto::InternalOrderDTO;
 use uuid::Uuid;
@@ -70,6 +70,21 @@ pub async fn update_orders(
     ApiResponse::ok(())
 }
 
+#[post("/get_order_by_uuid")]
+pub async fn get_order_by_uuid(
+    body: Bytes,
+    order_internal_service: web::Data<dyn OrderInternalService>,
+) -> Result<ApiResponse<Option<InternalOrderDTO>>, ApplicationErrorBox> {
+    let query: OrderByUuidQuery = parse_request_body(body)?;
+
+    let result = order_internal_service
+        .get_order_by_uuid(query)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn ApplicationError>)?;
+
+    ApiResponse::ok(result)
+}
+
 #[post("/get_order_list_by_user_id")]
 pub async fn get_order_list_by_user_id(
     body: Bytes,
@@ -91,5 +106,6 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
         .service(refund_transaction)
         .service(verify_train_order)
         .service(update_orders)
-        .service(get_order_list_by_user_id);
+        .service(get_order_list_by_user_id)
+        .service(get_order_by_uuid);
 }
