@@ -32,7 +32,7 @@ pub async fn get_train_by_number(
     ApiResponse::ok(result)
 }
 
-#[post("/get_train_schedule")]
+#[post("/get_train_schedule_by_train_id_and_origin_departure_time")]
 pub async fn get_train_schedule(
     body: Bytes,
     train_internal_service: Data<dyn TrainInternalService>,
@@ -158,5 +158,6 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
         .service(db_get_routes)
         .service(db_get_train_schedules)
         .service(db_get_seat_types)
-        .service(db_get_seat_type_mappings);
+        .service(db_get_seat_type_mappings)
+        .service(get_terminal_arrival_time);
 }

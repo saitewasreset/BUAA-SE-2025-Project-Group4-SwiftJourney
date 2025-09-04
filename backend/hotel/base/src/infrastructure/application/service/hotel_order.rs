@@ -359,11 +359,15 @@ where
 
         let user_id = UserId::from(user.user_id);
 
+        error!("Before validate_and_create_hotel_order");
+
         let mut orders: Vec<Box<dyn Order>> = Vec::new();
         for order_dto in &hotel_orders {
             let order = self.validate_and_create_hotel_order(order_dto).await?;
             orders.push(order);
         }
+
+        error!("After validate_and_create_hotel_order");
 
         let total_amount = orders
             .iter()
