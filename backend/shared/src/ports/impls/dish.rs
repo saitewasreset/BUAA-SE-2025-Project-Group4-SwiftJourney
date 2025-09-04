@@ -2,6 +2,7 @@
 
 use crate::api::{ApiEndpoint, DishInternalServiceApi, InternalApiError, SuperClient}; // DishInternalServiceApi is assumed to exist, similar to TrainInternalServiceApi
 use crate::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
+use crate::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
 use crate::ports::dish::DishPort;
 use async_trait::async_trait;
 use tracing::error;
@@ -42,5 +43,19 @@ impl DishPort for HttpDishPortImpl {
             .post(DishInternalServiceApi::SaveRawTakeaway, command)
             .await
             .inspect_err(|e| error!("Failed to save raw takeaway: {:?}", e))
+    }
+
+    async fn db_get_dishes(&self) -> Result<Vec<DbDishDTO>, InternalApiError> {
+        self.super_client
+            .get(DishInternalServiceApi::DbGetDishes)
+            .await
+            .inspect_err(|e| error!("Failed to get db dishes: {:?}", e))
+    }
+
+    async fn db_get_takeaway_dishes(&self) -> Result<Vec<DbTakeawayDishDTO>, InternalApiError> {
+        self.super_client
+            .get(DishInternalServiceApi::DbGetTakeawayDishes)
+            .await
+            .inspect_err(|e| error!("Failed to get db takeaway dishes: {:?}", e))
     }
 }

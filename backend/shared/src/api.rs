@@ -316,6 +316,8 @@ impl InternalApi for TrainInternalServiceApi {
 pub enum DishInternalServiceApi {
     SaveRawDish,
     SaveRawTakeaway,
+    DbGetDishes,
+    DbGetTakeawayDishes,
 }
 
 impl InternalApi for DishInternalServiceApi {
@@ -323,6 +325,8 @@ impl InternalApi for DishInternalServiceApi {
         match self {
             DishInternalServiceApi::SaveRawDish => "save_raw_dish",
             DishInternalServiceApi::SaveRawTakeaway => "save_raw_takeaway",
+            DishInternalServiceApi::DbGetDishes => "db_get_dishes",
+            DishInternalServiceApi::DbGetTakeawayDishes => "db_get_takeaway_dishes",
         }
     }
 }

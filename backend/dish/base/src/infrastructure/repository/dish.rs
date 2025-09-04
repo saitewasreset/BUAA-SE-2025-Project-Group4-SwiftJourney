@@ -1,5 +1,6 @@
 use crate::DbId;
 use crate::domain::repository::dish::DishRepository;
+use crate::models::dish::Model;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -138,6 +139,14 @@ impl Repository<Dish> for DishRepositoryImpl {
 
 #[async_trait]
 impl DishRepository for DishRepositoryImpl {
+    async fn load_all_raw(&self) -> Result<Vec<Model>, RepositoryError> {
+        crate::models::dish::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load dish: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
+
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,

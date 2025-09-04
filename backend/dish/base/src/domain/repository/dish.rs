@@ -6,6 +6,8 @@ use shared::domain::{Repository, RepositoryError};
 
 #[async_trait]
 pub trait DishRepository: Repository<Dish> {
+    async fn load_all_raw(&self) -> Result<Vec<crate::models::dish::Model>, RepositoryError>;
+
     async fn find_by_train_number(
         &self,
         train_number: TrainNumber<Verified>,

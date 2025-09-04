@@ -115,6 +115,7 @@ async fn main() -> std::io::Result<()> {
 
     let dish_internal_service_impl = Arc::new(
         dish_base::infrastructure::application::service::internal::DishInternalServiceImpl::new(
+            Arc::clone(&dish_repository_impl),
             Arc::clone(&takeaway_shop_repository_impl),
             Arc::clone(&train_port_impl),
             Arc::clone(&geo_port_impl),

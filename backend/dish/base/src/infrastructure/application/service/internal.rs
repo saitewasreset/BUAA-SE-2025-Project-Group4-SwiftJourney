@@ -1,4 +1,5 @@
 use crate::application::service::internal::DishInternalService;
+use crate::domain::repository::dish::DishRepository;
 use crate::domain::repository::takeaway::TakeawayShopRepository;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -10,6 +11,7 @@ use shared::domain::model::train::TrainId;
 use shared::event::queue::EventService;
 use shared::event::{DishUpdatedEvent, EventPackage, TakeawayDishUpdatedEvent};
 use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
+use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
 use shared::{
     DB_CHUNK_SIZE, MicroService,
     domain::{
@@ -24,14 +26,16 @@ use std::{collections::HashMap, fs, sync::Arc};
 use tracing::error;
 use uuid::Uuid;
 
-pub struct DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
+pub struct DishInternalServiceImpl<DR, TSR, TP, GP, OSP, ES>
 where
+    DR: DishRepository,
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
     OSP: ObjectStoragePort,
     ES: EventService,
 {
+    dish_repository: Arc<DR>,
     takeaway_shop_repository: Arc<TSR>,
     train_port: Arc<TP>,
     geo_port: Arc<GP>,
@@ -41,8 +45,9 @@ where
     event_service: Arc<ES>,
 }
 
-impl<TSR, TP, GP, OSP, ES> DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
+impl<DR, TSR, TP, GP, OSP, ES> DishInternalServiceImpl<DR, TSR, TP, GP, OSP, ES>
 where
+    DR: DishRepository,
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
@@ -50,6 +55,7 @@ where
     ES: EventService,
 {
     pub fn new(
+        dish_repository: Arc<DR>,
         takeaway_shop_repository: Arc<TSR>,
         train_port: Arc<TP>,
         geo_port: Arc<GP>,
@@ -59,6 +65,7 @@ where
         event_service: Arc<ES>,
     ) -> Self {
         Self {
+            dish_repository,
             takeaway_shop_repository,
             train_port,
             geo_port,
@@ -71,8 +78,10 @@ where
 }
 
 #[async_trait]
-impl<TSR, TP, GP, OSP, ES> DishInternalService for DishInternalServiceImpl<TSR, TP, GP, OSP, ES>
+impl<DR, TSR, TP, GP, OSP, ES> DishInternalService
+    for DishInternalServiceImpl<DR, TSR, TP, GP, OSP, ES>
 where
+    DR: DishRepository,
     TSR: TakeawayShopRepository,
     TP: TrainPort,
     GP: GeoPort,
@@ -303,5 +312,46 @@ where
         }
 
         Ok(())
+    }
+
+    async fn db_get_dishes(&self) -> Result<Vec<DbDishDTO>, RepositoryError> {
+        let result = self
+            .dish_repository
+            .load_all_raw()
+            .await
+            .inspect_err(|e| error!("Failed to load dish: {:?}", e))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbDishDTO {
+                id: x.id,
+                train_id: x.train_id,
+                r#type: x.r#type,
+                time: x.time,
+                name: x.name,
+                price: x.price,
+                images: x.images,
+            })
+            .collect())
+    }
+
+    async fn db_get_takeaway_dishes(&self) -> Result<Vec<DbTakeawayDishDTO>, RepositoryError> {
+        let result = self
+            .takeaway_shop_repository
+            .load_all_raw()
+            .await
+            .inspect_err(|e| error!("Failed to load takeaway dish: {:?}", e))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbTakeawayDishDTO {
+                id: x.id,
+                name: x.name,
+                dish_type: x.dish_type,
+                price: x.price,
+                takeaway_shop_id: x.takeaway_shop_id,
+                images: x.images,
+            })
+            .collect())
     }
 }

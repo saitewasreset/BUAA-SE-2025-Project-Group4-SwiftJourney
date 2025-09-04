@@ -2,6 +2,7 @@
 
 use crate::api::InternalApiError;
 use crate::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
+use crate::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
 use async_trait::async_trait;
 
 /// Trait defining the port for communicating with the Dish internal service.
@@ -18,4 +19,8 @@ pub trait DishPort: 'static + Send + Sync {
         &self,
         command: SaveRawTakeawayCommand,
     ) -> Result<(), InternalApiError>;
+
+    async fn db_get_dishes(&self) -> Result<Vec<DbDishDTO>, InternalApiError>;
+
+    async fn db_get_takeaway_dishes(&self) -> Result<Vec<DbTakeawayDishDTO>, InternalApiError>;
 }
