@@ -64,6 +64,8 @@ data:
       sendfile        on;
       keepalive_timeout  65;
 
+      client_max_body_size 2G;
+
       upstream user_upstream { server user:8080; }
       upstream geo_upstream { server geo:8080; }
       upstream train_upstream { server train:8080; }
@@ -90,6 +92,11 @@ data:
         location /api/dish/ { proxy_pass http://dish_upstream; }
         location /api/order/ { proxy_pass http://order_upstream; }
         location /api/payment/ { proxy_pass http://order_upstream; }
+        location /api/data/city { proxy_pass http://train_upstream; }
+        location /api/data/station { proxy_pass http://train_upstream; }
+        location /api/data/train_type { proxy_pass http://train_upstream; }
+        location /api/data/train_number { proxy_pass http://train_upstream; }
+        location /api/data/hotel { proxy_pass http://hotel_upstream; }
         location /resource/ { proxy_pass http://object_storage_upstream; }
         location / { proxy_pass http://frontend_upstream; }
       }
