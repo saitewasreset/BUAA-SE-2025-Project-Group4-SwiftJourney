@@ -39,7 +39,7 @@ use shared::domain::model::train_schedule::{SeatId, SeatLocationInfo};
 use shared::domain::transform_list;
 use shared::domain::{Identifiable, Repository, RepositoryError};
 use shared::event::queue::EventService;
-use shared::event::{EventPackage, RouteUpdatedEvent, TrainUpdatedEvent};
+use shared::event::{EventPackage, RouteUpdatedEvent, SeatTypeUpdatedEvent, TrainUpdatedEvent};
 use shared::{MicroService, impl_db_id_from_u64};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -1133,6 +1133,7 @@ pub async fn save_raw_train_number<T: RouteRepository>(
 pub async fn save_raw_train_type(
     db: &DatabaseConnection,
     train_type_data: TrainTypeData,
+    event_service: Arc<dyn EventService>,
 ) -> Result<(), RepositoryError> {
     let txn = db
         .begin()
@@ -1353,5 +1354,13 @@ pub async fn save_raw_train_type(
             error!("failed to commit transaction: {}", e);
             e
         })?;
+
+    if let Err(e) = event_service
+        .publish_event(EventPackage::new(MicroService::Train, SeatTypeUpdatedEvent))
+        .await
+    {
+        error!("Failed to publish seat type updated event: {:?}", e);
+    }
+
     Ok(())
 }

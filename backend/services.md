@@ -67,14 +67,14 @@ Events：
   - BUG?：`+wrong_payment_password_tried`值似乎并未更新
 - `-PersonalInfoUpdatedEvent()`
   - `+set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
-- `TrainUpdatedEvent()`
-  - `save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
-- `TrainScheduleUpdatedEvent()`
-  - `auto_plan_schedule`：`base/src/infrastructure/service/train_schedule.rs:288`
-- `RouteUpdatedEvent()`
-  - `save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
-- `seat_type + seat_type_mapping: SeatTypeUpdatedEvent()`
-  - `load_train_type`：`base/src/infrastructure/application/service/train_data.rs:218`
+- `-TrainUpdatedEvent()`
+  - `+save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
+- `-TrainScheduleUpdatedEvent()`
+  - `+auto_plan_schedule`：`base/src/infrastructure/service/train_schedule.rs:288`
+- `-RouteUpdatedEvent()`
+  - `+save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
+- `-seat_type + seat_type_mapping: SeatTypeUpdatedEvent()`
+  - `+save_raw_train_type`：`base/src/infrastructure/application/service/train_data.rs:218`
 - `+HotelUpdatedEvent()`
   - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
   - `+new_comment`：`base/src/infrastructure/application/service/hotel.rs:126`
@@ -199,6 +199,9 @@ Tables:
 - `station`
 
 ## Train(Err: 92XXX)
+
+- ++事件发送：`TrainUpdatedEvent`、`TrainScheduleUpdatedEvent`、`RouteUpdatedEvent`、`SeatTypeUpdatedEvent`
+- ++事件接收：`StationUpdatedEvent`、`PersonalInfoUpdatedEvent`
 
 Service:
 

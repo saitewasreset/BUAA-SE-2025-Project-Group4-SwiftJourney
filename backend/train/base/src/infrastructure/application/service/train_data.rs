@@ -211,7 +211,13 @@ where
     ) -> Result<(), Box<dyn ApplicationError>> {
         self.check_debug_mode()?;
 
-        save_raw_train_type(&self.db, command).await.map_err(|e| {
+        save_raw_train_type(
+            &self.db,
+            command,
+            Arc::clone(&self.event_service) as Arc<dyn EventService>,
+        )
+        .await
+        .map_err(|e| {
             error!("Error saving train type: {:?}", e);
             GeneralError::InternalServerError
         })?;
