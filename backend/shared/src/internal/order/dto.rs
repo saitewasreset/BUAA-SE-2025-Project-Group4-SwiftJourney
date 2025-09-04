@@ -247,7 +247,7 @@ impl From<InternalHotelDateRangeDTO> for HotelDateRange {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InternalBaseOrderDTO {
-    pub order_id: u64,
+    pub order_id: Option<u64>,
     pub uuid: Uuid,
     pub order_status: OrderStatus,
     pub order_time_info: InternalOrderTimeInfoDTO,
@@ -260,10 +260,7 @@ pub struct InternalBaseOrderDTO {
 impl From<BaseOrder> for InternalBaseOrderDTO {
     fn from(base: BaseOrder) -> Self {
         Self {
-            order_id: base
-                .order_id
-                .expect("Base Order for transmission internally should have an id")
-                .into(),
+            order_id: base.order_id.map(|x| x.into()),
             uuid: base.uuid,
             order_status: base.order_status,
             order_time_info: base.order_time_info.into(),
@@ -278,7 +275,7 @@ impl From<BaseOrder> for InternalBaseOrderDTO {
 impl From<InternalBaseOrderDTO> for BaseOrder {
     fn from(dto: InternalBaseOrderDTO) -> Self {
         Self::new(
-            Some(OrderId::from(dto.order_id)),
+            dto.order_id.map(|x| OrderId::from(x)),
             dto.uuid,
             dto.order_status,
             dto.order_time_info.into(),
