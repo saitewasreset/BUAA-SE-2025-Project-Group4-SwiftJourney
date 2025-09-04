@@ -28,7 +28,7 @@ impl UserEventServiceImpl {
 #[async_trait]
 impl EventService for UserEventServiceImpl {
     fn micro_service(&self) -> MicroService {
-        MicroService::Train
+        MicroService::User
     }
 
     fn lapin_channel(&self) -> lapin::Channel {
