@@ -81,10 +81,10 @@ Events：
   - `+process_hotel_orders`：`base/src/infrastructure/application/service/hotel_order.rs:336`
 - `+HotelRoomTypeUpdatedEvent()`
   - `+load_hotel`：`base/src/infrastructure/application/service/hotel_data.rs:62`
-- `DishUpdatedEvent()`
-  - `+load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
-- `TakeawayDishUpdatedEvent()`
-  - `+load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
+- `-DishUpdatedEvent()`
+  - `+save_raw_dish`：`dish/base/src/infrastructure/application/service/internal.rs`
+- `-TakeawayDishUpdatedEvent()`
+  - `+save_raw_takeaway`：`dish/base/src/infrastructure/application/service/internal.rs`
 
 ## User(Err: 90XXX)
 
@@ -414,6 +414,9 @@ Duplicates:
     - `set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
 
 ## Dish(Err: 94XXX)
+
+- ++事件发送：`DishUpdatedEvent`、`TakeawayDishUpdatedEvent`
+- ++事件接收：`TrainUpdatedEvent`、`StationUpdatedEvent`、`RouteUpdatedEvent`
 
 Service:
 
