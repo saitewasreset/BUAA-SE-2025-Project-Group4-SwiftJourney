@@ -169,7 +169,7 @@ async fn update_train(db: &DatabaseConnection, train_list: Vec<DbTrainDTO>) {
         .collect::<Vec<_>>();
 
     for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
-        let insert_result = crate::models::train::Entity::insert_many(chunk)
+        let insert_result = crate::models::train::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 OnConflict::column(crate::models::train::Column::Id)
                     .update_columns([
@@ -204,7 +204,7 @@ async fn update_route(db: &DatabaseConnection, route_list: Vec<DbRouteDTO>) {
         .collect::<Vec<_>>();
 
     for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
-        let insert_result = crate::models::route::Entity::insert_many(chunk)
+        let insert_result = crate::models::route::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 OnConflict::column(crate::models::route::Column::Id)
                     .update_columns([

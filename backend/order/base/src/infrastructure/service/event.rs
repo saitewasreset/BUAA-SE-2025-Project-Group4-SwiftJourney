@@ -384,7 +384,7 @@ async fn update_train(db: &DatabaseConnection, train_list: Vec<DbTrainDTO>) {
         .collect::<Vec<_>>();
 
     for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
-        let insert_result = crate::models::train::Entity::insert_many(chunk)
+        let insert_result = crate::models::train::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 OnConflict::column(crate::models::train::Column::Id)
                     .update_columns([
@@ -418,7 +418,7 @@ async fn update_train_schedule(db: &DatabaseConnection, schedule_list: Vec<DbTra
         .collect::<Vec<_>>();
 
     for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
-        let insert_result = crate::models::train_schedule::Entity::insert_many(chunk)
+        let insert_result = crate::models::train_schedule::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 OnConflict::column(crate::models::train_schedule::Column::Id)
                     .update_columns([
@@ -525,22 +525,24 @@ async fn update_hotel_room_type(db: &DatabaseConnection, room_type_list: Vec<DbH
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::hotel_room_type::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::hotel_room_type::Column::Id)
-                .update_columns([
-                    crate::models::hotel_room_type::Column::TypeName,
-                    crate::models::hotel_room_type::Column::Capacity,
-                    crate::models::hotel_room_type::Column::Price,
-                    crate::models::hotel_room_type::Column::HotelId,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::hotel_room_type::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::hotel_room_type::Column::Id)
+                    .update_columns([
+                        crate::models::hotel_room_type::Column::TypeName,
+                        crate::models::hotel_room_type::Column::Capacity,
+                        crate::models::hotel_room_type::Column::Price,
+                        crate::models::hotel_room_type::Column::HotelId,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting hotel room type: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting hotel room type: {:?}", err);
+        }
     }
 }
 
@@ -559,24 +561,26 @@ async fn update_dish(db: &DatabaseConnection, dish_list: Vec<DbDishDTO>) {
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::dish::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::dish::Column::Id)
-                .update_columns([
-                    crate::models::dish::Column::TrainId,
-                    crate::models::dish::Column::Type,
-                    crate::models::dish::Column::Time,
-                    crate::models::dish::Column::Name,
-                    crate::models::dish::Column::Price,
-                    crate::models::dish::Column::Images,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::dish::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::dish::Column::Id)
+                    .update_columns([
+                        crate::models::dish::Column::TrainId,
+                        crate::models::dish::Column::Type,
+                        crate::models::dish::Column::Time,
+                        crate::models::dish::Column::Name,
+                        crate::models::dish::Column::Price,
+                        crate::models::dish::Column::Images,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting dish: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting dish: {:?}", err);
+        }
     }
 }
 
@@ -594,22 +598,24 @@ async fn update_takeaway_dish(db: &DatabaseConnection, takeaway_dish_list: Vec<D
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::takeaway_dish::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::takeaway_dish::Column::Id)
-                .update_columns([
-                    crate::models::takeaway_dish::Column::Name,
-                    crate::models::takeaway_dish::Column::DishType,
-                    crate::models::takeaway_dish::Column::Price,
-                    crate::models::takeaway_dish::Column::TakeawayShopId,
-                    crate::models::takeaway_dish::Column::Images,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::takeaway_dish::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::takeaway_dish::Column::Id)
+                    .update_columns([
+                        crate::models::takeaway_dish::Column::Name,
+                        crate::models::takeaway_dish::Column::DishType,
+                        crate::models::takeaway_dish::Column::Price,
+                        crate::models::takeaway_dish::Column::TakeawayShopId,
+                        crate::models::takeaway_dish::Column::Images,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting takeaway dish: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting takeaway dish: {:?}", err);
+        }
     }
 }

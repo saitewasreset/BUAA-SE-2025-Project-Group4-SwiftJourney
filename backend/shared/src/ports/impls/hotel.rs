@@ -26,8 +26,8 @@ impl HotelPort for HttpHotelPortImpl {
     }
     async fn db_get_hotel_room_types(&self) -> Result<Vec<DbHotelRoomTypeDTO>, InternalApiError> {
         self.super_client
-            .get(HotelInternalServiceApi::DbGetHotels)
+            .get(HotelInternalServiceApi::DbGetHotelRoomTypes)
             .await
-            .inspect_err(|e| error!("Failed to get db hotels: {:?}", e))
+            .inspect_err(|e| error!("Failed to get db hotel room types: {:?}", e))
     }
 }

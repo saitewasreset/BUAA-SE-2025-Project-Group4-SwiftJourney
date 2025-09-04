@@ -11,7 +11,6 @@ members = [
     "geo/api",
     "train/base",
     "train/api",
-<<<<<<< Updated upstream
     "hotel/base",
     "hotel/api",
     "dish/base",
@@ -20,7 +19,5 @@ members = [
     "object_storage/api",
     "order/api",
     "order/base"
-=======
->>>>>>> Stashed changes
 ]
 resolver = "2"

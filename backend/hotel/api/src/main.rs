@@ -18,7 +18,7 @@ use hotel_base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
 use hotel_base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use hotel_base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
 use migration::MigratorTrait;
-use sea_orm::Database;
+use sea_orm::{Database, DatabaseConnection};
 use shared::MicroService;
 use shared::api::{AppConfig, MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
@@ -166,6 +166,8 @@ async fn main() -> std::io::Result<()> {
     let hotel_internal_service: web::Data<dyn HotelInternalService> =
         web::Data::from(hotel_internal_service_impl as Arc<dyn HotelInternalService>);
 
+    let db_data: web::Data<DatabaseConnection> = web::Data::new(conn.clone());
+
     tokio::task::spawn(async move {
         HttpServer::new(move || {
             App::new()
@@ -186,10 +188,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(hotel_data_service.clone())
             .app_data(hotel_service.clone())
             .app_data(hotel_order_service.clone())
+            .app_data(db_data.clone())
             .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
             .wrap(TracingLogger::default())
             .service(
                 web::scope("/api")
+                    .service(web::scope("/data").configure(hotel_api::data::scoped_config))
                     .service(web::scope("/hotel").configure(hotel_api::hotel::scoped_config)),
             )
     })
