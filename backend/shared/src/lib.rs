@@ -69,7 +69,7 @@ impl MicroService {
             MicroService::Hotel => "hotel",
             MicroService::Dish => "dish",
             MicroService::Order => "order",
-            MicroService::ObjectStorage => "object_storage",
+            MicroService::ObjectStorage => "object-storage",
             MicroService::Message => "message",
         }
     }

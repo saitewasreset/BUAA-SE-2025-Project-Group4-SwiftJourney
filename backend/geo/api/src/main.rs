@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
                 .wrap(TracingLogger::default())
                 .service(web::scope("/internal").configure(geo_api::internal::scoped_config))
         })
-        .bind(("0.0.0.0", 23334))
+        .bind(("0.0.0.0", 23333))
         .unwrap()
         .run()
         .await
@@ -86,7 +86,7 @@ async fn main() -> std::io::Result<()> {
                     .service(web::scope("/general").configure(geo_api::general::scoped_config)),
             )
     })
-    .bind(("0.0.0.0", 8081))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await?;
 

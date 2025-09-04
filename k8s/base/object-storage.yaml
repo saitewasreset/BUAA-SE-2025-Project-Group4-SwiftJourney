@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: object-storage
+  namespace: swiftjourney
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: object-storage
+  template:
+    metadata:
+      labels:
+        app: object-storage
+    spec:
+      containers:
+        - name: object-storage
+          image: saitewasreset/swiftjourney-object-storage:v0.1.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "128Mi" }
+          env:
+            - name: RUST_LOG
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: RUST_LOG } }
+            - name: POSTGRES_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@db/$(POSTGRES_DB)
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: MINIO_ENDPOINT } }
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_ACCESS_KEY } }
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: MINIO_SECRET_KEY } }
+            - name: SERVER_NAME
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: SERVER_NAME } }
+          ports: [{ containerPort: 8080 }, { containerPort: 23333 }]
+          readinessProbe:
+            {
+              tcpSocket: { port: 8080 },
+              initialDelaySeconds: 5,
+              periodSeconds: 10,
+            }
+          livenessProbe:
+            {
+              tcpSocket: { port: 8080 },
+              initialDelaySeconds: 15,
+              periodSeconds: 20,
+            }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: object-storage
+  namespace: swiftjourney
+spec:
+  selector: { app: object-storage }
+  ports:
+    [
+      { name: http, port: 8080, targetPort: 8080 },
+      { name: internal, port: 23333, targetPort: 23333 },
+    ]

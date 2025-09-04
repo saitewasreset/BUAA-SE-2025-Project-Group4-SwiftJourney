@@ -94,7 +94,6 @@ user/
 1. 拆分Application Service、Domain Service，并根据要求设计Internal Service，这些操作将在`*_base`中完成，例如，对于`User`微服务，相关文件在`user/base`下
 2. 通过Actix Web暴露外部API和内部API，两者需要使用不同的HttpServer在不同的端口上运行，这些操作将在`*_api`中完成，例如，对于`User`微服务，相关文件在`user/api`下，你可以参考`user/api/main.rs`来设置HttpServer
 
-
 **注意：在为微服务创建Cargo.toml并选择依赖时，请先读取`base/Cargo.toml`，确定依赖的版本，避免版本冲突**
 
 ## 微服务拆分方案
@@ -187,11 +186,13 @@ Events：
 
 请通过端口-适配器模式实现上述跨微服务调用（使用`reqwest`作为HTTP客户端）：
 
-核心原则
+核心原则：
+
 - 端口-适配器：应用层只依赖端口 trait（如 TransactionPort），HTTP 细节封装在基础设施层适配器中。
 - 同步查询、异步变更：跨服务的读取用同步 HTTP；跨服务的状态变更优先通过事件驱动实现最终一致。
 
-目录与职责
+目录与职责：
+
 - application/service/ports/*：定义外部依赖的端口（例如 TransactionPort），返回 TransactionInfoDTO，保持与现有流程兼容。
 - infrastructure/external/*：实现端口的 HTTP 客户端（如 HttpOrderClient）。
 - infrastructure/application/service/*：应用服务实现（如 HotelOrderServiceImpl），只组合端口与领域/仓储，业务流程清晰。
@@ -2165,34 +2166,34 @@ pub trait DbId {
    1. 为`*InternalServiceError`实现`Application Error`特征，错误代码可从微服务划分中获取，例如，`User(Err: 90XXX)`表示本微服务可用的错误码为`90000 -- 90999`，建议按`*InternalServiceError`枚举中变体出现的顺序，从`XX000`开始编号。
       例如，对于`User`微服务，在`user/base/src/application/service/internal.rs`中添加：
 
-   ```rust
-   #[derive(Error, Debug)]
-   pub enum UserInternalServiceError {
-       #[error("no such user: id = {0}")]
-       NoSuchUser(u64),
-       #[error("invalid payment password: {0}")]
-       InvalidPaymentPassword(String),
-       #[error("invalid session ID: {0}")]
-       InvalidSessionId(String),
-       #[error(transparent)]
-       RelatedServiceError(#[from] anyhow::Error),
-   }
+        ```rust
+        #[derive(Error, Debug)]
+        pub enum UserInternalServiceError {
+            #[error("no such user: id = {0}")]
+            NoSuchUser(u64),
+            #[error("invalid payment password: {0}")]
+            InvalidPaymentPassword(String),
+            #[error("invalid session ID: {0}")]
+            InvalidSessionId(String),
+            #[error(transparent)]
+            RelatedServiceError(#[from] anyhow::Error),
+        }
 
-   impl ApplicationError for UserInternalServiceError {
-       fn error_code(&self) -> u32 {
-           match self {
-               Self::NoSuchUser(_) => 900000,
-               Self::InvalidPaymentPassword(_) => 90001,
-               Self::InvalidSessionId(_) => 90002,
-               Self::RelatedServiceError(_) => 90003,
-           }
-       }
+        impl ApplicationError for UserInternalServiceError {
+            fn error_code(&self) -> u32 {
+                match self {
+                    Self::NoSuchUser(_) => 900000,
+                    Self::InvalidPaymentPassword(_) => 90001,
+                    Self::InvalidSessionId(_) => 90002,
+                    Self::RelatedServiceError(_) => 90003,
+                }
+            }
 
-       fn error_message(&self) -> String {
-           self.to_string()
-       }
-   }
-   ```
+            fn error_message(&self) -> String {
+                self.to_string()
+            }
+        }
+        ```
 
    2. 按照微服务划分，编写`*InternalService`的 API 端点，端点路径、处理函数名与微服务划分中的函数名相同，若有至少一个参数，使用 POST 请求，否则使用 GET 请求。例如，对于`User`微服务，在`user/api/src/internal.rs`中新增如下 API 端点，新增`scoped_config`函数注册 API 端点：
 

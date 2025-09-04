@@ -1,0 +1,27 @@
+# Reduce backend build context drastically
+# Build context is ./backend, so ignore heavy/unnecessary paths here
+
+# VCS/IDE
+.git
+.idea
+.vscode
+
+# Rust build artifacts and caches
+/target
+**/target
+**/.fingerprint
+**/*.rlib
+**/*.rmeta
+
+# Temporary and test outputs
+**/tmp
+**/tarpaulin
+**/*.log
+
+# Large local assets not needed to compile
+imgs/
+# If you keep local data here, exclude it from build context
+# data/
+
+# OS cruft
+**/.DS_Store
