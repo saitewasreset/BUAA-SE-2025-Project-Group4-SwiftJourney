@@ -17,7 +17,7 @@ use crate::domain::model::station::StationId;
 use crate::domain::model::train_schedule::TrainScheduleId;
 use crate::domain::repository::route::RouteRepository;
 use crate::domain::{DbId, Identifiable, Repository, RepositoryError};
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use sea_orm::{ActiveValue, DatabaseBackend, DatabaseConnection, Statement};
 use sea_orm::{ColumnTrait, TransactionTrait};
@@ -531,5 +531,212 @@ WHERE "train_schedule"."id" = $1;"#,
         txn.commit().await.context("Failed to commit transaction")?;
 
         Ok(RouteId::from_db_value(new_line_id)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::route::{Route, StopId};
+    use crate::domain::model::station::StationId;
+    use crate::domain::model::train_schedule::TrainScheduleId;
+    use crate::domain::repository::route::RouteRepository;
+    use chrono::NaiveDate;
+    use sea_orm::{
+        ActiveModelTrait, ActiveValue, ConnectionTrait, Database, DatabaseBackend,
+        DatabaseConnection, Statement,
+    };
+
+    // 内存数据库初始化函数
+    async fn setup_repo() -> RouteRepositoryImpl {
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+
+        // 创建 station 表（新增 city_id）
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            CREATE TABLE station (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                city_id INTEGER DEFAULT 0
+            );
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        // 创建 route 表
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            CREATE TABLE route (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                line_id INTEGER NOT NULL,
+                station_id INTEGER NOT NULL,
+                arrival_time INTEGER NOT NULL,
+                departure_time INTEGER NOT NULL,
+                "order" INTEGER NOT NULL
+            );
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        // 创建 train_schedule 表
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+    CREATE TABLE train_schedule (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        train_id INTEGER NOT NULL,
+        departure_date INTEGER NOT NULL,
+        origin_departure_time INTEGER NOT NULL,
+        line_id INTEGER NOT NULL
+    );
+    "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        // 插入测试站点
+        let stations = vec!["A", "B", "C"];
+        for name in stations {
+            crate::models::station::ActiveModel {
+                id: ActiveValue::NotSet,
+                name: ActiveValue::Set(name.to_string()),
+                city_id: ActiveValue::Set(1), // 给 city_id 一个默认值
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+
+        RouteRepositoryImpl::new(db)
+    }
+
+    #[tokio::test]
+    async fn test_save_and_find_route() {
+        let repo = setup_repo().await;
+
+        let mut route = Route::new(Some(1u64.into()));
+        let stations = vec![1, 2, 3];
+        for (i, s) in stations.iter().enumerate() {
+            route.add_stop(
+                Some(StopId::from_db_value(i as i32 + 1).unwrap()),
+                StationId::from_db_value(*s).unwrap(),
+                100 + i as u32,
+                110 + i as u32,
+                i as u32,
+            );
+        }
+
+        let route_id = repo.save(&mut route).await.unwrap();
+        let retrieved = repo.find(route_id).await.unwrap().unwrap();
+
+        assert_eq!(retrieved.get_id(), Some(route_id));
+        assert_eq!(retrieved.stops().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_remove_route() {
+        let repo = setup_repo().await;
+
+        let mut route = Route::new(Some(1u64.into()));
+        route.add_stop(
+            Some(StopId::from_db_value(1).unwrap()),
+            StationId::from_db_value(1).unwrap(),
+            100,
+            110,
+            0,
+        );
+
+        let route_id = repo.save(&mut route).await.unwrap();
+        repo.remove(route).await.unwrap();
+
+        let result = repo.find(route_id).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_load_routes() {
+        let repo = setup_repo().await;
+
+        let mut route = Route::new(Some(1u64.into()));
+        for s in 1..=3 {
+            route.add_stop(
+                Some(StopId::from_db_value(s).unwrap()),
+                StationId::from_db_value(s).unwrap(),
+                100 + s as u32,
+                110 + s as u32,
+                s as u32,
+            );
+        }
+        repo.save(&mut route).await.unwrap();
+
+        let routes = repo.load().await.unwrap();
+        assert_eq!(routes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_by_train_schedule() {
+        let repo = setup_repo().await;
+
+        let mut route = Route::new(Some(1u64.into()));
+        for s in 1..=3 {
+            route.add_stop(
+                Some(StopId::from_db_value(s).unwrap()),
+                StationId::from_db_value(s).unwrap(),
+                100 + s as u32,
+                110 + s as u32,
+                s as u32,
+            );
+        }
+        let route_id = repo.save(&mut route).await.unwrap();
+
+        crate::models::train_schedule::ActiveModel {
+            id: ActiveValue::NotSet,
+            train_id: ActiveValue::Set(1), // 默认值
+            departure_date: ActiveValue::Set(NaiveDate::from_ymd_opt(2022, 1, 1).unwrap()),
+            origin_departure_time: ActiveValue::Set(0),
+            line_id: ActiveValue::Set(route_id.to_db_value()),
+        }
+        .insert(&repo.db)
+        .await
+        .unwrap();
+
+        let route_by_schedule = repo
+            .get_by_train_schedule(TrainScheduleId::from_db_value(1).unwrap())
+            .await
+            .unwrap();
+
+        assert!(route_by_schedule.is_some());
+        assert_eq!(route_by_schedule.unwrap().get_id(), Some(route_id));
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_routes() {
+        let repo = setup_repo().await;
+
+        let raw_routes = vec![
+            RouteStationInfo {
+                station: "A".to_string(),
+                arrival_time: 100,
+                departure_time: 110,
+                order: 0,
+            },
+            RouteStationInfo {
+                station: "B".to_string(),
+                arrival_time: 120,
+                departure_time: 130,
+                order: 1,
+            },
+        ];
+
+        let route_id = repo.save_raw(raw_routes).await.unwrap();
+        let retrieved = repo.find(route_id).await.unwrap().unwrap();
+        assert_eq!(retrieved.stops().len(), 2);
     }
 }
