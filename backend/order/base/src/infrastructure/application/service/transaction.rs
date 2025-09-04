@@ -211,7 +211,7 @@ where
 
         Ok(tx_list
             .into_iter()
-            .map(|item| transaction_to_dto(item))
+            .map(transaction_to_dto)
             .collect())
     }
 

@@ -115,7 +115,7 @@ where
 
             let current_user_hotel_orders = user_order_list
                 .into_iter()
-                .map(|x| Into::<Box<dyn Order>>::into(x))
+                .map(Into::<Box<dyn Order>>::into)
                 .filter(|x| x.order_type() == OrderType::Hotel)
                 .collect::<Vec<_>>();
 

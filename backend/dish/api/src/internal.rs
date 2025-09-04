@@ -13,7 +13,7 @@ pub async fn save_raw_dish(
 ) -> Result<ApiResponse<()>, ApplicationErrorBox> {
     let command: SaveRawDishCommand = parse_request_body(body)?;
 
-    let result = dish_internal_service
+    dish_internal_service
         .save_raw_dish(command)
         .await
         .inspect_err(|e| error!("Failed to save dish: {:?}", e))
@@ -21,7 +21,7 @@ pub async fn save_raw_dish(
             ApplicationErrorBox(Box::from(GeneralError::InternalServerError))
         })?;
 
-    ApiResponse::ok(result)
+    ApiResponse::ok(())
 }
 
 #[post("/save_raw_takeaway")]
@@ -31,7 +31,7 @@ pub async fn save_raw_takeaway(
 ) -> Result<ApiResponse<()>, ApplicationErrorBox> {
     let command: SaveRawTakeawayCommand = parse_request_body(body)?;
 
-    let result = dish_internal_service
+    dish_internal_service
         .save_raw_takeaway(command)
         .await
         .inspect_err(|e| error!("Failed to save takeaway: {:?}", e))
@@ -39,7 +39,7 @@ pub async fn save_raw_takeaway(
             ApplicationErrorBox(Box::from(GeneralError::InternalServerError))
         })?;
 
-    ApiResponse::ok(result)
+    ApiResponse::ok(())
 }
 
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
