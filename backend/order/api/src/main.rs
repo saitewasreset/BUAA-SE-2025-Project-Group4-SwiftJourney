@@ -32,6 +32,7 @@ use order_base::application::service::transaction::TransactionApplicationService
 use order_base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
 use order_base::infrastructure::repository::order::OrderRepositoryImpl;
 use order_base::infrastructure::repository::transaction::TransactionRepositoryImpl;
+use order_base::infrastructure::service::event::OrderEventServiceImpl;
 use order_base::infrastructure::service::internal::OrderInternalServiceImpl;
 use order_base::infrastructure::service::order::OrderServiceImpl;
 use order_base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
@@ -39,7 +40,12 @@ use order_base::infrastructure::service::transaction::TransactionServiceImpl;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
+use shared::event::queue::EventService;
 use shared::messaging::order_status_producer_service::OrderStatusProducerService;
+use shared::ports::impls::dish::HttpDishPortImpl;
+use shared::ports::impls::geo::HttpGeoPortImpl;
+use shared::ports::impls::hotel::HttpHotelPortImpl;
+use shared::ports::impls::train::HttpTrainPortImpl;
 use shared::ports::impls::user::HttpUserPortImpl;
 use std::env;
 use std::env::VarError;
@@ -79,8 +85,20 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
+    let geo_port_impl = Arc::new(HttpGeoPortImpl::new(
+        MicroService::Geo.internal_api_endpoint(),
+    ));
     let user_port_impl = Arc::new(HttpUserPortImpl::new(
         MicroService::User.internal_api_endpoint(),
+    ));
+    let train_port_impl = Arc::new(HttpTrainPortImpl::new(
+        MicroService::Train.internal_api_endpoint(),
+    ));
+    let hotel_port_impl = Arc::new(HttpHotelPortImpl::new(
+        MicroService::Hotel.internal_api_endpoint(),
+    ));
+    let dish_port_impl = Arc::new(HttpDishPortImpl::new(
+        MicroService::Dish.internal_api_endpoint(),
     ));
 
     let order_repository_impl = Arc::new(OrderRepositoryImpl::new(conn.clone()));
@@ -129,6 +147,24 @@ async fn main() -> std::io::Result<()> {
 
     let order_internal_service: web::Data<dyn OrderInternalService> =
         web::Data::from(order_internal_service_impl as Arc<dyn OrderInternalService>);
+
+    let order_event_service_impl = OrderEventServiceImpl::new(
+        &rabbitmq_url,
+        conn.clone(),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&user_port_impl),
+        Arc::clone(&train_port_impl),
+        Arc::clone(&hotel_port_impl),
+        Arc::clone(&dish_port_impl),
+    )
+    .await
+    .expect("Cannot connect to rabbitmq");
+
+    order_event_service_impl
+        .clone()
+        .init_consumer()
+        .await
+        .expect("Failed to init consumer");
 
     tokio::task::spawn(async move {
         HttpServer::new(move || {

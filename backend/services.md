@@ -477,6 +477,9 @@ Duplicates:
 
 ## Order(Err: 95XXX)
 
+- ++事件发送：无
+- 事件接收：`UserUpdatedEvent`、`TrainUpdatedEvent`、`TrainScheduleUpdatedEvent`、`SeatTypeUpdatedEvent`、`StationUpdatedEvent`、`PersonalInfoUpdatedEvent`、`HotelUpdatedEvent`、`HotelRoomTypeUpdatedEvent`、`DishUpdatedEvent`、`TakeawayDishUpdatedEvent`
+
 Service:
 
 - Application Service
