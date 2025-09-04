@@ -128,3 +128,106 @@ impl Repository<Session> for SessionRepositoryImpl {
 }
 
 impl SessionRepository for SessionRepositoryImpl {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::session::Session;
+    use crate::domain::repository::session::SessionRepositoryConfig;
+    use chrono::Utc;
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    fn create_repo() -> SessionRepositoryImpl {
+        SessionRepositoryImpl::new(SessionRepositoryConfig {
+            // 设置较短的清理间隔，便于测试过期
+            session_cleanup_interval: Duration::from_millis(50),
+        })
+    }
+
+    #[tokio::test]
+    async fn test_save_and_find_success() {
+        let repo = create_repo();
+        let mut session = Session::new(
+            1u64.into(),
+            Utc::now(),
+            Utc::now() + Duration::from_secs(60),
+        );
+
+        // 保存
+        let id = repo.save(&mut session).await.unwrap();
+
+        // 查找成功
+        let found = repo.find(id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().user_id(), 1u64.into());
+    }
+
+    #[tokio::test]
+    async fn test_find_nonexistent_returns_none() {
+        let repo = create_repo();
+
+        let random_id = SessionId::random();
+        let result = repo.find(random_id).await.unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_success() {
+        let repo = create_repo();
+        let mut session = Session::new(
+            1u64.into(),
+            Utc::now(),
+            Utc::now() + Duration::from_secs(60),
+        );
+
+        let id = repo.save(&mut session).await.unwrap();
+
+        // 确认存在
+        assert!(repo.find(id).await.unwrap().is_some());
+
+        // 删除
+        repo.remove(session).await.unwrap();
+
+        // 删除后查找不到
+        let result = repo.find(id).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_ok() {
+        let repo = create_repo();
+        let session = Session::new(
+            1u64.into(),
+            Utc::now(),
+            Utc::now() + Duration::from_secs(60),
+        );
+
+        // 删除不存在的 session 不会报错
+        let result = repo.remove(session).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_expired_session_cleanup() {
+        let repo = create_repo();
+        let mut session = Session::new(
+            1u64.into(),
+            Utc::now(),
+            Utc::now() + Duration::from_millis(30),
+        );
+
+        let id = repo.save(&mut session).await.unwrap();
+
+        // 初始时能找到
+        assert!(repo.find(id).await.unwrap().is_some());
+
+        // 等待过期 + 清理任务运行
+        sleep(Duration::from_millis(200)).await;
+
+        // 应该被清理掉
+        let result = repo.find(id).await.unwrap();
+        assert!(result.is_none());
+    }
+}
