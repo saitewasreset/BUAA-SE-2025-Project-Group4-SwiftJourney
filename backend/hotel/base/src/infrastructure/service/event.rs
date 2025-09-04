@@ -113,7 +113,7 @@ where
     UP: UserPort,
 {
     fn micro_service(&self) -> MicroService {
-        MicroService::Train
+        MicroService::Hotel
     }
 
     fn lapin_channel(&self) -> lapin::Channel {

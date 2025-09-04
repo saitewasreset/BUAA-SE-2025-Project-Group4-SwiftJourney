@@ -52,10 +52,7 @@ impl GeoPort for HttpGeoPortImpl {
         cmd: SaveCityProvinceMapCommand,
     ) -> Result<(), InternalApiError> {
         self.super_client
-            .post(
-                GeoInternalServiceApi::SaveCityProvinceMap,
-                cmd.city_province_map,
-            )
+            .post(GeoInternalServiceApi::SaveCityProvinceMap, cmd)
             .await
             .inspect_err(|e| error!("Failed to save city province map: {:?}", e))
     }
@@ -65,10 +62,7 @@ impl GeoPort for HttpGeoPortImpl {
         cmd: SaveStationCityMapCommand,
     ) -> Result<(), InternalApiError> {
         self.super_client
-            .post(
-                GeoInternalServiceApi::SaveStationCityMap,
-                cmd.station_city_map,
-            )
+            .post(GeoInternalServiceApi::SaveStationCityMap, cmd)
             .await
             .inspect_err(|e| error!("Failed to save station city map: {:?}", e))
     }
