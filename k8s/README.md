@@ -69,3 +69,35 @@ kubectl -n swiftjourney port-forward svc/gateway 8080:80
 
 - 前端：<http://localhost:8080>
 - API：经网关按上述前缀访问。
+
+## 5. 重新加载
+
+重新应用配置：
+
+```bash
+kubectl apply -k k8s/overlays/local
+```
+
+重启网关：
+
+```bash
+kubectl -n swiftjourney rollout restart deploy/gateway
+```
+
+重新构建镜像：
+
+```bash
+eval $(minikube docker-env)
+
+# build missing images
+BIN_LIST=(dish_api geo_api hotel_api order_api object_storage_api train_api user_api)
+for bin in "${BIN_LIST[@]}"; do
+  docker build -f backend/Dockerfile.ms --build-arg BIN="$bin" -t saitewasreset/swiftjourney-"${bin%_api}":v0.1.0 backend || exit 1
+done
+```
+
+应用新镜像：
+
+```bash
+kubectl -n swiftjourney rollout restart deploy
+```
