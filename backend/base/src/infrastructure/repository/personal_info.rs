@@ -14,7 +14,7 @@ use crate::domain::service::{AggregateManagerImpl, DiffInfo};
 use crate::domain::{
     DbId, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, RepositoryError, TypedDiff,
 };
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
@@ -313,7 +313,7 @@ impl PersonalInfoRepository for PersonalInfoRepositoryImpl {
     async fn find_by_user_id_and_identity_card(
         &self,
         user_id: crate::domain::model::user::UserId,
-        identity_card_id: crate::domain::model::user::IdentityCardId,
+        identity_card_id: IdentityCardId,
     ) -> Result<Option<PersonalInfo>, RepositoryError> {
         let user_id_value = user_id.to_db_value();
         let identity_card_value = identity_card_id.to_string();
@@ -337,5 +337,190 @@ impl PersonalInfoRepository for PersonalInfoRepositoryImpl {
                 user_id_value, identity_card_value
             ))
             .map_err(RepositoryError::ValidationError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::personal_info::{
+        PersonalInfo, PersonalInfoId, PreferredSeatLocation,
+    };
+    use crate::domain::model::user::{IdentityCardId, RealName, UserId};
+    use sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, Statement};
+    use uuid::Uuid;
+
+    // 内存数据库初始化函数
+    async fn setup_repo() -> PersonalInfoRepositoryImpl {
+        let db: DatabaseConnection = Database::connect("sqlite::memory:").await.unwrap();
+
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            CREATE TABLE person_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid BLOB NOT NULL,
+                name TEXT NOT NULL,
+                identity_card TEXT NOT NULL,
+                preferred_seat_location TEXT,
+                user_id INTEGER NOT NULL,
+                is_default BOOLEAN NOT NULL
+            );
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        PersonalInfoRepositoryImpl::new(db)
+    }
+
+    // ===========================
+    // 插入与查询
+    // ===========================
+    #[tokio::test]
+    async fn test_insert_and_select_personal_info() {
+        let repo = setup_repo().await;
+
+        let uuid = Uuid::new_v4();
+        let name = RealName::try_from("Alice".to_string()).unwrap();
+        let identity_card = IdentityCardId::try_from("11010519491231002X".to_string()).unwrap();
+        let user_id: UserId = 1u64.into();
+
+        let mut info = PersonalInfo::new(
+            None,
+            uuid,
+            name.clone(),
+            identity_card.clone(),
+            Some(PreferredSeatLocation::A),
+            user_id,
+        );
+
+        // 插入
+        let inserted_id = repo.on_insert(info.clone()).await.unwrap();
+        info.set_id(inserted_id);
+
+        // 查询
+        let retrieved = repo.on_select(inserted_id).await.unwrap().unwrap();
+        assert_eq!(retrieved.name(), &name);
+        assert_eq!(retrieved.identity_card_id(), &identity_card);
+        assert_eq!(retrieved.user_id(), &user_id);
+    }
+
+    #[tokio::test]
+    async fn test_select_nonexistent_personal_info() {
+        let repo = setup_repo().await;
+        let result = repo.on_select(PersonalInfoId::from(999u64)).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    // ===========================
+    // find_by_user_id / find_by_user_id_and_identity_card
+    // ===========================
+    #[tokio::test]
+    async fn test_find_by_user_id_and_identity_card() {
+        let repo = setup_repo().await;
+
+        let mut info = PersonalInfo::new(
+            None,
+            Uuid::new_v4(),
+            RealName::try_from("Dana".to_string()).unwrap(),
+            IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+            None,
+            1u64.into(),
+        );
+
+        let inserted_id = repo.on_insert(info.clone()).await.unwrap();
+        info.set_id(inserted_id);
+
+        // 正向测试
+        let found = repo
+            .find_by_user_id_and_identity_card(
+                1u64.into(),
+                IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.identity_card_id(), info.identity_card_id());
+
+        // 反向测试
+        let not_found = repo
+            .find_by_user_id_and_identity_card(
+                1u64.into(),
+                IdentityCardId::try_from("150223195208236639".to_string()).unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_user_id_no_records() {
+        let repo = setup_repo().await;
+        let result = repo.find_by_user_id(1u64.into()).await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    // ===========================
+    // 更新
+    // ===========================
+    #[tokio::test]
+    async fn test_update_personal_info() {
+        use crate::domain::{DiffType, MultiEntityDiff, TypedDiff};
+
+        let repo = setup_repo().await;
+
+        let mut info = PersonalInfo::new(
+            None,
+            Uuid::new_v4(),
+            RealName::try_from("Bob".to_string()).unwrap(),
+            IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+            None,
+            1u64.into(),
+        );
+
+        let id = repo.on_insert(info.clone()).await.unwrap();
+        info.set_id(id);
+
+        let mut updated_info = info.clone();
+        updated_info.set_default(true);
+
+        let mut diff = MultiEntityDiff::new();
+        diff.add_change(TypedDiff::new(
+            DiffType::Modified,
+            Some(info.clone()),
+            Some(updated_info.clone()),
+        ));
+
+        repo.on_update(diff).await.unwrap();
+
+        let retrieved = repo.on_select(id).await.unwrap().unwrap();
+        assert!(retrieved.is_default());
+    }
+
+    // ===========================
+    // 删除
+    // ===========================
+    #[tokio::test]
+    async fn test_delete_personal_info() {
+        let repo = setup_repo().await;
+
+        let mut info = PersonalInfo::new(
+            None,
+            Uuid::new_v4(),
+            RealName::try_from("Charlie".to_string()).unwrap(),
+            IdentityCardId::try_from("11010519491231002X".to_string()).unwrap(),
+            None,
+            1u64.into(),
+        );
+
+        let id = repo.on_insert(info.clone()).await.unwrap();
+        info.set_id(id);
+
+        repo.on_delete(info).await.unwrap();
+
+        let result = repo.on_select(id).await.unwrap();
+        assert!(result.is_none());
     }
 }
