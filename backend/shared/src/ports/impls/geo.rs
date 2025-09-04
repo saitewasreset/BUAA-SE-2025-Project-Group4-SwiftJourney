@@ -21,7 +21,7 @@ impl HttpGeoPortImpl {
 impl GeoPort for HttpGeoPortImpl {
     async fn get_city_info(&self) -> Result<CityInfoDTO, InternalApiError> {
         self.super_client
-            .get(GeoInternalServiceApi::GetCities)
+            .get(GeoInternalServiceApi::GetCityInfo)
             .await
             .inspect_err(|e| error!("Failed to get city province info: {:?}", e))
     }

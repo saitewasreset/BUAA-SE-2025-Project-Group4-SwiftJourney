@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use shared::application_error::ApplicationError;
 use shared::domain::Identifiable;
 use shared::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
-use shared::internal::geo::dto::{CityDTO, DbCityDTO, DbStationDTO, StationDTO};
+use shared::internal::geo::dto::{
+    CityDTO, CityInfoDTO, CityStationInfoDTO, DbCityDTO, DbStationDTO, StationDTO,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -71,7 +73,12 @@ pub trait GeoInternalService: 'static + Send + Sync {
     async fn db_get_stations(&self) -> Result<Vec<DbStationDTO>, GeoInternalServiceError>;
 
     async fn get_cities(&self) -> Result<Vec<CityDTO>, GeoInternalServiceError>;
+
+    async fn get_city_info_list(&self) -> Result<CityInfoDTO, GeoInternalServiceError>;
+
     async fn get_stations(&self) -> Result<Vec<StationDTO>, GeoInternalServiceError>;
+
+    async fn get_city_station_info(&self) -> Result<CityStationInfoDTO, GeoInternalServiceError>;
 
     async fn save_city_province_map(
         &self,

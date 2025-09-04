@@ -4,10 +4,14 @@ use crate::domain::repository::station::StationRepository;
 use async_trait::async_trait;
 use shared::MicroService;
 use shared::data::{CityData, StationDataItem};
+use shared::domain::Identifiable;
 use shared::event::queue::EventService;
 use shared::event::{CityUpdatedEvent, EventPackage, StationUpdatedEvent};
 use shared::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
-use shared::internal::geo::dto::{CityDTO, DbCityDTO, DbStationDTO, StationDTO};
+use shared::internal::geo::dto::{
+    CityDTO, CityInfoDTO, CityStationInfoDTO, DbCityDTO, DbStationDTO, StationDTO,
+};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
 
@@ -79,6 +83,60 @@ where
             .into_iter()
             .map(|x| x.into())
             .collect())
+    }
+
+    async fn get_city_station_info(&self) -> Result<CityStationInfoDTO, GeoInternalServiceError> {
+        let station_list = self
+            .station_repository
+            .load()
+            .await
+            .map_err(|e| GeoInternalServiceError::RelatedServiceError(e.into()))?;
+
+        let city_list = self
+            .city_repository
+            .load()
+            .await
+            .map_err(|e| GeoInternalServiceError::RelatedServiceError(e.into()))?;
+
+        let city_id_to_city_name = city_list
+            .into_iter()
+            .map(|x| (x.get_id().unwrap(), x.name().to_string()))
+            .collect::<HashMap<_, _>>();
+
+        let mut city_to_station_list_map: HashMap<String, Vec<String>> = HashMap::new();
+
+        for station in station_list {
+            let city_name = city_id_to_city_name
+                .get(&station.city_id())
+                .cloned()
+                .unwrap_or_default();
+
+            let station_list = city_to_station_list_map.entry(city_name).or_default();
+
+            station_list.push(station.name().to_string());
+        }
+
+        Ok(city_to_station_list_map)
+    }
+
+    async fn get_city_info_list(&self) -> Result<CityInfoDTO, GeoInternalServiceError> {
+        let city_entity_list = self
+            .city_repository
+            .load()
+            .await
+            .map_err(|e| GeoInternalServiceError::RelatedServiceError(e.into()))?;
+
+        let mut province_to_cities_name: HashMap<String, Vec<String>> = HashMap::new();
+
+        for city in city_entity_list {
+            let city_list = province_to_cities_name
+                .entry(city.province().to_string())
+                .or_default();
+
+            city_list.push(city.name().to_string())
+        }
+
+        Ok(province_to_cities_name)
     }
 
     async fn get_stations(&self) -> Result<Vec<StationDTO>, GeoInternalServiceError> {

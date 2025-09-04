@@ -244,6 +244,7 @@ impl InternalApi for UserInternalServiceApi {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GeoInternalServiceApi {
     GetCities,
+    GetCityInfo,
     GetStations,
     DbGetCities,
     DbGetStations,
@@ -255,6 +256,7 @@ impl InternalApi for GeoInternalServiceApi {
     fn name(&self) -> &'static str {
         match self {
             GeoInternalServiceApi::GetCities => "get_cities",
+            GeoInternalServiceApi::GetCityInfo => "get_city_info",
             GeoInternalServiceApi::GetStations => "get_stations",
             GeoInternalServiceApi::DbGetCities => "db_get_cities",
             GeoInternalServiceApi::DbGetStations => "db_get_stations",

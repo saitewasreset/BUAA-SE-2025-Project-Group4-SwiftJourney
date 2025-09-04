@@ -81,7 +81,7 @@ where
     async fn handle_route_updated_event(&self) {
         match self.train_port.db_get_routes().await {
             Ok(route_list) => {
-                update_route(&self.db, route_list).await;
+                //update_route(&self.db, route_list).await;
             }
             Err(e) => {
                 error!("Failed to get db route list: {:?}", e);
@@ -208,7 +208,6 @@ async fn update_route(db: &DatabaseConnection, route_list: Vec<DbRouteDTO>) {
             .on_conflict(
                 OnConflict::column(crate::models::route::Column::Id)
                     .update_columns([
-                        crate::models::route::Column::Id,
                         crate::models::route::Column::LineId,
                         crate::models::route::Column::StationId,
                         crate::models::route::Column::ArrivalTime,
