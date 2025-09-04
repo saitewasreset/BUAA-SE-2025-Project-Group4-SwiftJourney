@@ -1,0 +1,233 @@
+use actix_web::{App, HttpServer, web};
+use dish_base::application::service::dish_query::DishQueryService;
+use dish_base::application::service::internal::DishInternalService;
+use dish_base::application::service::train_dish::TrainDishApplicationService;
+use dish_base::infrastructure::application::service::dish_query::DishQueryServiceImpl;
+use dish_base::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl;
+use dish_base::infrastructure::messaging::consumer::order_status::{
+    DishOrderStatusConsumer, TakeawayOrderStatusConsumer,
+};
+use dish_base::infrastructure::repository::dish::DishRepositoryImpl;
+use dish_base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
+use dish_base::infrastructure::service::dish_booking::DishBookingServiceImpl;
+use dish_base::infrastructure::service::event::DishEventServiceImpl;
+use dish_base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
+use migration::MigratorTrait;
+use sea_orm::Database;
+use shared::MicroService;
+use shared::api::MAX_BODY_LENGTH;
+use shared::event::queue::EventService;
+use shared::messaging::order_status::RabbitMQOrderStatusConsumer;
+use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
+use shared::ports::impls::geo::HttpGeoPortImpl;
+use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
+use shared::ports::impls::order::HttpOrderPortImpl;
+use shared::ports::impls::train::HttpTrainPortImpl;
+use shared::ports::impls::user::HttpUserPortImpl;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{env, fs};
+use tracing::{instrument, warn};
+use tracing_actix_web::TracingLogger;
+
+#[actix_web::main]
+
+async fn main() -> std::io::Result<()> {
+    // env_logger::init_from_env(Env::default().default_filter_or("info"));
+    let _ = dotenvy::dotenv();
+    tracing_subscriber::fmt::init();
+
+    let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let tz_offset_hour_str = read_file_env("TZ_OFFSET_HOUR");
+
+    let rabbitmq_url = shared::api::read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
+
+    let auto_schedule_days_str = read_file_env("AUTO_SCHEDULE_DAYS");
+
+    let data_base_path = read_file_env("DATA_PATH").expect("cannot get data path");
+
+    let data_base_path = PathBuf::from_str(&data_base_path).expect("cannot parse data path");
+
+    let tz_offset_hour = match tz_offset_hour_str {
+        Some(hour_str) => hour_str
+            .parse::<i32>()
+            .expect("cannot parse tz offset hour"),
+        // UTC+8: China Standard Time
+        None => 8,
+    };
+
+    match auto_schedule_days_str {
+        Some(days_str) => days_str
+            .parse::<i32>()
+            .expect("cannot parse auto schedule days"),
+        None => 14,
+    };
+
+    let conn = Database::connect(&database_url)
+        .await
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+
+    migration::Migrator::up(&conn, None)
+        .await
+        .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
+
+    let dish_repository_impl = Arc::new(DishRepositoryImpl::new(conn.clone()));
+    let takeaway_shop_repository_impl = Arc::new(TakeawayShopRepositoryImpl::new(conn.clone()));
+
+    let geo_port_impl = Arc::new(HttpGeoPortImpl::new(
+        MicroService::Geo.internal_api_endpoint(),
+    ));
+    let order_port_impl = Arc::new(HttpOrderPortImpl::new(
+        MicroService::Order.internal_api_endpoint(),
+    ));
+    let train_port_impl = Arc::new(HttpTrainPortImpl::new(
+        MicroService::Train.internal_api_endpoint(),
+    ));
+    let user_port_impl = Arc::new(HttpUserPortImpl::new(
+        MicroService::User.internal_api_endpoint(),
+    ));
+
+    let object_storage_port_impl = Arc::new(HttpObjectStoragePortImpl::new(
+        MicroService::ObjectStorage.internal_api_endpoint(),
+    ));
+
+    let dish_query_service_impl = Arc::new(DishQueryServiceImpl::new(
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_shop_repository_impl),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&order_port_impl),
+        Arc::clone(&train_port_impl),
+        Arc::clone(&user_port_impl),
+    ));
+
+    let train_dish_application_service_impl = Arc::new(TrainDishApplicationServiceImpl::new(
+        Arc::clone(&dish_repository_impl),
+        Arc::clone(&takeaway_shop_repository_impl),
+        Arc::clone(&train_port_impl),
+        Arc::clone(&user_port_impl),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&order_port_impl),
+        tz_offset_hour as u32,
+    ));
+
+    let dish_event_service_impl = DishEventServiceImpl::new(
+        &rabbitmq_url,
+        conn.clone(),
+        Arc::clone(&geo_port_impl),
+        Arc::clone(&train_port_impl),
+    )
+    .await
+    .expect("cannot connect to rabbitmq");
+
+    let dish_internal_service_impl = Arc::new(
+        dish_base::infrastructure::application::service::internal::DishInternalServiceImpl::new(
+            Arc::clone(&dish_repository_impl),
+            Arc::clone(&takeaway_shop_repository_impl),
+            Arc::clone(&train_port_impl),
+            Arc::clone(&geo_port_impl),
+            Arc::clone(&object_storage_port_impl),
+            data_base_path,
+            conn.clone(),
+            Arc::clone(&dish_event_service_impl),
+        ),
+    );
+
+    dish_event_service_impl
+        .init_consumer()
+        .await
+        .expect("failed to init event consumer");
+
+    let dish_query_service: web::Data<dyn DishQueryService> =
+        web::Data::from(dish_query_service_impl as Arc<dyn DishQueryService>);
+
+    let train_dish_application_service: web::Data<dyn TrainDishApplicationService> =
+        web::Data::from(
+            train_dish_application_service_impl as Arc<dyn TrainDishApplicationService>,
+        );
+
+    let dish_internal_service: web::Data<dyn DishInternalService> =
+        web::Data::from(dish_internal_service_impl as Arc<dyn DishInternalService>);
+
+    let dish_booking_service_impl =
+        Arc::new(DishBookingServiceImpl::new(Arc::clone(&order_port_impl)));
+
+    let takeaway_booking_service_impl = Arc::new(TakeawayBookingServiceImpl::new(Arc::clone(
+        &order_port_impl,
+    )));
+
+    let dish_order_status_consumer = Box::new(DishOrderStatusConsumer::new(
+        Arc::clone(&dish_booking_service_impl),
+        Arc::clone(&order_port_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let takeaway_order_status_consumer = Box::new(TakeawayOrderStatusConsumer::new(
+        Arc::clone(&takeaway_booking_service_impl),
+        Arc::clone(&order_port_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let order_status_consumer = vec![
+        dish_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>,
+        takeaway_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>,
+    ];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
+
+    tokio::task::spawn(async move {
+        HttpServer::new(move || {
+            App::new()
+                .app_data(dish_internal_service.clone())
+                .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
+                .wrap(TracingLogger::default())
+                .service(web::scope("/internal").configure(dish_api::internal::scoped_config))
+        })
+        .bind(("0.0.0.0", 23333))
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
+    });
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(dish_query_service.clone())
+            .app_data(train_dish_application_service.clone())
+            .app_data(conn.clone())
+            // Thinking 1.2.1D - 8: `App::new().app_data(...).app_data(...)`是什么设计模式的体现？
+            // Good! Next, build your API endpoint in `api::train::schedule`
+            .app_data(web::PayloadConfig::default().limit(MAX_BODY_LENGTH))
+            .wrap(TracingLogger::default())
+            .service(
+                web::scope("/api")
+                    .service(web::scope("/dish").configure(dish_api::dish::scoped_config)),
+            )
+    })
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await?;
+
+    Ok(())
+}
+
+#[instrument]
+fn read_file_env(target_env: &str) -> Option<String> {
+    let mut result: Option<String> = None;
+    if let Ok(file_path) = env::var(format!("{}_FILE", target_env)) {
+        match fs::read_to_string(&file_path) {
+            Ok(val) => result = Some(val.trim().to_string()),
+            Err(e) => {
+                warn!("cannot read env file {}: {}", file_path, e)
+            }
+        }
+    }
+
+    if result.is_none()
+        && let Ok(env_str) = env::var(target_env)
+    {
+        result = Some(env_str);
+    }
+
+    result
+}

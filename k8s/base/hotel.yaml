@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hotel
+  namespace: swiftjourney
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hotel
+  template:
+    metadata:
+      labels:
+        app: hotel
+    spec:
+      initContainers:
+        - name: wait-for-deps
+          image: busybox:1.36
+          command:
+            [
+              "sh",
+              "-c",
+              "set -e; echo 'waiting for rabbitmq:5672'; until nc -z rabbitmq 5672; do sleep 2; done; echo 'waiting for redis:6379'; until nc -z redis 6379; do sleep 2; done; echo 'waiting for db:5432'; until nc -z db 5432; do sleep 2; done",
+            ]
+      containers:
+        - name: hotel
+          image: saitewasreset/swiftjourney-hotel:v0.1.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+          env:
+            - name: RUST_LOG
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: RUST_LOG } }
+            - name: DEBUG
+              value: "1"
+            - name: POSTGRES_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@db/$(POSTGRES_DB)
+            - name: RABBITMQ_USER
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_USER } }
+            - name: RABBITMQ_PASS
+              valueFrom:
+                { secretKeyRef: { name: app-secrets, key: RABBITMQ_PASS } }
+            - name: RABBITMQ_URL
+              value: amqp://$(RABBITMQ_USER):$(RABBITMQ_PASS)@rabbitmq/%2f
+            - name: DATA_PATH
+              value: /init_data
+            - name: SERVER_NAME
+              valueFrom:
+                { configMapKeyRef: { name: app-config, key: SERVER_NAME } }
+          volumeMounts:
+            - name: init-data
+              mountPath: /init_data
+          ports: [{ containerPort: 8080 }, { containerPort: 23333 }]
+          readinessProbe:
+            {
+              tcpSocket: { port: 8080 },
+              initialDelaySeconds: 5,
+              periodSeconds: 10,
+            }
+          livenessProbe:
+            {
+              tcpSocket: { port: 8080 },
+              initialDelaySeconds: 15,
+              periodSeconds: 20,
+            }
+      volumes:
+        - name: init-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hotel
+  namespace: swiftjourney
+spec:
+  selector: { app: hotel }
+  ports:
+    [
+      { name: http, port: 8080, targetPort: 8080 },
+      { name: internal, port: 23333, targetPort: 23333 },
+    ]

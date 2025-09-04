@@ -11,16 +11,32 @@ resources:
   - rabbitmq.yaml
   - minio.yaml
   - minio-init-job.yaml
-  - backend.yaml
+  - user.yaml
+  - geo.yaml
+  - train.yaml
+  - hotel.yaml
+  - dish.yaml
+  - order.yaml
+  - object-storage.yaml
   - frontend.yaml
-  # - vpa-backend.yaml
-  # - vpa-frontend.yaml
   - gateway-nginx.yaml
   - ingress.yaml
-  - hpa-backend.yaml
+  - hpa.yaml
   - metrics-server.yaml
 images:
-  - name: saitewasreset/swiftjourney-backend
+  - name: saitewasreset/swiftjourney-user
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-geo
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-train
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-hotel
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-dish
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-order
+    newTag: v0.1.0
+  - name: saitewasreset/swiftjourney-object-storage
     newTag: v0.1.0
   - name: saitewasreset/swiftjourney-frontend
     newTag: v0.1.0

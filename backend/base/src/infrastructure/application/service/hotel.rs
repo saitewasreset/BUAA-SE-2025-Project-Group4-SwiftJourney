@@ -105,7 +105,7 @@ where
 
                 match e {
                     HotelRatingServiceError::InvalidHotelUuid(uuid) => {
-                        return GeneralError::NotFound(format!("Invalid hotel uuid: {}", uuid));
+                        GeneralError::NotFound(format!("Invalid hotel uuid: {}", uuid))
                     }
                     _ => GeneralError::InternalServerError,
                 }

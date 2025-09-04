@@ -4,7 +4,6 @@ use crate::application::commands::transaction::{
 };
 use crate::application::service::transaction::{
     BalanceInfoDTO, TransactionApplicationService, TransactionApplicationServiceError,
-    TransactionInfoDTO,
 };
 use crate::application::{ApplicationError, GeneralError, ModeError};
 use crate::domain::Identifiable;
@@ -20,6 +19,7 @@ use crate::domain::service::user::{UserService, UserServiceError};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use shared::internal::order::dto::TransactionInfoDTO;
 use shared::utils::TimeMeter;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};

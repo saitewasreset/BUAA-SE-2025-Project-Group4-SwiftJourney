@@ -1,6 +1,5 @@
 use crate::application::ApplicationError;
 use crate::application::commands::train_dish::OrderTrainDishCommand;
-use crate::application::service::transaction::TransactionInfoDTO;
 use crate::domain::model::dish::{DishId, DishTime};
 use crate::domain::model::personal_info::PersonalInfoId;
 use crate::domain::model::station::StationId;
@@ -10,6 +9,7 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use serde::{Deserialize, Serialize};
+use shared::internal::order::dto::TransactionInfoDTO;
 use thiserror::Error;
 use uuid::Uuid;
 

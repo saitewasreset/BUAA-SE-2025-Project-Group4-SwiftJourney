@@ -1,0 +1,408 @@
+use crate::application::commands::hotel_order::HotelOrderRequestDTO;
+use crate::application::commands::hotel_order::HotelOrderRequestsDTO;
+use crate::application::service::hotel::HotelServiceError;
+use crate::application::service::hotel_order::HotelOrderService;
+use crate::domain::repository::hotel::HotelRepository;
+use crate::domain::service::hotel_booking::HotelBookingService;
+use async_trait::async_trait;
+use chrono::{Datelike, NaiveDate, TimeZone};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
+use sea_orm::prelude::DateTimeWithTimeZone;
+use shared::MicroService;
+use shared::application_error::{ApplicationError, GeneralError};
+use shared::domain::Identifiable;
+use shared::domain::model::hotel::HotelDateRange;
+use shared::domain::model::order::{BaseOrder, Order, OrderStatus, OrderTimeInfo, PaymentInfo};
+use shared::domain::model::order::{HotelOrder, OrderType};
+use shared::domain::model::personal_info::PersonalInfoId;
+use shared::domain::model::user::UserId;
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, HotelUpdatedEvent};
+use shared::internal::order::command::{
+    NewTransactionCommand, OrderByUuidQuery, RefundTransactionCommand,
+};
+use shared::internal::order::dto::TransactionInfoDTO;
+use shared::internal::user::command::SessionQuery;
+use shared::ports::order::OrderPort;
+use shared::ports::user::UserPort;
+use std::sync::Arc;
+use tracing::{error, info, instrument};
+use uuid::Uuid;
+
+pub struct HotelOrderServiceImpl<HR, HBS, OP, UP, ES> {
+    hotel_repository: Arc<HR>,
+    hotel_booking_service: Arc<HBS>,
+    order_port: Arc<OP>,
+    user_port: Arc<UP>,
+    event_service: Arc<ES>,
+}
+
+impl<HR, HBS, OP, UP, ES> HotelOrderServiceImpl<HR, HBS, OP, UP, ES>
+where
+    HR: HotelRepository,
+    HBS: HotelBookingService,
+    OP: OrderPort,
+    UP: UserPort,
+    ES: EventService,
+{
+    pub fn new(
+        hotel_repository: Arc<HR>,
+        hotel_booking_service: Arc<HBS>,
+        order_port: Arc<OP>,
+        user_port: Arc<UP>,
+        event_service: Arc<ES>,
+    ) -> Self {
+        Self {
+            hotel_repository,
+            hotel_booking_service,
+            order_port,
+            user_port,
+            event_service,
+        }
+    }
+
+    async fn validate_and_create_hotel_order(
+        &self,
+        dto: &HotelOrderRequestDTO,
+    ) -> Result<Box<dyn Order>, Box<dyn ApplicationError>> {
+        let hotel_uuid = Uuid::parse_str(&dto.hotel_id).map_err(|_| {
+            Box::new(GeneralError::BadRequest(format!(
+                "Invalid hotel id format: {}",
+                dto.hotel_id
+            ))) as Box<dyn ApplicationError>
+        })?;
+        let hotel_id = self
+            .hotel_repository
+            .get_id_by_uuid(hotel_uuid)
+            .await
+            .map_err(|e| {
+                error!("Failed to get hotel id by uuid: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "invalid hotel uuid: {}",
+                hotel_uuid
+            ))) as Box<dyn ApplicationError>)?;
+
+        let hotel = self
+            .hotel_repository
+            .find(hotel_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to find hotel: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel uuid: {}",
+                dto.hotel_id,
+            ))) as Box<dyn ApplicationError>)?;
+
+        let room_type = hotel
+            .room_type_list()
+            .iter()
+            .find(|rt| rt.type_name() == &dto.room_type)
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "Invalid hotel room type: {}",
+                dto.room_type
+            ))) as Box<dyn ApplicationError>)?;
+
+        let room_type_id = room_type
+            .get_id()
+            .ok_or(Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)?;
+
+        let room_price_per_day = room_type.price();
+
+        let date_range = match (dto.begin_date.as_ref(), dto.end_date.as_ref()) {
+            (Some(begin), Some(end)) => {
+                let begin_date = NaiveDate::parse_from_str(begin, "%Y-%m-%d").map_err(|_| {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "Invalid date format".to_string(),
+                    )) as Box<dyn ApplicationError>
+                })?;
+                let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d").map_err(|_| {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "Invalid date format".to_string(),
+                    )) as Box<dyn ApplicationError>
+                })?;
+
+                if end_date <= begin_date {
+                    return Err(
+                        Box::new(HotelServiceError::InvalidDateRange(begin_date, end_date))
+                            as Box<dyn ApplicationError>,
+                    );
+                }
+
+                let duration = end_date.signed_duration_since(begin_date).num_days();
+                if duration > 7 {
+                    return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                        "Stay cannot exceed 7 days".to_string(),
+                    )) as Box<dyn ApplicationError>);
+                }
+
+                HotelDateRange::new(begin_date, end_date).map_err(|e| {
+                    Box::new(HotelServiceError::InvalidDateRangeMessage(e.to_string()))
+                        as Box<dyn ApplicationError>
+                })?
+            }
+            _ => {
+                return Err(Box::new(HotelServiceError::InvalidDateRangeMessage(
+                    "Both begin date and end date must be provided".to_string(),
+                )) as Box<dyn ApplicationError>);
+            }
+        };
+
+        // 解析 UUID
+        let personal_uuid = match Uuid::parse_str(&dto.personal_id) {
+            Ok(uuid) => uuid,
+            Err(_) => {
+                return Err(Box::new(GeneralError::BadRequest(format!(
+                    "Invalid personal id format: {}",
+                    dto.personal_id
+                ))) as Box<dyn ApplicationError>);
+            }
+        };
+
+        let personal_infos = self.user_port.db_get_personal_info().await.map_err(|e| {
+            error!("Error while finding personal info: {:?}", e);
+            Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+        })?;
+
+        let personal_info = personal_infos
+            .into_iter()
+            .find(|info| info.uuid == personal_uuid)
+            .ok_or(Box::new(GeneralError::NotFound(format!(
+                "invalid personal info uuid: {}",
+                personal_uuid
+            ))) as Box<dyn ApplicationError>)?;
+
+        let personal_info_id = PersonalInfoId::from(personal_info.id as u64);
+
+        let days = date_range
+            .end_date()
+            .signed_duration_since(date_range.begin_date())
+            .num_days() as u32;
+        let room_price = room_price_per_day * Decimal::from(days);
+
+        let amount = Decimal::from(dto.amount);
+
+        if amount <= Decimal::ZERO {
+            return Err(Box::new(GeneralError::BadRequest(
+                "Amount must be greater than zero".to_string(),
+            )) as Box<dyn ApplicationError>);
+        }
+
+        let order_uuid = Uuid::new_v4();
+        let payment_info = PaymentInfo::new(None, None);
+
+        let create_time: DateTimeWithTimeZone = chrono::Local::now().into();
+
+        let begin_time: DateTimeWithTimeZone = {
+            let local_time = chrono::Local
+                .with_ymd_and_hms(
+                    date_range.begin_date().year(),
+                    date_range.begin_date().month(),
+                    date_range.begin_date().day(),
+                    14,
+                    0,
+                    0, // 14:00 入住
+                )
+                .single()
+                .unwrap_or_else(chrono::Local::now);
+            local_time.into()
+        };
+
+        let end_time: DateTimeWithTimeZone = {
+            let local_time = chrono::Local
+                .with_ymd_and_hms(
+                    date_range.end_date().year(),
+                    date_range.end_date().month(),
+                    date_range.end_date().day(),
+                    12,
+                    0,
+                    0, // 12:00 退房
+                )
+                .single()
+                .unwrap_or_else(chrono::Local::now);
+            local_time.into()
+        };
+
+        let order_time_info = OrderTimeInfo::new(create_time, begin_time, end_time);
+
+        let base_order = BaseOrder::new(
+            None,
+            order_uuid,
+            OrderStatus::Unpaid,
+            order_time_info,
+            room_price,
+            amount,
+            payment_info,
+            personal_info_id,
+        );
+
+        let hotel_order = HotelOrder::new(base_order, hotel_id, room_type_id, date_range);
+
+        Ok(Box::new(hotel_order))
+    }
+
+    #[instrument(skip(self))]
+    pub async fn process_order_message(
+        &self,
+        transaction_id: Uuid,
+        order_uuids: Vec<Uuid>,
+        atomic: bool,
+    ) -> Result<(), Box<dyn ApplicationError>> {
+        info!(
+            "Processing hotel orders for transaction: {}",
+            transaction_id
+        );
+
+        let result = self
+            .hotel_booking_service
+            .booking_group(order_uuids.clone(), atomic)
+            .await;
+
+        match result {
+            Ok(_) => {
+                info!(
+                    "Successfully processed hotel orders for transaction: {}",
+                    transaction_id
+                );
+                Ok(())
+            }
+            Err(err) => {
+                error!(
+                    "Failed to process hotel orders for transaction {}: {:?}",
+                    transaction_id, err
+                );
+
+                info!(
+                    "Initiating automatic refund for failed transaction: {}",
+                    transaction_id
+                );
+
+                let mut to_refund_orders: Vec<Box<dyn Order>> = Vec::new();
+
+                for order_uuid in order_uuids.clone() {
+                    match self
+                        .order_port
+                        .get_order_by_uuid(OrderByUuidQuery { order_uuid })
+                        .await
+                    {
+                        Ok(Some(order)) => {
+                            let order_dyn: Box<dyn Order> = order.into();
+
+                            if order_dyn.order_type() == OrderType::Hotel {
+                                to_refund_orders.push(order_dyn);
+                            }
+                        }
+                        Ok(None) => {
+                            error!("Order {} not found for refund", order_uuid);
+                        }
+                        Err(e) => {
+                            error!("Error finding order {}: {:?}", order_uuid, e);
+                        }
+                    }
+                }
+
+                self.order_port
+                    .refund_transaction(RefundTransactionCommand {
+                        transaction_id,
+                        to_refund_orders: to_refund_orders
+                            .into_iter()
+                            .map(|x| x.as_ref().into())
+                            .collect(),
+                    })
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to create refund transaction: {:?}", e);
+                        Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+                    })?;
+
+                Err(Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>)
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl<HR, HBS, OP, UP, ES> HotelOrderService for HotelOrderServiceImpl<HR, HBS, OP, UP, ES>
+where
+    HR: HotelRepository,
+    HBS: HotelBookingService,
+    OP: OrderPort,
+    UP: UserPort,
+    ES: EventService,
+{
+    #[instrument(skip(self, hotel_orders), fields(session_id = %session_id))]
+    async fn process_hotel_orders(
+        &self,
+        session_id: String,
+        hotel_orders: HotelOrderRequestsDTO,
+    ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>> {
+        if hotel_orders.is_empty() {
+            return Err(
+                Box::new(GeneralError::BadRequest("Empty order list".to_string()))
+                    as Box<dyn ApplicationError>,
+            );
+        }
+
+        let user = self
+            .user_port
+            .get_session(SessionQuery { session_id })
+            .await
+            .map_err(|e| {
+                error!("Failed to get user id: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?
+            .ok_or(Box::new(GeneralError::InvalidSessionId) as Box<dyn ApplicationError>)?;
+
+        let user_id = UserId::from(user.user_id);
+
+        error!("Before validate_and_create_hotel_order");
+
+        let mut orders: Vec<Box<dyn Order>> = Vec::new();
+        for order_dto in &hotel_orders {
+            let order = self.validate_and_create_hotel_order(order_dto).await?;
+            orders.push(order);
+        }
+
+        error!("After validate_and_create_hotel_order");
+
+        let total_amount = orders
+            .iter()
+            .map(|order| {
+                (order.unit_price() * order.amount())
+                    .to_f64()
+                    .unwrap_or(0.0)
+            })
+            .sum::<f64>();
+
+        let transaction_id = self
+            .order_port
+            .new_transaction(NewTransactionCommand {
+                user_id: user_id.into(),
+                orders: orders.into_iter().map(|x| x.as_ref().into()).collect(),
+                atomic: true,
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to create transaction: {:?}", e);
+                Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
+            })?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Hotel, HotelUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish hotel event: {:?}", e);
+        }
+
+        Ok(TransactionInfoDTO {
+            transaction_id,
+            amount: total_amount,
+            status: "unpaid".to_string(),
+        })
+    }
+}

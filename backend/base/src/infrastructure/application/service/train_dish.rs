@@ -4,7 +4,6 @@ use crate::application::service::train_dish::{
     DishOrderRequestDTO, TakeawayOrderRequestDTO, TrainDishApplicationService,
     TrainDishApplicationServiceError, VerifiedDishOrderRequest, VerifiedTakeawayOrderRequest,
 };
-use crate::application::service::transaction::TransactionInfoDTO;
 use crate::application::{ApplicationError, GeneralError};
 use crate::domain::Identifiable;
 use crate::domain::model::dish::DishTime;
@@ -35,6 +34,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveTime};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use shared::internal::order::dto::TransactionInfoDTO;
 use std::any::Any;
 use std::collections::HashMap;
 use std::ops::Deref;

@@ -9,6 +9,7 @@ use crate::domain::service::transaction::TransactionServiceError;
 use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
+use shared::internal::order::dto::TransactionInfoDTO;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -45,14 +46,6 @@ pub struct TransactionGenerateDTO {
 #[serde(rename_all = "camelCase")]
 pub struct BalanceInfoDTO {
     pub balance: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct TransactionInfoDTO {
-    pub transaction_id: Uuid,
-    pub amount: f64,
-    pub status: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
