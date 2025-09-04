@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
-use shared::MicroService;
 use shared::event::queue::{EventService, EventServiceError, get_channel};
 use shared::event::{
     DishUpdatedEvent, EventRegistry, HotelRoomTypeUpdatedEvent, HotelUpdatedEvent,
@@ -18,6 +17,7 @@ use shared::ports::geo::GeoPort;
 use shared::ports::hotel::HotelPort;
 use shared::ports::train::TrainPort;
 use shared::ports::user::UserPort;
+use shared::{DB_CHUNK_SIZE, MicroService};
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 use tracing::log::warn;
@@ -383,22 +383,24 @@ async fn update_train(db: &DatabaseConnection, train_list: Vec<DbTrainDTO>) {
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::train::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::train::Column::Id)
-                .update_columns([
-                    crate::models::train::Column::Number,
-                    crate::models::train::Column::TypeId,
-                    crate::models::train::Column::DefaultOriginDepartureTime,
-                    crate::models::train::Column::DefaultLineId,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::train::Entity::insert_many(chunk)
+            .on_conflict(
+                OnConflict::column(crate::models::train::Column::Id)
+                    .update_columns([
+                        crate::models::train::Column::Number,
+                        crate::models::train::Column::TypeId,
+                        crate::models::train::Column::DefaultOriginDepartureTime,
+                        crate::models::train::Column::DefaultLineId,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting train: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting trains: {:?}", err);
+        }
     }
 }
 
@@ -415,22 +417,24 @@ async fn update_train_schedule(db: &DatabaseConnection, schedule_list: Vec<DbTra
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::train_schedule::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::train_schedule::Column::Id)
-                .update_columns([
-                    crate::models::train_schedule::Column::TrainId,
-                    crate::models::train_schedule::Column::DepartureDate,
-                    crate::models::train_schedule::Column::OriginDepartureTime,
-                    crate::models::train_schedule::Column::LineId,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::train_schedule::Entity::insert_many(chunk)
+            .on_conflict(
+                OnConflict::column(crate::models::train_schedule::Column::Id)
+                    .update_columns([
+                        crate::models::train_schedule::Column::TrainId,
+                        crate::models::train_schedule::Column::DepartureDate,
+                        crate::models::train_schedule::Column::OriginDepartureTime,
+                        crate::models::train_schedule::Column::LineId,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting train schedule: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting train schedule: {:?}", err);
+        }
     }
 }
 

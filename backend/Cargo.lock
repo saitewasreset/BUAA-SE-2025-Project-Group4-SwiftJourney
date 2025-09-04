@@ -5029,11 +5029,18 @@ dependencies = [
  "dyn-fmt",
  "email_address",
  "id_macro",
+<<<<<<< Updated upstream
  "lapin",
  "mockall",
  "phf",
  "regex",
  "reqwest",
+=======
+ "lapin 3.2.1",
+ "mockall",
+ "phf",
+ "regex",
+>>>>>>> Stashed changes
  "rust_decimal",
  "sea-orm",
  "serde",
