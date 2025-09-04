@@ -131,6 +131,10 @@ where
     ) -> Result<(), EventServiceError> {
         if event.downcast_ref::<StationUpdatedEvent>().is_some() {
             self.handle_station_updated_event().await;
+        } else if event.downcast_ref::<CityUpdatedEvent>().is_some() {
+            self.handle_city_updated_event().await;
+        } else if event.downcast_ref::<UserUpdatedEvent>().is_some() {
+            self.handle_user_updated_event().await;
         } else if event.downcast_ref::<PersonalInfoUpdatedEvent>().is_some() {
             self.handle_personal_info_updated_event().await;
         } else {

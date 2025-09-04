@@ -316,6 +316,9 @@ Duplicates:
 
 ## Hotel(Err: 93XXX)
 
+- ++事件发送：`HotelUpdatedEvent`、`HotelRoomTypeUpdatedEvent`
+- ++事件接收：`CityUpdatedEvent`、`StationUpdatedEvent`、`UserUpdatedEvent`、`PersonalInfoUpdatedEvent`
+
 Service:
 
 - Application Service
