@@ -5,7 +5,6 @@
 //! - 领域模型与数据库模型之间的转换
 //! - 变更追踪与聚合管理
 
-use crate::domain::DbId;
 use crate::domain::model::password::HashedPassword;
 use crate::domain::model::user::{
     Age, Gender, IdentityCardId, PasswordAttempts, Phone, RealName, User, UserId, UserInfo,
@@ -13,6 +12,7 @@ use crate::domain::model::user::{
 };
 use crate::domain::repository::user::UserRepository;
 use crate::domain::service::{AggregateManagerImpl, DiffInfo};
+use crate::domain::DbId;
 use crate::domain::{
     AggregateManager, DbRepositorySupport, DiffType, Identifiable, MultiEntityDiff, Repository,
     RepositoryError, TypedDiff,
@@ -373,5 +373,202 @@ impl UserRepository for UserRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::password::PasswordSalt;
+    use crate::domain::model::user::{Gender, Phone, RealName, UserId, UserInfo, Username};
+    use email_address::EmailAddress;
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Statement};
+
+    /// 初始化内存数据库
+    async fn setup_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            r#"
+            CREATE TABLE user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                hashed_password TEXT NOT NULL,
+                hashed_payment_password TEXT,
+                salt TEXT NOT NULL,
+                wrong_payment_password_tried INTEGER NOT NULL,
+                gender TEXT,
+                age INTEGER,
+                phone TEXT NOT NULL,
+                email TEXT,
+                name TEXT NOT NULL,
+                identity_card_id TEXT NOT NULL
+            );
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        db
+    }
+
+    /// 构造一个简单 User
+    fn make_test_user(id: Option<UserId>) -> User {
+        let username = Username::try_from("testuser".to_string()).unwrap();
+        let name = RealName::try_from("Test Name".to_string()).unwrap();
+        let phone = Phone::try_from("15999999999".to_string()).unwrap();
+        let email = Some(EmailAddress::from_str("test@example.com").unwrap());
+        let identity_card_id = IdentityCardId::try_from("11010519491231002X".to_string()).unwrap();
+        let user_info = UserInfo::new(
+            name,
+            Some(Gender::Male),
+            Some(Age::try_from(20).unwrap()),
+            phone,
+            email,
+            identity_card_id,
+        );
+
+        User::new(
+            id,
+            username,
+            HashedPassword {
+                hashed_password: vec![],
+                salt: PasswordSalt::from(vec![]),
+            },
+            None,
+            PasswordAttempts::try_from(0).unwrap(),
+            user_info,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_on_insert_and_on_select() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db);
+
+        let user = make_test_user(None);
+
+        // 正向测试：插入并查询
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        let fetched = repo.on_select(user_id).await.unwrap().unwrap();
+        assert_eq!(fetched.username(), user.username());
+
+        // 反向测试：查询不存在ID
+        let not_found = repo.on_select(999.into()).await.unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_on_update() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db.clone());
+
+        let mut user = make_test_user(None);
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        user.set_id(user_id);
+
+        // 修改字段
+        let mut modified_user = user.clone();
+        modified_user.set_username(Username::try_from("newname".to_string()).unwrap());
+
+        let mut diff = MultiEntityDiff::new();
+        diff.add_change(TypedDiff::new(
+            DiffType::Modified,
+            Some(user),
+            Some(modified_user.clone()),
+        ));
+
+        repo.on_update(diff).await.unwrap();
+
+        let fetched = repo.on_select(user_id).await.unwrap().unwrap();
+        assert_eq!(fetched.username(), modified_user.username());
+    }
+
+    #[tokio::test]
+    async fn test_on_delete() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db.clone());
+
+        let mut user = make_test_user(None);
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        user.set_id(user_id);
+
+        // 正向删除
+        repo.on_delete(user.clone()).await.unwrap();
+        let fetched = repo.on_select(user_id).await.unwrap();
+        assert!(fetched.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_phone() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db.clone());
+
+        let mut user = make_test_user(None);
+        let phone = user.user_info().phone.clone();
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        user.set_id(user_id);
+
+        // 正向查询
+        let fetched = repo.find_by_phone(phone.clone()).await.unwrap().unwrap();
+        assert_eq!(fetched.get_id(), Some(user_id));
+
+        // 反向查询
+        let not_found = repo
+            .find_by_phone(Phone::try_from("15899999999".to_string()).unwrap())
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_identity_card_id() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db.clone());
+
+        let mut user = make_test_user(None);
+        let id_card = user.user_info().identity_card_id.clone();
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        user.set_id(user_id);
+
+        // 正向查询
+        let fetched = repo
+            .find_by_identity_card_id(id_card.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(fetched.get_id(), Some(user_id));
+
+        // 反向查询
+        let not_found = repo
+            .find_by_identity_card_id(
+                IdentityCardId::try_from("150524200701216857".to_string()).unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_by_phone() {
+        let db = setup_db().await;
+        let repo = UserRepositoryImpl::new(db.clone());
+
+        let mut user = make_test_user(None);
+        let phone = user.user_info().phone.clone();
+        let user_id = repo.on_insert(user.clone()).await.unwrap();
+        user.set_id(user_id);
+
+        // 正向删除
+        repo.remove_by_phone(phone.clone()).await.unwrap();
+        let fetched = repo.find_by_phone(phone.clone()).await.unwrap();
+        assert!(fetched.is_none());
+
+        // 反向删除（不存在用户）
+        repo.remove_by_phone(Phone::try_from("15999999999".to_string()).unwrap())
+            .await
+            .unwrap();
     }
 }
