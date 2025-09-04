@@ -99,7 +99,7 @@ where
 
         let schedule = self
             .train_schedule_repository
-            .find_by_train_id_and_origin_departure_time(train_id, origin_departure_time.into())
+            .find_by_train_id_and_origin_departure_time(train_id, origin_departure_time)
             .await
             .inspect_err(|e| error!("error getting train schedule: {:?}", e))
             .map_err(|e| TrainInternalServiceError::RelatedServiceError(e.into()))?;

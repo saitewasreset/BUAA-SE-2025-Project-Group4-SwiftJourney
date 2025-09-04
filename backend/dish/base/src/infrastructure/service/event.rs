@@ -113,11 +113,11 @@ where
         &self,
         event: Box<dyn Any + Send + Sync>,
     ) -> Result<(), EventServiceError> {
-        if let Some(_) = event.downcast_ref::<StationUpdatedEvent>() {
+        if event.downcast_ref::<StationUpdatedEvent>().is_some() {
             self.handle_station_updated_event().await;
-        } else if let Some(_) = event.downcast_ref::<TrainUpdatedEvent>() {
+        } else if event.downcast_ref::<TrainUpdatedEvent>().is_some() {
             self.handle_train_updated_event().await;
-        } else if let Some(_) = event.downcast_ref::<RouteUpdatedEvent>() {
+        } else if event.downcast_ref::<RouteUpdatedEvent>().is_some() {
             self.handle_route_updated_event().await;
         } else {
             warn!("Unknown event type");

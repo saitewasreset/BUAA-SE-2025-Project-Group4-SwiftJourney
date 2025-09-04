@@ -10,7 +10,6 @@ use shared::ports::impls::user::HttpUserPortImpl;
 use std::env;
 use std::env::VarError;
 use std::sync::Arc;
-use tokio;
 use tracing_actix_web::TracingLogger;
 use train_api::internal::scoped_config as internal_scoped_config;
 use train_base::application::service::internal::TrainInternalService;

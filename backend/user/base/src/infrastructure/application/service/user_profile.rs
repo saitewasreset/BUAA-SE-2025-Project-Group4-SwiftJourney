@@ -309,7 +309,7 @@ mod tests {
     async fn test_get_profile_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
-        let mut mock_event_service = MockEventService::new();
+        let mock_event_service = MockEventService::new();
 
         let user = default_test_user();
         let user_id = UserId::from(1);
@@ -403,7 +403,7 @@ mod tests {
     async fn test_set_profile_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
-        let mut mock_event_service = MockEventService::new();
+        let mock_event_service = MockEventService::new();
 
         let user = default_test_user();
         let user_id = UserId::from(1);

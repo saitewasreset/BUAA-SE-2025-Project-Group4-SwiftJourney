@@ -112,8 +112,8 @@ where
             .inspect_err(|e| error!("failed to find train by number: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or(GeneralError::NotFound(format!(
-                "No such train: {}",
-                train_number.to_string()
+                "No such train: {:?}",
+                train_number
             )))?;
 
         let dish_list = self
@@ -377,8 +377,8 @@ where
             TrainNumber::from_unchecked(train_number.clone().to_string())
         } else {
             return Err(GeneralError::NotFound(format!(
-                "Invalid train number: {}",
-                train_number.clone().to_string()
+                "Invalid train number: {:?}",
+                train_number
             ))
             .into());
         };
@@ -413,8 +413,8 @@ where
             .inspect_err(|e| error!("failed to find train by number: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or(GeneralError::NotFound(format!(
-                "No such train: {}",
-                train_number.clone().to_string()
+                "No such train: {:?}",
+                train_number
             )))?;
 
         let train_schedule = self

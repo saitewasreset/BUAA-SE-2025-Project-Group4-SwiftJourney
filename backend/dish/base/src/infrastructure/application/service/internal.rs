@@ -54,6 +54,7 @@ where
     OSP: ObjectStoragePort,
     ES: EventService,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dish_repository: Arc<DR>,
         takeaway_shop_repository: Arc<TSR>,

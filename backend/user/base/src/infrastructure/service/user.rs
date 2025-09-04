@@ -397,9 +397,7 @@ where
 mod tests {
     use super::*;
     use crate::domain::model::password::{HashedPassword, PasswordSalt};
-    use crate::infrastructure::service::password::{
-        Argon2PasswordServiceImpl, MockPasswordServiceImpl,
-    };
+    use crate::infrastructure::service::password::Argon2PasswordServiceImpl;
     use async_trait::async_trait;
     use mockall::mock;
     use shared::domain::{Identifiable, Repository, RepositoryError};
