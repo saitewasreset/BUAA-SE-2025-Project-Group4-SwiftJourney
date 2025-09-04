@@ -28,10 +28,13 @@ use crate::domain::repository::user::UserRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
 use email_address::EmailAddress;
+use shared::MicroService;
 use shared::application_error::{ApplicationError, GeneralError};
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, UserUpdatedEvent};
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{error, warn};
 
 /// 用户资料服务实现
 ///
@@ -46,19 +49,22 @@ use tracing::warn;
 /// # 字段
 /// - `session_manager`: 会话管理服务的`Arc`引用
 /// - `user_repository`: 用户仓储的`Arc`引用
-pub struct UserProfileServiceImpl<S, U>
+pub struct UserProfileServiceImpl<S, U, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     U: UserRepository + 'static + Send + Sync,
+    ES: EventService,
 {
     session_manager: Arc<S>,
     user_repository: Arc<U>,
+    event_service: Arc<ES>,
 }
 
-impl<S, U> UserProfileServiceImpl<S, U>
+impl<S, U, ES> UserProfileServiceImpl<S, U, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     U: UserRepository + 'static + Send + Sync,
+    ES: EventService,
 {
     /// 创建新的用户资料服务实例
     ///
@@ -68,10 +74,11 @@ where
     ///
     /// # Returns
     /// 返回初始化好的`UserProfileServiceImpl`实例
-    pub fn new(session_manager: Arc<S>, user_repository: Arc<U>) -> Self {
+    pub fn new(session_manager: Arc<S>, user_repository: Arc<U>, event_service: Arc<ES>) -> Self {
         Self {
             session_manager,
             user_repository,
+            event_service,
         }
     }
 
@@ -115,10 +122,11 @@ where
 }
 
 #[async_trait]
-impl<S, U> UserProfileService for UserProfileServiceImpl<S, U>
+impl<S, U, ES> UserProfileService for UserProfileServiceImpl<S, U, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     U: UserRepository + 'static + Send + Sync,
+    ES: EventService,
 {
     /// 获取用户资料信息
     ///
@@ -197,6 +205,14 @@ where
             .await
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::User, UserUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish user updated event: {:?}", e);
+        }
+
         Ok(())
     }
 }
@@ -213,9 +229,13 @@ mod tests {
     use anyhow::anyhow;
     use chrono::Utc;
     use mockall::{mock, predicate::*};
+    use shared::MicroService;
     use shared::domain::{Repository, RepositoryError};
+    use shared::event::EventRegistry;
+    use shared::event::queue::EventServiceError;
+    use std::any::Any;
     use std::convert::TryFrom;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     mock! {
         SessionManagerService {}
@@ -226,6 +246,21 @@ mod tests {
             async fn get_session(&self, session_id: SessionId) -> Result<Option<Session>, RepositoryError>;
             async fn get_user_id_by_session(&self, session_id: SessionId) -> Result<Option<UserId>, RepositoryError>;
             async fn verify_session_id(&self, session_id_str: &str) -> Result<bool, RepositoryError>;
+        }
+    }
+
+    mock! {
+        EventService {}
+        #[async_trait]
+        impl EventService for EventService {
+            fn micro_service(&self) -> MicroService;
+            fn lapin_channel(&self) -> lapin::Channel;
+            fn event_registry(&self) -> Arc<Mutex<EventRegistry>>;
+
+            async fn handle_event(
+                &self,
+                event: Box<dyn Any + Send + Sync>,
+            ) -> Result<(), EventServiceError>;
         }
     }
 
@@ -274,6 +309,8 @@ mod tests {
     async fn test_get_profile_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
+        let mut mock_event_service = MockEventService::new();
+
         let user = default_test_user();
         let user_id = UserId::from(1);
         let session_id = SessionId::random();
@@ -305,7 +342,11 @@ mod tests {
                 .return_once(move |_| Ok(Some(user)));
         }
 
-        let service = UserProfileServiceImpl::new(Arc::new(mock_session), Arc::new(mock_user_repo));
+        let service = UserProfileServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_user_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .get_profile(UserProfileQuery {
@@ -330,6 +371,7 @@ mod tests {
     async fn test_get_profile_invalid_session() {
         let mut mock_session = MockSessionManagerService::new();
         let mock_user_repo = MockUserRepository::new();
+        let mock_event_service = MockEventService::new();
         let session_id = SessionId::random();
 
         // 设置会话返回None
@@ -339,7 +381,11 @@ mod tests {
 
         mock_session.expect_get_session().return_once(|_| Ok(None));
 
-        let service = UserProfileServiceImpl::new(Arc::new(mock_session), Arc::new(mock_user_repo));
+        let service = UserProfileServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_user_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .get_profile(UserProfileQuery {
@@ -357,6 +403,8 @@ mod tests {
     async fn test_set_profile_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
+        let mut mock_event_service = MockEventService::new();
+
         let user = default_test_user();
         let user_id = UserId::from(1);
         let session_id = SessionId::random();
@@ -379,7 +427,11 @@ mod tests {
             .withf(|u| u.user_info().email.as_ref().unwrap().to_string() == "new@example.com")
             .return_once(|_| Ok(UserId::from(1)));
 
-        let service = UserProfileServiceImpl::new(Arc::new(mock_session), Arc::new(mock_user_repo));
+        let service = UserProfileServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_user_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .set_profile(SetUserProfileCommand {
@@ -398,6 +450,7 @@ mod tests {
     async fn test_set_profile_invalid_gender() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
+        let mock_event_service = MockEventService::new();
         let session_id = SessionId::random();
 
         let user = default_test_user();
@@ -421,7 +474,11 @@ mod tests {
             .with(eq(UserId::from(1)))
             .returning(move |_| Ok(Some(user.clone())));
 
-        let service = UserProfileServiceImpl::new(Arc::new(mock_session), Arc::new(mock_user_repo));
+        let service = UserProfileServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_user_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .set_profile(SetUserProfileCommand {
@@ -443,6 +500,7 @@ mod tests {
     async fn test_set_profile_save_failure() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_user_repo = MockUserRepository::new();
+        let mock_event_service = MockEventService::new();
         let user = default_test_user();
         let user_id = UserId::from(1);
         let session_id = SessionId::random();
@@ -459,7 +517,11 @@ mod tests {
             )))
         });
 
-        let service = UserProfileServiceImpl::new(Arc::new(mock_session), Arc::new(mock_user_repo));
+        let service = UserProfileServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_user_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .set_profile(SetUserProfileCommand {

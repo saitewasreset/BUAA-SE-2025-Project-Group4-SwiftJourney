@@ -1,3 +1,4 @@
+pub mod event;
 pub mod internal;
 pub mod password;
 pub mod session;

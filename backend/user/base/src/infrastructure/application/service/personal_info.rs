@@ -29,7 +29,10 @@ use crate::domain::model::user::{IdentityCardId, RealName};
 use crate::domain::repository::personal_info::PersonalInfoRepository;
 use crate::domain::service::session::SessionManagerService;
 use async_trait::async_trait;
+use shared::MicroService;
 use shared::application_error::{ApplicationError, GeneralError};
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, PersonalInfoUpdatedEvent};
 use std::sync::Arc;
 use tracing::{error, instrument};
 
@@ -38,19 +41,22 @@ use tracing::{error, instrument};
 /// 依赖:
 /// - 会话管理服务 - 用于验证会话和获取用户ID
 /// - 个人信息仓储 - 用于存取个人信息数据
-pub struct PersonalInfoServiceImpl<S, P>
+pub struct PersonalInfoServiceImpl<S, P, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     P: PersonalInfoRepository + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     session_manager: Arc<S>,
     personal_info_repository: Arc<P>,
+    event_service: Arc<ES>,
 }
 
-impl<S, P> PersonalInfoServiceImpl<S, P>
+impl<S, P, ES> PersonalInfoServiceImpl<S, P, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     P: PersonalInfoRepository + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     /// 创建个人信息服务实例
     ///
@@ -60,19 +66,25 @@ where
     ///
     /// # Returns
     /// 返回初始化好的`PersonalInfoServiceImpl`实例
-    pub fn new(session_manager: Arc<S>, personal_info_repository: Arc<P>) -> Self {
+    pub fn new(
+        session_manager: Arc<S>,
+        personal_info_repository: Arc<P>,
+        event_service: Arc<ES>,
+    ) -> Self {
         PersonalInfoServiceImpl {
             session_manager,
             personal_info_repository,
+            event_service,
         }
     }
 }
 
 #[async_trait]
-impl<S, P> PersonalInfoService for PersonalInfoServiceImpl<S, P>
+impl<S, P, ES> PersonalInfoService for PersonalInfoServiceImpl<S, P, ES>
 where
     S: SessionManagerService + 'static + Send + Sync,
     P: PersonalInfoRepository + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     /// 获取所有个人信息
     ///
@@ -185,6 +197,17 @@ where
                     .map_err(|_| {
                         Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
                     })?;
+
+                if let Err(e) = self
+                    .event_service
+                    .publish_event(EventPackage::new(
+                        MicroService::User,
+                        PersonalInfoUpdatedEvent,
+                    ))
+                    .await
+                {
+                    error!("Failed to publish personal info updated event: {:?}", e);
+                }
             } else {
                 return Err(
                     Box::new(PersonalInfoError::InvalidIdentityCardId) as Box<dyn ApplicationError>
@@ -234,6 +257,17 @@ where
                     .map_err(|_| {
                         Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
                     })?;
+
+                if let Err(e) = self
+                    .event_service
+                    .publish_event(EventPackage::new(
+                        MicroService::User,
+                        PersonalInfoUpdatedEvent,
+                    ))
+                    .await
+                {
+                    error!("Failed to publish personal info updated event: {:?}", e);
+                }
             } else {
                 // 创建新的个人信息
                 let mut new_info = PersonalInfo::new(
@@ -255,6 +289,17 @@ where
                     .map_err(|_| {
                         Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
                     })?;
+
+                if let Err(e) = self
+                    .event_service
+                    .publish_event(EventPackage::new(
+                        MicroService::User,
+                        PersonalInfoUpdatedEvent,
+                    ))
+                    .await
+                {
+                    error!("Failed to publish personal info updated event: {:?}", e);
+                }
             }
             return Ok(());
         }
@@ -277,6 +322,10 @@ mod tests {
     use mockall::{mock, predicate::*};
     use shared::domain::Repository;
     use shared::domain::RepositoryError;
+    use shared::event::EventRegistry;
+    use shared::event::queue::EventServiceError;
+    use std::any::Any;
+    use std::sync::Mutex;
 
     // 模拟会话管理服务
     mock! {
@@ -288,6 +337,21 @@ mod tests {
             async fn get_session(&self, session_id: SessionId) -> Result<Option<Session>, RepositoryError>;
             async fn get_user_id_by_session(&self, session_id: SessionId) -> Result<Option<UserId>, RepositoryError>;
             async fn verify_session_id(&self, session_id_str: &str) -> Result<bool, RepositoryError>;
+        }
+    }
+
+    mock! {
+        EventService {}
+        #[async_trait]
+        impl EventService for EventService {
+            fn micro_service(&self) -> MicroService;
+            fn lapin_channel(&self) -> lapin::Channel;
+            fn event_registry(&self) -> Arc<Mutex<EventRegistry>>;
+
+            async fn handle_event(
+                &self,
+                event: Box<dyn Any + Send + Sync>,
+            ) -> Result<(), EventServiceError>;
         }
     }
 
@@ -325,6 +389,7 @@ mod tests {
     async fn test_get_personal_info_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_personal_info_repo = MockPersonalInfoRepository::new();
+        let mock_event_service = MockEventService::new();
         let personal_info = create_test_personal_info(Some(PersonalInfoId::from(1)));
         let user_id = UserId::from(1);
         let session_id = SessionId::random();
@@ -341,8 +406,11 @@ mod tests {
             .with(eq(user_id))
             .return_once(move |_| Ok(vec![personal_info.clone()]));
 
-        let service =
-            PersonalInfoServiceImpl::new(Arc::new(mock_session), Arc::new(mock_personal_info_repo));
+        let service = PersonalInfoServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_personal_info_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .get_personal_info(PersonalInfoQuery {
@@ -363,6 +431,7 @@ mod tests {
     async fn test_set_personal_info_update_success() {
         let mut mock_session = MockSessionManagerService::new();
         let mut mock_personal_info_repo = MockPersonalInfoRepository::new();
+        let mock_event_service = MockEventService::new();
         let personal_info = create_test_personal_info(Some(PersonalInfoId::from(1)));
         let user_id = UserId::from(1);
         let session_id = SessionId::random();
@@ -388,8 +457,11 @@ mod tests {
             })
             .return_once(|_| Ok(PersonalInfoId::from(1)));
 
-        let service =
-            PersonalInfoServiceImpl::new(Arc::new(mock_session), Arc::new(mock_personal_info_repo));
+        let service = PersonalInfoServiceImpl::new(
+            Arc::new(mock_session),
+            Arc::new(mock_personal_info_repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .set_personal_info(SetPersonalInfoCommand {

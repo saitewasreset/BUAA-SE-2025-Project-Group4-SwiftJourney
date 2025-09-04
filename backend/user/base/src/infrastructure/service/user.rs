@@ -10,9 +10,13 @@ use crate::domain::repository::user::UserRepository;
 use crate::domain::service::password::PasswordService;
 use crate::domain::service::user::{UserService, UserServiceError};
 use async_trait::async_trait;
+use shared::MicroService;
 use shared::domain::ServiceError;
+use shared::event::queue::EventService;
+use shared::event::{EventPackage, UserUpdatedEvent};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use tracing::{error, instrument};
 
 /// 用户服务具体实现
 ///
@@ -23,39 +27,44 @@ use std::sync::Arc;
 /// # 类型约束
 /// - `R`必须实现`UserRepository` trait
 /// - `P`必须实现`PasswordService` trait
-pub struct UserServiceImpl<R, P>
+pub struct UserServiceImpl<R, P, ES>
 where
-    R: UserRepository,
-    P: PasswordService,
+    R: UserRepository + 'static + Send + Sync,
+    P: PasswordService + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     /// 用户仓储实例
     repository: Arc<R>,
+    event_service: Arc<ES>,
     /// 用于标记密码服务类型的PhantomData
     _for_super_earth: PhantomData<P>,
 }
 
-impl<R, P> UserServiceImpl<R, P>
+impl<R, P, ES> UserServiceImpl<R, P, ES>
 where
-    R: UserRepository,
-    P: PasswordService,
+    R: UserRepository + 'static + Send + Sync,
+    P: PasswordService + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     /// 创建新的用户服务实例
     ///
     /// # Arguments
     /// * `repository` - 用户仓储实现
-    pub fn new(repository: Arc<R>) -> Self {
+    pub fn new(repository: Arc<R>, event_service: Arc<ES>) -> Self {
         Self {
             repository,
+            event_service,
             _for_super_earth: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<R, P> UserService for UserServiceImpl<R, P>
+impl<R, P, ES> UserService for UserServiceImpl<R, P, ES>
 where
     R: UserRepository + 'static + Send + Sync,
     P: PasswordService + 'static + Send + Sync,
+    ES: EventService + 'static + Send + Sync,
 {
     /// 用户注册实现
     ///
@@ -119,6 +128,14 @@ where
         );
 
         self.repository.save(&mut user).await?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::User, UserUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish user updated event: {:?}", e);
+        }
 
         Ok(())
     }
@@ -216,6 +233,14 @@ where
 
             self.repository.save(&mut user).await?;
 
+            if let Err(e) = self
+                .event_service
+                .publish_event(EventPackage::new(MicroService::User, UserUpdatedEvent))
+                .await
+            {
+                error!("Failed to publish user updated event: {:?}", e);
+            }
+
             Ok(())
         } else {
             Err(UserServiceError::NoSuchUser(u64::from(user_id).to_string()))
@@ -231,6 +256,7 @@ where
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 密码哈希失败或基础设施错误
+    #[instrument(skip(self, payment_password))]
     async fn set_payment_password(
         &self,
         user_id: UserId,
@@ -253,6 +279,14 @@ where
 
             self.repository.save(&mut user).await?;
 
+            if let Err(e) = self
+                .event_service
+                .publish_event(EventPackage::new(MicroService::User, UserUpdatedEvent))
+                .await
+            {
+                error!("Failed to publish user updated event: {:?}", e);
+            }
+
             Ok(())
         } else {
             Err(UserServiceError::NoSuchUser(u64::from(user_id).to_string()))
@@ -268,6 +302,7 @@ where
     /// # Errors
     /// * `NoSuchUser` - 用户不存在
     /// * `InfrastructureError` - 基础设施错误
+    #[instrument(skip(self))]
     async fn set_wrong_payment_password_tried(
         &self,
         user_id: UserId,
@@ -277,6 +312,14 @@ where
             *user.wrong_payment_password_tried_mut() = password_attempts;
 
             self.repository.save(&mut user).await?;
+
+            if let Err(e) = self
+                .event_service
+                .publish_event(EventPackage::new(MicroService::User, UserUpdatedEvent))
+                .await
+            {
+                error!("Failed to publish user updated event: {:?}", e);
+            }
 
             Ok(())
         } else {
@@ -360,6 +403,25 @@ mod tests {
     use async_trait::async_trait;
     use mockall::mock;
     use shared::domain::{Identifiable, Repository, RepositoryError};
+    use shared::event::{EventRegistry, queue::EventServiceError};
+    use std::any::Any;
+    use std::sync::Mutex;
+
+    mock! {
+        EventService {}
+
+        #[async_trait]
+        impl EventService for EventService {
+            fn micro_service(&self) -> MicroService;
+            fn lapin_channel(&self) -> lapin::Channel;
+            fn event_registry(&self) -> Arc<Mutex<EventRegistry>>;
+
+            async fn handle_event(
+                &self,
+                event: Box<dyn Any + Send + Sync>,
+            ) -> Result<(), EventServiceError>;
+        }
+    }
 
     mock! {
         UserRepo {}
@@ -419,6 +481,7 @@ mod tests {
         let identity_card_id = "110108197703065171";
 
         let mut repo = MockRepo::new();
+        let mock_event_service = MockEventService::new();
 
         repo.expect_find().returning(|_| Ok(None));
         repo.expect_find_by_phone().returning(|_| Ok(None));
@@ -435,7 +498,10 @@ mod tests {
             .times(1)
             .returning(|_| Ok(UserId::from(1)));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
 
         let result = service
             .register(
@@ -453,6 +519,7 @@ mod tests {
     #[tokio::test]
     async fn register_phone_exists() {
         let mut repo = MockRepo::new();
+        let mock_event_service = MockEventService::new();
 
         repo.expect_find().returning(|_| Ok(None));
         repo.expect_find_by_phone()
@@ -460,8 +527,10 @@ mod tests {
         repo.expect_find_by_identity_card_id()
             .returning(|_| Ok(None));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
-
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
         let default_user = default_test_user();
 
         let result = service
@@ -480,14 +549,17 @@ mod tests {
     #[tokio::test]
     async fn register_identity_card_exists() {
         let mut repo = MockRepo::new();
+        let mock_event_service = MockEventService::new();
 
         repo.expect_find().returning(|_| Ok(None));
         repo.expect_find_by_phone().returning(|_| Ok(None));
         repo.expect_find_by_identity_card_id()
             .returning(|_| Ok(Some(default_test_user())));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
-
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
         let default_user = default_test_user();
 
         let result = service
@@ -510,6 +582,7 @@ mod tests {
     #[tokio::test]
     async fn delete_success() {
         let mut repo = MockUserRepo::new();
+        let mock_event_service = MockEventService::new();
         repo.expect_remove_by_phone()
             .withf(|x| {
                 let default_user = default_test_user();
@@ -522,8 +595,10 @@ mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
-
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
         let result = service
             .delete(default_test_user().user_info().phone.to_owned())
             .await;
@@ -536,6 +611,7 @@ mod tests {
         let user = default_test_user();
 
         let mut repo = MockUserRepo::new();
+        let mock_event_service = MockEventService::new();
 
         let prev_hashed_password = user.hashed_password().clone();
         {
@@ -553,8 +629,10 @@ mod tests {
             .times(1)
             .returning(|_| Ok(UserId::from(1)));
 
-        let service = UserServiceImpl::<_, MockPasswordServiceImpl>::new(Arc::new(repo));
-
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
         let result = service
             .set_password(UserId::from(1), "new_password".to_string())
             .await;
@@ -577,8 +655,12 @@ mod tests {
         repo.expect_find()
             .returning(move |_| Ok(Some(user.clone())));
 
-        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(Arc::new(repo));
+        let mock_event_service = MockEventService::new();
 
+        let service = UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
+            Arc::new(repo),
+            Arc::new(mock_event_service),
+        );
         let result = service
             .increment_wrong_payment_password_tried(user_id)
             .await;

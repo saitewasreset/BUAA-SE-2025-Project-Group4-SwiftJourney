@@ -29,6 +29,7 @@ use actix_web::{App, HttpServer, web};
 use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
+use shared::event::queue::EventService;
 use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
 use user_base::application::service::internal::UserInternalService;
@@ -46,6 +47,7 @@ use user_base::infrastructure::application::service::user_profile::UserProfileSe
 use user_base::infrastructure::repository::personal_info::PersonalInfoRepositoryImpl;
 use user_base::infrastructure::repository::session::SessionRepositoryImpl;
 use user_base::infrastructure::repository::user::UserRepositoryImpl;
+use user_base::infrastructure::service::event::UserEventServiceImpl;
 use user_base::infrastructure::service::internal::UserInternalServiceImpl;
 use user_base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use user_base::infrastructure::service::session::SessionManagerServiceImpl;
@@ -59,6 +61,7 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
 
     let conn = Database::connect(&database_url)
         .await
@@ -67,6 +70,16 @@ async fn main() -> std::io::Result<()> {
     migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
+
+    let user_event_service_impl = UserEventServiceImpl::new(&rabbitmq_url)
+        .await
+        .expect("cannot connect to rabbitmq");
+
+    user_event_service_impl
+        .clone()
+        .init_consumer()
+        .await
+        .expect("failed to init consumer");
 
     let session_manager_service_impl =
         Arc::new(SessionManagerServiceImpl::<SessionRepositoryImpl>::new(
@@ -80,8 +93,9 @@ async fn main() -> std::io::Result<()> {
 
     let personal_info_repository_impl = Arc::new(PersonalInfoRepositoryImpl::new(conn.clone()));
 
-    let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl>::new(
+    let user_service_impl = Arc::new(UserServiceImpl::<_, Argon2PasswordServiceImpl, _>::new(
         Arc::clone(&user_repository_impl),
+        Arc::clone(&user_event_service_impl),
     ));
 
     let user_manager_service_impl = Arc::new(UserManagerServiceImpl::new(
@@ -93,11 +107,13 @@ async fn main() -> std::io::Result<()> {
     let user_profile_service_impl = Arc::new(UserProfileServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&user_repository_impl),
+        Arc::clone(&user_event_service_impl),
     ));
 
     let personal_info_service_impl = Arc::new(PersonalInfoServiceImpl::new(
         Arc::clone(&session_manager_service_impl),
         Arc::clone(&personal_info_repository_impl),
+        Arc::clone(&user_event_service_impl),
     ));
 
     let user_internal_service_impl = Arc::new(UserInternalServiceImpl::new(

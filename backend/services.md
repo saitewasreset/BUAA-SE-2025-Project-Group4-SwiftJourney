@@ -59,14 +59,14 @@ Events：
   - `load_city`：`base/src/infrastructure/application/service/train_data.rs:165`
 - `StationUpdatedEvent()`
   - `load_station`：`base/src/infrastructure/application/service/train_data.rs:188`
-- `UserUpdatedEvent()`
-  - `set_profile`：`base/src/infrastructure/application/service/user_profile.rs:162`
-  - `register`：`base/src/infrastructure/application/service/user_manager.rs:101`
-  - `update_password`：`base/src/infrastructure/application/service/user_manager.rs:215`
-  - `set_payment_password`：`base/src/infrastructure/application/service/transaction.rs:211`
-  - BUG?：`wrong_payment_password_tried`值似乎并未更新
-- `PersonalInfoUpdatedEvent()`
-  - `set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
+- `-UserUpdatedEvent()`
+  - `+set_profile`：`base/src/infrastructure/application/service/user_profile.rs:162`
+  - `+register`：`base/src/infrastructure/application/service/user_manager.rs:101`
+  - `+set_password`：`base/src/infrastructure/application/service/user_manager.rs:215`
+  - `+set_payment_password`：`user/base/src/infrastructure/service/user.rs`
+  - BUG?：`+wrong_payment_password_tried`值似乎并未更新
+- `-PersonalInfoUpdatedEvent()`
+  - `+set_personal_info`：`base/src/infrastructure/application/service/personal_info.rs:140`
 - `TrainUpdatedEvent()`
   - `save_raw_train_number`：`base/src/infrastructure/repository/train.rs:953`
 - `TrainScheduleUpdatedEvent()`
@@ -87,6 +87,9 @@ Events：
   - `+load_dish_takeaway`：`base/src/infrastructure/application/service/train_data.rs:263`
 
 ## User(Err: 90XXX)
+
+- ++事件发送：`UserUpdatedEvent`、`PersonalInfoUpdatedEvent`
+- ++事件接收：无
 
 Service:
 
