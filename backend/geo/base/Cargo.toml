@@ -19,3 +19,4 @@ sea-orm = { version = "1.1", features = [
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
+lapin = "2.5"

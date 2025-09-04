@@ -55,9 +55,9 @@ Events：
 
 领域事件以及其触发途径，接收到领域事件后，应当同步相关的表。
 
-- `CityUpdatedEvent`
+- `-CityUpdatedEvent`
   - `load_city`：`base/src/infrastructure/application/service/train_data.rs:165`
-- `StationUpdatedEvent()`
+- `-StationUpdatedEvent()`
   - `load_station`：`base/src/infrastructure/application/service/train_data.rs:188`
 - `-UserUpdatedEvent()`
   - `+set_profile`：`base/src/infrastructure/application/service/user_profile.rs:162`
@@ -148,6 +148,9 @@ Tables:
 - `personal_info`
 
 ## Geo(Err: 91XXX)
+
+- ++事件发送：`CityUpdatedEvent`、`StationUpdatedEvent`
+- ++事件接收：无
 
 Service:
 

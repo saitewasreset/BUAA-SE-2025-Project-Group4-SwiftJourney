@@ -3,12 +3,14 @@ use geo_base::application::service::geo::{GeoApplicationService, GeoApplicationS
 use geo_base::application::service::internal::GeoInternalService;
 use geo_base::infrastructure::repository::city::CityRepositoryImpl;
 use geo_base::infrastructure::repository::station::StationRepositoryImpl;
+use geo_base::infrastructure::service::event::GeoEventServiceImpl;
 use geo_base::infrastructure::service::geo::GeoServiceImpl;
 use geo_base::infrastructure::service::internal::GeoInternalServiceImpl;
 use geo_base::infrastructure::service::station::StationServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
+use shared::event::queue::EventService;
 use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
 
@@ -18,6 +20,7 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
+    let rabbitmq_url = read_file_env("RABBITMQ_URL").expect("cannot get rabbitmq url");
 
     let conn = Database::connect(&database_url)
         .await
@@ -26,6 +29,16 @@ async fn main() -> std::io::Result<()> {
     migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
+
+    let geo_event_service_impl = GeoEventServiceImpl::new(&rabbitmq_url)
+        .await
+        .expect("Cannot connect to rabbitmq");
+
+    geo_event_service_impl
+        .clone()
+        .init_consumer()
+        .await
+        .expect("Failed to init consumer");
 
     let city_repository_impl = Arc::new(CityRepositoryImpl::new(conn.clone()));
     let station_repository_impl = Arc::new(StationRepositoryImpl::new(conn.clone()));
@@ -53,6 +66,7 @@ async fn main() -> std::io::Result<()> {
     let geo_internal_service_impl = Arc::new(GeoInternalServiceImpl::new(
         Arc::clone(&city_repository_impl),
         Arc::clone(&station_repository_impl),
+        Arc::clone(&geo_event_service_impl),
     ));
 
     let geo_app_service: web::Data<dyn GeoApplicationService> =

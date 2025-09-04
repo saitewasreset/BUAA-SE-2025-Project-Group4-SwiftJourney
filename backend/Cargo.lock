@@ -2352,6 +2352,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "id_macro",
+ "lapin",
  "sea-orm",
  "serde",
  "shared",

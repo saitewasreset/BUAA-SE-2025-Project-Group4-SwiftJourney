@@ -2,38 +2,51 @@ use crate::application::service::internal::{GeoInternalService, GeoInternalServi
 use crate::domain::repository::city::CityRepository;
 use crate::domain::repository::station::StationRepository;
 use async_trait::async_trait;
+use shared::MicroService;
 use shared::data::{CityData, StationDataItem};
+use shared::event::queue::EventService;
+use shared::event::{CityUpdatedEvent, EventPackage, StationUpdatedEvent};
 use shared::internal::geo::command::{SaveCityProvinceMapCommand, SaveStationCityMapCommand};
 use shared::internal::geo::dto::{CityDTO, DbCityDTO, DbStationDTO, StationDTO};
 use std::sync::Arc;
+use tracing::error;
 
-pub struct GeoInternalServiceImpl<CR, SR>
+pub struct GeoInternalServiceImpl<CR, SR, ES>
 where
     CR: CityRepository,
     SR: StationRepository,
+    ES: EventService,
 {
     city_repository: Arc<CR>,
     station_repository: Arc<SR>,
+    event_service: Arc<ES>,
 }
 
-impl<CR, SR> GeoInternalServiceImpl<CR, SR>
+impl<CR, SR, ES> GeoInternalServiceImpl<CR, SR, ES>
 where
     CR: CityRepository,
     SR: StationRepository,
+    ES: EventService,
 {
-    pub fn new(city_repository: Arc<CR>, station_repository: Arc<SR>) -> Self {
+    pub fn new(
+        city_repository: Arc<CR>,
+        station_repository: Arc<SR>,
+        event_service: Arc<ES>,
+    ) -> Self {
         Self {
             city_repository,
             station_repository,
+            event_service,
         }
     }
 }
 
 #[async_trait]
-impl<CR, SR> GeoInternalService for GeoInternalServiceImpl<CR, SR>
+impl<CR, SR, ES> GeoInternalService for GeoInternalServiceImpl<CR, SR, ES>
 where
     CR: CityRepository,
     SR: StationRepository,
+    ES: EventService,
 {
     async fn db_get_cities(&self) -> Result<Vec<DbCityDTO>, GeoInternalServiceError> {
         Ok(self
@@ -90,6 +103,14 @@ where
             .await
             .map_err(|e| GeoInternalServiceError::RelatedServiceError(e.into()))?;
 
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Geo, CityUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish city updated event: {:?}", e);
+        }
+
         Ok(())
     }
 
@@ -110,6 +131,14 @@ where
             .save_raw(station_data)
             .await
             .map_err(|e| GeoInternalServiceError::RelatedServiceError(e.into()))?;
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(MicroService::Geo, StationUpdatedEvent))
+            .await
+        {
+            error!("Failed to publish station updated event: {:?}", e);
+        }
 
         Ok(())
     }
