@@ -3,28 +3,26 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "takeaway_dish")]
+#[sea_orm(table_name = "station")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,
-    pub dish_type: String,
-    #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
-    pub price: Decimal,
-    pub takeaway_shop_id: i32,
-    pub images: Json,
+    pub city_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::takeaway_shop::Entity",
-        from = "Column::TakeawayShopId",
-        to = "super::takeaway_shop::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
+    #[sea_orm(has_many = "super::route::Entity")]
+    Route,
+    #[sea_orm(has_many = "super::takeaway_shop::Entity")]
     TakeawayShop,
+}
+
+impl Related<super::route::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Route.def()
+    }
 }
 
 impl Related<super::takeaway_shop::Entity> for Entity {

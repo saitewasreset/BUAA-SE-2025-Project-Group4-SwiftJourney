@@ -1,10 +1,12 @@
-use crate::internal::dish::dto::TrainDishOrderRequestDTO;
+use crate::data::{DishData, TakeawayData};
+use serde::{Deserialize, Serialize};
 
-pub struct SaveRawDishCommand {}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SaveRawDishCommand {
+    pub dish: DishData,
+}
 
-pub struct SaveRawTakeawayCommand {}
-
-pub struct OrderTrainDishCommand {
-    pub session_id: String,
-    pub info: TrainDishOrderRequestDTO,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SaveRawTakeawayCommand {
+    pub takeaway: TakeawayData,
 }

@@ -28,8 +28,11 @@ use std::sync::{Arc, Mutex};
 use tracing::{error, instrument};
 use uuid::Uuid;
 
-impl_db_id_from_u64!(TakeawayDishId, i32, "takeaway dish id");
-impl_db_id_from_u64!(TakeawayShopId, i32, "takeaway shop id");
+impl_db_id_from_u64!(TakeawayDishId, i32, "takeaway dish");
+impl_db_id_from_u64!(TakeawayShopId, i32, "takeaway shop");
+impl_db_id_from_u64!(StationId, i32, "station");
+impl_db_id_from_u64!(RouteId, i32, "route");
+impl_db_id_from_u64!(StopId, i32, "stop");
 
 pub struct TakeawayDishDataConverter;
 pub struct TakeawayShopDataConverter;
@@ -524,7 +527,7 @@ WHERE "route"."line_id" = $1;"#,
         for data in &r {
             let stop = Stop::new(
                 Some(StopId::from_db_value(data.stop_id)?),
-                Some(RouteId::from_db_value(data.stop_route_id)?),
+                Some(RouteId::from_db_value(data.stop_route_id as i32)?),
                 StationId::from_db_value(data.route_station_id)?,
                 data.route_arrival_time as u32,
                 data.route_departure_time as u32,
@@ -615,7 +618,7 @@ pub async fn save_raw_takeaway<TSR: TakeawayShopRepository, GP: GeoPort, OSP: Ob
     let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
 
     let station_list = geo_port
-        .load()
+        .db_get_stations()
         .await
         .inspect_err(|e| {
             error!("failed to get stations: {}", e);
@@ -623,8 +626,8 @@ pub async fn save_raw_takeaway<TSR: TakeawayShopRepository, GP: GeoPort, OSP: Ob
         .map_err(|e| RepositoryError::Db(e.into()))?;
 
     let station_name_to_id = station_list
-        .iter()
-        .map(|station| (station.name().to_string(), station.get_id().unwrap()))
+        .into_iter()
+        .map(|station| (station.name, StationId::from(station.id as u64)))
         .collect::<HashMap<_, _>>();
 
     let mut entity_list = Vec::new();

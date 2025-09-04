@@ -2,7 +2,7 @@ use crate::domain::Identifiable;
 use crate::domain::model::train::{SeatType, Train};
 use crate::domain::model::train_schedule::{StationRange, TrainSchedule};
 use chrono::NaiveDate;
-use sea_orm::prelude::{DateTimeWithTimeZone, Decimal};
+use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

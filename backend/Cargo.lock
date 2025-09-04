@@ -301,25 +301,11 @@ version = "7.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "587d313f3a8b4a40f866cc84b6059fe83133bf172165ac3b583129dd211d8e1c"
 dependencies = [
- "amq-protocol-tcp 7.2.3",
- "amq-protocol-types 7.2.3",
- "amq-protocol-uri 7.2.3",
+ "amq-protocol-tcp",
+ "amq-protocol-types",
+ "amq-protocol-uri",
  "cookie-factory",
- "nom 7.1.3",
- "serde",
-]
-
-[[package]]
-name = "amq-protocol"
-version = "8.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "355603365d2217f7fbc03f0be085ea1440498957890f04276402012cdde445f5"
-dependencies = [
- "amq-protocol-tcp 8.3.1",
- "amq-protocol-types 8.3.1",
- "amq-protocol-uri 8.3.1",
- "cookie-factory",
- "nom 8.0.0",
+ "nom",
  "serde",
 ]
 
@@ -329,23 +315,8 @@ version = "7.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc707ab9aa964a85d9fc25908a3fdc486d2e619406883b3105b48bf304a8d606"
 dependencies = [
- "amq-protocol-uri 7.2.3",
- "tcp-stream 0.28.0",
- "tracing",
-]
-
-[[package]]
-name = "amq-protocol-tcp"
-version = "8.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d7b97a85e08671697e724a6b7f1459ff81603613695e3151764a9529c6fec15"
-dependencies = [
- "amq-protocol-uri 8.3.1",
- "async-trait",
- "cfg-if",
- "executor-trait",
- "reactor-trait 2.8.0",
- "tcp-stream 0.30.9",
+ "amq-protocol-uri",
+ "tcp-stream",
  "tracing",
 ]
 
@@ -356,19 +327,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf99351d92a161c61ec6ecb213bc7057f5b837dd4e64ba6cb6491358efd770c4"
 dependencies = [
  "cookie-factory",
- "nom 7.1.3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "amq-protocol-types"
-version = "8.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2984a816dba991b5922503921d8f94650792bdeac47c27c83830710d2567f63"
-dependencies = [
- "cookie-factory",
- "nom 8.0.0",
+ "nom",
  "serde",
  "serde_json",
 ]
@@ -379,18 +338,7 @@ version = "7.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f89f8273826a676282208e5af38461a07fe939def57396af6ad5997fcf56577d"
 dependencies = [
- "amq-protocol-types 7.2.3",
- "percent-encoding",
- "url",
-]
-
-[[package]]
-name = "amq-protocol-uri"
-version = "8.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31db8e69d1456ec8ecf6ee598707179cf1d95f34f7d30037b16ad43f0cddcff"
-dependencies = [
- "amq-protocol-types 8.3.1",
+ "amq-protocol-types",
  "percent-encoding",
  "url",
 ]
@@ -517,7 +465,7 @@ dependencies = [
  "asn1-rs-derive",
  "asn1-rs-impl",
  "displaydoc",
- "nom 7.1.3",
+ "nom",
  "num-traits",
  "rusticata-macros",
  "thiserror",
@@ -702,19 +650,7 @@ dependencies = [
  "async-io 1.13.0",
  "async-trait",
  "futures-core",
- "reactor-trait 1.1.0",
-]
-
-[[package]]
-name = "async-reactor-trait"
-version = "2.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dd0cd60fbae6eb1171788ce253bbe5bcbd0cc8e7c5097dd114214b6a5e3acc"
-dependencies = [
- "async-io 2.4.0",
- "async-trait",
- "futures-core",
- "reactor-trait 2.8.0",
+ "reactor-trait",
 ]
 
 [[package]]
@@ -1159,7 +1095,7 @@ dependencies = [
  "dyn-fmt",
  "email_address",
  "id_macro",
- "lapin 2.5.3",
+ "lapin",
  "mockall",
  "petgraph",
  "phf",
@@ -1443,7 +1379,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
 dependencies = [
- "nom 7.1.3",
+ "nom",
 ]
 
 [[package]]
@@ -1814,7 +1750,7 @@ checksum = "07da5016415d5a3c4dd39b11ed26f915f52fc4e0dc197d87908bc916e51bc1a6"
 dependencies = [
  "asn1-rs",
  "displaydoc",
- "nom 7.1.3",
+ "nom",
  "num-bigint",
  "num-traits",
  "rusticata-macros",
@@ -1894,6 +1830,64 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "dish_api"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "actix-ws",
+ "chrono",
+ "dish_base",
+ "dotenvy",
+ "dyn-fmt",
+ "migration",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "dish_base"
+version = "0.1.0"
+dependencies = [
+ "actix-ws",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "aws-sdk-s3",
+ "chrono",
+ "claims",
+ "dashmap",
+ "dyn-clone",
+ "dyn-fmt",
+ "email_address",
+ "id_macro",
+ "lapin",
+ "mockall",
+ "petgraph",
+ "phf",
+ "regex",
+ "rust_decimal",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2273,17 +2267,6 @@ dependencies = [
  "futures-io",
  "parking",
  "pin-project-lite",
-]
-
-[[package]]
-name = "futures-rustls"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8f2f12607f92c69b12ed746fabf9ca4f5c482cba46679c1a75b874ed7c26adb"
-dependencies = [
- "futures-io",
- "rustls 0.23.25",
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -3060,9 +3043,9 @@ version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4273975142078ed200dedd77f09c8903dec110d0b02a0c8ad45796b39b691ea9"
 dependencies = [
- "amq-protocol 7.2.3",
+ "amq-protocol",
  "async-global-executor-trait",
- "async-reactor-trait 1.1.0",
+ "async-reactor-trait",
  "async-trait",
  "executor-trait",
  "flume",
@@ -3070,28 +3053,10 @@ dependencies = [
  "futures-io",
  "parking_lot",
  "pinky-swear",
- "reactor-trait 1.1.0",
+ "reactor-trait",
  "serde",
  "tracing",
  "waker-fn",
-]
-
-[[package]]
-name = "lapin"
-version = "3.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad5ae535873471fc68e6e25a90f92ab0a65f5bd10979b9f1c407ab4a3aaeaa3"
-dependencies = [
- "amq-protocol 8.3.1",
- "async-global-executor-trait",
- "async-reactor-trait 2.8.0",
- "async-trait",
- "executor-trait",
- "flume",
- "futures-core",
- "futures-io",
- "reactor-trait 2.8.0",
- "tracing",
 ]
 
 [[package]]
@@ -3352,15 +3317,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nom"
-version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "nu-ansi-term"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3483,7 +3439,7 @@ dependencies = [
  "dyn-fmt",
  "email_address",
  "id_macro",
- "lapin 2.5.3",
+ "lapin",
  "mockall",
  "petgraph",
  "phf",
@@ -3561,6 +3517,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "order_api"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "actix-ws",
+ "chrono",
+ "dotenvy",
+ "dyn-fmt",
+ "migration",
+ "order_base",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "order_base"
+version = "0.1.0"
+dependencies = [
+ "actix-ws",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "aws-sdk-s3",
+ "chrono",
+ "claims",
+ "dashmap",
+ "dyn-clone",
+ "dyn-fmt",
+ "email_address",
+ "id_macro",
+ "lapin",
+ "mockall",
+ "petgraph",
+ "phf",
+ "regex",
+ "rust_decimal",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "shared",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3611,29 +3625,6 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cae83056e7cb770211494a0ecf66d9fa7eba7d00977e5bb91f0e925b40b937f"
 dependencies = [
- "cbc",
- "cms",
- "der 0.7.9",
- "des",
- "hex",
- "hmac",
- "pkcs12",
- "pkcs5",
- "rand 0.9.1",
- "rc2",
- "sha1",
- "sha2",
- "thiserror",
- "x509-parser",
-]
-
-[[package]]
-name = "p12-keystore"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8d55319bae67f92141ce4da80c5392acd3d1323bd8312c1ffdfb018927d07d7"
-dependencies = [
- "base64 0.22.1",
  "cbc",
  "cms",
  "der 0.7.9",
@@ -4167,30 +4158,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reactor-trait"
-version = "2.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ffbbf16bc3e4db5fdcf4b77cebf1313610b54b339712aa90088d2d9b1acb1f1"
-dependencies = [
- "async-trait",
- "reactor-trait 3.1.1",
-]
-
-[[package]]
-name = "reactor-trait"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b1c85237926dd82e8bc3634240ecf2236ea81e904b3d83cdb1df974af9af293"
-dependencies = [
- "async-io 2.4.0",
- "async-trait",
- "executor-trait",
- "flume",
- "futures-core",
- "futures-io",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4415,7 +4382,7 @@ version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf0c4a6ece9950b9abdb62b1cfcf2a68b3b67a10ba445b3bb85be2a293d0632"
 dependencies = [
- "nom 7.1.3",
+ "nom",
 ]
 
 [[package]]
@@ -4494,21 +4461,6 @@ dependencies = [
  "log",
  "rustls 0.23.25",
  "rustls-native-certs 0.7.3",
- "rustls-pki-types",
- "rustls-webpki 0.103.1",
-]
-
-[[package]]
-name = "rustls-connector"
-version = "0.21.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10eb7ce243317e6b6a342ef6bff8c2e0d46d78120a9aeb2ee39693a569615c96"
-dependencies = [
- "futures-io",
- "futures-rustls",
- "log",
- "rustls 0.23.25",
- "rustls-native-certs 0.8.1",
  "rustls-pki-types",
  "rustls-webpki 0.103.1",
 ]
@@ -4962,7 +4914,7 @@ dependencies = [
  "dyn-fmt",
  "email_address",
  "id_macro",
- "lapin 3.2.1",
+ "lapin",
  "mockall",
  "phf",
  "regex",
@@ -5418,22 +5370,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "495b0abdce3dc1f8fd27240651c9e68890c14e9d9c61527b1ce44d8a5a7bd3d5"
 dependencies = [
  "cfg-if",
- "p12-keystore 0.1.5",
- "rustls-connector 0.20.2",
- "rustls-pemfile 2.2.0",
-]
-
-[[package]]
-name = "tcp-stream"
-version = "0.30.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "282ebecea8280bce8b7a0695b5dc93a19839dd445cbba70d3e07c9f6e12c4653"
-dependencies = [
- "cfg-if",
- "futures-io",
- "p12-keystore 0.2.0",
- "reactor-trait 2.8.0",
- "rustls-connector 0.21.11",
+ "p12-keystore",
+ "rustls-connector",
  "rustls-pemfile 2.2.0",
 ]
 
@@ -5871,7 +5809,7 @@ dependencies = [
  "dyn-fmt",
  "email_address",
  "id_macro",
- "lapin 2.5.3",
+ "lapin",
  "mockall",
  "petgraph",
  "phf",
@@ -6402,7 +6340,7 @@ dependencies = [
  "data-encoding",
  "der-parser",
  "lazy_static",
- "nom 7.1.3",
+ "nom",
  "oid-registry",
  "rusticata-macros",
  "thiserror",

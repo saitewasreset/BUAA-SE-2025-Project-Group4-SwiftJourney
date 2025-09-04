@@ -1,64 +1,79 @@
-use crate::domain::repository::{dish::DishRepository, takeaway::TakeawayShopRepository};
+use crate::application::service::internal::DishInternalService;
+use crate::domain::repository::takeaway::TakeawayShopRepository;
 use anyhow::{Context, anyhow};
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, TransactionTrait};
+use shared::domain::model::station::StationId;
+use shared::domain::model::train::TrainId;
+use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
 use shared::{
     DB_CHUNK_SIZE,
-    data::{DishData, TakeawayData},
     domain::{
         RepositoryError,
         model::takeaway::{TakeawayDish, TakeawayShop},
     },
     internal::object_storage::{command::PutObjectCommand, dto::ObjectCategory},
-    ports::{geo::GeoPort, object_storage::ObjectStoragePort, train::TrainPort, user::UserPort},
+    ports::{geo::GeoPort, object_storage::ObjectStoragePort, train::TrainPort},
 };
-use std::{collections::HashMap, fs, path::Path, sync::Arc};
+use std::path::PathBuf;
+use std::{collections::HashMap, fs, sync::Arc};
 use tracing::error;
 use uuid::Uuid;
 
-pub struct DishInternalServiceImpl<DS, TR, TP, UP>
+pub struct DishInternalServiceImpl<TSR, TP, GP, OSP>
 where
-    DS: DishRepository,
-    TR: TakeawayShopRepository,
+    TSR: TakeawayShopRepository,
     TP: TrainPort,
-    UP: UserPort,
+    GP: GeoPort,
+    OSP: ObjectStoragePort,
 {
-    dish_service: Arc<DS>,
-    takeaway_repository: Arc<TR>,
+    takeaway_shop_repository: Arc<TSR>,
     train_port: Arc<TP>,
-    user_port: Arc<UP>,
+    geo_port: Arc<GP>,
+    object_storage_port: Arc<OSP>,
+    data_path: PathBuf,
+    db: DatabaseConnection,
 }
 
-impl<DS, TR, TP, UP> DishInternalServiceImpl<DS, TR, TP, UP>
+impl<TSR, TP, GP, OSP> DishInternalServiceImpl<TSR, TP, GP, OSP>
 where
-    DS: DishRepository,
-    TR: TakeawayShopRepository,
+    TSR: TakeawayShopRepository,
     TP: TrainPort,
-    UP: UserPort,
+    GP: GeoPort,
+    OSP: ObjectStoragePort,
 {
     pub fn new(
-        dish_service: Arc<DS>,
-        takeaway_repository: Arc<TR>,
+        takeaway_shop_repository: Arc<TSR>,
         train_port: Arc<TP>,
-        user_port: Arc<UP>,
+        geo_port: Arc<GP>,
+        object_storage_port: Arc<OSP>,
+        data_path: PathBuf,
+        db: DatabaseConnection,
     ) -> Self {
         Self {
-            dish_service,
-            takeaway_repository,
+            takeaway_shop_repository,
             train_port,
-            user_port,
+            geo_port,
+            object_storage_port,
+            data_path,
+            db,
         }
     }
+}
 
-    async fn save_raw_dish<OSP: ObjectStoragePort>(
-        &self,
-        data: DishData,
-        data_path: &Path,
-        object_storage_port: Arc<OSP>,
-        db: &DatabaseConnection,
-    ) -> Result<(), RepositoryError> {
-        let tx = db
+#[async_trait]
+impl<TSR, TP, GP, OSP> DishInternalService for DishInternalServiceImpl<TSR, TP, GP, OSP>
+where
+    TSR: TakeawayShopRepository,
+    TP: TrainPort,
+    GP: GeoPort,
+    OSP: ObjectStoragePort,
+{
+    async fn save_raw_dish(&self, command: SaveRawDishCommand) -> Result<(), RepositoryError> {
+        let tx = self
+            .db
             .begin()
             .await
             .inspect_err(|e| {
@@ -78,13 +93,13 @@ where
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         let train_number_str_to_id = train_list
-            .iter()
-            .map(|train| (train.number().to_string(), train.get_id().unwrap()))
+            .into_iter()
+            .map(|train| (train.number, TrainId::from(train.id)))
             .collect::<HashMap<_, _>>();
 
         let mut dish_model_list = Vec::new();
 
-        for (train_number_str, dish_list) in data {
+        for (train_number_str, dish_list) in command.dish {
             let train_id = *train_number_str_to_id
                 .get(&train_number_str)
                 .ok_or_else(|| {
@@ -98,7 +113,7 @@ where
                 let image_uuid = if let Some(uuid) = image_path_to_uuid.get(&dish.picture) {
                     *uuid
                 } else {
-                    let image_path = data_path.join(&dish.picture);
+                    let image_path = self.data_path.join(&dish.picture);
 
                     let image_data = fs::read(&image_path)
                         .context(format!("cannot read from: {:?}", &image_path))
@@ -106,7 +121,8 @@ where
                             error!("failed load dish image: {}", e);
                         })?;
 
-                    let uuid = object_storage_port
+                    let uuid = self
+                        .object_storage_port
                         .put_object(PutObjectCommand {
                             object_category: ObjectCategory::Dish,
                             content_type: "image/jpeg".to_owned(),
@@ -129,7 +145,7 @@ where
                 for available_time in dish.available_time {
                     let model = crate::models::dish::ActiveModel {
                         id: ActiveValue::NotSet,
-                        train_id: ActiveValue::Set(train_id.to_db_value()),
+                        train_id: ActiveValue::Set(u64::from(train_id) as i32),
                         r#type: ActiveValue::Set(dish.dish_type.clone()),
                         time: ActiveValue::Set(available_time),
                         name: ActiveValue::Set(dish.name.clone()),
@@ -167,17 +183,15 @@ where
         Ok(())
     }
 
-    async fn save_raw_takeaway<TSR: TakeawayShopRepository, GP: GeoPort, OSP: ObjectStoragePort>(
-        data: TakeawayData,
-        data_path: &Path,
-        takeaway_shop_repository: Arc<TSR>,
-        station_port: Arc<GP>,
-        object_storage_service: Arc<OSP>,
+    async fn save_raw_takeaway(
+        &self,
+        command: SaveRawTakeawayCommand,
     ) -> Result<(), RepositoryError> {
         let mut image_path_to_uuid: HashMap<String, Uuid> = HashMap::new();
 
-        let station_list = station_port
-            .get_stations()
+        let station_list = self
+            .geo_port
+            .db_get_stations()
             .await
             .inspect_err(|e| {
                 error!("failed to get stations: {}", e);
@@ -185,13 +199,13 @@ where
             .map_err(|e| RepositoryError::Db(e.into()))?;
 
         let station_name_to_id = station_list
-            .iter()
-            .map(|station| (station.name().to_string(), station.get_id().unwrap()))
+            .into_iter()
+            .map(|station| (station.name, StationId::from(station.id as u64)))
             .collect::<HashMap<_, _>>();
 
         let mut entity_list = Vec::new();
 
-        for (station_name, inner_map) in data {
+        for (station_name, inner_map) in command.takeaway {
             let station_id = *station_name_to_id.get(&station_name).ok_or_else(|| {
                 RepositoryError::InconsistentState(anyhow!(
                     "station name {} not found in database",
@@ -206,7 +220,7 @@ where
                     let image_uuid = if let Some(uuid) = image_path_to_uuid.get(&takeaway.picture) {
                         *uuid
                     } else {
-                        let image_path = data_path.join(&takeaway.picture);
+                        let image_path = self.data_path.join(&takeaway.picture);
 
                         let image_data = fs::read(&image_path)
                             .context(format!("cannot read from: {:?}", &image_path))
@@ -214,7 +228,8 @@ where
                                 error!("failed load takeaway image: {}", e);
                             })?;
 
-                        let uuid = object_storage_service
+                        let uuid = self
+                            .object_storage_port
                             .put_object(PutObjectCommand {
                                 object_category: ObjectCategory::Takeaway,
                                 content_type: "image/jpeg".to_owned(),
@@ -252,7 +267,7 @@ where
             }
         }
 
-        takeaway_shop_repository
+        self.takeaway_shop_repository
             .save_many_atomic(entity_list)
             .await
             .inspect_err(|e| {

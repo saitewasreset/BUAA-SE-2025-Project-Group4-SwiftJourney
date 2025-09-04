@@ -24,6 +24,8 @@ use std::sync::Arc;
 use tracing::error;
 use uuid::Uuid;
 
+impl_db_id_from_u64!(TrainId, i32, "train");
+
 pub struct DishDataConverter;
 
 impl DishDataConverter {
@@ -187,8 +189,8 @@ pub async fn save_raw_dish<TP: TrainPort, OSP: ObjectStoragePort>(
         .map_err(|e| RepositoryError::Db(e.into()))?;
 
     let train_number_str_to_id = train_list
-        .iter()
-        .map(|train| (train.number().to_string(), train.get_id().unwrap()))
+        .into_iter()
+        .map(|train| (train.number, TrainId::from(train.id)))
         .collect::<HashMap<_, _>>();
 
     let mut dish_model_list = Vec::new();

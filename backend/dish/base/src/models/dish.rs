@@ -18,8 +18,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::dish_order::Entity")]
-    DishOrder,
     #[sea_orm(
         belongs_to = "super::train::Entity",
         from = "Column::TrainId",
@@ -28,12 +26,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Train,
-}
-
-impl Related<super::dish_order::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::DishOrder.def()
-    }
 }
 
 impl Related<super::train::Entity> for Entity {

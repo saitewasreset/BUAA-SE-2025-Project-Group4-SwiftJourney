@@ -1,6 +1,6 @@
+use crate::application::commands::train_dish::OrderTrainDishCommand;
 use async_trait::async_trait;
 use shared::api::ApplicationError;
-use shared::internal::dish::command::OrderTrainDishCommand;
 use shared::internal::order::dto::TransactionInfoDTO;
 use thiserror::Error;
 

@@ -13,10 +13,13 @@ use crate::application::service::dish_query::{
 use crate::domain::repository::{dish::DishRepository, takeaway::TakeawayShopRepository};
 use rust_decimal::prelude::ToPrimitive;
 use sea_orm::prelude::DateTimeWithTimeZone;
-use shared::domain::Identifiable;
 use shared::domain::model::session::SessionId;
+use shared::domain::model::station::StationId;
+use shared::domain::model::train::TrainNumber;
 use shared::internal::order::command::VerifyTrainOrderQuery;
-use shared::internal::train::command::{GetTerminalArrivalTimeQuery, GetTrainByNumberQuery};
+use shared::internal::train::command::{
+    GetTerminalArrivalTimeQuery, GetTrainByNumberQuery, VerifyTrainNumberQuery,
+};
 use shared::ports::geo::GeoPort;
 use shared::ports::order::OrderPort;
 use shared::ports::train::TrainPort;
@@ -108,7 +111,7 @@ where
         let train_number = self
             .train_port
             .get_train_by_number(GetTrainByNumberQuery {
-                train_number: query.train_number,
+                train_number: query.train_number.clone(),
             })
             .await
             .map_err(|e| {
@@ -143,20 +146,25 @@ where
             .map_err(|e| {
                 error!("Failed to get terminal arrival: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
-            })?
-            .ok_or_else(|| {
-                error!(
-                    "Terminal arrival time not found for train number {}",
-                    train_number
-                );
-                GeneralError::NotFound(format!(
-                    "Terminal arrival time not found for train number {}",
-                    train_number
-                ))
-            })?
-            .time;
+            })?;
 
         meter.meter("get terminal arrival time");
+
+        let train_number = if self
+            .train_port
+            .verify_train_number(VerifyTrainNumberQuery {
+                train_number: train_number.clone(),
+            })
+            .await
+            .inspect_err(|e| error!("Failed to verify train number: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+        {
+            TrainNumber::from_unchecked(train_number)
+        } else {
+            return Err(
+                GeneralError::NotFound(format!("Invalid train number: {}", train_number)).into(),
+            );
+        };
 
         let dishes = self
             .dish_repository
@@ -187,15 +195,17 @@ where
 
         let train = self
             .train_port
-            .get_train_by_number(train_number.clone())
+            .get_train_by_number(GetTrainByNumberQuery {
+                train_number: train_number.clone().to_string(),
+            })
             .await
             .map_err(|e| {
                 error!("Failed to find train by number: {:?}", e);
                 Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
             })?
             .ok_or_else(|| {
-                error!("Train number {} not found", train_number);
-                GeneralError::NotFound(format!("Train number {} not found", train_number))
+                error!("Train number {:?} not found", train_number);
+                GeneralError::NotFound(format!("Train number {:?} not found", train_number))
             })?;
 
         meter.meter("load train");
@@ -215,7 +225,7 @@ where
 
         let mut takeaway_map = HashMap::new();
 
-        let stations = self.geo_port.get_stations().await.map_err(|e| {
+        let stations = self.geo_port.db_get_stations().await.map_err(|e| {
             error!("Failed to get stations: {:?}", e);
             Box::new(GeneralError::InternalServerError) as Box<dyn ApplicationError>
         })?;
@@ -224,7 +234,7 @@ where
 
         let station_id_to_name = stations
             .into_iter()
-            .map(|x| (x.get_id().unwrap(), x.name().to_string()))
+            .map(|x| (StationId::from(x.id as u64), x.name))
             .collect::<HashMap<_, _>>();
 
         for (stop, shops) in shop_by_stop {

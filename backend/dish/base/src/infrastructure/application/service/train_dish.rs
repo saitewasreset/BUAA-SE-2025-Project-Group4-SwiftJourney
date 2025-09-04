@@ -1,3 +1,7 @@
+use crate::application::commands::train_dish::{
+    DishOrderRequestDTO, OrderTrainDishCommand, TakeawayOrderRequestDTO, VerifiedDishOrderRequest,
+    VerifiedTakeawayOrderRequest,
+};
 use crate::application::service::train_dish::TrainDishApplicationService;
 use crate::domain::repository::dish::DishRepository;
 use crate::domain::repository::takeaway::TakeawayShopRepository;
@@ -7,29 +11,28 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use shared::Verified;
 use shared::api::ApplicationError;
-use shared::application_error::TrainOrderServiceError::InfrastructureError;
 use shared::application_error::{GeneralError, TrainDishApplicationServiceError};
+use shared::domain::Identifiable;
 use shared::domain::model::dish::DishTime;
 use shared::domain::model::order::{
     BaseOrder, DishOrder, Order, OrderId, OrderStatus, OrderTimeInfo, PaymentInfo, TakeawayOrder,
     TrainOrder,
 };
 use shared::domain::model::personal_info::PersonalInfoId;
-use shared::domain::model::session::SessionId;
+use shared::domain::model::route::RouteId;
 use shared::domain::model::station::StationId;
 use shared::domain::model::takeaway::TakeawayDish;
-use shared::domain::model::train::TrainNumber;
-use shared::domain::model::train_schedule::{TrainSchedule, TrainScheduleId};
-use shared::domain::model::transaction::{Transaction, TransactionStatus};
+use shared::domain::model::train::{TrainId, TrainNumber};
+use shared::domain::model::train_schedule::TrainScheduleId;
+use shared::domain::model::transaction::Transaction;
 use shared::domain::model::user::UserId;
-use shared::domain::{Identifiable, Repository};
-use shared::internal::dish::command::OrderTrainDishCommand;
-use shared::internal::dish::dto::{
-    DishOrderRequestDTO, TakeawayOrderRequestDTO, VerifiedDishOrderRequest,
-    VerifiedTakeawayOrderRequest,
-};
+use shared::internal::order::command::{NewTransactionCommand, UserOrderListQuery};
 use shared::internal::order::dto::TransactionInfoDTO;
-use shared::internal::user::command::{SessionQuery, UserInfoQuery};
+use shared::internal::train::command::{
+    GetTrainByNumberQuery, GetTrainScheduleQuery, VerifyTrainNumberQuery,
+};
+use shared::internal::train::dto::TrainScheduleDTO;
+use shared::internal::user::command::SessionQuery;
 use shared::ports::geo::GeoPort;
 use shared::ports::order::OrderPort;
 use shared::ports::train::TrainPort;
@@ -102,10 +105,16 @@ where
 
         let train = self
             .train_port
-            .get_train_by_number(train_number.clone())
+            .get_train_by_number(GetTrainByNumberQuery {
+                train_number: train_number.clone().to_string(),
+            })
             .await
             .inspect_err(|e| error!("failed to find train by number: {}", e))
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::NotFound(format!(
+                "No such train: {}",
+                train_number.to_string()
+            )))?;
 
         let dish_list = self
             .dish_repository
@@ -160,7 +169,7 @@ where
             result.push(VerifiedDishOrderRequest {
                 dish_id: requested_dish.get_id().expect("dish should have an ID"),
                 personal_id: personal_info_id,
-                train_id: train.get_id().expect("train should have an ID"),
+                train_id: TrainId::from(train.id),
                 unit_price: requested_dish.unit_price(),
                 amount,
                 dish_time,
@@ -174,14 +183,14 @@ where
     #[instrument(skip(self, personal_uuid_to_id))]
     async fn verify_takeaway_order_request(
         &self,
-        train_schedule: &TrainSchedule,
+        train_schedule: &TrainScheduleDTO,
         personal_uuid_to_id: &HashMap<Uuid, PersonalInfoId>,
         station_name_to_id: &HashMap<String, StationId>,
         request_list: Vec<TakeawayOrderRequestDTO>,
     ) -> Result<Vec<VerifiedTakeawayOrderRequest>, Box<dyn ApplicationError>> {
         let takeaway_shops_map = self
             .takeaway_shop_repository
-            .find_by_train_route(train_schedule.route_id())
+            .find_by_train_route(RouteId::from(train_schedule.route_id))
             .await
             .inspect_err(|e| error!("failed to find takeaway shops for train route: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
@@ -257,10 +266,10 @@ where
                 })?;
 
             let active_time = train_schedule
-                .date()
+                .date
                 .and_time(
                     NaiveTime::from_num_seconds_from_midnight_opt(
-                        train_schedule.origin_departure_time() as u32 + station_arrival_time,
+                        train_schedule.origin_departure_time as u32 + station_arrival_time,
                         0,
                     )
                     .unwrap(),
@@ -282,7 +291,7 @@ where
 
             result.push(VerifiedTakeawayOrderRequest {
                 takeaway_dish_id: requested_dish.get_id().expect("dish should have an ID"),
-                train_id: train_schedule.train_id(),
+                train_id: TrainId::from(train_schedule.train_id),
                 station_id: *station_id,
                 personal_id: personal_info_id,
                 unit_price: requested_dish.unit_price(),
@@ -299,19 +308,19 @@ where
         user_id: UserId,
         train_schedule_id: TrainScheduleId,
     ) -> Result<OrderId, Box<dyn ApplicationError>> {
-        let user_transaction_list = self
+        let order_list = self
             .order_port
-            .find_by_user_id(user_id)
-            .await
-            .inspect_err(|e| {
-                error!("failed to find transactions by user ID: {}", e);
+            .get_order_list_by_user_id(UserOrderListQuery {
+                user_id: user_id.into(),
             })
+            .await
+            .inspect_err(|e| error!("Failed to get order list: {:?} user id = {}", e, user_id))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
-        let related_order = user_transaction_list
+        let order_list: Vec<Box<dyn Order>> = order_list.into_iter().map(|x| x.into()).collect();
+
+        let related_order = order_list
             .iter()
-            .filter(|tx| tx.status() == TransactionStatus::Paid)
-            .flat_map(|tx| tx.orders())
             .filter(|order| {
                 order.order_status() == OrderStatus::Paid
                     || order.order_status() == OrderStatus::Ongoing
@@ -343,12 +352,7 @@ where
         &self,
         command: OrderTrainDishCommand,
     ) -> Result<TransactionInfoDTO, Box<dyn ApplicationError>> {
-        let session_id = SessionId::from(
-            Uuid::try_parse(&command.session_id)
-                .map_err(|_for_super_earth| GeneralError::InvalidSessionId)?,
-        );
-
-        let user_id = self
+        let session = self
             .user_port
             .get_session(SessionQuery {
                 session_id: command.session_id,
@@ -357,39 +361,42 @@ where
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
             .ok_or(GeneralError::InvalidSessionId)?;
 
+        let user_id = UserId::from(session.user_id);
+
         let train_number = TrainNumber::from(command.info.train_number.clone());
 
-        let train_number = self
+        let train_number = if self
             .train_port
-            .verify_train_number(train_number)
+            .verify_train_number(VerifyTrainNumberQuery {
+                train_number: train_number.clone().to_string(),
+            })
             .await
-            .map_err(|e| match e {
-                InfrastructureError(e) => {
-                    error!("failed to verify train number: {}", e);
-                    GeneralError::InternalServerError
-                }
-                _ => {
-                    error!("failed to verify train number: {}", e);
-                    GeneralError::NotFound(format!("invalid train number: {}", e))
-                }
-            })?;
+            .inspect_err(|e| error!("Failed to verify train number: {:?}", e))
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+        {
+            TrainNumber::from_unchecked(train_number.clone().to_string())
+        } else {
+            return Err(GeneralError::NotFound(format!(
+                "Invalid train number: {}",
+                train_number.clone().to_string()
+            ))
+            .into());
+        };
         let personal_info_list = self
             .user_port
-            .get_user_info(UserInfoQuery {
-                user_id: user_id.user_id,
-            })
+            .db_get_personal_info()
             .await
             .inspect_err(|e| error!("failed to find personal info by user ID: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
+        let personal_info_list = personal_info_list
+            .into_iter()
+            .filter(|x| x.user_id == u64::from(user_id) as i32)
+            .collect::<Vec<_>>();
+
         let personal_uuid_to_id: HashMap<Uuid, PersonalInfoId> = personal_info_list
             .into_iter()
-            .map(|info| {
-                (
-                    info.uuid(),
-                    info.get_id().expect("personal info should have an ID"),
-                )
-            })
+            .map(|info| (info.uuid, PersonalInfoId::from(info.id as u64)))
             .collect();
 
         let origin_departure_time =
@@ -399,17 +406,23 @@ where
 
         let train = self
             .train_port
-            .find_by_train_number(train_number.clone())
+            .get_train_by_number(GetTrainByNumberQuery {
+                train_number: train_number.clone().to_string(),
+            })
             .await
             .inspect_err(|e| error!("failed to find train by number: {}", e))
-            .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
+            .map_err(|_for_super_earth| GeneralError::InternalServerError)?
+            .ok_or(GeneralError::NotFound(format!(
+                "No such train: {}",
+                train_number.clone().to_string()
+            )))?;
 
         let train_schedule = self
             .train_port
-            .find_by_train_id_and_origin_departure_time(
-                train.get_id().expect("train should have an ID"),
-                origin_departure_time,
-            )
+            .get_train_schedule(GetTrainScheduleQuery {
+                train_id: train.id,
+                origin_departure_time: origin_departure_time.to_rfc3339(),
+            })
             .await
             .inspect_err(|e| error!("failed to find train schedule: {}", e))
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?
@@ -423,12 +436,7 @@ where
             })?;
 
         let train_order_id = self
-            .verify_train_order(
-                user_id,
-                train_schedule
-                    .get_id()
-                    .expect("train schedule should have an ID"),
-            )
+            .verify_train_order(user_id, TrainScheduleId::from(train_schedule.id))
             .await?;
 
         let verified_dish_order_requests = self
@@ -443,7 +451,7 @@ where
 
         let station_list = self
             .geo_port
-            .get_stations()
+            .db_get_stations()
             .await
             .inspect_err(|e| {
                 error!("failed to load stations: {}", e);
@@ -452,12 +460,7 @@ where
 
         let station_name_to_id: HashMap<String, StationId> = station_list
             .into_iter()
-            .map(|station| {
-                (
-                    station.name().to_string(),
-                    station.get_id().expect("station should have an ID"),
-                )
-            })
+            .map(|station| (station.name, StationId::from(station.id as u64)))
             .collect();
 
         let verified_takeaway_order_requests = self
@@ -530,10 +533,15 @@ where
             order_list.push(Box::new(takeaway_order));
         }
 
-        let mut tx = Transaction::new(user_id, order_list, false);
+        let tx = Transaction::new(user_id, order_list.clone(), false);
 
-        self.order_port
-            .save(&mut tx)
+        let tx_uuid = self
+            .order_port
+            .new_transaction(NewTransactionCommand {
+                user_id: user_id.into(),
+                orders: order_list.into_iter().map(|x| x.as_ref().into()).collect(),
+                atomic: false,
+            })
             .await
             .inspect_err(|e| {
                 error!("failed to save transaction: {}", e);
@@ -541,7 +549,7 @@ where
             .map_err(|_for_super_earth| GeneralError::InternalServerError)?;
 
         Ok(TransactionInfoDTO {
-            transaction_id: tx.uuid(),
+            transaction_id: tx_uuid,
             amount: tx.amount().to_f64().unwrap(),
             status: tx.status().to_string(),
         })

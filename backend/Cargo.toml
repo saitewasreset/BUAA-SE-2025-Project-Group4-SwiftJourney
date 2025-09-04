@@ -13,9 +13,11 @@ members = [
     #"train/api",
     #"hotel/base",
     #"hotel/api",
-    #"dish/base",
-    #"dish/api",
+    "dish/base",
+    "dish/api",
     "object_storage/base",
-    "object_storage/api"
+    "object_storage/api",
+    "order/api",
+    "order/base"
 ]
 resolver = "2"

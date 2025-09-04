@@ -1,16 +1,16 @@
-use crate::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use actix_web::{
     HttpRequest, post,
     web::{self, Bytes},
 };
-use base::application::commands::train_dish::OrderTrainDishCommand;
-use base::application::service::train_dish::{
-    TrainDishApplicationService, TrainDishOrderRequestDTO,
+use dish_base::application::commands::train_dish::{
+    OrderTrainDishCommand, TrainDishOrderRequestDTO,
 };
-use base::application::{
+use dish_base::application::service::train_dish::TrainDishApplicationService;
+use dish_base::application::{
     commands::dish_query::DishQueryDTO,
     service::dish_query::{DishQueryService, TrainDishInfoDTO},
 };
+use shared::api::{ApiResponse, ApplicationErrorBox, get_session_id, parse_request_body};
 use shared::internal::order::dto::TransactionInfoDTO;
 
 #[post("/query")]
