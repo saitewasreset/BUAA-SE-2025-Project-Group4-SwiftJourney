@@ -3,7 +3,3 @@ kind: Kustomization
 namespace: swiftjourney
 resources:
   - ../../base
-images:
-  - name: saitewasreset/swiftjourney-frontend
-    newName: swiftjourney-frontend
-    newTag: local

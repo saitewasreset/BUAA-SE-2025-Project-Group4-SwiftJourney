@@ -97,6 +97,7 @@ data:
         location /api/data/train_type { proxy_pass http://train_upstream; }
         location /api/data/train_number { proxy_pass http://train_upstream; }
         location /api/data/hotel { proxy_pass http://hotel_upstream; }
+        location /api/data/dish_takeaway { proxy_pass http://dish_upstream; }
         location /resource/ { proxy_pass http://object_storage_upstream; }
         location / { proxy_pass http://frontend_upstream; }
       }
