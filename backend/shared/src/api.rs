@@ -87,10 +87,10 @@ pub struct AppConfig {
     pub server_name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T>
 where
-    T: Serialize,
+    T: Serialize + Debug,
 {
     pub code: u32,
     pub message: String,
@@ -99,7 +99,7 @@ where
 
 impl<T> ApiResponse<T>
 where
-    T: Serialize,
+    T: Serialize + Debug,
 {
     pub fn ok(data: T) -> Result<Self, ApplicationErrorBox> {
         Ok(ApiResponse {
@@ -112,7 +112,7 @@ where
 
 impl<T> Responder for ApiResponse<T>
 where
-    T: Serialize,
+    T: Serialize + Debug,
 {
     type Body = BoxBody;
     fn respond_to(self, _for_super_earth: &HttpRequest) -> HttpResponse<Self::Body> {
@@ -126,7 +126,7 @@ where
 
 impl<T> From<Result<T, Box<dyn ApplicationError>>> for ApiResponse<T>
 where
-    T: Serialize,
+    T: Serialize + Debug,
 {
     fn from(value: Result<T, Box<dyn ApplicationError>>) -> Self {
         match value {
@@ -429,7 +429,7 @@ impl SuperClient {
 
     pub async fn get<Return>(&self, api: impl InternalApi) -> Result<Return, InternalApiError>
     where
-        Return: Serialize + DeserializeOwned + Default,
+        Return: Serialize + DeserializeOwned + Default + Debug,
     {
         let response = self.client.get(self.get_url_for_api(api)).send().await?;
 
@@ -442,7 +442,7 @@ impl SuperClient {
             });
         }
 
-        Ok(payload.data.unwrap())
+        Ok(payload.data.unwrap_or_default())
     }
 
     pub async fn post<Data, Return>(
@@ -452,7 +452,7 @@ impl SuperClient {
     ) -> Result<Return, InternalApiError>
     where
         Data: Serialize + DeserializeOwned,
-        Return: Serialize + DeserializeOwned,
+        Return: Serialize + DeserializeOwned + Debug + Default,
     {
         let serialized = serde_json::to_vec(&data).unwrap();
 
@@ -472,6 +472,6 @@ impl SuperClient {
             });
         }
 
-        Ok(payload.data.unwrap())
+        Ok(payload.data.unwrap_or_default())
     }
 }

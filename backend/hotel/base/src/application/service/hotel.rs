@@ -44,7 +44,7 @@ impl ApplicationError for HotelServiceError {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HotelCommentQuotaDTO {
     pub quota: i32,
@@ -59,7 +59,7 @@ pub struct NewHotelCommentDTO {
     pub comment: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HotelGeneralInfoDTO {
     pub hotel_id: Uuid,
@@ -72,7 +72,7 @@ pub struct HotelGeneralInfoDTO {
     pub info: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HotelCommentDTO {
     pub user_name: String,
@@ -81,7 +81,7 @@ pub struct HotelCommentDTO {
     pub comment: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HotelDetailInfoDTO {
     pub hotel_id: String,
@@ -97,7 +97,7 @@ pub struct HotelDetailInfoDTO {
     pub comments: Vec<HotelCommentDTO>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HotelRoomDetailInfoDTO {
     pub capacity: i32,

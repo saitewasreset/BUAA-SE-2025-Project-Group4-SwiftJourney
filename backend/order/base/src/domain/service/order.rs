@@ -9,7 +9,7 @@ pub mod order_dto {
     use serde::Serialize;
     // DTO结构体定义
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct TransactionDataDto {
         pub transaction_id: String,
@@ -20,7 +20,7 @@ pub mod order_dto {
         pub amount: f64,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum OrderInfoDto {
         #[serde(rename = "train")]
@@ -33,7 +33,7 @@ pub mod order_dto {
         Takeaway(TakeawayOrderDto),
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct SeatLocationInfoDTO {
         pub carriage: i32,
@@ -43,7 +43,7 @@ pub mod order_dto {
         pub type_name: String,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct TrainOrderDto {
         // 公共字段
@@ -69,7 +69,7 @@ pub mod order_dto {
         pub seat: Option<SeatLocationInfoDTO>,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct HotelOrderDto {
         #[serde(flatten)]
@@ -82,7 +82,7 @@ pub mod order_dto {
         pub end_date: String,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct DishOrderDto {
         #[serde(flatten)]
@@ -95,7 +95,7 @@ pub mod order_dto {
         pub dish_name: String,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct TakeawayOrderDto {
         #[serde(flatten)]
@@ -110,7 +110,7 @@ pub mod order_dto {
         pub takeaway_name: String,
     }
 
-    #[derive(Serialize, Clone)]
+    #[derive(Serialize, Clone, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct BaseOrderDto {
         pub order_id: String,

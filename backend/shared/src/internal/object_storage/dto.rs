@@ -35,7 +35,7 @@ impl ObjectCategory {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct ObjectInfo {
     pub content_type: String,
     pub data: Vec<u8>,
