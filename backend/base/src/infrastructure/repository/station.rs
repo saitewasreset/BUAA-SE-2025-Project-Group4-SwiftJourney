@@ -12,13 +12,13 @@
 //! - 使用SeaORM实现数据库操作
 //! - 事务支持保证数据一致性
 //! - 详细的错误处理和日志记录
-use crate::domain::DbId;
 use crate::domain::model::city::CityId;
 use crate::domain::model::station::{Station, StationId};
 use crate::domain::repository::station::StationRepository;
+use crate::domain::DbId;
 use crate::domain::{Identifiable, Repository, RepositoryError};
 use crate::infrastructure::repository::transform_list;
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
@@ -415,5 +415,234 @@ impl StationRepositoryImpl {
                 e
             })
             .map_err(RepositoryError::ValidationError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::model::city::CityId;
+    use crate::domain::model::station::StationId;
+    use crate::models::{city, station};
+    use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, Set};
+    use shared::data::StationDataItem;
+
+    /// 初始化内存数据库，创建必要表并插入测试数据
+    async fn setup_repo() -> StationRepositoryImpl {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+
+        // 创建 city 表
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            r#"
+                CREATE TABLE city (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    province TEXT NOT NULL,
+                    name TEXT NOT NULL
+                );
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        // 创建 station 表
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            r#"
+                CREATE TABLE station (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    city_id INTEGER NOT NULL,
+    UNIQUE(name, city_id)
+);
+            "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        // 插入基础城市数据
+        city::ActiveModel {
+            id: Set(1),
+            name: Set("CityA".to_string()),
+            province: Set("ProvinceA".to_string()),
+        }
+        .insert(&db)
+        .await
+        .unwrap()
+        .id;
+
+        // 插入基础车站数据
+        station::ActiveModel {
+            id: Set(1),
+            name: Set("Station1".to_string()),
+            city_id: Set(1),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        StationRepositoryImpl::new(db)
+    }
+
+    #[tokio::test]
+    async fn test_save_and_find_station() {
+        let repo = setup_repo().await;
+
+        let mut station = Station::new(
+            None,
+            "StationX".to_string(),
+            CityId::from_db_value(1).unwrap(),
+        );
+
+        // 正向：保存车站
+        let id = repo.save(&mut station).await.unwrap();
+        assert!(station.get_id().is_some());
+
+        // 正向：根据ID查找
+        let fetched = repo.find(id).await.unwrap();
+        assert!(fetched.is_some());
+        assert_eq!(fetched.unwrap().name(), "StationX");
+
+        // 反向：查找不存在的ID
+        let not_found = repo
+            .find(StationId::from_db_value(999).unwrap())
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_station() {
+        let repo = setup_repo().await;
+
+        let mut station = Station::new(
+            None,
+            "StationY".to_string(),
+            CityId::from_db_value(1).unwrap(),
+        );
+
+        let id = repo.save(&mut station).await.unwrap();
+        assert!(repo.find(id).await.unwrap().is_some());
+
+        // 正向删除
+        repo.remove(station.clone()).await.unwrap();
+        assert!(repo.find(id).await.unwrap().is_none());
+
+        // 反向删除：删除不存在的车站
+        let fake_station = Station::new(
+            Some(StationId::from_db_value(999).unwrap()),
+            "Fake".to_string(),
+            CityId::from_db_value(1).unwrap(),
+        );
+        let res = repo.remove(fake_station).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_load_stations() {
+        let repo = setup_repo().await;
+
+        // 正向：加载所有车站
+        let stations = repo.load().await.unwrap();
+        assert!(!stations.is_empty());
+
+        // 反向：模拟空表
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            r#"
+        CREATE TABLE city (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            province TEXT NOT NULL,
+            name TEXT NOT NULL
+        );
+    "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            r#"
+        CREATE TABLE station (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            city_id INTEGER NOT NULL
+        );
+    "#
+            .to_string(),
+        ))
+        .await
+        .unwrap();
+        let empty_repo = StationRepositoryImpl::new(db);
+        let empty_list = empty_repo.load().await.unwrap();
+        assert!(empty_list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_city() {
+        let repo = setup_repo().await;
+
+        // 正向：已有城市ID
+        let stations = repo
+            .find_by_city(CityId::from_db_value(1).unwrap())
+            .await
+            .unwrap();
+        assert!(!stations.is_empty());
+
+        // 反向：不存在城市ID
+        let empty = repo
+            .find_by_city(CityId::from_db_value(999).unwrap())
+            .await
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_name() {
+        let repo = setup_repo().await;
+
+        // 正向：已存在车站名称
+        let station = repo.find_by_name("Station1").await.unwrap();
+        assert!(station.is_some());
+        assert_eq!(station.unwrap().name(), "Station1");
+
+        // 反向：不存在车站名称
+        let station = repo.find_by_name("NonExistent").await.unwrap();
+        assert!(station.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_raw_station_data() {
+        let repo = setup_repo().await;
+
+        let station_data = vec![
+            StationDataItem {
+                name: "Station1".to_string(),
+                city: "CityA".to_string(),
+            },
+            StationDataItem {
+                name: "Station2".to_string(),
+                city: "CityA".to_string(),
+            },
+        ];
+
+        // 正向：保存原始数据
+        let res = repo.save_raw(station_data).await;
+
+        println!("{:?}", res);
+
+        assert!(res.is_ok());
+
+        // 反向：保存不存在城市的数据
+        let invalid_data = vec![StationDataItem {
+            name: "stationX".to_string(),
+            city: "cityX".to_string(),
+        }];
+        let res = repo.save_raw(invalid_data).await;
+        assert!(res.is_err());
     }
 }
