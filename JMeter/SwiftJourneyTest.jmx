@@ -5,6 +5,8 @@
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="用户定义的变量">
         <collectionProp name="Arguments.arguments"/>
       </elementProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
     </TestPlan>
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Test Users">
@@ -21,7 +23,7 @@
         <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="HTTP Cookie管理器">
           <collectionProp name="CookieManager.cookies"/>
           <boolProp name="CookieManager.clearEachIteration">false</boolProp>
-          <boolProp name="CookieManager.controlledByThreadGroup">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
         </CookieManager>
         <hashTree/>
         <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值">
@@ -170,7 +172,7 @@
           </elementProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="get personalId var">
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="get personalId var" enabled="true">
             <stringProp name="JSONPostProcessor.referenceNames">personalId</stringProp>
             <stringProp name="JSONPostProcessor.jsonPathExprs">$.data[0].personalId</stringProp>
             <stringProp name="JSONPostProcessor.match_numbers"></stringProp>
@@ -224,6 +226,7 @@
           <hashTree/>
         </hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Train Query">
+          <intProp name="HTTPSampler.connect_timeout">120000</intProp>
           <stringProp name="HTTPSampler.path">/api/train/schedule/query_direct</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
@@ -287,16 +290,7 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
 	    if (seatInfo &amp;&amp; !seatInfo.isEmpty()) {
 	        def firstSeatType = seatInfo.keySet().iterator().next()
 	        vars.put(&quot;seatType&quot;, firstSeatType)
-	    } else {
-	        vars.put(&quot;seatType&quot;, &quot;N/A&quot;)
 	    }
-	} else {
-	    // 如果没有解决方案，设置默认值
-	    vars.put(&quot;trainNumber&quot;, &quot;N/A&quot;)
-	    vars.put(&quot;originDepartureTime&quot;, &quot;N/A&quot;)
-	    vars.put(&quot;departureStation&quot;, &quot;N/A&quot;)
-	    vars.put(&quot;arrivalStation&quot;, &quot;N/A&quot;)
-	    vars.put(&quot;seatType&quot;, &quot;N/A&quot;)
 	}
 }
 </stringProp>
@@ -304,13 +298,14 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           </JSR223PostProcessor>
           <hashTree/>
         </hashTree>
-        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="IF 控制器">
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="IF 控制器" enabled="true">
           <stringProp name="IfController.condition">${__jexl3(${solutionsCount} &gt; 0,)}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Book Ticket">
+            <intProp name="HTTPSampler.connect_timeout">120000</intProp>
             <stringProp name="HTTPSampler.path">/api/train/order/new</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
@@ -345,10 +340,19 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
               <stringProp name="JSONPostProcessor.referenceNames">transactionId</stringProp>
               <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.transactionId</stringProp>
               <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+              <stringProp name="JSONPostProcessor.defaultValues">0</stringProp>
             </JSONPostProcessor>
             <hashTree/>
           </hashTree>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="IF 控制器">
+          <stringProp name="IfController.condition">${__groovy(vars.get(&quot;transactionId&quot;) != null &amp;&amp; vars.get(&quot;transactionId&quot;) != &quot;0&quot;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Pay Transaction">
+            <intProp name="HTTPSampler.connect_timeout">120000</intProp>
             <stringProp name="HTTPSampler.path">/api/payment/pay/${transactionId}</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
@@ -416,7 +420,7 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           <stringProp name="filename"></stringProp>
         </ResultCollector>
         <hashTree/>
-        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="汇总报告">
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="汇总报告" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
@@ -453,7 +457,7 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           <stringProp name="filename"></stringProp>
         </ResultCollector>
         <hashTree/>
-        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告">
+        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
@@ -490,7 +494,7 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           <stringProp name="filename"></stringProp>
         </ResultCollector>
         <hashTree/>
-        <ResultCollector guiclass="StatGraphVisualizer" testclass="ResultCollector" testname="汇总图">
+        <ResultCollector guiclass="StatGraphVisualizer" testclass="ResultCollector" testname="汇总图" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
@@ -527,9 +531,9 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           <stringProp name="filename"></stringProp>
         </ResultCollector>
         <hashTree/>
-        <Summariser guiclass="SummariserGui" testclass="Summariser" testname="生成概要结果"/>
+        <Summariser guiclass="SummariserGui" testclass="Summariser" testname="生成概要结果" enabled="true"/>
         <hashTree/>
-        <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="图形结果">
+        <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="图形结果" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
@@ -566,7 +570,7 @@ if (response &amp;&amp; response.trim().startsWith(&apos;{&apos;)) {
           <stringProp name="filename"></stringProp>
         </ResultCollector>
         <hashTree/>
-        <ResultCollector guiclass="RespTimeGraphVisualizer" testclass="ResultCollector" testname="响应时间图">
+        <ResultCollector guiclass="RespTimeGraphVisualizer" testclass="ResultCollector" testname="响应时间图" enabled="true">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
