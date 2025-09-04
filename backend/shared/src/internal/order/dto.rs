@@ -275,7 +275,7 @@ impl From<BaseOrder> for InternalBaseOrderDTO {
 impl From<InternalBaseOrderDTO> for BaseOrder {
     fn from(dto: InternalBaseOrderDTO) -> Self {
         Self::new(
-            dto.order_id.map(|x| OrderId::from(x)),
+            dto.order_id.map(OrderId::from),
             dto.uuid,
             dto.order_status,
             dto.order_time_info.into(),

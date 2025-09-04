@@ -3,6 +3,8 @@ use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
+use shared::messaging::order_status::RabbitMQOrderStatusConsumer;
+use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
 use shared::ports::impls::dish::HttpDishPortImpl;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -20,6 +22,7 @@ use train_base::domain::service::train_schedule::TrainScheduleService;
 use train_base::infrastructure::application::service::train_data::TrainDataServiceImpl;
 use train_base::infrastructure::application::service::train_order::TrainOrderServiceImpl;
 use train_base::infrastructure::application::service::train_query::TrainQueryServiceImpl;
+use train_base::infrastructure::messaging::order_status::TrainOrderStatusConsumer;
 use train_base::infrastructure::repository::route::RouteRepositoryImpl;
 use train_base::infrastructure::repository::seat_availability::SeatAvailabilityRepositoryImpl;
 use train_base::infrastructure::repository::train::TrainRepositoryImpl;
@@ -190,6 +193,18 @@ async fn main() -> std::io::Result<()> {
                 .await;
         });
     }
+
+    let train_order_status_consumer = Box::new(TrainOrderStatusConsumer::new(
+        Arc::clone(&train_booking_service),
+        Arc::clone(&order_port),
+    ));
+
+    let order_status_consumer =
+        vec![train_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
 
     tokio::task::spawn(async move {
         HttpServer::new(move || {

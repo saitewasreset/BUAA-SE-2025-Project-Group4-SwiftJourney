@@ -80,7 +80,7 @@ where
     #[instrument(skip(self))]
     async fn handle_route_updated_event(&self) {
         match self.train_port.db_get_routes().await {
-            Ok(route_list) => {
+            Ok(_route_list) => {
                 //update_route(&self.db, route_list).await;
             }
             Err(e) => {

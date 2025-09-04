@@ -4,14 +4,21 @@ use dish_base::application::service::internal::DishInternalService;
 use dish_base::application::service::train_dish::TrainDishApplicationService;
 use dish_base::infrastructure::application::service::dish_query::DishQueryServiceImpl;
 use dish_base::infrastructure::application::service::train_dish::TrainDishApplicationServiceImpl;
+use dish_base::infrastructure::messaging::consumer::order_status::{
+    DishOrderStatusConsumer, TakeawayOrderStatusConsumer,
+};
 use dish_base::infrastructure::repository::dish::DishRepositoryImpl;
 use dish_base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
+use dish_base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use dish_base::infrastructure::service::event::DishEventServiceImpl;
+use dish_base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::MAX_BODY_LENGTH;
 use shared::event::queue::EventService;
+use shared::messaging::order_status::RabbitMQOrderStatusConsumer;
+use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -141,6 +148,32 @@ async fn main() -> std::io::Result<()> {
 
     let dish_internal_service: web::Data<dyn DishInternalService> =
         web::Data::from(dish_internal_service_impl as Arc<dyn DishInternalService>);
+
+    let dish_booking_service_impl =
+        Arc::new(DishBookingServiceImpl::new(Arc::clone(&order_port_impl)));
+
+    let takeaway_booking_service_impl = Arc::new(TakeawayBookingServiceImpl::new(Arc::clone(
+        &order_port_impl,
+    )));
+
+    let dish_order_status_consumer = Box::new(DishOrderStatusConsumer::new(
+        Arc::clone(&dish_booking_service_impl),
+        Arc::clone(&order_port_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let takeaway_order_status_consumer = Box::new(TakeawayOrderStatusConsumer::new(
+        Arc::clone(&takeaway_booking_service_impl),
+        Arc::clone(&order_port_impl),
+    )) as Box<dyn RabbitMQOrderStatusConsumer>;
+
+    let order_status_consumer = vec![
+        dish_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>,
+        takeaway_order_status_consumer as Box<dyn RabbitMQOrderStatusConsumer>,
+    ];
+
+    let _ = OrderStatusConsumerService::start(&rabbitmq_url, order_status_consumer)
+        .await
+        .expect("Failed to start order status consumer service");
 
     tokio::task::spawn(async move {
         HttpServer::new(move || {
