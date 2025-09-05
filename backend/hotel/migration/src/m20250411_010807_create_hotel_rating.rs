@@ -1,0 +1,45 @@
+use sea_orm_migration::{prelude::*, schema::*};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[derive(DeriveIden)]
+pub enum HotelRating {
+    Table,
+    Id,
+    UserId,
+    HotelId,
+    Time,
+    Rating,
+    Text,
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(HotelRating::Table)
+                    .if_not_exists()
+                    .col(pk_auto(HotelRating::Id))
+                    .col(integer(HotelRating::UserId).not_null())
+                    .col(integer(HotelRating::HotelId).not_null())
+                    .col(timestamp_with_time_zone(HotelRating::Time).not_null())
+                    .col(
+                        decimal_len(HotelRating::Rating, 2, 1)
+                            .not_null()
+                            .check(Expr::col(HotelRating::Rating).between(1.0, 5.0)),
+                    )
+                    .col(string(HotelRating::Text))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(HotelRating::Table).to_owned())
+            .await
+    }
+}

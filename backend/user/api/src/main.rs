@@ -26,7 +26,6 @@
  * Become a Helldiver!
  */
 use actix_web::{App, HttpServer, web};
-use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
@@ -52,6 +51,7 @@ use user_base::infrastructure::service::internal::UserInternalServiceImpl;
 use user_base::infrastructure::service::password::Argon2PasswordServiceImpl;
 use user_base::infrastructure::service::session::SessionManagerServiceImpl;
 use user_base::infrastructure::service::user::UserServiceImpl;
+use user_migration::MigratorTrait;
 
 #[actix_web::main]
 
@@ -67,7 +67,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    user_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 

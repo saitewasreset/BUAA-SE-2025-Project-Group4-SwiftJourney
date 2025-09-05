@@ -26,7 +26,6 @@
  * Become a Helldiver!
  */
 use actix_web::{App, HttpServer, web};
-use migration::MigratorTrait;
 use order_base::application::service::internal::OrderInternalService;
 use order_base::application::service::transaction::TransactionApplicationService;
 use order_base::infrastructure::application::service::transaction::TransactionApplicationServiceImpl;
@@ -37,6 +36,7 @@ use order_base::infrastructure::service::internal::OrderInternalServiceImpl;
 use order_base::infrastructure::service::order::OrderServiceImpl;
 use order_base::infrastructure::service::order_status::OrderStatusManagerServiceImpl;
 use order_base::infrastructure::service::transaction::TransactionServiceImpl;
+use order_migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
@@ -81,7 +81,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    order_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 

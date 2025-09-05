@@ -7,7 +7,7 @@ edition = "2024"
 
 geo_base = { path = "../base" }
 shared = { path = "../../shared" }
-migration = { path = "../../migration" }
+geo_migration = { path = "../migration" }
 
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",

@@ -1838,8 +1838,8 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "dish_base",
+ "dish_migration",
  "dotenvy",
- "migration",
  "sea-orm",
  "shared",
  "tokio",
@@ -1864,6 +1864,14 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "dish_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -2302,7 +2310,7 @@ dependencies = [
  "actix-web",
  "dotenvy",
  "geo_base",
- "migration",
+ "geo_migration",
  "sea-orm",
  "shared",
  "tokio",
@@ -2322,6 +2330,14 @@ dependencies = [
  "shared",
  "thiserror 2.0.12",
  "tracing",
+]
+
+[[package]]
+name = "geo_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -2520,7 +2536,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "hotel_base",
- "migration",
+ "hotel_migration",
  "sea-orm",
  "serde",
  "shared",
@@ -2546,6 +2562,14 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "hotel_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -3524,8 +3548,8 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "dotenvy",
- "migration",
  "order_base",
+ "order_migration",
  "sea-orm",
  "serde",
  "shared",
@@ -3552,6 +3576,14 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "order_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -5747,7 +5779,6 @@ dependencies = [
  "actix-web",
  "chrono",
  "dotenvy",
- "migration",
  "sea-orm",
  "serde",
  "shared",
@@ -5756,6 +5787,7 @@ dependencies = [
  "tracing-actix-web",
  "tracing-subscriber",
  "train_base",
+ "train_migration",
 ]
 
 [[package]]
@@ -5776,6 +5808,14 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "train_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -5852,7 +5892,6 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "dotenvy",
- "migration",
  "sea-orm",
  "serde_json",
  "shared",
@@ -5860,6 +5899,7 @@ dependencies = [
  "tracing-actix-web",
  "tracing-subscriber",
  "user_base",
+ "user_migration",
 ]
 
 [[package]]
@@ -5883,6 +5923,14 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "user_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]

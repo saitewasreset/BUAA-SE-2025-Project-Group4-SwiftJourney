@@ -1,5 +1,4 @@
 use actix_web::{App, HttpServer, web};
-use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
@@ -35,6 +34,8 @@ use train_base::infrastructure::service::train_booking::TrainBookingServiceImpl;
 use train_base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
 use train_base::infrastructure::service::train_seat::TrainSeatServiceImpl;
 use train_base::infrastructure::service::train_type::TrainTypeConfigurationServiceImpl;
+use train_migration::MigratorTrait;
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
@@ -72,7 +73,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    train_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
