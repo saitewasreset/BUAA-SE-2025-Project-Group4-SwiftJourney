@@ -31,7 +31,7 @@ pub struct TrainScheduleDTO {
     pub date: NaiveDate,
     pub origin_departure_time: i32,
     pub route_id: u64,
-    pub seat_availability_map: HashMap<StationRangeDTO, HashMap<SeatTypeDTO, u64>>,
+    pub seat_availability_map: Vec<(StationRangeDTO, Vec<(SeatTypeDTO, u64)>)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
