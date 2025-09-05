@@ -17,3 +17,6 @@ pub mod train_order;
 pub mod train_schedule;
 pub mod transaction;
 pub mod user;
+
+pub mod route;
+pub mod takeaway_shop;

@@ -18,6 +18,10 @@ mod m20250411_010858_create_takeaway_order;
 mod m20250411_011731_seat_type_mapping;
 mod m20250503_052335_create_balance_view;
 
+mod m20250411_010701_create_route;
+
+mod m20250411_010825_create_takeaway_shop;
+
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -41,6 +45,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250411_010858_create_takeaway_order::Migration),
             Box::new(m20250411_011731_seat_type_mapping::Migration),
             Box::new(m20250503_052335_create_balance_view::Migration),
+            Box::new(m20250411_010701_create_route::Migration),
+            Box::new(m20250411_010825_create_takeaway_shop::Migration),
         ]
     }
 }

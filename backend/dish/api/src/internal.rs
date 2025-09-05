@@ -4,7 +4,7 @@ use dish_base::application::service::internal::DishInternalService;
 use shared::api::{ApiResponse, ApplicationErrorBox, parse_request_body};
 use shared::application_error::GeneralError;
 use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
-use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
+use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO, DbTakeawayShopDTO};
 use tracing::error;
 
 #[post("/save_raw_dish")]
@@ -71,9 +71,24 @@ pub async fn db_get_takeaway_dishes(
     ApiResponse::ok(result)
 }
 
+#[get("/db_get_takeaway_shops")]
+pub async fn db_get_takeaway_shops(
+    dish_internal_service: web::Data<dyn DishInternalService>,
+) -> Result<ApiResponse<Vec<DbTakeawayShopDTO>>, ApplicationErrorBox> {
+    let result = dish_internal_service
+        .db_get_takeaway_shops()
+        .await
+        .map_err(|_for_super_earth| {
+            ApplicationErrorBox(GeneralError::InternalServerError.into())
+        })?;
+
+    ApiResponse::ok(result)
+}
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(save_raw_dish)
         .service(save_raw_takeaway)
         .service(db_get_dishes)
-        .service(db_get_takeaway_dishes);
+        .service(db_get_takeaway_dishes)
+        .service(db_get_takeaway_shops);
 }

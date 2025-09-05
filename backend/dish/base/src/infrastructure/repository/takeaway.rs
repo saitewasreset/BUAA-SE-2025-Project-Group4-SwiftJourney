@@ -426,13 +426,23 @@ impl DbRepositorySupport<TakeawayShop> for TakeawayShopRepositoryImpl {
 
 #[async_trait]
 impl TakeawayShopRepository for TakeawayShopRepositoryImpl {
-    async fn load_all_raw(
+    async fn load_all_raw_dish(
         &self,
     ) -> Result<Vec<crate::models::takeaway_dish::Model>, RepositoryError> {
         crate::models::takeaway_dish::Entity::find()
             .all(&self.db)
             .await
             .inspect_err(|e| error!("Failed to load takeaway dish: {:?}", e))
+            .map_err(|e| RepositoryError::Db(e.into()))
+    }
+
+    async fn load_all_raw_shop(
+        &self,
+    ) -> Result<Vec<crate::models::takeaway_shop::Model>, RepositoryError> {
+        crate::models::takeaway_shop::Entity::find()
+            .all(&self.db)
+            .await
+            .inspect_err(|e| error!("Failed to load takeaway shop: {:?}", e))
             .map_err(|e| RepositoryError::Db(e.into()))
     }
 

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use shared::application_error::ApplicationError;
 use shared::domain::RepositoryError;
 use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
-use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
+use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO, DbTakeawayShopDTO};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -37,4 +37,6 @@ pub trait DishInternalService: 'static + Send + Sync {
 
     async fn db_get_dishes(&self) -> Result<Vec<DbDishDTO>, RepositoryError>;
     async fn db_get_takeaway_dishes(&self) -> Result<Vec<DbTakeawayDishDTO>, RepositoryError>;
+
+    async fn db_get_takeaway_shops(&self) -> Result<Vec<DbTakeawayShopDTO>, RepositoryError>;
 }

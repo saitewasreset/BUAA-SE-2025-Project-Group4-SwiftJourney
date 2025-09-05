@@ -6,9 +6,13 @@ use std::collections::HashMap;
 
 #[async_trait]
 pub trait TakeawayShopRepository: Repository<TakeawayShop> {
-    async fn load_all_raw(
+    async fn load_all_raw_dish(
         &self,
     ) -> Result<Vec<crate::models::takeaway_dish::Model>, RepositoryError>;
+
+    async fn load_all_raw_shop(
+        &self,
+    ) -> Result<Vec<crate::models::takeaway_shop::Model>, RepositoryError>;
 
     async fn find_by_train_route(
         &self,

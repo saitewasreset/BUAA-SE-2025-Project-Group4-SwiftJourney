@@ -320,6 +320,7 @@ pub enum DishInternalServiceApi {
     SaveRawTakeaway,
     DbGetDishes,
     DbGetTakeawayDishes,
+    DbGetTakeawayShops,
 }
 
 impl InternalApi for DishInternalServiceApi {
@@ -329,6 +330,7 @@ impl InternalApi for DishInternalServiceApi {
             DishInternalServiceApi::SaveRawTakeaway => "save_raw_takeaway",
             DishInternalServiceApi::DbGetDishes => "db_get_dishes",
             DishInternalServiceApi::DbGetTakeawayDishes => "db_get_takeaway_dishes",
+            DishInternalServiceApi::DbGetTakeawayShops => "db_get_takeaway_shops",
         }
     }
 }

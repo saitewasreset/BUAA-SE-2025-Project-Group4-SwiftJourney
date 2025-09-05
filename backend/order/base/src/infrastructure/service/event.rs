@@ -4,13 +4,16 @@ use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
 use shared::event::queue::{EventService, EventServiceError, get_channel};
 use shared::event::{
     DishUpdatedEvent, EventRegistry, HotelRoomTypeUpdatedEvent, HotelUpdatedEvent,
-    PersonalInfoUpdatedEvent, SeatTypeUpdatedEvent, StationUpdatedEvent, TakeawayDishUpdatedEvent,
-    TrainScheduleUpdatedEvent, TrainUpdatedEvent, UserUpdatedEvent,
+    PersonalInfoUpdatedEvent, RouteUpdatedEvent, SeatTypeUpdatedEvent, StationUpdatedEvent,
+    TakeawayDishUpdatedEvent, TakeawayShopUpdatedEvent, TrainScheduleUpdatedEvent,
+    TrainUpdatedEvent, UserUpdatedEvent,
 };
-use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
+use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO, DbTakeawayShopDTO};
 use shared::internal::geo::dto::DbStationDTO;
 use shared::internal::hotel::dto::{DbHotelDTO, DbHotelRoomTypeDTO};
-use shared::internal::train::dto::{DbSeatTypeDTO, DbTrainDTO, DbTrainScheduleDTO};
+use shared::internal::train::dto::{
+    DbRouteDTO, DbSeatTypeDTO, DbSeatTypeMappingDTO, DbTrainDTO, DbTrainScheduleDTO,
+};
 use shared::internal::user::dto::{DbPersonalInfo, DbUserDTO};
 use shared::ports::dish::DishPort;
 use shared::ports::geo::GeoPort;
@@ -65,6 +68,7 @@ where
         event_registry.register::<UserUpdatedEvent>();
         event_registry.register::<PersonalInfoUpdatedEvent>();
         event_registry.register::<StationUpdatedEvent>();
+        event_registry.register::<RouteUpdatedEvent>();
         event_registry.register::<TrainUpdatedEvent>();
         event_registry.register::<TrainScheduleUpdatedEvent>();
         event_registry.register::<SeatTypeUpdatedEvent>();
@@ -72,6 +76,7 @@ where
         event_registry.register::<HotelRoomTypeUpdatedEvent>();
         event_registry.register::<DishUpdatedEvent>();
         event_registry.register::<TakeawayDishUpdatedEvent>();
+        event_registry.register::<TakeawayShopUpdatedEvent>();
 
         Ok(Arc::new(Self {
             channel,
@@ -155,6 +160,15 @@ where
                 error!("Failed to get db seat types: {:?}", e);
             }
         }
+
+        match self.train_port.db_get_seat_type_mapping().await {
+            Ok(seat_type_mapping_list) => {
+                update_seat_type_mapping(&self.db, seat_type_mapping_list).await;
+            }
+            Err(e) => {
+                error!("Failed to get db seat type mappings: {:?}", e);
+            }
+        }
     }
 
     #[instrument(skip(self))]
@@ -201,6 +215,30 @@ where
             }
             Err(e) => {
                 error!("Failed to get db takeaway dishes: {:?}", e);
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
+    async fn handle_takeaway_shop_updated_event(&self) {
+        match self.dish_port.db_get_takeaway_shops().await {
+            Ok(takeaway_shop_list) => {
+                update_takeaway_shop(&self.db, takeaway_shop_list).await;
+            }
+            Err(e) => {
+                error!("Failed to get db takeaway shops: {:?}", e);
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
+    async fn handle_route_updated_event(&self) {
+        match self.train_port.db_get_routes().await {
+            Ok(route_list) => {
+                update_route(&self.db, route_list).await;
+            }
+            Err(e) => {
+                error!("Failed to get db routes: {:?}", e);
             }
         }
     }
@@ -252,6 +290,10 @@ where
             self.handle_dish_updated_event().await;
         } else if event.downcast_ref::<TakeawayDishUpdatedEvent>().is_some() {
             self.handle_takeaway_dish_updated_event().await;
+        } else if event.downcast_ref::<TakeawayShopUpdatedEvent>().is_some() {
+            self.handle_takeaway_shop_updated_event().await;
+        } else if event.downcast_ref::<RouteUpdatedEvent>().is_some() {
+            self.handle_route_updated_event().await;
         } else {
             warn!("Unknown event type");
         }
@@ -469,6 +511,45 @@ async fn update_seat_type(db: &DatabaseConnection, seat_type_list: Vec<DbSeatTyp
 }
 
 #[instrument(skip_all)]
+async fn update_seat_type_mapping(
+    db: &DatabaseConnection,
+    seat_type_list: Vec<DbSeatTypeMappingDTO>,
+) {
+    let active_model_list = seat_type_list
+        .into_iter()
+        .map(|item| crate::models::seat_type_mapping::ActiveModel {
+            train_type_id: ActiveValue::Set(item.train_type_id),
+            seat_type_id: ActiveValue::Set(item.seat_type_id),
+            seat_id: ActiveValue::Set(item.seat_id),
+            carriage: ActiveValue::Set(item.carriage),
+            row: ActiveValue::Set(item.row),
+            location: ActiveValue::Set(item.location),
+        })
+        .collect::<Vec<_>>();
+
+    let insert_result = crate::models::seat_type_mapping::Entity::insert_many(active_model_list)
+        .on_conflict(
+            OnConflict::columns([
+                crate::models::seat_type_mapping::Column::TrainTypeId,
+                crate::models::seat_type_mapping::Column::SeatTypeId,
+                crate::models::seat_type_mapping::Column::SeatId,
+            ])
+            .update_columns([
+                crate::models::seat_type_mapping::Column::Carriage,
+                crate::models::seat_type_mapping::Column::Row,
+                crate::models::seat_type_mapping::Column::Location,
+            ])
+            .to_owned(),
+        )
+        .exec(db)
+        .await;
+
+    if let Err(err) = insert_result {
+        error!("Error while inserting seat type mapping: {:?}", err);
+    }
+}
+
+#[instrument(skip_all)]
 async fn update_hotel(db: &DatabaseConnection, hotel_list: Vec<DbHotelDTO>) {
     let active_model_list = hotel_list
         .into_iter()
@@ -487,28 +568,30 @@ async fn update_hotel(db: &DatabaseConnection, hotel_list: Vec<DbHotelDTO>) {
         })
         .collect::<Vec<_>>();
 
-    let insert_result = crate::models::hotel::Entity::insert_many(active_model_list)
-        .on_conflict(
-            OnConflict::column(crate::models::hotel::Column::Id)
-                .update_columns([
-                    crate::models::hotel::Column::Uuid,
-                    crate::models::hotel::Column::Name,
-                    crate::models::hotel::Column::CityId,
-                    crate::models::hotel::Column::StationId,
-                    crate::models::hotel::Column::Address,
-                    crate::models::hotel::Column::Phone,
-                    crate::models::hotel::Column::Images,
-                    crate::models::hotel::Column::TotalRatingCount,
-                    crate::models::hotel::Column::TotalBookingCount,
-                    crate::models::hotel::Column::Info,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::hotel::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::hotel::Column::Id)
+                    .update_columns([
+                        crate::models::hotel::Column::Uuid,
+                        crate::models::hotel::Column::Name,
+                        crate::models::hotel::Column::CityId,
+                        crate::models::hotel::Column::StationId,
+                        crate::models::hotel::Column::Address,
+                        crate::models::hotel::Column::Phone,
+                        crate::models::hotel::Column::Images,
+                        crate::models::hotel::Column::TotalRatingCount,
+                        crate::models::hotel::Column::TotalBookingCount,
+                        crate::models::hotel::Column::Info,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
 
-    if let Err(err) = insert_result {
-        error!("Error while inserting hotel: {:?}", err);
+        if let Err(err) = insert_result {
+            error!("Error while inserting hotel: {:?}", err);
+        }
     }
 }
 
@@ -616,6 +699,76 @@ async fn update_takeaway_dish(db: &DatabaseConnection, takeaway_dish_list: Vec<D
 
         if let Err(err) = insert_result {
             error!("Error while inserting takeaway dish: {:?}", err);
+        }
+    }
+}
+
+#[instrument(skip_all)]
+async fn update_takeaway_shop(db: &DatabaseConnection, takeaway_shop_list: Vec<DbTakeawayShopDTO>) {
+    let active_model_list = takeaway_shop_list
+        .into_iter()
+        .map(|item| crate::models::takeaway_shop::ActiveModel {
+            id: ActiveValue::Set(item.id),
+            uuid: ActiveValue::Set(item.uuid),
+            name: ActiveValue::Set(item.name),
+            station_id: ActiveValue::Set(item.station_id),
+            images: ActiveValue::Set(item.images),
+        })
+        .collect::<Vec<_>>();
+
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::takeaway_shop::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::takeaway_shop::Column::Id)
+                    .update_columns([
+                        crate::models::takeaway_shop::Column::Uuid,
+                        crate::models::takeaway_shop::Column::Name,
+                        crate::models::takeaway_shop::Column::StationId,
+                        crate::models::takeaway_shop::Column::Images,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
+
+        if let Err(err) = insert_result {
+            error!("Error while inserting takeaway shop: {:?}", err);
+        }
+    }
+}
+
+#[instrument(skip_all)]
+async fn update_route(db: &DatabaseConnection, route_list: Vec<DbRouteDTO>) {
+    let active_model_list = route_list
+        .into_iter()
+        .map(|item| crate::models::route::ActiveModel {
+            id: ActiveValue::Set(item.id),
+            line_id: ActiveValue::Set(item.line_id),
+            station_id: ActiveValue::Set(item.station_id),
+            arrival_time: ActiveValue::Set(item.arrival_time),
+            departure_time: ActiveValue::Set(item.departure_time),
+            order: ActiveValue::Set(item.order),
+        })
+        .collect::<Vec<_>>();
+
+    for chunk in active_model_list.chunks(DB_CHUNK_SIZE) {
+        let insert_result = crate::models::route::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                OnConflict::column(crate::models::route::Column::Id)
+                    .update_columns([
+                        crate::models::route::Column::LineId,
+                        crate::models::route::Column::StationId,
+                        crate::models::route::Column::ArrivalTime,
+                        crate::models::route::Column::DepartureTime,
+                        crate::models::route::Column::Order,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await;
+
+        if let Err(err) = insert_result {
+            error!("Error while inserting route: {:?}", err);
         }
     }
 }
