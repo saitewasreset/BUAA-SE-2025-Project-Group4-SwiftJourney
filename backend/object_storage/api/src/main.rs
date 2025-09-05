@@ -4,7 +4,6 @@ use std::{
 };
 
 use actix_web::{App, HttpServer, web};
-use migration::MigratorTrait;
 use object_storage_api::resource;
 use object_storage_base::{
     application::service::internal::ObjectStorageInternalService,
@@ -13,7 +12,6 @@ use object_storage_base::{
         internal::ObjectStorageInternalServiceImpl, object_storage::S3ObjectStorageServiceImpl,
     },
 };
-use sea_orm::Database;
 use shared::api::read_file_env;
 use shared::api::{AppConfig, MAX_BODY_LENGTH};
 use tracing::error;
@@ -27,8 +25,6 @@ async fn main() -> std::io::Result<()> {
 
     let server_name = read_file_env("SERVER_NAME").expect("cannot get server name");
 
-    let database_url = read_file_env("DATABASE_URL").expect("cannot get database url");
-
     let mini_io_endpoint = read_file_env("MINIO_ENDPOINT").expect("cannot get minio endpoint");
     let mini_io_access_key =
         read_file_env("MINIO_ACCESS_KEY").expect("cannot get minio access key");
@@ -40,14 +36,6 @@ async fn main() -> std::io::Result<()> {
         Err(VarError::NotPresent) => false,
         Err(VarError::NotUnicode(_)) => true,
     };
-
-    let conn = Database::connect(&database_url)
-        .await
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
-
-    migration::Migrator::up(&conn, None)
-        .await
-        .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
     let app_config = AppConfig {
         debug: debug_mode,

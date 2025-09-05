@@ -9,9 +9,11 @@ use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, TransactionTrait};
 use shared::domain::model::station::StationId;
 use shared::domain::model::train::TrainId;
 use shared::event::queue::EventService;
-use shared::event::{DishUpdatedEvent, EventPackage, TakeawayDishUpdatedEvent};
+use shared::event::{
+    DishUpdatedEvent, EventPackage, TakeawayDishUpdatedEvent, TakeawayShopUpdatedEvent,
+};
 use shared::internal::dish::command::{SaveRawDishCommand, SaveRawTakeawayCommand};
-use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO};
+use shared::internal::dish::dto::{DbDishDTO, DbTakeawayDishDTO, DbTakeawayShopDTO};
 use shared::{
     DB_CHUNK_SIZE, MicroService,
     domain::{
@@ -305,6 +307,17 @@ where
             .event_service
             .publish_event(EventPackage::new(
                 MicroService::Dish,
+                TakeawayShopUpdatedEvent,
+            ))
+            .await
+        {
+            error!("failed to publish takeaway shop updated event: {:?}", e);
+        }
+
+        if let Err(e) = self
+            .event_service
+            .publish_event(EventPackage::new(
+                MicroService::Dish,
                 TakeawayDishUpdatedEvent,
             ))
             .await
@@ -339,7 +352,7 @@ where
     async fn db_get_takeaway_dishes(&self) -> Result<Vec<DbTakeawayDishDTO>, RepositoryError> {
         let result = self
             .takeaway_shop_repository
-            .load_all_raw()
+            .load_all_raw_dish()
             .await
             .inspect_err(|e| error!("Failed to load takeaway dish: {:?}", e))?;
 
@@ -351,6 +364,25 @@ where
                 dish_type: x.dish_type,
                 price: x.price,
                 takeaway_shop_id: x.takeaway_shop_id,
+                images: x.images,
+            })
+            .collect())
+    }
+
+    async fn db_get_takeaway_shops(&self) -> Result<Vec<DbTakeawayShopDTO>, RepositoryError> {
+        let result = self
+            .takeaway_shop_repository
+            .load_all_raw_shop()
+            .await
+            .inspect_err(|e| error!("Failed to load takeaway shop: {:?}", e))?;
+
+        Ok(result
+            .into_iter()
+            .map(|x| DbTakeawayShopDTO {
+                id: x.id,
+                uuid: x.uuid,
+                name: x.name,
+                station_id: x.station_id,
                 images: x.images,
             })
             .collect())

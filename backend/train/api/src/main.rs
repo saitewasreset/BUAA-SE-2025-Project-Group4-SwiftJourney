@@ -34,6 +34,8 @@ use train_base::infrastructure::service::train_booking::TrainBookingServiceImpl;
 use train_base::infrastructure::service::train_schedule::TrainScheduleServiceImpl;
 use train_base::infrastructure::service::train_seat::TrainSeatServiceImpl;
 use train_base::infrastructure::service::train_type::TrainTypeConfigurationServiceImpl;
+use train_migration::MigratorTrait;
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
@@ -70,6 +72,10 @@ async fn main() -> std::io::Result<()> {
     let conn = Database::connect(&database_url)
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+
+    train_migration::Migrator::up(&conn, None)
+        .await
+        .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
     // Repositories
     let train_repo = Arc::new(TrainRepositoryImpl::new(conn.clone()));

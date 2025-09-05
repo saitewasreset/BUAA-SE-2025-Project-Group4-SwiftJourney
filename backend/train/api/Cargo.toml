@@ -6,8 +6,7 @@ edition = "2024"
 [dependencies]
 train_base = { path = "../base" }
 shared = { path = "../../shared" }
-
-thiserror = "1.0"
+train_migration = { path = "../migration" }
 
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",
@@ -17,12 +16,10 @@ sea-orm = { version = "1.1", features = [
 
 actix-web = { version = "4.4", features = ["cookies"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-actix-web = "0.7"
-uuid = { version = "1.4", features = ["v4"] }
 chrono = "0.4"
 
 dotenvy = "0.15"

@@ -80,8 +80,8 @@ where
     #[instrument(skip(self))]
     async fn handle_route_updated_event(&self) {
         match self.train_port.db_get_routes().await {
-            Ok(_route_list) => {
-                //update_route(&self.db, route_list).await;
+            Ok(route_list) => {
+                update_route(&self.db, route_list).await;
             }
             Err(e) => {
                 error!("Failed to get db route list: {:?}", e);

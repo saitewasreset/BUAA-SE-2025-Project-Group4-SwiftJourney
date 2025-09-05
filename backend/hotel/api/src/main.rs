@@ -18,13 +18,13 @@ use hotel_base::infrastructure::service::event::HotelEventServiceImpl;
 use hotel_base::infrastructure::service::hotel_booking::HotelBookingServiceImpl;
 use hotel_base::infrastructure::service::hotel_query::HotelQueryServiceImpl;
 use hotel_base::infrastructure::service::hotel_rating::HotelRatingServiceImpl;
-use migration::MigratorTrait;
+use hotel_migration::MigratorTrait;
 use sea_orm::{Database, DatabaseConnection};
-use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
 use shared::MicroService;
 use shared::api::{AppConfig, MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
 use shared::messaging::order_status::RabbitMQOrderStatusConsumer;
+use shared::messaging::order_status_consumer_service::OrderStatusConsumerService;
 use shared::ports::impls::geo::HttpGeoPortImpl;
 use shared::ports::impls::object_storage::HttpObjectStoragePortImpl;
 use shared::ports::impls::order::HttpOrderPortImpl;
@@ -62,7 +62,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    hotel_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 

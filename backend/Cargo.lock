@@ -1169,7 +1169,7 @@ dependencies = [
  "bitflags 2.9.0",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
+ "itertools",
  "lazy_static",
  "lazycell",
  "log",
@@ -1836,58 +1836,42 @@ dependencies = [
 name = "dish_api"
 version = "0.1.0"
 dependencies = [
- "actix-files",
  "actix-web",
- "actix-ws",
- "chrono",
  "dish_base",
+ "dish_migration",
  "dotenvy",
- "dyn-fmt",
- "migration",
  "sea-orm",
- "serde",
- "serde_json",
  "shared",
- "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
  "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
 name = "dish_base"
 version = "0.1.0"
 dependencies = [
- "actix-ws",
  "anyhow",
- "argon2",
  "async-trait",
- "aws-sdk-s3",
  "chrono",
- "claims",
- "dashmap",
- "dyn-clone",
- "dyn-fmt",
- "email_address",
- "id_macro",
  "lapin",
- "mockall",
- "petgraph 0.8.1",
- "phf",
- "regex",
  "rust_decimal",
  "sea-orm",
  "serde",
  "serde_json",
  "shared",
  "thiserror 2.0.12",
- "tokio",
- "tokio-stream",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "dish_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -2323,26 +2307,15 @@ dependencies = [
 name = "geo_api"
 version = "0.1.0"
 dependencies = [
- "actix-files",
  "actix-web",
- "actix-ws",
- "anyhow",
- "chrono",
  "dotenvy",
- "dyn-fmt",
  "geo_base",
- "migration",
+ "geo_migration",
  "sea-orm",
- "serde",
- "serde_json",
  "shared",
- "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
- "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
@@ -2354,11 +2327,17 @@ dependencies = [
  "id_macro",
  "lapin",
  "sea-orm",
- "serde",
  "shared",
  "thiserror 2.0.12",
- "tokio",
  "tracing",
+]
+
+[[package]]
+name = "geo_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -2557,10 +2536,9 @@ dependencies = [
  "chrono",
  "dotenvy",
  "hotel_base",
- "migration",
+ "hotel_migration",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
  "tokio",
  "tracing-actix-web",
@@ -2572,34 +2550,26 @@ dependencies = [
 name = "hotel_base"
 version = "0.1.0"
 dependencies = [
- "actix-ws",
  "anyhow",
- "argon2",
  "async-trait",
- "aws-sdk-s3",
  "chrono",
- "claims",
- "dashmap",
- "dyn-clone",
- "dyn-fmt",
- "email_address",
- "id_macro",
  "lapin",
- "mockall",
- "petgraph 0.8.1",
- "phf",
- "regex",
- "reqwest",
  "rust_decimal",
  "sea-orm",
  "serde",
  "serde_json",
  "shared",
  "thiserror 2.0.12",
- "tokio",
- "tokio-stream",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "hotel_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -3063,15 +3033,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3477,21 +3438,11 @@ dependencies = [
 name = "object_storage_api"
 version = "0.1.0"
 dependencies = [
- "actix-files",
  "actix-web",
- "actix-ws",
- "chrono",
  "dotenvy",
- "dyn-fmt",
- "migration",
  "object_storage_base",
- "sea-orm",
- "serde",
- "serde_json",
  "shared",
- "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
  "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
@@ -3595,22 +3546,14 @@ dependencies = [
 name = "order_api"
 version = "0.1.0"
 dependencies = [
- "actix-files",
  "actix-web",
- "actix-ws",
- "chrono",
  "dotenvy",
- "dyn-fmt",
- "migration",
  "order_base",
+ "order_migration",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
- "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
- "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
  "uuid",
@@ -3620,33 +3563,27 @@ dependencies = [
 name = "order_base"
 version = "0.1.0"
 dependencies = [
- "actix-ws",
  "anyhow",
- "argon2",
  "async-trait",
- "aws-sdk-s3",
  "chrono",
- "claims",
- "dashmap",
- "dyn-clone",
- "dyn-fmt",
- "email_address",
  "id_macro",
  "lapin",
- "mockall",
- "petgraph 0.8.1",
- "phf",
- "regex",
  "rust_decimal",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
  "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "order_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -5844,15 +5781,13 @@ dependencies = [
  "dotenvy",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
- "thiserror 1.0.69",
  "tokio",
  "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
  "train_base",
- "uuid",
+ "train_migration",
 ]
 
 [[package]]
@@ -5862,20 +5797,25 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "id_macro",
- "itertools 0.13.0",
  "lapin",
  "log",
  "petgraph 0.6.5",
  "rust_decimal",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "train_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]
@@ -5950,58 +5890,47 @@ dependencies = [
 name = "user_api"
 version = "0.1.0"
 dependencies = [
- "actix-files",
  "actix-web",
- "actix-ws",
- "chrono",
  "dotenvy",
- "dyn-fmt",
- "migration",
  "sea-orm",
- "serde",
  "serde_json",
  "shared",
- "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
- "tracing",
  "tracing-actix-web",
  "tracing-subscriber",
  "user_base",
- "uuid",
+ "user_migration",
 ]
 
 [[package]]
 name = "user_base"
 version = "0.1.0"
 dependencies = [
- "actix-ws",
  "anyhow",
  "argon2",
  "async-trait",
- "aws-sdk-s3",
  "chrono",
  "claims",
  "dashmap",
- "dyn-clone",
- "dyn-fmt",
  "email_address",
  "id_macro",
  "lapin",
  "mockall",
- "petgraph 0.8.1",
- "phf",
- "regex",
- "rust_decimal",
  "sea-orm",
  "serde",
- "serde_json",
  "shared",
  "thiserror 2.0.12",
  "tokio",
- "tokio-stream",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "user_migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
 ]
 
 [[package]]

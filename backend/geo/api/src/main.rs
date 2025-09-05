@@ -7,7 +7,7 @@ use geo_base::infrastructure::service::event::GeoEventServiceImpl;
 use geo_base::infrastructure::service::geo::GeoServiceImpl;
 use geo_base::infrastructure::service::internal::GeoInternalServiceImpl;
 use geo_base::infrastructure::service::station::StationServiceImpl;
-use migration::MigratorTrait;
+use geo_migration::MigratorTrait;
 use sea_orm::Database;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
 use shared::event::queue::EventService;
@@ -26,7 +26,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    geo_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 

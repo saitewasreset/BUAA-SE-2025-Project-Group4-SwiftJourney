@@ -12,7 +12,7 @@ use dish_base::infrastructure::repository::takeaway::TakeawayShopRepositoryImpl;
 use dish_base::infrastructure::service::dish_booking::DishBookingServiceImpl;
 use dish_base::infrastructure::service::event::DishEventServiceImpl;
 use dish_base::infrastructure::service::takeaway_booking::TakeawayBookingServiceImpl;
-use migration::MigratorTrait;
+use dish_migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::MAX_BODY_LENGTH;
@@ -68,7 +68,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    migration::Migrator::up(&conn, None)
+    dish_migration::Migrator::up(&conn, None)
         .await
         .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 

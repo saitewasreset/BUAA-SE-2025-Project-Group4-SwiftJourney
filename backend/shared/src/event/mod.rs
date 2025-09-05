@@ -504,3 +504,12 @@ impl Event for TakeawayDishUpdatedEvent {
         "takeaway_dish_updated_event".to_string()
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TakeawayShopUpdatedEvent;
+
+impl Event for TakeawayShopUpdatedEvent {
+    fn event_type() -> EventType {
+        "takeaway_shop_updated_event".to_string()
+    }
+}

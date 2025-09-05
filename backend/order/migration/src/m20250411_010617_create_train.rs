@@ -1,0 +1,39 @@
+use sea_orm_migration::{prelude::*, schema::*};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[derive(DeriveIden)]
+pub enum Train {
+    Table,
+    Id,
+    Number,
+    TypeId,
+    DefaultOriginDepartureTime,
+    DefaultLineId,
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Train::Table)
+                    .if_not_exists()
+                    .col(pk_auto(Train::Id))
+                    .col(string(Train::Number).not_null().unique_key())
+                    .col(integer(Train::TypeId).not_null())
+                    .col(integer(Train::DefaultOriginDepartureTime))
+                    .col(big_integer(Train::DefaultLineId))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Train::Table).to_owned())
+            .await
+    }
+}

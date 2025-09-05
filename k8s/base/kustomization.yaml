@@ -6,7 +6,12 @@ resources:
   - secrets.yaml
   - configmap.yaml
   - storage.yaml
-  - db.yaml
+  - db-user.yaml
+  - db-geo.yaml
+  - db-train.yaml
+  - db-hotel.yaml
+  - db-dish.yaml
+  - db-order.yaml
   - redis.yaml
   - rabbitmq.yaml
   - minio.yaml
