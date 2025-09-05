@@ -46,6 +46,8 @@ docker build -f frontend/Dockerfile -t saitewasreset/swiftjourney-frontend:v0.1.
 ## 3. 应用清单
 
 ```bash
+# 首先运行 metrics-server 统计使用率
+kubectl pply -f k8s/bse/metrics-server-officil.yaml
 kubectl apply -k k8s/overlays/local
 ```
 
