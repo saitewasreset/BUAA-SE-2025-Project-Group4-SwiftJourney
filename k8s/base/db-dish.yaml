@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db-dish
+  namespace: swiftjourney
+spec:
+  serviceName: db-dish
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-dish
+  template:
+    metadata:
+      labels:
+        app: db-dish
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: app-secrets, key: POSTGRES_DB } }
+            - name: TZ
+              valueFrom: { configMapKeyRef: { name: app-config, key: TZ } }
+            - name: LANG
+              valueFrom: { configMapKeyRef: { name: app-config, key: LANG } }
+            - name: POSTGRES_INITDB_ARGS
+              valueFrom: { configMapKeyRef: { name: app-config, key: POSTGRES_INITDB_ARGS } }
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data-dish
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-dish
+  namespace: swiftjourney
+spec:
+  selector:
+    app: db-dish
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-dish
+  namespace: swiftjourney
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
