@@ -5747,6 +5747,7 @@ dependencies = [
  "actix-web",
  "chrono",
  "dotenvy",
+ "migration",
  "sea-orm",
  "serde",
  "shared",

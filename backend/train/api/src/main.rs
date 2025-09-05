@@ -1,4 +1,5 @@
 use actix_web::{App, HttpServer, web};
+use migration::MigratorTrait;
 use sea_orm::Database;
 use shared::MicroService;
 use shared::api::{MAX_BODY_LENGTH, read_file_env};
@@ -70,6 +71,10 @@ async fn main() -> std::io::Result<()> {
     let conn = Database::connect(&database_url)
         .await
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+
+    migration::Migrator::up(&conn, None)
+        .await
+        .unwrap_or_else(|_| panic!("Error applying migration to {}", database_url));
 
     // Repositories
     let train_repo = Arc::new(TrainRepositoryImpl::new(conn.clone()));
