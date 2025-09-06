@@ -17,7 +17,7 @@
 
 ## 代码结构
 
-```
+```text
 ├── src/
 │   ├── api/         # API 请求模块
 │   ├── assets/      # 静态资源（图片、样式等）
@@ -80,13 +80,13 @@ npm run test:e2e
 
 本项目提供了 `Dockerfile` 用于构建生产环境的 Docker 镜像。该镜像基于 Nginx，用于托管构建好的前端静态文件。
 
-1.  构建镜像:
+1. 构建镜像:
 
     ```bash
     docker build -t frontend-app .
     ```
 
-2.  运行容器:
+2. 运行容器:
 
     ```bash
     docker run -d -p 80:80 frontend-app
