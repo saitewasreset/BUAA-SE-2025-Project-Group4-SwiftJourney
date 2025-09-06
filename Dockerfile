@@ -32,14 +32,14 @@ RUN ./upx-4.2.4-amd64_linux/upx --best target/release/api
 # build stage
 FROM node:alpine AS build-deps
 WORKDIR /app
-RUN --mount=type=bind,source=./SwiftJourney-Front-End/package.json,target=package.json \
-    --mount=type=bind,source=./SwiftJourney-Front-End/package-lock.json,target=package-lock.json \
+RUN --mount=type=bind,source=./frontend/package.json,target=package.json \
+    --mount=type=bind,source=./frontend/package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
     npm ci
 
 FROM build-deps AS fbuild
 
-COPY ./SwiftJourney-Front-End ./
+COPY ./frontend ./
 RUN npm run build
 
 # production stage
