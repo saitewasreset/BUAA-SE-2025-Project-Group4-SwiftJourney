@@ -1,12 +1,44 @@
-# SwiftJourney 后端
+# “风行旅途”后端项目
+
+本项目是“风行旅途”在线火车购票旅游系统的后端部分，基于 Rust 开发。
+
+本项目支持的最低 Rust 版本（MSRV）为：1.89.0
+
+## 技术栈
+
+- 编程语言: [Rust](https://www.rust-lang.org/)
+- Web 框架: [Actix Web](https://actix.rs/)
+- 消息队列: [RabbitMQ](https://www.rabbitmq.com/)
+- 数据库: [PostgreSQL](https://www.postgresql.org)
+- ORM: [SeaORM](https://www.sea-ql.org/SeaORM/)
+- 对象存储: [Axios](https://axios-http.com/)
+
+## 代码结构
+
+```text
+├── apps                # 单体应用：提供API接口，包含HTTP服务器
+├── base                # 单体应用：业务逻辑，包含Application Service、Domain Service、Repository等
+├── dish                # 微服务：火车餐微服务
+├── geo                 # 微服务：地理信息微服务
+├── hotel               # 微服务：酒店查询及预订微服务
+├── id_macro            # 过程宏，用于定义Entity ID类型
+├── migration           # 单体应用：数据库Migration
+├── object_storage      # 微服务：对象存储微服务
+├── order               # 微服务：订单与交易管理微服务
+├── shared              # 单体应用与微服务共用：Entity、Domain Event、内部API、消息传递等
+├── train               # 微服务：火车查询与预订微服务
+└── user                # 微服务：用户与身份信息微服务
+```
+
+微服务拆分细节见`services.md`
 
 ## 调试
 
-### 直接运行（增量构建速度快，需配置环境）
+### 直接运行（仅单体，增量构建速度快，需配置环境）
 
 #### 环境要求
 
-- [Rust 工具链 1.86.0+](https://www.rust-lang.org/learn/get-started)
+- [Rust 工具链](https://www.rust-lang.org/learn/get-started)
 
 #### 构建后端
 
@@ -42,7 +74,7 @@ Release 模式（启用优化）：`cargo run --release --bin api`
 
 后端启动后，将监听`8080`端口。
 
-### Docker 运行（增量构建速度慢，无需配置环境）
+### Docker 运行（仅单体，增量构建速度慢，无需配置环境）
 
 #### 编译 Docker 镜像（注意，若修改了后端代码，需要重新编译）
 
@@ -65,6 +97,10 @@ docker compose up
 打开`docker-compose.yaml`配置文件，将其中的`SERVER_NAME`替换为**前端**访问后端服务时的**域名**，**含端口号**。
 
 例如，前端通过`http://127.0.0.1:8080/api/xxx`访问后端，则将`SERVER_NAME`设置为`127.0.0.1:8080`。
+
+### 微服务
+
+若要调试微服务版本的后端，请使用项目根目录的`./docker-compose.yaml`文件。
 
 ## 配置 MinIO 密钥（只需在第一次启动时配置）
 
